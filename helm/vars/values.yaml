@@ -1,0 +1,29 @@
+hedra:
+  image:
+    repository: registry.gitlab.com/thezebra/infrastructure/performance-testing
+  bootstrap:
+    replicas: 1
+    leaders: 1
+  leader:
+    persona: simple
+    engine: http
+    execution_mode: ephemeral-leader
+    log_level: debug
+  worker:
+    persona: simple
+    engine: http
+    execution_mode: ephemeral-worker
+    log_level: info
+    workers: "4"
+  actions_filepath: /data/actions.json
+  config_filepath: /data/config.json
+  reporter_config_path: /data/reporter.json
+  uwsgi_ini_path: /uwsgi/hedra_updates_uwsgi.ini
+  live_progress_updates: "false"
+statserve:
+  replicas: 1
+  image:
+    repository: registry.gitlab.com/thezebra/libraries/zebra-statserve
+  statserve_streams_path: /data/streams.json
+  statserve_server_path: /data/server.json
+  log_level: debug

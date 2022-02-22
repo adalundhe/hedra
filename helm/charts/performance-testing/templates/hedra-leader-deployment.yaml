@@ -1,0 +1,90 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: performance-testing-dev
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  labels:
+    role: hedra
+    name: leader
+spec:
+  # selector:
+  #   matchLabels:
+  #     role: hedra
+  #     name: leader
+  parallelism: {{ (int .Values.hedra.bootstrap.leaders) }}
+  # completions: 1
+  template:
+    metadata:
+      labels:
+        role: hedra
+        name: leader
+    spec:
+      containers:
+      - image: hedra:latest
+        imagePullPolicy: Never
+        name: hedra
+        envFrom:
+          - configMapRef:
+              name: hedra-cm
+        env:
+          # - name: DD_API_KEY
+          #   valueFrom:
+          #     secretKeyRef:
+          #       name: hedra-datadog
+          #       key: DD_API_KEY
+          # - name: DD_APP_KEY
+          #   valueFrom:
+          #     secretKeyRef:
+          #       name: hedra-datadog
+          #       key: DD_APP_KEY
+          - name: RUNNER_MODE
+            value: ephemeral-leader
+          - name: AUTOMATE_MODE
+            value: hedra
+          - name: GRPC_DNS_RESOLVER
+            value: native
+          - name: LEADER_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: LOG_LEVEL
+            value: info
+          - name: STATSERVE_SERVER_HOST
+            value: performance-testing-statserve
+          - name: BOOTSTRAP_IP
+            value: performance-testing-bootstrap-dev
+          - name: DISCOVERY_MODE
+            value: {{ .Values.hedra.leader.discovery_mode }}
+          - name: KUBE_CONFIG_FILEPATH
+            value: {{ .Values.hedra.leader.kube_config_filepath }}
+          - name: KUBE_CONFIG_CONTEXT
+            value: {{ .Values.hedra.leader.kube_config_context }}
+        volumeMounts:
+          - mountPath: /data
+            name: hedra-files
+        ports:
+            - containerPort: 6669
+              name: leader-comm
+            - containerPort: 6670
+              name: worker-comm
+            - containerPort: 6671
+              name: update-comm
+            - containerPort: 8711
+              name: bootstrap-comm
+            - containerPort: 9001
+              name: statserve-in
+            - containerPort: 9002
+              name: nginx-out
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      restartPolicy: Never
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 60
+      volumes:
+      - name: hedra-files
+        configMap:
+          name: hedra-files-cm
+          

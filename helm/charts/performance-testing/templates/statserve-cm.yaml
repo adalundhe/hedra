@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: performance-testing-statserve-cm
+data:
+  STREAMS_FILE_PATH: {{ .Values.statserve.statserve_streams_path | quote }}
+  SERVER_CONFIG_PATH: {{ .Values.statserve.statserve_server_path | quote }}

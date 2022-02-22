@@ -1,0 +1,37 @@
+{
+    "executor_config": {
+        "no_run_visuals": true,
+        "total_time": "00:01:00",
+        "batch_size": 30000,
+        "batch_time": 30,
+        "engine": "fast-http",
+        "job_timeout": 650,
+        "warmup": 60
+    },
+    "distributed_config": {
+    },
+    "reporter_config": {
+        "update_connector_type": "statserve",
+        "fetch_connector_type": "statserve",
+        "submit_connector_type": "statserve",
+        "update_config": {
+            "stream_config": {
+                "stream_name": "hedra",
+                "fields": {}
+            }
+        },
+        "fetch_config": {
+            "stream_config": {
+                "stream_name": "hedra",
+                "fields": {}
+            }
+        },
+        "submit_config": {
+            "save_to_file": false,
+            "stream_config": {
+                "stream_name": "hedra",
+                "fields": {}
+            }
+        }
+    }
+}

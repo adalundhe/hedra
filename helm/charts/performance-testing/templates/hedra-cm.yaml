@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hedra-cm
+data:
+  ACTIONS_FILEPATH: {{ .Values.hedra.actions_filepath | quote }}
+  CONFIG_FILEPATH: {{ .Values.hedra.config_filepath | quote }}
+  REPORTER_CONFIG_PATH: {{ .Values.hedra.reporter_config_path | quote }}
+  WORKERS: {{ .Values.hedra.worker.workers | quote }}
+  LIVE_PROGRESS_UPDATES: {{ .Values.hedra.live_progress_updates | quote }}

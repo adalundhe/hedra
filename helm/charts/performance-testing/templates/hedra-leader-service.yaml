@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: performance-testing-dev
+  labels:
+    role: hedra
+    name: leader
+spec:
+  ports:
+  - port: 6669
+    name: leader-comm
+  - port: 6670
+    name: worker-comm
+  - port: 6671
+    name: updates-comm
+  - port: 8711
+    name: bootstrap-comm
+  - port: 9001
+    name: statserve-out
+  - port: 9002
+    name: nginx-out
+  selector:
+    role: hedra
+    name: leader
+  type: ClusterIP

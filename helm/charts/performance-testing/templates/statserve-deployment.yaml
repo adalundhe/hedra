@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+#apiVersion: batch/v1
+kind: Deployment
+metadata:
+  name: performance-testing-statserve
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  labels:
+    role: hedra
+    name: statserve
+spec:
+  replicas: {{ (int .Values.statserve.replicas) }} 
+  selector:
+    matchLabels:
+      role: hedra
+      name: statserve
+  template:
+    metadata:
+      labels:
+        role: hedra
+        name: statserve
+    spec:
+      containers:
+      - image: hedra:latest
+        imagePullPolicy: Never
+        name: statserve
+        envFrom:
+          - configMapRef:
+              name: performance-testing-statserve-cm
+        env:
+          - name: AUTOMATE_MODE
+            value: statserve
+          - name: GRPC_DNS_RESOLVER
+            value: native
+        volumeMounts:
+          - mountPath: /data
+            name: statserve-files
+        ports:
+            - containerPort: 9001
+              name: statserve-out
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 60
+      volumes:
+      - name: statserve-files
+        configMap:
+          name: hedra-files-cm
+          

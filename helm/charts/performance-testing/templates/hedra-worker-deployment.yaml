@@ -1,0 +1,74 @@
+# apiVersion: apps/v1
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: performance-testing-dev-worker
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  labels:
+    role: hedra
+    name: worker
+spec:
+  # replicas: {{ (int .Values.workers) }} 
+  # selector:
+  #   matchLabels:
+  #     role: hedra
+  #     name: worker
+  # completions: {{ (int .Values.hedra.worker.workers) }}
+  parallelism: {{ (int .Values.hedra.worker.workers) }}
+  template:
+    metadata:
+      labels:
+        role: hedra
+        name: worker
+    spec:
+      containers:
+      - image: hedra:latest
+        imagePullPolicy: Never
+        name: worker
+        envFrom:
+          - configMapRef:
+              name: hedra-cm
+        env:
+          - name: RUNNER_MODE
+            value: ephemeral-worker
+          - name: WORKER_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: LEADER_IP
+            value: performance-testing-dev
+          - name: STATSERVE_SERVER_HOST
+            value: performance-testing-statserve
+          - name: AUTOMATE_MODE
+            value: hedra
+          - name: GRPC_DNS_RES_FIOLVER
+            value: native
+          - name: LOG_LEVEL
+            value: debug
+        volumeMounts:
+          - mountPath: /data
+            name: hedra-files
+        ports:
+            - containerPort: 6669
+              name: leader-comm
+            - containerPort: 6670
+              name: worker-comm
+            - containerPort: 6671
+              name: updates-comm
+            - containerPort: 9001
+              name: statserve-out
+            - containerPort: 9002
+              name: nginx-out
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      restartPolicy: Never
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 60
+      volumes:
+      - name: hedra-files
+        configMap:
+          name: hedra-files-cm
+          

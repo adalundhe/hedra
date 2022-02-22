@@ -1,0 +1,10 @@
+{
+  "http://httpbin.org": [
+      {
+        "endpoint": "/get",
+        "method": "GET",
+        "name": "dev_httpbin_get",
+        "weight": 1
+      }
+  ]
+}

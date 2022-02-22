@@ -1,0 +1,139 @@
+syntax = "proto3";
+import "google/protobuf/struct.proto";
+
+
+message WorkerRegisterRequest {
+    string host_address = 1;
+    string host_id = 2;
+    string server_address = 3;
+}
+
+message WorkerRegisterResponse {
+    string host_address = 1;
+    string host_id = 2;
+    google.protobuf.Struct job_config = 3;
+}
+
+message WorkerUpdateRequest {
+    string host_address = 1;
+    int64 host_id = 2;
+}
+
+message WorkerUpdateResponse {
+    string host_address = 1;
+    string host_id = 2;
+    google.protobuf.Struct completed = 3;
+}
+
+message WorkerDeregisterRequest {
+    string host_address = 1;
+    string host_id = 2;
+    repeated string reporter_fields = 3;
+}
+
+message WorkerDeregisterResponse {
+    string host_address = 1;
+    string host_id = 2;
+}
+
+message LeaderRegisterRequest {
+    string host_address = 1;
+    string host_id =  2;
+}
+
+message LeaderRegisterResponse {
+    string host_address = 1;
+    string host_id = 2;
+}
+
+
+message PollLeaderRequest {
+    string host_address = 1;
+    string host_id = 2;
+}
+
+message PollLeaderResponse {
+    string host_address = 1;
+    string host_id = 2;
+    bool completed = 3;
+}
+
+message PollLeaderJobRequest {
+    string host_address = 1;
+    string host_id = 2;
+    string job_id = 3;
+    string current_stage = 4;
+}
+
+message PollLeaderJobResponse {
+    string host_address = 1;
+    string host_id = 2;
+    bool completed = 3;
+}
+
+message PipelineStageRequest {
+    string host_address = 1;
+    string host_id = 2;
+    string job_id = 3;
+    string stage_completed = 4;
+}
+
+message PipelineStageResponse {
+    string host_address = 1;
+    string host_id = 2;
+}
+
+message NewJobLeaderRequest {
+    string host_address = 1;
+    string host_id = 2;
+    google.protobuf.Struct job_config = 3;
+    int64 job_timeout = 4;
+}
+
+message NewJobLeaderResponse {
+    string host_address = 1;
+    string host_id = 2;
+    string job_id = 3;
+}
+
+message LeaderHeartbeatRequest {
+    string host_address = 1;
+    string host_id = 2;
+    string status = 3;
+}
+
+message LeaderHeartbeatResponse {
+    string host_address = 1;
+    string host_id = 2;
+    string status = 3;
+}
+
+message LeaderJobRequest {
+    string host_address = 1;
+    string host_id = 2;
+    string job_id = 3;
+    google.protobuf.Struct job_config = 4;
+    google.protobuf.Struct pipeline_status = 5;
+}
+
+message LeaderJobResponse {
+    string host_address = 1;
+    string host_id = 2;
+    string job_id = 3;
+    google.protobuf.Struct job_config = 4;
+    google.protobuf.Struct pipeline_status = 5;
+}
+
+
+service DistributedServer {
+    rpc AddClient (WorkerRegisterRequest) returns (WorkerRegisterResponse) {};
+    rpc GetUpdate (WorkerUpdateRequest) returns (WorkerUpdateResponse) {};
+    rpc RemoveClient (WorkerDeregisterRequest) returns (WorkerDeregisterResponse) {};
+    rpc RegisterLeader (LeaderRegisterRequest) returns (LeaderRegisterResponse) {};
+    rpc PollLeader (PollLeaderRequest) returns (PollLeaderResponse) {};
+    rpc MarkStageCompleted (PipelineStageRequest) returns (PipelineStageResponse) {};
+    rpc PollLeaderJob (PollLeaderJobRequest) returns (PollLeaderJobResponse) {};
+    rpc CreateNewJob (NewJobLeaderRequest) returns (NewJobLeaderResponse) {};
+    rpc CheckLeaderHeartbeat (LeaderHeartbeatRequest) returns (LeaderHeartbeatResponse) {};
+    rpc ShareCurrentJob (LeaderJobRequest) returns (LeaderJobResponse) {};
+}

@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: performance-testing-dev
+  annotations:
+    ## tells ingress to check for regex in the config file
+    nginx.ingress.kubernetes.io/enable-cors: 'true'
+    nginx.ingress.kubernetes.io/cors-allow-methods: "*"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+spec:
+  rules:
+  - host: personas-api.dev.zbra.io
+    http:
+      paths:
+      - backend:
+          service:
+              name: performance-testing-dev
+              port:
+                number: 9002
+        path: /api/hedra/jobs
+        pathType: Prefix
+      - backend:
+          service:
+              name: performance-testing-api-dev
+              port:
+                number: 9002
+        path: /api/hedra/workers
+        pathType: Prefix

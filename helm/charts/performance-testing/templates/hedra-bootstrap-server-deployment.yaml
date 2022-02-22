@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: performance-testing-bootstrap-dev
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  labels:
+    role: hedra
+    name: bootstrap
+spec:
+  replicas: {{ (int .Values.hedra.bootstrap.replicas) }} 
+  selector:
+    matchLabels:
+      role: hedra
+      name: bootstrap
+  template:
+    metadata:
+      labels:
+        role: hedra
+        name: bootstrap
+    spec:
+      containers:
+      - image: hedra:latest
+        imagePullPolicy: Never
+        name: hedra
+        envFrom:
+          - configMapRef:
+              name: kube-config
+        env:
+          - name: RUNNER_MODE
+            value: bootstrap-server
+          - name: LEADERS
+            value: {{ .Values.hedra.bootstrap.leaders | quote }}
+          - name: AUTOMATE_MODE
+            value: hedra
+          - name: GRPC_DNS_RESOLVER
+            value: native
+          - name: KUBE_CONFIG_FILEPATH
+            value: /.kube/kube_config
+          - name: KUBE_CONFIG_CONTEXT
+            value: dev
+          - name: DISCOVERY_MODE
+            value: kubernetes
+          - name: KUBECONFIG
+            value: /.kube/kube_config
+          - name: BOOTSTRAP_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: LOG_LEVEL
+            value: info
+          - name: STATSERVE_SERVER_HOST
+            value: performance-testing-statserve
+        volumeMounts:
+          - mountPath: /.kube
+            name: kube-config
+        ports:
+            - containerPort: 6669
+              name: leader-comm
+            - containerPort: 6670
+              name: worker-comm
+            - containerPort: 6671
+              name: update-comm
+            - containerPort: 8711
+              name: bootstrap-comm
+            - containerPort: 9001
+              name: statserve-in
+            - containerPort: 9002
+              namehedra-server ${HEDRA_OPTS}: nginx-out
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 60
+      volumes:
+      - name: kube-config
+        configMap:
+          name: kube-config

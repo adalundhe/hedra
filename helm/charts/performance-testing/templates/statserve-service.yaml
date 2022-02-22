@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: performance-testing-statserve
+  labels:
+    role: hedra
+    name: statserve
+spec:
+  ports:
+  - port: 9001
+    name: statserve-in
+  selector:
+    role: hedra
+    name: statserve

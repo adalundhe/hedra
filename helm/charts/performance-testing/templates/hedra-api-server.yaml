@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: performance-testing-api-dev
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  labels:
+    role: hedra
+    name: api
+spec:
+  selector:
+    matchLabels:
+      role: hedra
+      name: api
+  template:
+    metadata:
+      labels:
+        role: hedra
+        name: api
+    spec:
+      containers:
+      - image: hedra:latest
+        imagePullPolicy: Never
+        name: hedra
+        envFrom:
+          - configMapRef:
+              name: hedra-cm
+        env:
+          - name: AUTOMATE_MODE
+            value: hedra
+          - name: AS_SERVER
+            value: "true"
+          - name: LEADER_IP
+            value: performance-testing-dev
+          - name: GRPC_DNS_RESOLVER
+            value: native
+        volumeMounts:
+          - mountPath: /data
+            name: hedra-files
+        ports:
+            - containerPort: 6669
+              name: leader-comm
+            - containerPort: 6670
+              name: worker-comm
+            - containerPort: 6671
+              name: updates-comm
+            - containerPort: 9001
+              name: statserve-in
+            - containerPort: 9002
+              name: api-out
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 60
+      volumes:
+      - name: hedra-files
+        configMap:
+          name: hedra-files-cm
+          
