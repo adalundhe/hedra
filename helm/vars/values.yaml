@@ -1,6 +1,6 @@
 hedra:
   image:
-    repository: registry.gitlab.com/thezebra/infrastructure/performance-testing
+    repository: #TODO: Add repository
   bootstrap:
     replicas: 1
     leaders: 1
@@ -23,7 +23,7 @@ hedra:
 statserve:
   replicas: 1
   image:
-    repository: registry.gitlab.com/thezebra/libraries/zebra-statserve
+    repository: #TODO: Add repository
   statserve_streams_path: /data/streams.json
   statserve_server_path: /data/server.json
   log_level: debug

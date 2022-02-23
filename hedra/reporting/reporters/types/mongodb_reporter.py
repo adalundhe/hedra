@@ -1,6 +1,6 @@
 from __future__ import annotations
 import uuid
-from zebra_automate_connect.types.mongodb_connector import MongoDBConnector as MongoDB
+from hedra.connectors.types.mongodb_connector import MongoDBConnector as MongoDB
 from .utils.tools.mongodb_tools import (
     to_record,
     to_query

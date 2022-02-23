@@ -1,14 +1,14 @@
 import os
 import grpc
-from zebra_automate_logging import Logger
-from zebra_broadkast.grpc import BroadkastClient
-from zebra_kube_app_discovery import Query
+from easy_logger import Logger
+from broadkast.grpc import BroadkastClient
+from broadkast.discovery import Query
 from hedra.runners.worker_services.leader_registry import LeaderRegistry
 from hedra.runners.utils.connect_timeout import connect_with_retry_async
 from hedra.runners.bootstrap_services.proto import (
     BootstrapServerStub
 )
-from zebra_broadkast.grpc.proto import (
+from broadkast.grpc.proto import (
     ServiceDiscoveryResponse
 )
 

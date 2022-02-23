@@ -1,5 +1,5 @@
-from zebra_async_tools.datatypes.async_list import AsyncList
-from zebra_automate_logging import Logger
+from async_tools.datatypes.async_list import AsyncList
+from easy_logger import Logger
 from .responses import Response
 
 

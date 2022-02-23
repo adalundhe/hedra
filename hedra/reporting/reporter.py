@@ -2,7 +2,7 @@ from hedra.reporting.metrics.metric import Metric
 from hedra.reporting.reporters.types.redis_reporter import RedisReporter
 from .reporters import ReporterStore
 from hedra.reporting.events import Event
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 
 
 class Reporter:

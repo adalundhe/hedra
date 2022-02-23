@@ -1,7 +1,7 @@
 from art import text2art
 from hedra.runners.bootstrap_services import bootstrap_server
 from .command_line import CommandLine
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 from .runners import (
     ParallelLocalWorker,
     LocalWorker,
@@ -14,8 +14,9 @@ from .servers import (
     UpdateServer,
     JobServer
 )
-from zebra_async_tools.functions import check_event_loop
+from async_tools.functions import check_event_loop
 from importlib.metadata import version
+
 
 
 

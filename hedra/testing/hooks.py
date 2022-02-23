@@ -7,7 +7,7 @@ from aiosonic.resolver import AsyncResolver as AioSonicResolver
 from aiosonic import HTTPClient
 from aiosonic.connectors import TCPConnector as AioSonicTCP
 from gql.transport.aiohttp import AIOHTTPTransport
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 
 from .test import Test
 

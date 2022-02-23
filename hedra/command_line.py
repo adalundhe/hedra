@@ -1,8 +1,7 @@
-import dis
 import sys
-from zebra_automate_logging import Logger
-from zebra_cli_tools import BaseConfig
-from zebra_cli_tools.arguments.bundler import Bundler
+from easy_logger import Logger
+from pycli_tools import BaseConfig
+from pycli_tools.arguments.bundler import Bundler
 from importlib.metadata import version
 
 from hedra.testing import Test

@@ -3,13 +3,13 @@ import time
 import asyncio
 import psutil
 import uvloop
-from zebra_async_tools.functions.awaitable import awaitable
+from async_tools.functions.awaitable import awaitable
 
 from hedra.execution.personas.batching.batch import Batch
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 uvloop.install()
-from zebra_async_tools.datatypes.async_list import AsyncList
-from zebra_automate_logging import Logger
+from async_tools.datatypes.async_list import AsyncList
+from easy_logger import Logger
 from hedra.execution.personas.batching import Batch
 from hedra.execution.personas.batching.batch_interval import BatchInterval
 from hedra.execution.engines import Engine

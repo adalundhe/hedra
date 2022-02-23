@@ -1,9 +1,9 @@
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 from .multi_user_sequence_persona import MultiUserSequenceParser
 from .multi_sequence_parser import MultiSequenceParser
 from .default_parser import DefaultParser
 from .action_set_parser import ActionSetParser
-from zebra_async_tools.datatypes import AsyncList
+from async_tools.datatypes import AsyncList
 
 class ActionsParser:
 

@@ -1,4 +1,4 @@
-from zebra_cli_tools import BaseConfig
+from pycli_tools import BaseConfig
 from .config.cli.hedra_uwsgi import hedra_uwsgi_cli
 
 

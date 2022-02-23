@@ -1,7 +1,7 @@
 import math
 from hedra.execution.personas.types.multi_sequence_persona import MultiSequencePersona
 from hedra.execution.personas.types.multi_sequence_persona.sequence_persona import SequencedPersonaCollection
-from zebra_async_tools.functions import awaitable
+from async_tools.functions import awaitable
 
 
 class UserSequencePersona(MultiSequencePersona):

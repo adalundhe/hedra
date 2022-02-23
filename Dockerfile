@@ -1,5 +1,8 @@
 ARG REPO_SLUG
 ARG REPO_BRANCH
+ARG REPO_URL
+ARG KUBE_CONFIG_PATH
+ARG KUBE_CONFIG_FILE
 
 #################################################################
 FROM python:3.9.5-slim AS build-python
@@ -22,9 +25,11 @@ RUN pip install -r /requirements.txt
 ################################################################
 FROM python:3.9.5-slim-buster AS run
 ARG REPO_SLUG
+ARG REPO_URL
 ARG REPO_BRANCH
 ARG KUBE_CONFIG_PATH
 ARG KUBE_CONFIG_FILE
+ENV REPO_URL=${REPO_URL}
 ENV REPO_SLUG=${REPO_SLUG}
 ENV REPO_BRANCH=${REPO_BRANCH}
 
@@ -40,7 +45,7 @@ RUN apt-get update && \
     python3-dev build-essential libpq-dev \
     && apt-get clean
 
-RUN USERNAME="zebra" && \
+RUN USERNAME="hedra" && \
     apt-get install -y sudo && \
     sudo groupadd -g 1000 $USERNAME && \
     useradd -u 1000 -g $USERNAME -s /bin/sh $USERNAME && \
@@ -52,7 +57,7 @@ COPY config/nginx/* /etc/nginx/
 COPY config/uwsgi/* /uwsgi/
 COPY . /app/
 
-RUN git clone --branch ${REPO_BRANCH} https://gitlab.com/thezebra/${REPO_SLUG} "/data/${REPO_SLUG}"
+RUN git clone --branch ${REPO_BRANCH} https://${REPO_URL}/${REPO_SLUG} "/data/${REPO_SLUG}"
 RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 RUN sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
@@ -65,7 +70,7 @@ EXPOSE 6669 6670 6671 8711 9001 9002
 RUN ["sudo", "chmod", "a+rw", "/data"]
 RUN ["sudo","chmod", "a+x", "/app/scripts/hedra_entrypoint.sh"]
 
-USER zebra
+USER hedra
 
 ENTRYPOINT ["/app/scripts/hedra_entrypoint.sh"]
 

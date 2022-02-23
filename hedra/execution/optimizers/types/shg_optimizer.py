@@ -1,4 +1,4 @@
-from zebra_async_tools.functions import awaitable
+from async_tools.functions import awaitable
 from scipy.optimize import shgo
 
 

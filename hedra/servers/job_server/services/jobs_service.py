@@ -9,7 +9,7 @@ from hedra.runners.leader_services.proto import(
     DistributedServerStub,
     NewJobLeaderRequest
 )
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 
 
 

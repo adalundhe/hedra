@@ -1,7 +1,7 @@
 from hedra.parsing.actions import action
 from .actions import Action
-from zebra_automate_logging import Logger
-from zebra_async_tools.datatypes import AsyncList
+from easy_logger import Logger
+from async_tools.datatypes import AsyncList
 
 
 class DefaultParser:

@@ -1,7 +1,7 @@
 import asyncio
 from hedra.execution.personas.utils import time
 import random
-from zebra_async_tools.functions import awaitable
+from async_tools.functions import awaitable
 
 
 class BatchInterval:

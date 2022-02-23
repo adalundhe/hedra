@@ -1,5 +1,5 @@
 from scipy.optimize import differential_evolution
-from zebra_async_tools.functions import awaitable
+from async_tools.functions import awaitable
 
 
 class DifferentialEvolutionOptimizer:

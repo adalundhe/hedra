@@ -2,10 +2,10 @@ from __future__ import annotations
 import os
 import psycopg2
 import uuid
-from zebra_automate_connect.types.postgres_async_connector.postgres_async_connector import PostgresAsyncConnector
+from hedra.connectors.types.postgres_async_connector.postgres_async_connector import PostgresAsyncConnector
 from hedra.reporting.events.types import PostgresEvent
 from hedra.reporting.metrics.types import PostgresMetric
-from zebra_automate_connect.types.postgres_async_connector import PostgresAsyncConnector as Postgres
+from hedra.connectors.types.postgres_async_connector import PostgresAsyncConnector as Postgres
 from .utils.helpers import SQLHelper
 
 

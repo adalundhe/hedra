@@ -1,7 +1,7 @@
 from re import S
-from zebra_async_tools.datatypes.async_dict import AsyncDict
+from async_tools.datatypes.async_dict import AsyncDict
 from .actions import Action
-from zebra_async_tools.datatypes import AsyncList
+from async_tools.datatypes import AsyncList
 
 
 class MultiUserSequenceParser:

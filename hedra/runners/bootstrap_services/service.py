@@ -1,6 +1,6 @@
 import os
 from .service_registry import ServiceRegistry
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 import uuid
 from .proto import (
     ServiceRegisterRequest,
@@ -10,7 +10,7 @@ from .proto import (
 
 )
 
-from zebra_broadkast.grpc import BroadkastServer
+from broadkast.grpc import BroadkastServer
 from google.protobuf.json_format import (
     MessageToDict
 )

@@ -1,10 +1,9 @@
 
 from __future__ import annotations
-import asyncio
 import uuid
 from hedra.reporting.metrics import Metric
-from zebra_automate_connect.types.statserve_connector import StatServeConnector as StatServe
-from zebra_automate_logging import Logger
+from hedra.connectors.types.statserve_connector import StatServeConnector as StatServe
+from easy_logger import Logger
 
 class StatServeReporter:
 

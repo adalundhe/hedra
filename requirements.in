@@ -21,10 +21,10 @@ uvloop
 asyncio-pool
 playwright
 kubernetes
-pycli-tools
-easy-logger
+py3cli-tools
+easy-logger-py
 broadkast
-statstream
+statstream-py
 statserve
 aiopg
 prometheus-client

@@ -4,10 +4,10 @@ import uvloop
 import math
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 uvloop.install()
-from zebra_async_tools.functions import check_event_loop
-from zebra_async_tools.datatypes.async_list import AsyncList
-from zebra_automate_logging import Logger
-from zebra_async_tools.functions import awaitable
+from async_tools.functions import check_event_loop
+from async_tools.datatypes.async_list import AsyncList
+from easy_logger import Logger
+from async_tools.functions import awaitable
 from hedra.execution.personas.utils import parse_time
 from hedra.execution.pipelines.stages import setup
 from .stages import (

@@ -1,5 +1,5 @@
 import asyncio
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 from .bootstrap_services import BootstrapManager
 
 

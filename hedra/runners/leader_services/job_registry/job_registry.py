@@ -2,7 +2,7 @@ import asyncio
 import time
 import uuid
 from typing import Union
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 from hedra.runners.leader_services.worker_registry import WorkerServicesManager
 from hedra.runners.leader_services.pipelines import JobPipeline
 from hedra.runners.leader_services.electorate import ElectionManager

@@ -1,6 +1,6 @@
-from zebra_async_tools.functions.awaitable import awaitable
+from async_tools.functions.awaitable import awaitable
 from .actions import Action
-from zebra_async_tools.datatypes import AsyncList
+from async_tools.datatypes import AsyncList
 
 
 class MultiSequenceParser:

@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 from .leader_server import LeaderServer
 
 

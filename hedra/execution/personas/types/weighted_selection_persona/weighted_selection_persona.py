@@ -2,8 +2,8 @@ import random
 import time
 import asyncio
 import math
-from zebra_async_tools.datatypes.async_list import AsyncList
-from zebra_async_tools.functions import awaitable
+from async_tools.datatypes.async_list import AsyncList
+from async_tools.functions import awaitable
 from hedra.execution.engines import Engine
 from hedra.execution.personas.types.default_persona import DefaultPersona
 

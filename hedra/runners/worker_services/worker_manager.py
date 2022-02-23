@@ -1,7 +1,7 @@
 import asyncio
 import os
 import uuid
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 from .updates_server import UpdatesServer
 
 

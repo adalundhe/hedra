@@ -1,9 +1,8 @@
 from __future__ import annotations
-import logging
 import datetime
 import time
-from zebra_automate_connect.types.datadog_connector import DatadogConnector as Datadog
-from zebra_automate_logging import Logger
+from hedra.connectors.types.datadog_connector import DatadogConnector as Datadog
+from easy_logger import Logger
 
 
 class DatadogReporter:
@@ -21,7 +20,7 @@ class DatadogReporter:
 
         The Datadog reporter allows you to submit events and metrics to Datadog for aggregation and viewing. Note
         that if no dashboard exists or if an existing dashboard needs to be re-configured to display events/metrics,
-        you may do so by passing dashboard configuration options (see Zebra Automate Connect for more information). 
+        you may do so by passing dashboard configuration options (see Connectors for more information). 
         Dashboards should be based as key/value pairs with keys of "events_dashboard" and/or "metrics_dashboard",
         with each key having a value of a dictionary/JSON object containing a valid dashboard configuration. Also
         note that event/metric tags are particularly handy when aggregating events via Datadog.

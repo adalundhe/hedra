@@ -1,8 +1,6 @@
 from __future__ import annotations
-import os
 import uuid
-import json
-from zebra_automate_connect.types.kafka_connector import KafkaConnector as Kafka
+from hedra.connectors.types.kafka_connector import KafkaConnector as Kafka
 
 
 class KafkaReporter:

@@ -4,9 +4,9 @@ description: Performance testing.
 version: 0.0.1
 keywords:
   - hedra
-home: https://gitlab.com/thezebra/infrastructure/performance-testing
+home: https://github.com/scorbettUM/hedra
 sources:
   - https://hub.docker.com/_/python
 maintainers:
   - name: seancorbett
-    email: scorbett@thezebra.com
+    email: sean.corbett@umontana.edu

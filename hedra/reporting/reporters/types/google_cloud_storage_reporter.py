@@ -1,8 +1,7 @@
 from __future__ import annotations
 import os
-import json
 from google.cloud import storage
-from zebra_automate_connect.types.gcs_connector import GCSConnector
+from hedra.connectors.types.gcs_connector import GCSConnector
 
 
 class GoogleCloudStorageReporter:

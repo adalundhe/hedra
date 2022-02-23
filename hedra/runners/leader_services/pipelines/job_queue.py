@@ -1,4 +1,4 @@
-from zebra_async_tools.datatypes.async_list import AsyncList
+from async_tools.datatypes.async_list import AsyncList
 
 
 class JobQueue:

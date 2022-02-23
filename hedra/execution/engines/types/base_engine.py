@@ -2,10 +2,8 @@ import asyncio
 import uvloop
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 uvloop.install()
-import psutil
-import math
-from zebra_automate_logging import Logger
-from zebra_async_tools.functions import check_event_loop
+from easy_logger import Logger
+from async_tools.functions import check_event_loop
 
 
 class BaseEngine:

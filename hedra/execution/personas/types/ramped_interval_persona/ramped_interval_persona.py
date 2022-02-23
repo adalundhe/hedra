@@ -1,6 +1,6 @@
 import time
 import asyncio
-from zebra_async_tools.functions import awaitable
+from async_tools.functions import awaitable
 from hedra.execution.personas.types.default_persona import DefaultPersona
 
 

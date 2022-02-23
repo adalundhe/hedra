@@ -1,5 +1,5 @@
 import uuid
-from zebra_async_tools.functions import awaitable
+from async_tools.functions import awaitable
 from .registered_actions import registered_actions
 
 

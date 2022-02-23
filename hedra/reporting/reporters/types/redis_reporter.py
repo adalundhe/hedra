@@ -1,9 +1,6 @@
 from __future__ import annotations
-import os
-import redis
-import pickle
 import uuid
-from zebra_automate_connect.types.redis_connector import RedisConnector as Redis
+from hedra.connectors.types.redis_connector import RedisConnector as Redis
 from .utils.tools.redis_tools import (
     to_redis_event,
     to_redis_metric,

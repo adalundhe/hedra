@@ -1,6 +1,6 @@
 import subprocess
 from .uwsgi_command_line import UWSGICommandLine
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 
 uwsgi_config = UWSGICommandLine()
 def run_uwsgi():

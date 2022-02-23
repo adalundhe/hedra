@@ -2,7 +2,7 @@ import random
 from hedra.execution.engines.types.helpers.playwright_helpers import command_librarian
 from .base_engine import BaseEngine
 from playwright.async_api import async_playwright
-from zebra_async_tools.datatypes import AsyncDict, AsyncList
+from async_tools.datatypes import AsyncDict, AsyncList
 from .helpers.playwright_helpers import CommandLibrarian
 from .utils.wrap_awaitable import async_execute_or_catch, wrap_awaitable_future
 

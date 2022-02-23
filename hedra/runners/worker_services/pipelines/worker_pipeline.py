@@ -10,8 +10,8 @@ from hedra.execution import Executor
 from hedra.execution.events.handlers import Handler
 from hedra.runners.leader_services.proto import PollLeaderRequest, PipelineStageRequest
 from hedra.runners.utils.connect_timeout import connect_or_return_none
-from zebra_async_tools.functions import check_event_loop
-from zebra_automate_logging import Logger
+from async_tools.functions import check_event_loop
+from easy_logger import Logger
 from hedra.execution.personas.utils import parse_time
 from .worker_pipeline_config import WorkerPipelineConfig
 

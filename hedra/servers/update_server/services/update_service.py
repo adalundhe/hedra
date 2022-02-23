@@ -1,8 +1,8 @@
 import asyncio
 import os
 import grpc
-from zebra_async_tools.datatypes import AsyncList, AsyncDict
-from zebra_async_tools.functions.awaitable import awaitable
+from async_tools.datatypes import AsyncList, AsyncDict
+from async_tools.functions.awaitable import awaitable
 from hedra.runners.leader_services.proto import (
     WorkerUpdateRequest,
     DistributedServerStub
@@ -10,7 +10,7 @@ from hedra.runners.leader_services.proto import (
 from google.protobuf.json_format import (
     MessageToDict
 )
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 from hedra.command_line import CommandLine
 from hedra.runners.utils.connect_timeout import connect_with_retry
 

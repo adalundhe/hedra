@@ -2,10 +2,8 @@ import asyncio
 from asyncio.tasks import wait
 import os
 import grpc
-from zebra_automate_logging import Logger
-from zebra_broadkast.grpc import BroadkastClient
+from easy_logger import Logger
 from hedra.runners.worker_services.bootstrap import BootstrapManager
-from zebra_kube_app_discovery import Query
 from .leader_registry import LeaderRegistry
 
 from hedra.runners.leader_services.proto import (

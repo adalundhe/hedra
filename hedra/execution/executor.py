@@ -1,11 +1,11 @@
 import asyncio
 from alive_progress import alive_bar
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 from .personas import PersonaManager
 from .events.handlers import Handler, ParallelHandler
 from hedra.parsing import ActionsParser
 from .pipelines import Pipeline
-from zebra_async_tools.functions import check_event_loop
+from async_tools.functions import check_event_loop
 
 
 class Executor:

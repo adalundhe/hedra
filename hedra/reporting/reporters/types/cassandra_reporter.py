@@ -1,6 +1,6 @@
 from __future__ import annotations
 import uuid
-from zebra_automate_connect.types.cassandra_connector import CassandraConnector as Cassandra
+from hedra.connectors.types.cassandra_connector import CassandraConnector as Cassandra
 from hedra.reporting.events.types import CassandraEvent
 from hedra.reporting.metrics.types import CassandraMetric
 from .utils.helpers import CassandraHelper

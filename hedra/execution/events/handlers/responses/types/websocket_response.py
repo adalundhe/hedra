@@ -1,4 +1,4 @@
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 from .http_response import HttpResponse
 
 

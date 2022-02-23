@@ -1,7 +1,7 @@
 import grpc
 import os
 import psutil
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 from .service import LeaderService
 from .proto import add_DistributedServerServicer_to_server
 

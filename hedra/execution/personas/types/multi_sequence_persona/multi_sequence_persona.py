@@ -4,8 +4,8 @@ import time
 import asyncio
 from hedra.execution.personas.types.default_persona import DefaultPersona
 from .sequence_persona import SequencedPersonaCollection
-from zebra_async_tools.datatypes import AsyncList
-from zebra_async_tools.functions import awaitable
+from async_tools.datatypes import AsyncList
+from async_tools.functions import awaitable
 from hedra.execution.engines import Engine
 
 

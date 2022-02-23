@@ -1,7 +1,7 @@
 import asyncio
 import dill
-from zebra_automate_logging import Logger
-from zebra_cli_tools.arguments.bundler import Bundler
+from easy_logger import Logger
+from pycli_tools.arguments.bundler import Bundler
 from hedra.execution import Executor
 from hedra.testing import (
     ActionSet

@@ -1,6 +1,6 @@
 import asyncio
 from .worker_services.worker_manager import WorkerManager
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 
 
 class DistributedWorkerServer:

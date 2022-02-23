@@ -1,6 +1,6 @@
 import time
-from zebra_async_tools.functions import check_event_loop
-from zebra_statserve.server import Server
+from async_tools.functions import check_event_loop
+from statserve.server import Server
 
 
 class EmbeddedStatserve:

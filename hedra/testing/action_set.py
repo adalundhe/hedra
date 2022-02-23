@@ -1,5 +1,5 @@
 import psutil
-from zebra_async_tools.datatypes.async_list import AsyncList
+from async_tools.datatypes.async_list import AsyncList
 from .hooks import setup, teardown
 from .abstract_engine import AbstractEngine
 from hedra.parsing.actions import Action

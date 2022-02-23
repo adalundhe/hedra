@@ -1,6 +1,6 @@
 import time
 import httpx
-from zebra_async_tools.datatypes.async_list import AsyncList
+from async_tools.datatypes.async_list import AsyncList
 from .http_engine import HttpEngine
 from .utils.wrap_awaitable import async_execute_or_catch, wrap_awaitable_future
 

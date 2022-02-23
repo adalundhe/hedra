@@ -2,7 +2,7 @@ import imp
 
 
 import uuid
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 from .service_node import ServiceNode
 
 

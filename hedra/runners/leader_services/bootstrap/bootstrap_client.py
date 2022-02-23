@@ -2,9 +2,9 @@ import os
 from typing import List
 import uuid
 import grpc
-from zebra_automate_logging import Logger
-from zebra_broadkast.grpc import BroadkastClient
-from zebra_kube_app_discovery import Query
+from easy_logger import Logger
+from broadkast.grpc import BroadkastClient
+from broadkast.discovery import Query
 from hedra.runners.bootstrap_services.proto.bootstrap_pb2 import ServiceRegistrationStatusResponse
 from hedra.runners.leader_services.bootstrap.discovered_leaders_registry import DiscoveredLeadersRegistry
 from hedra.runners.utils.connect_timeout import connect_with_retry_async
@@ -14,7 +14,7 @@ from hedra.runners.bootstrap_services.proto import (
     ServiceRegistrationStatusRequest,
     ServiceRegistrationStatusResponse
 )
-from zebra_broadkast.grpc.proto import (
+from broadkast.grpc.proto import (
     ServiceDiscoveryResponse
 )
 

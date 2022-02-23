@@ -1,6 +1,6 @@
 from __future__ import annotations
 import uuid
-from zebra_automate_connect.types.prometheus_connector import PrometheusConnector as Prometheus
+from hedra.connectors.types.prometheus_connector import PrometheusConnector as Prometheus
 from .utils.tools.prometheus_tools import (
     event_to_prometheus_metric,
     metric_to_prometheus_metric

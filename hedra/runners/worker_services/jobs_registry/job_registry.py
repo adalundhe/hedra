@@ -2,7 +2,7 @@ import asyncio
 import time
 from hedra.runners.leader_services.job_registry import job
 from .job import Job
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 from hedra.runners.worker_services.pipelines import WorkerPipeline
 from hedra.runners.worker_services.leader_registry import LeaderServicesManager
 

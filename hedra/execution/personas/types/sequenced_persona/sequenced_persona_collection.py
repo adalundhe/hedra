@@ -1,6 +1,6 @@
 import time
 import asyncio
-from zebra_async_tools.datatypes.async_list import AsyncList
+from async_tools.datatypes.async_list import AsyncList
 from hedra.execution.personas.types.default_persona import DefaultPersona
 from hedra.execution.engines import Engine
 

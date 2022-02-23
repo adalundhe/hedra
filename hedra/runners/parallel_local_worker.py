@@ -6,10 +6,10 @@ import asyncio
 import dill
 import time
 import ctypes
-from zebra_async_tools.functions import awaitable
+from async_tools.functions import awaitable
 from alive_progress import alive_bar
 from queue import Queue
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 from hedra.command_line import CommandLine
 from hedra.execution.events.handlers import Handler
 from hedra.parsing import ActionsParser

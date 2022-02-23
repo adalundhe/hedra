@@ -2,7 +2,7 @@ import time
 import asyncio
 from aiosonic.resolver import AsyncResolver
 import uvloop
-from zebra_async_tools.datatypes.async_list import AsyncList
+from async_tools.datatypes.async_list import AsyncList
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 uvloop.install()
 from aiosonic import HTTPClient

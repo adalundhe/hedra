@@ -1,5 +1,5 @@
 from scipy.optimize import dual_annealing
-from zebra_async_tools.functions.awaitable import awaitable
+from async_tools.functions.awaitable import awaitable
 
 
 class DualAnnealingOptimizer:

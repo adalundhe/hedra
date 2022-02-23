@@ -3,10 +3,10 @@ import math
 import json
 from re import S
 import time
-from zebra_automate_logging import Logger
+from easy_logger import Logger
 from alive_progress import alive_bar
-from zebra_async_tools.functions import awaitable
-from zebra_async_tools.datatypes import AsyncList
+from async_tools.functions import awaitable
+from async_tools.datatypes import AsyncList
 from .types import (
     SHGOptimizer,
     DualAnnealingOptimizer,

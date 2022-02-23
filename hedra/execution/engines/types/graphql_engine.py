@@ -5,7 +5,7 @@ import time
 from aiohttp.connector import TCPConnector
 from aiohttp.resolver import AsyncResolver
 from gql.transport.aiohttp import AIOHTTPTransport
-from zebra_async_tools.datatypes.async_list import AsyncList
+from async_tools.datatypes.async_list import AsyncList
 from .http_engine import HttpEngine
 from .utils.wrap_awaitable import wrap_awaitable_future
 from gql.transport.aiohttp import log as aiohttp_logger

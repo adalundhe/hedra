@@ -1,7 +1,7 @@
 
 from __future__ import annotations
 import uuid
-from zebra_automate_connect.types.statstream_connector import StatStreamConnector as StatsStream
+from hedra.connectors.types.statstream_connector import StatStreamConnector as StatsStream
 
 class StatStreamReporter:
 

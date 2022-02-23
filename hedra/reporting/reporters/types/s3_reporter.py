@@ -1,6 +1,6 @@
 from __future__ import annotations
 import os
-from zebra_automate_connect.types.s3_connector import S3Connector
+from hedra.connectors.types.s3_connector import S3Connector
 
 
 

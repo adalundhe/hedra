@@ -1,4 +1,4 @@
-from zebra_broadkast.grpc.proto import ServiceDiscoveryResponse
+from broadkast.grpc.proto import ServiceDiscoveryResponse
 from hedra.runners.bootstrap_services.proto import ServiceRegistrationStatusResponse
 from hedra.runners.leader_services.leader_registry.leader_service import LeaderService
 
