@@ -11,7 +11,7 @@ with open(os.path.join(current_directory, 'README.md'), "r") as readme:
 
 setup(
     name="hedra",
-    version="0.1.0",
+    version="0.1.1",
     description="Powerful performance testing made easy.",
     long_description=package_description,
     long_description_content_type="text/markdown",
@@ -48,10 +48,10 @@ setup(
         'asyncio-pool',
         'playwright',
         'kubernetes',
-        'pycli-tools',
-        'easy-logger',
+        'py3cli-tools',
+        'easy-logger-py',
         'broadkast',
-        'statstream',
+        'statstream-py',
         'statserve',
         'aiopg',
         'prometheus-client',
