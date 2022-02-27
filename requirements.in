@@ -13,6 +13,7 @@ gql[all]>=3.0.0a6
 flask
 uwsgi
 alive-progress
+py3-async-tools
 dill
 scipy
 art
@@ -20,7 +21,6 @@ scikit-learn
 uvloop
 asyncio-pool
 playwright
-kubernetes
 py3cli-tools
 easy-logger-py
 broadkast
