@@ -1,5 +1,6 @@
 import asyncio
 import dill
+import traceback
 from easy_logger import Logger
 from pycli_tools.arguments.bundler import Bundler
 from hedra.execution import Executor
@@ -23,6 +24,7 @@ def run_job(config):
         asyncio.set_event_loop(loop)
 
         config = dill.loads(config)
+
         job_config = config.get('config')
 
         if job_config.executor_config.get('engine_type') == 'action-set':
@@ -50,6 +52,7 @@ def run_job(config):
         }
 
     except Exception as err:
+        session_logger.info(f'{traceback.format_exc()}')
         session_logger.info(f'Parallel pipeline encountered exception - {str(err)}')
 
 async def _run_job(worker):

@@ -111,7 +111,7 @@ class Reporter:
         logger.setup(self.log_level)
         self.session_logger = logger.generate_logger()
         
-        self.session_logger.debug('Initializing StatsReport...')
+        self.session_logger.debug('Initializing Repoter...')
         self.reporter_store = ReporterStore(config=self.config)
         await self.reporter_store.init()
 

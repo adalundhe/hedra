@@ -103,8 +103,7 @@ class DefaultPersona:
         while elapsed < self.duration:
             deferred_actions, _ = await asyncio.wait([
                 request async for request in self.engine.defer_all(self.actions)
-            ], 
-            loop=asyncio.get_event_loop(),
+            ],
             timeout=self.batch.time
             )
 
@@ -115,7 +114,7 @@ class DefaultPersona:
         await self.stop_updates()
 
         for deferred_batch in self.batch.deferred:
-            results += await asyncio.gather(*deferred_batch, loop=asyncio.get_event_loop(), return_exceptions=True)
+            results += await asyncio.gather(*deferred_batch, return_exceptions=True)
             
         self.total_actions = len(results)
         self.total_elapsed = elapsed

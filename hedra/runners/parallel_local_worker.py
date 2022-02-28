@@ -80,7 +80,6 @@ class ParallelLocalWorker:
             b'results': False,
             b'serializing': False
         }
-        self.handler = Handler(config)
         actions_parser = ActionsParser(config)
         
         loop = asyncio.get_event_loop()
@@ -93,13 +92,18 @@ class ParallelLocalWorker:
         with alive_bar(self._workers, title='Setting up workers...') as bar:
             for worker in range(self._workers):
                 command_line = CommandLine()
+                command_line.runner_mode = 'parallel'
                 command_line = self.config.copy(command_line)
                 command_line.executor_config.update(self.config.executor_config)
                 command_line.reporter_config.update(self.config.reporter_config)
                 command_line.log_level = self.config.log_level
                 command_line.executor_config['pool_size'] = self._workers
-                command_line.actions = {}
                 command_line.config_helper = None
+
+                if command_line.executor_config.get('engine_type') == 'action-set':
+                    command_line.actions = {}
+                else:
+                    command_line.actions = dict(self.config.actions)
                 
                 reporter_config = dict(self.reporter_config.copy())
         
@@ -152,7 +156,7 @@ class ParallelLocalWorker:
             )
         )
 
-        self._results = pool.map_async(run_job, configs, )
+        self._results = pool.map_async(run_job, configs)
 
         if self._no_run_visuals:
             self._results = self._results.get()
@@ -189,7 +193,8 @@ class ParallelLocalWorker:
         
     def kill(self):
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.handler.on_config(self.reporter_config))
+        handler = Handler(self.config)
+        loop.run_until_complete(handler.on_config(self.reporter_config))
 
         actions_per_second_rates = []
         total_completed_actions = []
@@ -233,9 +238,9 @@ class ParallelLocalWorker:
         ) as bar:
             for result in self._results:
                 loop.run_until_complete(
-                    self.handler.on_events(result.get('events'), serialize=False)
+                    handler.on_events(result.get('events'), serialize=False)
                 )
 
-        loop.run_until_complete(self.handler.on_exit())
+        loop.run_until_complete(handler.on_exit())
 
         self.session_logger.info('\nCompleted run, exiting...\n')
