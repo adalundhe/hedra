@@ -77,18 +77,7 @@ class ReporterStore:
         await self.submit_reporter.init()
 
     async def update_stream(self, events):
-        parsed_events = []
-        for event in events:
-            if event.format != self.update_reporter.format:
-                self.session_logger.debug('Converting event of type - {from_type} - to type - {to_type}'.format(
-                    from_type=event.format,
-                    to_format=self.update_reporter.format
-                ))
-                event = await event.convert(self.update_reporter.format)
-
-            parsed_events += [event]
-
-        return await self.update_reporter.stream_updates(parsed_events)
+        return await self.update_reporter.stream_updates(events)
 
     async def update(self, event):
         if event.format != self.update_reporter.format:

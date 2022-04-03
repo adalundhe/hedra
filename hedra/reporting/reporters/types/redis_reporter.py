@@ -1,6 +1,6 @@
 from __future__ import annotations
 import uuid
-from hedra.connectors.types.redis_connector import RedisConnector as Redis
+from hedra.reporting.connectors.types.redis_connector import RedisConnector as Redis
 from .utils.tools.redis_tools import (
     to_redis_event,
     to_redis_metric,

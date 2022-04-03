@@ -1,6 +1,6 @@
 from __future__ import annotations
 import uuid
-from hedra.connectors.types.mongodb_connector import MongoDBConnector as MongoDB
+from hedra.reporting.connectors.types.mongodb_connector import MongoDBConnector as MongoDB
 from .utils.tools.mongodb_tools import (
     to_record,
     to_query

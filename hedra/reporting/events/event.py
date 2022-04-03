@@ -3,58 +3,36 @@ import datetime
 import time
 import tzlocal
 from .types import (
-    DataDogEvent,
-    StatServeEvent,
-    CassandraEvent,
-    StatStreamEvent,
-    MongoDBEvent,
-    PostgresEvent,
-    PrometheusEvent,
-    RedisEvent,
-    KafkaEvent,
-    S3Event,
-    GoogleCloudStorageEvent,
-    SnowflakeEvent
+    HttpEvent,
+    PlaywrightEvent,
+    FastHttpEvent,
+    CustomEvent,
+    WebsocketEvent,
+    GrpcEvent,
+    GraphQLEvent
 )
 
 
 class Event:
 
-    events = {
-        'statstream': StatStreamEvent,
-        'datadog': DataDogEvent,
-        'statserve': StatServeEvent,
-        'cassandra': CassandraEvent,
-        'mongodb': MongoDBEvent,
-        'postgres': PostgresEvent,
-        'prometheus': PrometheusEvent,
-        'redis': RedisEvent,
-        'kafka': KafkaEvent,
-        's3': S3Event,
-        'gcs': GoogleCloudStorageEvent,
-        'snowflake': SnowflakeEvent
-    }
+    def __init__(self, action):
+        event_types = {
+            'http': HttpEvent,
+            'fast-http': FastHttpEvent,
+            'playwright': PlaywrightEvent,
+            'custom': CustomEvent,
+            'websocket': WebsocketEvent,
+            'grpc': GrpcEvent,
+            'graphql': GraphQLEvent
+        }
+        self.data = event_types.get(
+            action.get('action_type'),
+            CustomEvent
+        )(action)
 
-    def __init__(self, event_type=None, data=None):
-        self.event = self.events.get(event_type, 'statserve')(data)
-        self.format = self.event.format
         self.event_time = datetime.datetime.now()
         self.machine_timezone = tzlocal.get_localzone()
         self.machine_timezone = tzlocal.get_localzone()
-
-    def __str__(self):
-        return json.dumps({
-            'time_utc': self.get_utc_time(),
-            'time_local': self.get_local_time(),
-            **self.to_dict()
-        })
-
-    def __repr__(self):
-        return json.dumps({
-            'time_utc': self.get_utc_time(),
-            'time_local': self.get_local_time(),
-            **self.to_dict()
-        })
 
     @classmethod
     def about(cls):
@@ -134,11 +112,23 @@ class Event:
         return time.mktime(
             created_time.timetuple()
         )
+    
+    def __str__(self):
+        return json.dumps({
+            'time_utc': self.get_utc_time(),
+            'time_local': self.get_local_time(),
+            **self.to_dict()
+        })
+
+    def __repr__(self):
+        return json.dumps({
+            'time_utc': self.get_utc_time(),
+            'time_local': self.get_local_time(),
+            **self.to_dict()
+        })
+
+    async def assert_response(self):
+        await self.data.assert_result()
 
     def to_dict(self):
-        return self.event.to_dict()
-    
-    def convert(self, event_type):
-        return self.events.get(event_type)(
-            self.event.data
-        )
+        return self.data.to_dict()

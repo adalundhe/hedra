@@ -1,18 +1,16 @@
 import asyncio
-from alive_progress.core.progress import alive_bar
 import uvloop
 import time
 from hedra.runners.leader_services.proto.leader_pb2 import PollLeaderJobRequest
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 uvloop.install()
 from operator import countOf
-from hedra.execution import Executor
-from hedra.execution.events.handlers import Handler
-from hedra.runners.leader_services.proto import PollLeaderRequest, PipelineStageRequest
+from hedra.core import Executor
+from hedra.reporting.handlers import Handler
+from hedra.runners.leader_services.proto import PipelineStageRequest
 from hedra.runners.utils.connect_timeout import connect_or_return_none
-from async_tools.functions import check_event_loop
 from easy_logger import Logger
-from hedra.execution.personas.utils import parse_time
+from hedra.core.personas.utils import parse_time
 from .worker_pipeline_config import WorkerPipelineConfig
 
 

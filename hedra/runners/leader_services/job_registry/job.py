@@ -1,6 +1,6 @@
 import time
 
-from hedra.execution.personas.utils.time import parse_time
+from hedra.core.personas.utils.time import parse_time
 
 import time
 import asyncio

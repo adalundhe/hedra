@@ -1,5 +1,5 @@
 from __future__ import annotations
-from hedra.connectors.types.snowflake_connector import SnowflakeConnector
+from hedra.reporting.connectors.types.snowflake_connector import SnowflakeConnector
 from .postgresql_reporter import PostgresReporter
 
 

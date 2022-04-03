@@ -1,4 +1,4 @@
-from hedra.execution.personas import PersonaManager
+from hedra.core.personas import PersonaManager
 
 
 class PersonasDocs:

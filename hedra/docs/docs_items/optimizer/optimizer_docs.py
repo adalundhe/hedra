@@ -1,4 +1,4 @@
-from hedra.execution.optimizers import Optimizer
+from hedra.core.optimizers import Optimizer
 
 class OptimizerDocs:
 

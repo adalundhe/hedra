@@ -1,7 +1,7 @@
 from __future__ import annotations
 import datetime
 import time
-from hedra.connectors.types.datadog_connector import DatadogConnector as Datadog
+from hedra.reporting.connectors.types.datadog_connector import DatadogConnector as Datadog
 from easy_logger import Logger
 
 

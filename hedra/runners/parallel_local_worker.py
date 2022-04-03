@@ -11,8 +11,9 @@ from alive_progress import alive_bar
 from queue import Queue
 from easy_logger import Logger
 from hedra.command_line import CommandLine
-from hedra.execution.events.handlers import Handler
+from hedra.reporting.handlers import Handler
 from hedra.parsing import ActionsParser
+from .embedded_statserve import EmbeddedStatserve
 from .parallel.jobs import (
     create_job,
     run_job
@@ -106,12 +107,12 @@ class ParallelLocalWorker:
                     command_line.actions = dict(self.config.actions)
                 
                 reporter_config = dict(self.reporter_config.copy())
-        
                 configs.append(dill.dumps({
                     'config': command_line,
                     'reporter_config': reporter_config,
                     'worker_idx': worker
                 }))
+
                 bar()
 
         return configs
@@ -156,7 +157,7 @@ class ParallelLocalWorker:
             )
         )
 
-        self._results = pool.map_async(run_job, configs)
+        self._results = pool.map_async(run_job, configs, )
 
         if self._no_run_visuals:
             self._results = self._results.get()
@@ -193,6 +194,11 @@ class ParallelLocalWorker:
         
     def kill(self):
         loop = asyncio.get_event_loop()
+
+        embedded_statserve = EmbeddedStatserve(self.config)
+        if self.config.embedded_stats:
+            embedded_statserve.run()
+
         handler = Handler(self.config)
         loop.run_until_complete(handler.on_config(self.reporter_config))
 
@@ -211,22 +217,20 @@ class ParallelLocalWorker:
             end_times.append(stats.get('end_time'))
 
         total_completed_actions = sum(total_completed_actions)
+        
+        median_start = statistics.median(start_times)
+        median_end = statistics.median(end_times)
+        median_elapsed = median_end - median_start
 
-        true_start = min(start_times)
-        true_end = max(end_times)
-        true_elapsed = true_end - true_start
-
-        median_elapsed_time = statistics.median(elapsed_times)
         median_actions_per_second = statistics.median(actions_per_second_rates)
         average_actions_per_second = sum(actions_per_second_rates)/self._workers
-        peak_actions_per_second = total_completed_actions/median_elapsed_time
+        peak_actions_per_second = statistics.median(actions_per_second_rates)
 
         self.session_logger.info('\n')
         self.session_logger.info(f'Calculated median APS per-worker of - {median_actions_per_second} - actions per second.')
         self.session_logger.info(f'Calculated average APS per-worker of {average_actions_per_second} - actions per second.')
         self.session_logger.info(f'Calculated estimated peak APS of - {peak_actions_per_second} - actions per second.')
-        self.session_logger.info(f'Total action completed - {total_completed_actions} over actual runtime of - {median_elapsed_time} - seconds')
-        self.session_logger.info(f'Total actions completed - {total_completed_actions} - over wall-clock runtime of - {true_elapsed} - seconds')
+        self.session_logger.info(f'Total actions completed - {total_completed_actions} - over runtime of - {median_elapsed} - seconds')
 
         self.session_logger.info(f'Submitting results for - {self._workers} - workers...\n')
         with alive_bar(
@@ -236,11 +240,15 @@ class ParallelLocalWorker:
             spinner='dots_waves2',
             stats=False
         ) as bar:
-            for result in self._results:
+            for aggregated_events in self._results:
                 loop.run_until_complete(
-                    handler.on_events(result.get('events'), serialize=False)
+                    handler.merge(aggregated_events.get('events'))
                 )
 
-        loop.run_until_complete(handler.on_exit())
+        stats = loop.run_until_complete(handler.get_stats())
+        loop.run_until_complete(handler.on_exit(stats))
+
+        if embedded_statserve.running:
+            embedded_statserve.kill()
 
         self.session_logger.info('\nCompleted run, exiting...\n')

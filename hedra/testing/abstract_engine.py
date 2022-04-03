@@ -1,6 +1,6 @@
 import asyncio
 from typing import Union
-from hedra.execution.engines import Engine
+from hedra.core.engines import Engine
 from hedra.parsing.actions.types.custom_action import CustomAction
 from hedra.parsing.actions.types.graphql_action import GraphQLAction
 from hedra.parsing.actions.types.grpc_action import GrpcAction

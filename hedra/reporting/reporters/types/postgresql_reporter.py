@@ -2,10 +2,9 @@ from __future__ import annotations
 import os
 import psycopg2
 import uuid
-from hedra.connectors.types.postgres_async_connector.postgres_async_connector import PostgresAsyncConnector
-from hedra.reporting.events.types import PostgresEvent
+from hedra.reporting.connectors.types.postgres_async_connector.postgres_async_connector import PostgresAsyncConnector
+from hedra.reporting._events.types import PostgresEvent
 from hedra.reporting.metrics.types import PostgresMetric
-from hedra.connectors.types.postgres_async_connector import PostgresAsyncConnector as Postgres
 from .utils.helpers import SQLHelper
 
 
@@ -16,7 +15,7 @@ class PostgresReporter:
         self.format = 'postgres'
         self.session_id = uuid.uuid4()
         self.reporter_config = config
-        self.connector = Postgres(self.reporter_config)
+        self.connector = PostgresAsyncConnector(self.reporter_config)
 
         self._default_fields = [
             {

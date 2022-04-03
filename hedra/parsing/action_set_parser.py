@@ -1,6 +1,6 @@
 import inspect
 from easy_logger import Logger
-from hedra.execution.engines import engine
+from hedra.core.engines import engine
 
 from .actions import Action
 from async_tools.datatypes import AsyncList

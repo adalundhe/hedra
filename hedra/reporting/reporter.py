@@ -1,7 +1,7 @@
 from hedra.reporting.metrics.metric import Metric
 from hedra.reporting.reporters.types.redis_reporter import RedisReporter
 from .reporters import ReporterStore
-from hedra.reporting.events import Event
+from hedra.reporting._events import Event
 from easy_logger import Logger
 
 
@@ -115,8 +115,7 @@ class Reporter:
         self.reporter_store = ReporterStore(config=self.config)
         await self.reporter_store.init()
 
-    async def on_event(self, data):
-        
+    async def on_event(self, data):   
         event = Event(
             event_type=self.reporter_store.update_reporter.format,
             data=data
@@ -129,14 +128,10 @@ class Reporter:
             if self.fields.get(stream_field) is None and stream_field:
                 self.fields[stream_field] = {}
 
-    async def on_events(self, data):
-        events = [
-            Event(
-                event_type=self.reporter_store.update_reporter.format,
-                data=event
-            ) for event in data
-        ]
+    async def on_merge(self, data):
+        pass
 
+    async def on_events(self, events):
         responses = await self.reporter_store.update_stream(events)
 
         for response in responses:

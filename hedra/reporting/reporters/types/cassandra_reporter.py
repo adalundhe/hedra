@@ -1,7 +1,7 @@
 from __future__ import annotations
 import uuid
-from hedra.connectors.types.cassandra_connector import CassandraConnector as Cassandra
-from hedra.reporting.events.types import CassandraEvent
+from hedra.reporting.connectors.types.cassandra_connector import CassandraConnector as Cassandra
+from hedra.reporting._events.types import CassandraEvent
 from hedra.reporting.metrics.types import CassandraMetric
 from .utils.helpers import CassandraHelper
 

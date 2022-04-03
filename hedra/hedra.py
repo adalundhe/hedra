@@ -30,8 +30,8 @@ def run():
     command_line.generate_config()
 
 
-    updates_server = UpdateServer(config=command_line)
-    embedded_server = EmbeddedStatserve(command_line)
+ 
+    embedded_server = None
 
     logger.setup(command_line.log_level)
     session_logger = logger.generate_logger('hedra')
@@ -41,7 +41,8 @@ def run():
 
     session_logger.info(f'\n{header_text} {hedra_version}\n\n')
 
-    if command_line.embedded_stats:
+    if command_line.embedded_stats and command_line.runner_mode != 'parallel':
+        embedded_server = EmbeddedStatserve(command_line)
         embedded_server.run()
         session_logger.info('\n')
 
@@ -63,6 +64,7 @@ def run():
         parallel_worker.kill()
     
     elif command_line.runner_mode == 'update-server':
+        updates_server = UpdateServer(config=command_line)
         updates_server.run_local()
 
     elif command_line.runner_mode == 'job-leader':
@@ -88,8 +90,7 @@ def run():
     else:
         worker = LocalWorker(command_line)
         worker.run()
-        worker.calculate_results()
-        worker.kill()
+        worker.complete()
 
-    if embedded_server.running:
+    if embedded_server and embedded_server.running:
         embedded_server.kill()

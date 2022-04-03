@@ -1,7 +1,6 @@
 from __future__ import annotations
 import os
-from google.cloud import storage
-from hedra.connectors.types.gcs_connector import GCSConnector
+from hedra.reporting.connectors.types.gcs_connector import GCSConnector
 
 
 class GoogleCloudStorageReporter:

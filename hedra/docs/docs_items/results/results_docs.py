@@ -1,4 +1,4 @@
-from hedra.execution.events.handlers import Handler
+from hedra.reporting.handlers import Handler
 from .reporting_docs import ReportingDocs
 
 

@@ -3,7 +3,7 @@ import dill
 import traceback
 from easy_logger import Logger
 from pycli_tools.arguments.bundler import Bundler
-from hedra.execution import Executor
+from hedra.core import Executor
 from hedra.testing import (
     ActionSet
 )
@@ -44,11 +44,11 @@ def run_job(config):
             job_config.actions = actions.values()
 
         worker = Executor(job_config)
-        parsed_results = loop.run_until_complete(_run_job(worker))
+        results = loop.run_until_complete(_run_job(worker))
 
         return {
             'stats': worker.pipeline.stats,
-            'events': parsed_results
+            'events': results
         }
 
     except Exception as err:
@@ -69,8 +69,6 @@ async def _run_job(worker):
     process_barrier.wait()
 
     return parsed_results
-
-
 
 def create_job(sync_barrier, process_queue, process_stage, optimal_aps, optimal_batch_size, optimal_batch_time):
     global process_barrier

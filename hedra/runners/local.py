@@ -1,6 +1,6 @@
 import asyncio
 from alive_progress import alive_bar
-from hedra.execution import Executor
+from hedra.core import Executor
 
 
 class LocalWorker:
@@ -28,11 +28,7 @@ class LocalWorker:
     def parse_results(self):
         return self.loop.run_until_complete(self.executor.serialize_results())
 
-    def calculate_results(self):
-        return self.loop.run_until_complete(self.executor.calculate_results())
-
-    def kill(self):
-        return self.loop.run_until_complete(self.executor.submit_results())
-
-        
+    def complete(self):
+        aggregate_events = self.loop.run_until_complete(self.executor.calculate_results())
+        return self.loop.run_until_complete(self.executor.submit_results(aggregate_events))
         

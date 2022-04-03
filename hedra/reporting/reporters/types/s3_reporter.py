@@ -1,6 +1,6 @@
 from __future__ import annotations
 import os
-from hedra.connectors.types.s3_connector import S3Connector
+from hedra.reporting.connectors.types.s3_connector import S3Connector
 
 
 

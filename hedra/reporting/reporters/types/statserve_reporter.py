@@ -2,7 +2,7 @@
 from __future__ import annotations
 import uuid
 from hedra.reporting.metrics import Metric
-from hedra.connectors.types.statserve_connector import StatServeConnector as StatServe
+from hedra.reporting.connectors.types.statserve_connector import StatServeConnector as StatServe
 from easy_logger import Logger
 
 class StatServeReporter:
@@ -52,14 +52,11 @@ class StatServeReporter:
         return await self.connector.commit()
 
     async def stream_updates(self, events) -> list:
-        await self.connector.execute_stream([
-            {
-                'type': 'update',
-                **event.to_dict()
-            } for event in events
-        ])
+        results = []
+        async for result in self.connector.execute_stream(events):
+            results.append(result)
 
-        return await self.connector.commit()
+        return results
 
     async def merge(self, connector) -> StatServeReporter:
         return self

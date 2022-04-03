@@ -1,6 +1,6 @@
 from __future__ import annotations
 import uuid
-from hedra.connectors.types.kafka_connector import KafkaConnector as Kafka
+from hedra.reporting.connectors.types.kafka_connector import KafkaConnector as Kafka
 
 
 class KafkaReporter:

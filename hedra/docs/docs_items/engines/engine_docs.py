@@ -1,4 +1,4 @@
-from hedra.execution.engines import Engine
+from hedra.core.engines import Engine
 
 
 class EngineDocs:

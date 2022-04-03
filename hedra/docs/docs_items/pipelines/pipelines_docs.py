@@ -1,5 +1,5 @@
-from hedra.execution import pipelines
-from hedra.execution.pipelines import Pipeline
+from hedra.core import pipelines
+from hedra.core.pipelines import Pipeline
 
 
 
