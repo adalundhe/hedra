@@ -17,18 +17,14 @@ class KafkaReporter:
                 }
             }
 
-
-        self._session_events_topic = 'hedra_events'
         self._session_metrics_topic = 'hedra_metrics'
 
         kafka_topics = self.reporter_config.get('message_topics')
 
         if kafka_topics and len(kafka_topics) > 0:
-            self._session_events_topic = kafka_topics.get('events_topic', 'hedra_events')
             self._session_metrics_topic = kafka_topics.get('metrics_topic', 'hedra_metrics')
 
         self.reporter_config['kafka_topics'] = [
-            self._session_events_topic,
             self._session_metrics_topic
         ]
 
@@ -48,26 +44,6 @@ class KafkaReporter:
     async def init(self) -> KafkaReporter:
         await self.connector.connect()
         return self
-    
-    async def update(self, event) -> list:
-        await self.connector.execute({
-            'type': 'update',
-            'message_topic': self._session_events_topic
-            **event.event.to_format()
-        })
-
-        return await self.connector.commit()
-
-    async def merge(self, connector) -> KafkaReporter:
-        return self
-
-    async def fetch(self, key=None, stat_type=None, stat_field=None, partial=False) -> list:
-        await self.connector.execute({
-            'type': 'query',
-            'message_topic': self._session_events_topic
-        })
-
-        return await self.connector.commit()
 
     async def submit(self, metric) -> KafkaReporter:
         await self.connector.execute({

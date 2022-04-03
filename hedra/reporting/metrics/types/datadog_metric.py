@@ -38,30 +38,30 @@ class DataDogMetric(BaseMetric):
         
         
         self.metric_name = '{metric_name}_{stat_type}'.format(
-            metric_name=metadata.get('metric_name'),
+            metric_name=metadata.get('event_name'),
             stat_type=stat_type
         )
         self.metric_value = value
         self.metric_stat = self.types_map.get(stat_type)
-        self.metric_host = metadata.get('metric_host')
+        self.metric_host = metadata.get('event_host')
 
         self.tags = MetricTagCollection(
-            tags=metadata.get('metric_tags'),
+            tags=metadata.get('event_tags'),
             reporter_format=self.format
         )
 
         self.metric_tags = [
             {
                 'name': 'metric_url',
-                'value': metadata.get('url')
+                'value': metadata.get('event_url')
             },
             {
                 'name': 'metric_host',
-                'value': metadata.get('metric_host')
+                'value': metadata.get('event_host')
             },
             {
                 'name': 'metric_type',
-                'value': metadata.get('method')
+                'value': metadata.get('event_type')
             },
             *self.tags.to_dict_list()
         ]

@@ -39,33 +39,6 @@ class MongoDBReporter:
         self.metrics_collection = self.reporter_config.get('metrics', 'hedra_metrics')
         await self.connector.connect()
         return self
-
-    async def update(self, event) -> list:
-        insert_event_query = to_record(
-            collection_name=self.events_collection,
-            data=event
-        )
-       
-        await  self.connector.execute(insert_event_query)
-        return await self.connector.commit()
-
-    async def merge(self, connector) -> MongoDBReporter:
-        return self
-
-    async def fetch(self, key=None, stat_type=None, stat_field=None, partial=False) -> list:
-        events_fetch_query = to_query(
-            collection_name=self.events_collection,
-            key=key,
-            stat_field=stat_field,
-            stat_type=stat_type,
-            partial=partial
-        )
-
-        await self.connector.execute(
-            events_fetch_query
-        )
-        
-        return await self.connector.commit()
     
     async def submit(self, metric) -> MongoDBReporter:
         insert_metric_query = to_record(

@@ -188,9 +188,10 @@ class WorkerServicesManager:
         ], timeout=self.worker_request_timeout)
 
         results = await asyncio.gather(*worker_job_responses)
-
-        selected_results = results.pop()
-        return MessageToDict(selected_results).get('reporterFields', [])
+            
+        return [
+            MessageToDict(worker_job).get('jobResults', {}) for worker_job in results
+        ]
 
     @connect_with_retry_async(wait_buffer=5, timeout_threshold=15)
     async def _get_worker_job_results(self, worker, job):

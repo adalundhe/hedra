@@ -6,7 +6,7 @@ asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 uvloop.install()
 from operator import countOf
 from hedra.core import Executor
-from hedra.reporting.handlers import Handler
+from hedra.reporting import Handler
 from hedra.runners.leader_services.proto import PipelineStageRequest
 from hedra.runners.utils.connect_timeout import connect_or_return_none
 from easy_logger import Logger
@@ -53,7 +53,7 @@ class WorkerPipeline:
 
         self._worker_poll_rate = job.get('poll_rate', 1)
 
-        await self.handler.on_config(self.reporter_config)
+        await self.handler.connect()
         self.status = 'created'
 
     async def run(self, job_id=None):
@@ -73,7 +73,7 @@ class WorkerPipeline:
             completed_actions = self.executor.pipeline.stats.get('completed_actions')
             self.executor.session_logger.info(f'Processing - {completed_actions} - action results.')
 
-            await self.handler.on_events(
+            await self.handler.aggregate(
                 self.executor.pipeline.results
             )
 
@@ -96,7 +96,7 @@ class WorkerPipeline:
 
         self.status = 'completed'
         
-        return self.handler.reporter.fields
+        return await self.handler.get_stats()
 
     async def check_for_completion(self, job_id=None):
         

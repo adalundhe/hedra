@@ -2,7 +2,7 @@ import asyncio
 import time
 import os
 from easy_logger import Logger
-from hedra.reporting.handlers import Handler
+from hedra.reporting import Handler
 from hedra.runners.leader_services.bootstrap import BootstrapManager
 from hedra.runners.leader_services.leader_registry import LeaderRegistry
 from hedra.runners.leader_services.leader_registry.leader_service import LeaderService
@@ -49,10 +49,10 @@ class ElectionManager:
             'host_id': str(self.leader_id)
         }
 
-    async def elect_leader_and_submit(self, reporter_fields, job_id=None):
+    async def elect_leader_and_submit(self, job_results, job_id=None):
 
         handler = Handler(self.config)
-        await handler.on_config(self.reporter_config)
+        await handler.connect()
 
         if job_id:
             self.session_logger.info(f'\nJob - {job_id} has completed...')
@@ -79,11 +79,12 @@ class ElectionManager:
 
                 if self.elected_leader:
                     self.session_logger.info(f'Elected leader at - {self.elected_leader.service_address} - to submit results.')
-                    handler.reporter.fields = reporter_fields
+                    
+                    await handler.merge(job_results)
 
                 if self.is_leader:
                     self.session_logger.info(f'Leader - {self.leader_address} - submitting session results...')
-                    submitted = await handler.on_exit()
+                    submitted = await handler.submit()
                     self.session_logger.info(f'Results submitted!\n')
                     self.poll_completed = submitted
                     await self.wait_until_poll_complete()
@@ -106,8 +107,8 @@ class ElectionManager:
         if submitted is False:
             self.session_logger.info(f'Elected leader at - {self.leader_address} - to submit results.\n')
 
-            handler.reporter.fields = reporter_fields
-            await handler.on_exit()
+            aggregate_events = await handler.get_stats()
+            await handler.submit(aggregate_events)
             self.session_logger.info(f'Results submitted!\n')
 
     async def elect_leader(self):

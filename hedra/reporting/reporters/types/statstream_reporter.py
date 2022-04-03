@@ -44,34 +44,6 @@ class StatStreamReporter:
         await self.connector.connect()
         return self
 
-    async def update(self, event) -> list:
-        await self.connector.execute({
-            'type': 'update',
-            'stream_name': self.stream_name,
-            **event.to_dict()
-        })
-
-        return await self.connector.commit()
-
-    async def merge(self, connector) -> StatStreamReporter:
-        return self
-
-    async def fetch(self, key=None, stat_type=None, stat_field=None, partial=False) -> list:
-        if partial:
-            query_type = 'stat_query'       
-        else:
-            query_type = 'field_query'
-
-        await self.connector.execute({
-            'stream_name': self.stream_name,
-            'key': key,
-            'stat_type': stat_type,
-            'stat_field': stat_field,
-            'type': query_type
-        })
-
-        return await self.connector.commit()
-
     async def submit(self, metric) -> StatStreamReporter:
         self.connector.connection.results += [metric.to_dict()]
         return self

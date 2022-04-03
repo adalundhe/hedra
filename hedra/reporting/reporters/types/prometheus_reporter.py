@@ -2,7 +2,6 @@ from __future__ import annotations
 import uuid
 from hedra.reporting.connectors.types.prometheus_connector import PrometheusConnector as Prometheus
 from .utils.tools.prometheus_tools import (
-    event_to_prometheus_metric,
     metric_to_prometheus_metric
 )
 
@@ -34,30 +33,10 @@ class PrometheusReporter:
             'job_name': self.session_id,
             **self.reporter_config
         })
+        
         await self.connector.connect()
 
         return self
-
-    async def update(self, event) -> list:
-        prometheus_metric = event_to_prometheus_metric(event, self.session_id)
-        await self.connector.execute(prometheus_metric)
-    
-        return await self.connector.commit()
-
-    async def merge(self, connector):
-        return self
-
-    async def fetch(self, key=None, stat_type=None, stat_field=None, partial=False) -> list:
-        await self.connector.execute({
-            'name': key,
-            'labels': {
-                'type': stat_type,
-                'field': stat_field ,
-                'session_id': self.session_id
-            }
-        })
-        
-        return await self.connector.commit()
 
     async def submit(self, metric) -> PrometheusReporter:
         prometheus_metric = metric_to_prometheus_metric(metric, self.session_id)

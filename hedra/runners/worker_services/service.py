@@ -100,8 +100,8 @@ class WorkerService(WorkerServerServicer):
         job = await self.job_registry.get_from_active(results_request.job_id)
 
         if job and job.pipeline.status == 'completed':
-            reporter_fields = await job.get_task()
-            response.reporter_fields.extend(reporter_fields)
+            job_results = await job.get_task()
+            response.job_results.update(job_results)
             await job.remove_leader(results_request.host_address)
             await self.job_registry.set_job_complete(job.job_id)
 

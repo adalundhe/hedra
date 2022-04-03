@@ -53,7 +53,6 @@ class DatadogReporter:
 
         if self.reporter_config.get('dashboard_config'):
             dashboard_config = self.reporter_config.get('dashboard_config')
-            events_dashboard = dashboard_config.get('events_dashboard')
             metrics_dashboard = dashboard_config.get('metrics_dashboard')
             
             if dashboard_config.get('id') is None:
@@ -64,48 +63,8 @@ class DatadogReporter:
             await self.connector.execute({
                 'type': 'dashboard',
                 'action': action
-                **events_dashboard
-            })
-
-            await self.connector.execute({
-                'type': 'dashboard',
-                'action': action
                 **metrics_dashboard
             })
-
-
-    async def update(self, event) -> dict:
-
-        await self.connector.execute({
-            'type': 'event',
-            'action': 'create',
-            **event.to_dict()
-        })
-
-        return {
-            'field': event.event.aggregation_key,
-            'message': 'OK'
-        }
-
-    async def merge(self, connector) -> DatadogReporter:
-        return self
-
-    async def fetch(self, key=None, stat_type=None, stat_field=None, partial=False) -> list:
-        current_time = time.mktime(
-            datetime.datetime.now().timetuple()
-        )
-
-        await self.connector.execute({
-            'type': 'metric',
-            'action': 'get',
-            'name': key,
-            'options': {
-                'from_time': self._start_time,
-                'to_time': current_time
-            }
-        })
-
-        return await self.connector.commit()
 
     async def submit(self, metric) -> DatadogReporter:
         await self.connector.execute({

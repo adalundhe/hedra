@@ -28,21 +28,6 @@ class SnowflakeReporter(PostgresReporter):
     async def init(self) -> SnowflakeReporter:
         await super().init()
         return self
-    
-    async def update(self, event) -> SnowflakeReporter:
-        return await super().update(event)        
-
-    async def merge(self, connector) -> SnowflakeReporter:
-        await super().merge(connector)
-        return self
-
-    async def fetch(self, key=None, stat_type=None, stat_field=None, partial=False) -> list:
-        return await super().fetch(
-            key=key,
-            stat_type=stat_type, 
-            stat_field=stat_field, 
-            partial=partial
-        )
 
     async def submit(self, metric) -> SnowflakeReporter:
         return await super().submit(metric) 

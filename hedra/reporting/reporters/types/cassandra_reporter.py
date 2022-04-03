@@ -1,7 +1,5 @@
 from __future__ import annotations
-import uuid
 from hedra.reporting.connectors.types.cassandra_connector import CassandraConnector as Cassandra
-from hedra.reporting._events.types import CassandraEvent
 from hedra.reporting.metrics.types import CassandraMetric
 from .utils.helpers import CassandraHelper
 
@@ -42,10 +40,6 @@ class CassandraReporter:
             "keyspace": self.cassandra_helper.keyspace_config,
             "tables": [
                 self.cassandra_helper.as_table(
-                    table_name=self.events_table,
-                    data=CassandraEvent
-                ),
-                self.cassandra_helper.as_table(
                     table_name=self.metrics_table,
                     data=CassandraMetric
                 ),
@@ -55,49 +49,6 @@ class CassandraReporter:
         })
 
         return self
-
-    async def update(self, event) -> list:
-
-        insert_query = await self.cassandra_helper.to_record(
-            table=self.events_table,
-            data=event,
-            timestamp=event.get_utc_time()
-        )
-
-        await self.connector.execute(insert_query.get('table'))
-
-        for insert_tag_query in insert_query.get('tags_table'):
-            await self.connector.execute(insert_tag_query)
-
-        return await self.connector.commit()
-
-    async def merge(self, connector) -> CassandraReporter:
-        #TODO: Implement merge.
-        return self
-
-    async def fetch(self, key=None, stat_type=None, stat_field=None, partial=False) -> list:
-        query = await self.cassandra_helper.to_query(
-            table=self.events_table,
-            tags_table=self.events_tags_table
-        )
-
-        await self.connector.execute(
-            query.get('table')
-        )
-        
-        event = await self.connector.commit()
-
-        await self.connector.execute(
-            query.get('tags_table')
-        )
-        event_tags = await self.connector.commit()
-
-        return [
-            {
-                **event,
-                'tags': event_tags
-            }
-        ]
 
     async def submit(self, metric) -> CassandraReporter:
 

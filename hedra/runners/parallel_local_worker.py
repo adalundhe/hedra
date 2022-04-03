@@ -11,7 +11,7 @@ from alive_progress import alive_bar
 from queue import Queue
 from easy_logger import Logger
 from hedra.command_line import CommandLine
-from hedra.reporting.handlers import Handler
+from hedra.reporting import Handler
 from hedra.parsing import ActionsParser
 from .embedded_statserve import EmbeddedStatserve
 from .parallel.jobs import (
@@ -200,7 +200,7 @@ class ParallelLocalWorker:
             embedded_statserve.run()
 
         handler = Handler(self.config)
-        loop.run_until_complete(handler.on_config(self.reporter_config))
+        loop.run_until_complete(handler.connect())
 
         actions_per_second_rates = []
         total_completed_actions = []
@@ -232,21 +232,15 @@ class ParallelLocalWorker:
         self.session_logger.info(f'Calculated estimated peak APS of - {peak_actions_per_second} - actions per second.')
         self.session_logger.info(f'Total actions completed - {total_completed_actions} - over runtime of - {median_elapsed} - seconds')
 
-        self.session_logger.info(f'Submitting results for - {self._workers} - workers...\n')
-        with alive_bar(
-            title='Processing results...',
-            bar=None, 
-            monitor=False,
-            spinner='dots_waves2',
-            stats=False
-        ) as bar:
-            for aggregated_events in self._results:
-                loop.run_until_complete(
-                    handler.merge(aggregated_events.get('events'))
-                )
+        self.session_logger.info(f'Submitting results for - {self._workers} - workers...')
+
+        for aggregated_events in self._results:
+            loop.run_until_complete(
+                handler.merge(aggregated_events.get('events'))
+            )
 
         stats = loop.run_until_complete(handler.get_stats())
-        loop.run_until_complete(handler.on_exit(stats))
+        loop.run_until_complete(handler.submit(stats))
 
         if embedded_statserve.running:
             embedded_statserve.kill()

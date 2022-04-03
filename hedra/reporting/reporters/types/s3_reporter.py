@@ -12,7 +12,6 @@ class S3Reporter:
         self.session = None
         
         buckets_config = self.reporter_config.get('bucket_config')
-        self.events_bucket = buckets_config.get('events_bucket', os.getenv('S3_EVENTS_BUCKET', 'events'))
         self.metrics_bucket = buckets_config.get('metrics_bucket', os.getenv('S3_METRICS_BUCKET', 'metrics'))
 
         self.connector = S3Connector(self.reporter_config)
@@ -58,33 +57,6 @@ class S3Reporter:
     async def init(self) -> S3Reporter:
         await self.connector.connect()
         return self
-
-    async def update(self, event) -> list:
-        await self.connector.execute({
-            'bucket': self.events_bucket,
-            'key': event.event.name,
-            'data': event.to_dict(),
-            'data_type': 'json',
-            'type': 'put'
-        })
-
-        return [
-            {
-                'field': event.event.name,
-                'message': 'OK'
-            }
-        ]
-
-    async def merge(self, connector) -> S3Reporter:
-        return self
-
-    async def fetch(self, key=None, stat_type=None, stat_field=None, partial=False) -> list:
-        await self.connector.execute({
-            'bucket': self.metrics_bucket,
-            'key': key
-        })
-        
-        return await self.connector.commit()
 
     async def submit(self, metric) -> S3Reporter:
         await self.connector.execute({

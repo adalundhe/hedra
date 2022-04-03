@@ -33,13 +33,13 @@ class PrometheusMetric(StatStreamMetric):
 
         self.tags.add_tags([
             'metric_url:{url}'.format(
-                url=metadata.get('metric_url')
+                url=metadata.get('event_url')
             ),
             'metric_host:{host}'.format(
-                host=metadata.get('metric_host')
+                host=metadata.get('event_host')
             ),
             'metric_type:{request_type}'.format(
-                request_type=metadata.get('metric_type')
+                request_type=metadata.get('event_type')
             )
         ])
 

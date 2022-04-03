@@ -167,8 +167,8 @@ class JobRegistry:
 
             if completed:
                 await active_job.set_job_status('completed')
-                reporter_fields = await self.workers.get_worker_job_results(active_job)
-                active_job.results_task = asyncio.create_task(self.electorate.elect_leader_and_submit(reporter_fields, job_id=active_job.job_id)) 
+                job_results = await self.workers.get_worker_job_results(active_job)
+                active_job.results_task = asyncio.create_task(self.electorate.elect_leader_and_submit(job_results, job_id=active_job.job_id)) 
 
                 self.completed[job_id] = active_job
             else:

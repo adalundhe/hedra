@@ -32,12 +32,6 @@ class ParallelHandler:
             event = Event(action)
             await event.assert_response()
 
-            # response_dict = response.to_dict()
-            # event = Event(
-            #     event_type='statstream',
-            #     data=response_dict
-            # )
-    
             event_names.add(event.data.name)
 
             await self.connector.execute({

@@ -48,7 +48,7 @@ message JobCompleteRequest {
 message JobCompleteResponse {
     string host_address = 1;
     string host_id = 2;
-    repeated string reporter_fields = 3;
+    google.protobuf.Struct job_results = 3;
 }
 
 message WorkerHeartbeatRequest {

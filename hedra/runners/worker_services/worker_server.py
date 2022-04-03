@@ -7,7 +7,7 @@ from easy_logger import Logger
 from .service import WorkerService
 from .proto import add_WorkerServerServicer_to_server
 
-class UpdatesServer:
+class WorkerServer:
 
     def __init__(self, config, reporter_config, worker_id):
         logger = Logger()

@@ -1,18 +1,50 @@
 import uuid
 from easy_logger import Logger
-from hedra.reporting import Reporter
 from hedra.reporting.events import Event
+from hedra.reporting.metrics import Metric
 from hedra.reporting.connectors.types.statstream_connector import StatStreamConnector
 from statstream.streaming import StatStream
 from async_tools.datatypes import AsyncList
+from hedra.command_line import CommandLine
+from .reporters.types import (
+    DatadogReporter,
+    JSONReporter,
+    CassandraReporter,
+    StatStreamReporter,
+    StatServeReporter,
+    MongoDBReporter,
+    PostgresReporter,
+    PrometheusReporter,
+    KafkaReporter,
+    S3Reporter,
+    GoogleCloudStorageReporter,
+    SnowflakeReporter,
+    RedisReporter
+)
+
 
 
 class Handler:
 
-    def __init__(self, config):
+    reporters = {
+        'datadog': DatadogReporter,
+        'json': JSONReporter,
+        'cassandra': CassandraReporter,
+        'statserve': StatServeReporter,
+        'statstream': StatStreamReporter,
+        'mongodb': MongoDBReporter,
+        'postgres': PostgresReporter,
+        'prometheus': PrometheusReporter,
+        'kafka': KafkaReporter,
+        's3': S3Reporter,
+        'gcs': GoogleCloudStorageReporter,
+        'snowflake': SnowflakeReporter,
+        'redis': RedisReporter
+    }
+
+    def __init__(self, config: CommandLine):
         self.config = config
         self.runner_mode = self.config.runner_mode
-        self.reporter = Reporter()
         self.batches = 0
 
         self.session_id = str(uuid.uuid4())
@@ -27,7 +59,12 @@ class Handler:
 
         logger = Logger()
         self.session_logger = logger.generate_logger('hedra')
+        self.reporter_config = config.reporter_config
 
+        self.reporter_type = self.reporter_config.get('reporter_type', 'statserve')
+        self.reporter = self.reporters.get(self.reporter_type)(
+            self.reporter_config
+        )
 
     @classmethod
     def about(cls):
@@ -84,8 +121,8 @@ class Handler:
         '''
 
 
-    async def on_config(self, reporter_config):
-        await self.reporter.initialize(reporter_config, log_level=self.config.log_level)
+    async def connect(self):
+        await self.reporter.init()
 
     async def merge(self, aggregate_events):
 
@@ -100,7 +137,7 @@ class Handler:
     async def get_stats(self):
         return await self.stream.get_stream_stats()
             
-    async def aggregate(self, actions):
+    async def aggregate(self, actions, bar=None):
 
         event_names = set()
         await self.connector.connect()
@@ -117,6 +154,9 @@ class Handler:
                 **event.to_dict()
             })
 
+            if bar:
+                bar()
+
         await self.connector.commit()
 
         for event_name in event_names:
@@ -128,11 +168,26 @@ class Handler:
                 
         return await self.connector.commit()
 
-    async def on_exit(self, aggregate_events):
+    async def submit(self, aggregate_events):
         if self.runner_mode == 'worker':
             self.session_logger.warning('Warning: Results cannot be generated for distributed workers.')
         else:
-            await self.reporter.on_output(aggregate_events)
+            for aggregate_event in aggregate_events.values():
+                metadata = aggregate_event.get('metadata')
+                stats = aggregate_event.get('stats')
+                
+                for stat_name, stat in stats.items():
+
+                    metric = Metric(
+                        reporter_type=self.reporter_type,
+                        stat=stat_name,
+                        value=stat,
+                        metadata=metadata
+                    )
+
+                    await self.reporter.submit(metric)
+
+        await self.reporter.close()
 
         return True
 

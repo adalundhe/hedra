@@ -60,34 +60,6 @@ class GoogleCloudStorageReporter:
         await self.connector.connect()
         return self
 
-    async def update(self, event) -> list:
-
-        await self.connector.execute({
-            'bucket': self.events_bucket,
-            'key': event.event.name,
-            'data': event.to_dict(),
-            'data_type': 'json',
-            'type': 'put'
-        })
-
-        return [
-            {
-                'field': event.event.name,
-                'message': 'OK'
-            }
-        ]
-
-    async def merge(self, connector) -> GoogleCloudStorageReporter:
-        return self
-
-    async def fetch(self, key=None, stat_type=None, stat_field=None, partial=False) -> list:
-        await self.connector.execute({
-            'bucket': self.metrics_bucket,
-            'key': key
-        })
-
-        return await self.connector.commit()
-
     async def submit(self, metric) -> GoogleCloudStorageReporter:
         await self.connector.execute({
             'bucket': self.metrics_bucket,

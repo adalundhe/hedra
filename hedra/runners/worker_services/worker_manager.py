@@ -2,7 +2,7 @@ import asyncio
 import os
 import uuid
 from easy_logger import Logger
-from .updates_server import UpdatesServer
+from .worker_server import WorkerServer
 
 
 class WorkerManager:
@@ -35,7 +35,7 @@ class WorkerManager:
         self.session_logger.info(f'Initializing worker at - {self.worker_address}')
 
 
-        self.server = UpdatesServer(config, reporter_config, self.worker_id)
+        self.server = WorkerServer(config, reporter_config, self.worker_id)
         self.running = True
 
     async def register(self):

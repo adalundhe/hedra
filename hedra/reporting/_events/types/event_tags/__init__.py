@@ -1,1 +1,0 @@
-from .event_tag_collection import EventTagCollection

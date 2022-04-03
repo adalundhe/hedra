@@ -2,7 +2,7 @@ import asyncio
 from alive_progress import alive_bar
 from easy_logger import Logger
 from .personas import PersonaManager
-from hedra.reporting.handlers import Handler, ParallelHandler
+from hedra.reporting import Handler, ParallelHandler
 from hedra.parsing import ActionsParser
 from .pipelines import Pipeline
 from async_tools.functions import check_event_loop
@@ -44,7 +44,7 @@ class Executor:
 
         if self._is_parallel is False:
             self.session_logger.info('Initializing reporting...')
-            await self.handler.on_config(reporter_config)
+            await self.handler.connect()
             self.session_logger.info('Reporter successfully connected!')
 
         await self.actions.parse()
@@ -87,17 +87,18 @@ class Executor:
         self.session_logger.info(f'Processing - {completed_actions} - action results.')
 
         with alive_bar(
+            total=self.pipeline.stats.get('completed_actions'),
             title='Processing results...',
             bar=None, 
-            spinner='dots_waves2',
-            monitor=False,
-            stats=False
+            spinner='dots_waves2'
         ) as bar:
-            return await self.handler.aggregate(self.pipeline.results)
+            await self.handler.aggregate(self.pipeline.results, bar=bar)
+
+        return await self.handler.get_stats()
 
     async def submit_results(self, aggregate_events):
         self.session_logger.info('Requesting session summary from reporter...')
-        await self.handler.on_exit(aggregate_events)
+        await self.handler.submit(aggregate_events)
         self.session_logger.info('Summary generated!')
         self.session_logger.info('Exiting now. Goodbye!\n')
 

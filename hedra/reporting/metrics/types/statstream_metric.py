@@ -28,26 +28,26 @@ class StatStreamMetric(BaseMetric):
         self.metric_value = value
         
         self.metric_name = '{metric_name}_{stat}'.format(
-            metric_name=metadata.get('metric_name'),
+            metric_name=metadata.get('event_name'),
             stat=self.metric_stat
         )
 
-        self.metric_host = metadata.get('metric_host')
-        self.metric_url = metadata.get('metric_url')
-        self.metric_type = metadata.get('metric_type')
+        self.metric_host = metadata.get('event_host')
+        self.metric_url = metadata.get('event_url')
+        self.metric_type = metadata.get('event_type')
 
         self.tags = MetricTagCollection(
             reporter_format=self.format
         )
 
-        self.tags.add_tags(metadata.get('metric_tags'))
+        self.tags.add_tags(metadata.get('event_tags'))
 
         self.metric_tags = self.tags.to_dict_list()
         
-        if metadata.get('metric_context'):
+        if metadata.get('event_context'):
             self.metric_tags.append({
                 'tag_name': 'metric_context',
-                'tag_value': metadata.get('metric_context')
+                'tag_value': metadata.get('event_context')
             })
 
     @classmethod

@@ -26,28 +26,6 @@ class JSONReporter:
     async def init(self) -> JSONReporter:
         pass
 
-    async def update(self, event) -> list:
-
-        event_name = event.data.get('event_name')
-        event_dict = {
-            'time': event.get_utc_time(),
-            **event.to_dict()
-        }
-
-        if self.events.get(event_name) is None:
-            self.events[event_name] = [ event_dict ]
-
-        else:
-            self.events[event_name] += [ event_dict ]
-
-        return list(self.events.values())
-
-    async def merge(self, connector) -> JSONReporter:
-        return self
-
-    async def fetch(self, key=None) -> list:
-        return [ self.events.get(key) ]
-
     async def submit(self, metric) -> JSONReporter:
 
         metric_name = metric.metric.name
