@@ -21,7 +21,7 @@ class PlaywrightEvent:
         self._error = action.get('error')
         self.status = None
 
-    async def assert_response(self):
+    async def assert_result(self):
         try:
             if self._error:
                 raise self._error

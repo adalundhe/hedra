@@ -29,22 +29,12 @@ def run():
     command_line.execute_cli()
     command_line.generate_config()
 
-
- 
-    embedded_server = None
-
     logger.setup(command_line.log_level)
     session_logger = logger.generate_logger('hedra')
-
 
     check_event_loop(session_logger)
 
     session_logger.info(f'\n{header_text} {hedra_version}\n\n')
-
-    if command_line.embedded_stats and command_line.runner_mode != 'parallel':
-        embedded_server = EmbeddedStatserve(command_line)
-        embedded_server.run()
-        session_logger.info('\n')
 
     if command_line.runner_mode == 'ephemeral-leader':
         leader = LeaderJobServer(command_line)
@@ -91,6 +81,3 @@ def run():
         worker = LocalWorker(command_line)
         worker.run()
         worker.complete()
-
-    if embedded_server and embedded_server.running:
-        embedded_server.kill()

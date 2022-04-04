@@ -90,11 +90,7 @@ class Engine:
 
     async def setup(self, actions):
         await self.engine.create_session(actions)
-
-    async def execute(self, action):
-        async for http_response in self.engine.execute(action):
-            yield http_response
-
+        
     async def defer_all(self, actions):
         async for response in self.engine.defer_all(actions):
             yield response

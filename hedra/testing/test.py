@@ -18,35 +18,14 @@ class Test:
     optimize_iter_duration=10
     optimizer_type='shgo'
     gradient=0.1
-    pool_size=int(psutil.cpu_count(logical=False)/2) + 2
+    pool_size=psutil.cpu_count(logical=False)
     no_run_visuals=False
     session_url=None
     request_timeout=None
-    update_connector_type='statserve'
-    fetch_connector_type='statserve'
-    submit_connector_type='statserve'
-    update_config={
-        "stream_config": {
-            "stream_name": "hedra",
-            "fields": {}
-        }
-
+    reporter_type='statstream'
+    reporter_config={
+        "save_to_file": True
     }
-    fetch_config={
-        "stream_config": {
-            "stream_name": "hedra",
-            "fields": {}
-        }
-
-    }
-    submit_config={
-        "save_to_file": True,
-        "stream_config": {
-            "stream_name": "hedra",
-            "fields": {}
-        }
-    }
-
 
     def __init__(self) -> None:
         self.executor_config = {
@@ -70,12 +49,8 @@ class Test:
         }
 
         self.reporter_config = {
-            'update_connector_type': self.update_connector_type,
-            'fetch_connector_type': self.fetch_connector_type,
-            'submit_connector_type': self.submit_connector_type,
-            'update_config': self.update_config,
-            'fetch_config': self.fetch_config,
-            'submit_config': self.submit_config
+            'reporter_type': self.reporter_type,
+            **self.reporter_config
         }
         
     @classmethod
@@ -158,4 +133,3 @@ class Test:
         hook to minimize boilerplate code to setup Engine sessions.
 
         '''
-{"stream_config": { "stream_name": "hedra", "fields": {}}}

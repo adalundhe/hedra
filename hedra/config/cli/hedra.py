@@ -35,7 +35,7 @@ hedra_cli = {
             'class_type': ActionSet,
             "envar_default": "CODE_FILEPATH",
             "required": False,
-            "help": "The path to the actions JSON file for Hedra to load."
+            "help": "The path to the actions Python file for Hedra to load."
         },
         {
             "map_name": "executor_config",

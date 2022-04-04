@@ -195,12 +195,8 @@ class ParallelLocalWorker:
     def kill(self):
         loop = asyncio.get_event_loop()
 
-        embedded_statserve = EmbeddedStatserve(self.config)
-        if self.config.embedded_stats:
-            embedded_statserve.run()
-
         handler = Handler(self.config)
-        loop.run_until_complete(handler.connect())
+        loop.run_until_complete(handler.initialize_reporter())
 
         actions_per_second_rates = []
         total_completed_actions = []
@@ -223,10 +219,9 @@ class ParallelLocalWorker:
         median_elapsed = median_end - median_start
 
         median_actions_per_second = statistics.median(actions_per_second_rates)
-        average_actions_per_second = sum(actions_per_second_rates)/self._workers
-        peak_actions_per_second = statistics.median(actions_per_second_rates)
+        peak_actions_per_second = sum(actions_per_second_rates)
+        average_actions_per_second = peak_actions_per_second/self._workers
 
-        self.session_logger.info('\n')
         self.session_logger.info(f'Calculated median APS per-worker of - {median_actions_per_second} - actions per second.')
         self.session_logger.info(f'Calculated average APS per-worker of {average_actions_per_second} - actions per second.')
         self.session_logger.info(f'Calculated estimated peak APS of - {peak_actions_per_second} - actions per second.')
@@ -241,8 +236,5 @@ class ParallelLocalWorker:
 
         stats = loop.run_until_complete(handler.get_stats())
         loop.run_until_complete(handler.submit(stats))
-
-        if embedded_statserve.running:
-            embedded_statserve.kill()
 
         self.session_logger.info('\nCompleted run, exiting...\n')

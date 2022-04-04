@@ -53,7 +53,7 @@ class WorkerPipeline:
 
         self._worker_poll_rate = job.get('poll_rate', 1)
 
-        await self.handler.connect()
+        await self.handler.initialize_reporter()
         self.status = 'created'
 
     async def run(self, job_id=None):

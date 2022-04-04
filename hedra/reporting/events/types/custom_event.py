@@ -17,7 +17,7 @@ class CustomEvent:
         self.status = None
         self.context = None
 
-    async def assert_response(self):
+    async def assert_result(self):
         try:
             if self.success_condition:
                 assert self.success_condition(self._response) == True

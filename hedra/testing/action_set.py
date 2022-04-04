@@ -1,7 +1,8 @@
-import psutil
+from telnetlib import EXOPL
+from hedra.core.engines import Engine
+from hedra.parsing.actions.action import Action
 from async_tools.datatypes.async_list import AsyncList
 from .hooks import setup, teardown
-from .abstract_engine import AbstractEngine
 from hedra.parsing.actions import Action
 from .hooks import (
     setup,
@@ -16,10 +17,11 @@ class ActionSet:
     config={}
 
     def __init__(self) -> None:
-        self.engine = AbstractEngine(config={
+        engine = Engine({
             'engine_type': self.engine_type,
             **self.config
-        })
+        }, None)
+        self.engine = engine.engine
         self.actions = AsyncList()
 
     @classmethod
@@ -96,13 +98,16 @@ class ActionSet:
 
     @setup('setup_action_set')
     async def setup(self):
-        await self.engine.setup_engine(self.session)
+        self.engine.session = self.session
 
-    async def execute(self, action: dict, group: str=None):
-        custom_action = Action(action, self.engine.engine_type, group=group)
-        return await self.engine.execute(custom_action.type)
+    def execute(self, action_data: dict, group: str=None):
+        action = Action(action_data, self.engine_type, group=group)
+        return self.engine.execute(action.type)
 
     @teardown('teardown_action_set')
     async def close(self):
-        await self.engine.close()
+        try:
+            await self.engine.close()
+        except Exception:
+            pass
     

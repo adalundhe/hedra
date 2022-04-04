@@ -65,7 +65,7 @@ async def _run_job(worker):
         process_barrier.wait()
 
     stage.value = b'serializing'
-    parsed_results = await worker.serialize_results()
+    parsed_results = await worker.calculate_results()
     process_barrier.wait()
 
     return parsed_results

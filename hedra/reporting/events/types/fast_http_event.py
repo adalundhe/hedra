@@ -6,7 +6,7 @@ class FastHttpEvent(HttpEvent):
     def __init__(self, action):
         super(FastHttpEvent, self).__init__(action)
 
-    async def assert_response(self):
+    async def assert_result(self):
         try:
             if self._response is None:
                 raise self._error

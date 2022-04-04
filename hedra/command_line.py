@@ -56,6 +56,8 @@ class CommandLine(BaseConfig):
         self.config_helper.merge('config', 'reporter_config', sub_key='reporter_config')
 
         self.embedded_stats = self.config_helper['embedded_stats']
+
+        self.runner_mode = self.config_helper['runner_mode']
         self.log_level = self.config_helper['log_level']
 
         jobs_config = self.config_helper['jobs_config']
@@ -100,8 +102,6 @@ class CommandLine(BaseConfig):
 
             self.actions = code_actions
             self.executor_config['engine_type'] = 'action-set'
-
-        self.runner_mode = self.config_helper['runner_mode']
 
         logger = Logger()
         session_logger = logger.generate_logger('hedra')

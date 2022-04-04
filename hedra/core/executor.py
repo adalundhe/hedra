@@ -44,7 +44,7 @@ class Executor:
 
         if self._is_parallel is False:
             self.session_logger.info('Initializing reporting...')
-            await self.handler.connect()
+            await self.handler.initialize_reporter()
             self.session_logger.info('Reporter successfully connected!')
 
         await self.actions.parse()
@@ -65,46 +65,52 @@ class Executor:
             self.session_logger.info('Executing load testing...\n')
         
         await self.pipeline.execute()
+
+        self._results = self.pipeline.results
+        self._stats = self.pipeline.stats
+
+    async def calculate_results(self):
+
         await self.pipeline.get_results()
 
-        actions_per_second = self.pipeline.stats.get('actions_per_second')
-        completed_actions = self.pipeline.stats.get('completed_actions')
-        total_time = self.pipeline.stats.get('total_time')
-        start_time = self.pipeline.stats.get('start_time')
-        end_time = self.pipeline.stats.get('end_time')
-
-        true_elapsed = end_time - start_time
-
         if self._is_parallel is False:
+
+            actions_per_second = self.pipeline.stats.get('actions_per_second')
+            completed_actions = self.pipeline.stats.get('completed_actions')
+            total_time = self.pipeline.stats.get('total_time')
+            start_time = self.pipeline.stats.get('start_time')
+            end_time = self.pipeline.stats.get('end_time')
+
+            true_elapsed = end_time - start_time
+
             self.session_logger.info('\n')
             self.session_logger.info(f'Calculated APS of - {actions_per_second} - actions per second.')
             self.session_logger.info(f'Total action completed - {completed_actions} over actual runtime of - {total_time} - seconds.')
             self.session_logger.info(f'Total actions completed - {completed_actions} - over wall-clock runtime of - {true_elapsed} - seconds')
             self.session_logger.info('\n')
 
-    async def calculate_results(self):
-        completed_actions = self.pipeline.stats.get('completed_actions')
-        self.session_logger.info(f'Processing - {completed_actions} - action results.')
+            self.session_logger.info(f'Processing - {completed_actions} - action results.')
+        
+            with alive_bar(
+                total=self.pipeline.stats.get('completed_actions'),
+                title='Processing results...',
+                bar=None, 
+                spinner='dots_waves2'
+            ) as bar:
+                return await self.handler.aggregate(self.pipeline.results, bar=bar)
 
-        with alive_bar(
-            total=self.pipeline.stats.get('completed_actions'),
-            title='Processing results...',
-            bar=None, 
-            spinner='dots_waves2'
-        ) as bar:
-            await self.handler.aggregate(self.pipeline.results, bar=bar)
-
-        return await self.handler.get_stats()
+        else:
+            return await self.handler.aggregate(self.pipeline.results)
 
     async def submit_results(self, aggregate_events):
+        await self.handler.merge(aggregate_events)
+
         self.session_logger.info('Requesting session summary from reporter...')
-        await self.handler.submit(aggregate_events)
+
+        metrics = await self.handler.get_stats()
+        await self.handler.submit(metrics)
         self.session_logger.info('Summary generated!')
         self.session_logger.info('Exiting now. Goodbye!\n')
-
-    async def serialize_results(self):
-        await self.pipeline.get_results()
-        return await self.handler.aggregate(self.pipeline.results)
 
     async def get_completed(self):
         return await self.pipeline.get_completed_count()

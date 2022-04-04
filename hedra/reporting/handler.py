@@ -61,10 +61,8 @@ class Handler:
         self.session_logger = logger.generate_logger('hedra')
         self.reporter_config = config.reporter_config
 
-        self.reporter_type = self.reporter_config.get('reporter_type', 'statserve')
-        self.reporter = self.reporters.get(self.reporter_type)(
-            self.reporter_config
-        )
+        self.reporter_type = self.reporter_config.get('reporter_type', 'statstream')
+        self.reporter = None
 
     @classmethod
     def about(cls):
@@ -80,27 +78,10 @@ class Handler:
 
         {
             "reporter_config": {
-                "update_connector_type": "statserve",
-                "fetch_connector_type": "statserve",
-                "submit_connector_type": "statserve",
-                "update_config": {
-                    "stream_config": {
-                        "stream_name": "hedra",
-                        "fields": {}
-                    }
-                },
-                "fetch_config": {
-                    "stream_config": {
-                        "stream_name": "hedra",
-                        "fields": {}
-                    }
-                },
-                "submit_config": {
-                    "save_to_file": true,
-                    "stream_config": {
-                        "stream_name": "hedra",
-                        "fields": {}
-                    }
+                "reporter_type": "statstream",
+                "stream_config": {
+                    "stream_name": "hedra",
+                    "fields": {}
                 }
             }
         }
@@ -120,8 +101,11 @@ class Handler:
         
         '''
 
+    async def initialize_reporter(self):
+        self.reporter = self.reporters.get(self.reporter_type)(
+            self.reporter_config
+        )
 
-    async def connect(self):
         await self.reporter.init()
 
     async def merge(self, aggregate_events):
@@ -175,6 +159,10 @@ class Handler:
             for aggregate_event in aggregate_events.values():
                 metadata = aggregate_event.get('metadata')
                 stats = aggregate_event.get('stats')
+                quantiles = aggregate_event.get('quantiles')
+                counts = aggregate_event.get('counts')
+
+                metrics = []
                 
                 for stat_name, stat in stats.items():
 
@@ -185,19 +173,32 @@ class Handler:
                         metadata=metadata
                     )
 
+                    metrics.append(metric)
+
+                for quantile_name, quantile in quantiles.items():
+                    metric = Metric(
+                        reporter_type=self.reporter_type,
+                        stat=quantile_name,
+                        value=quantile,
+                        metadata=metadata
+                    )
+
+                    metrics.append(metric)
+
+                for count_name, count in counts.items():
+                    metric = Metric(
+                        reporter_type=self.reporter_type,
+                        stat=count_name,
+                        value=count,
+                        metadata=metadata
+                    )
+
+                    metrics.append(metric)
+                    
+
+                for metric in metrics:
                     await self.reporter.submit(metric)
 
         await self.reporter.close()
 
         return True
-
-    async def serialize(self, actions):
-        async for batch in AsyncList(actions):
-            async for action in AsyncList(batch):
-                event = Event(action)
-                await event.assert_response()
-
-                yield {
-                    'type': 'update',
-                    **event.to_dict()
-                }

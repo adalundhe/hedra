@@ -21,7 +21,7 @@ class GrpcEvent:
         self.status = None
         self.context = None
 
-    async def assert_response(self):
+    async def assert_result(self):
 
         if self._error:
             self.status = 'FAILED'

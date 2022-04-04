@@ -8,7 +8,6 @@ from aiosonic import HTTPClient
 from aiosonic.connectors import TCPConnector as AioSonicTCP
 from gql.transport.aiohttp import AIOHTTPTransport
 from easy_logger import Logger
-
 from .test import Test
 
 
@@ -146,6 +145,7 @@ def teardown(name, group=None, metadata={}):
 
 
 def use(config: Test, inject=None):
+
     '''
     Use
 

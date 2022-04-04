@@ -52,7 +52,7 @@ class ElectionManager:
     async def elect_leader_and_submit(self, job_results, job_id=None):
 
         handler = Handler(self.config)
-        await handler.connect()
+        await handler.initialize_reporter()
 
         if job_id:
             self.session_logger.info(f'\nJob - {job_id} has completed...')
