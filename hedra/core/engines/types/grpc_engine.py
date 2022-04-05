@@ -44,8 +44,8 @@ class GrpcEngine(BaseEngine):
     async def yield_session(self):
         pass
 
-    async def execute(self, action):
-        return await action.execute(action)
+    def execute(self, action):
+        return action.execute(action)
 
     async def defer_all(self, actions):
         async for action in actions:

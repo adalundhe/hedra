@@ -2,6 +2,8 @@ from telnetlib import EXOPL
 from hedra.core.engines import Engine
 from hedra.parsing.actions.action import Action
 from async_tools.datatypes.async_list import AsyncList
+
+from hedra.parsing.actions.types.http_action import HttpAction
 from .hooks import setup, teardown
 from hedra.parsing.actions import Action
 from .hooks import (
@@ -23,6 +25,7 @@ class ActionSet:
         }, None)
         self.engine = engine.engine
         self.actions = AsyncList()
+        self.action_type = Action.action_types.get(self.engine_type, HttpAction)
 
     @classmethod
     def about(cls):
@@ -101,8 +104,12 @@ class ActionSet:
         self.engine.session = self.session
 
     def execute(self, action_data: dict, group: str=None):
-        action = Action(action_data, self.engine_type, group=group)
-        return self.engine.execute(action.type)
+        return self.engine.execute(
+            self.action_type(
+                action_data,
+                group=group
+            )
+        )
 
     @teardown('teardown_action_set')
     async def close(self):

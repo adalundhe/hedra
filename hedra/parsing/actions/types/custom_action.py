@@ -48,8 +48,8 @@ class CustomAction:
 
         '''
 
-    async def execute(self, context):
-        return await self.action()
+    def execute(self, context):
+        return self.action()
         
     def to_dict(self) -> dict:
         return {

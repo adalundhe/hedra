@@ -1,4 +1,5 @@
 from .types.default_persona import DefaultPersona
+from .types.fixed_wait_persona import FixedWaitPersona
 from .types.sequenced_persona import SequencedPersonaCollection
 from .types.multi_sequence_persona import MultiSequencePersona
 from .types.multi_user_sequence_persona import MultiUserSequencePersona
@@ -12,6 +13,7 @@ class PersonaManager:
 
     registered_personas = {
         'default': DefaultPersona,
+        'fixed-wait': FixedWaitPersona,
         'interval': IntervalPersona,
         'multi-sequence': MultiSequencePersona,
         'multi-user-sequence': MultiUserSequencePersona,

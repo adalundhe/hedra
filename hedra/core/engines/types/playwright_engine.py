@@ -167,12 +167,10 @@ class PlaywrightEngine(BaseEngine):
 
             await self._librarians.append(command_librarian)
 
-    async def execute(self, action):
+    def execute(self, action):
         idx = random.randint(0, len(self._librarians))
-
-        async for command in self._librarians[idx].lookup(action):
-                result = await command(action)
-                yield result
+        command = self._librarians[idx].get(action)
+        return command(action)
 
     async def defer_all(self, actions):
         async for idx, action in actions.enum():

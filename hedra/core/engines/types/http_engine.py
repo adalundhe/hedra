@@ -84,8 +84,8 @@ class HttpEngine(BaseEngine):
         else:
             return ClientSession(connector=connector)
 
-    async def execute(self, action):
-        return await action.execute(self.session)
+    def execute(self, action):
+        return action.execute(self.session)
 
     async def defer_all(self, actions):
         async for action in actions:

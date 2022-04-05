@@ -38,4 +38,7 @@ class CommandLibrarian:
     async def lookup(self, action):
         yield self.command_library.__getattribute__(action.type)
 
+    def get(self, action):
+        return self.command_library.__getattribute__(action.type)
+
     
