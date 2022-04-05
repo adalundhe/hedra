@@ -118,7 +118,7 @@ class ParallelLocalWorker:
         return configs
 
     def run(self):
-        self.session_logger.info(f'Starting parallel worker - {self._workers} - workers...\n')
+        self.session_logger.info(f'Starting parallel execution - {self._workers} - workers...\n')
         configs = self._partition_actions(action='optimize')
         self.session_logger.debug(f'Successfully generated bins, spawning threads...\n')
         self.session_logger.info('\nStarting job...')
