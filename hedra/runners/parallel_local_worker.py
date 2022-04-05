@@ -114,7 +114,7 @@ class ParallelLocalWorker:
                 }))
 
                 bar()
-
+    
         return configs
 
     def run(self):

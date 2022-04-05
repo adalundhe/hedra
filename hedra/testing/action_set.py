@@ -101,7 +101,7 @@ class ActionSet:
 
     @setup('setup_action_set')
     async def setup(self):
-        self.engine.session = self.session
+        self.engine.session = await self.session.create()
 
     def execute(self, action_data: dict, group: str=None):
         return self.engine.execute(

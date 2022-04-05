@@ -1,3 +1,4 @@
+import traceback
 from .event_tags import EventTagCollection
 
 
@@ -20,7 +21,7 @@ class CustomEvent:
     async def assert_result(self):
         try:
             if self.success_condition:
-                assert self.success_condition(self._response) == True
+                self.success_condition(self._response)
 
             if self._error:
                 raise self._error
@@ -30,7 +31,13 @@ class CustomEvent:
         
         except Exception as error:
             self.status = 'FAILED'
-            self.context = str(error)
+
+            traceback_stack = traceback.format_exc().splitlines()
+            error_message = f'{traceback_stack[-1].strip()} - {traceback_stack[-2].strip()}'
+            if len(str(error)) > 1:
+                error_message = str(error)
+
+            self.context = error_message
 
     def to_dict(self):
         return {

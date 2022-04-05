@@ -15,7 +15,7 @@ class FastHttp2Engine(FastHttpEngine):
             handler,
             actions
         )
-        self.headers = {}
+        
         self._timeout = None
         self._dns_cache = 10**6
 

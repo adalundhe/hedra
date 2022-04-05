@@ -1,22 +1,17 @@
-import asyncio
-import uvloop
-import logging
-import time
-from aiohttp.connector import TCPConnector
-from aiohttp.resolver import AsyncResolver
-from gql.transport.aiohttp import AIOHTTPTransport
-from async_tools.datatypes.async_list import AsyncList
+from .sessions import GraphQLSession
 from .http_engine import HttpEngine
-from .utils.wrap_awaitable import wrap_awaitable_future
-from gql.transport.aiohttp import log as aiohttp_logger
-aiohttp_logger.setLevel(logging.ERROR)
 
 
 class GraphQLEngine(HttpEngine):
 
     def __init__(self, config, handler):
         super().__init__(config, handler)
-        self.session_url = self.config.get('session_url')
+        self.session = GraphQLSession(
+            pool_size=self._pool_size,
+            dns_cache_seconds=10**8,
+            request_timeout=self.config.get('request_timeout'),
+            session_url=self.config.get('session_url')
+        )
 
     @classmethod
     def about(cls):
@@ -43,33 +38,4 @@ class GraphQLEngine(HttpEngine):
         '''
 
     async def yield_session(self):
-        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-        loop = asyncio.get_event_loop()
-
-        connector = TCPConnector(
-            limit=self._connection_pool_size, 
-            ttl_dns_cache=self._dns_cache, 
-            resolver=AsyncResolver(),
-            keepalive_timeout=self._dns_cache,
-            loop=loop
-        )
-
-        if self.request_timeout:
-            transport = AIOHTTPTransport(
-                url=self.session_url, 
-                timeout=self.request_timeout, 
-                client_session_args={
-                    'connector': connector
-                }
-            )
-        
-        else:
-            transport = AIOHTTPTransport(
-                url=self.session_url, 
-                client_session_args={
-                    'connector': connector
-                }
-            )
-
-        await transport.connect()
-        return transport
+        return await self.session.create()

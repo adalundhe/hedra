@@ -1,14 +1,6 @@
-import time
-import uvloop
-import asyncio
-from aiohttp import (
-    ClientSession,
-    ClientTimeout
-)
-from aiohttp.connector import TCPConnector
-from aiohttp.resolver import AsyncResolver
 import psutil
 from async_tools.datatypes.async_list import AsyncList
+from .sessions import HttpSession
 from .base_engine import BaseEngine
 from .utils.wrap_awaitable import async_execute_or_catch, wrap_awaitable_future
 
@@ -20,10 +12,12 @@ class HttpEngine(BaseEngine):
             config,
             handler
         )
-        self.headers = {}
-        self.request_timeout = self.config.get('request_timeout')
-        self._dns_cache = 10**8
-        self._connection_pool_size = int((psutil.cpu_count(logical=True) * 10**3)/self._pool_size)
+
+        self.session = HttpSession(
+            pool_size=self._pool_size,
+            dns_cache_seconds=10**8,
+            request_timeout=self.config.get('request_timeout')
+        )
 
     @classmethod
     def about(cls):
@@ -65,24 +59,7 @@ class HttpEngine(BaseEngine):
         self.session = await self.yield_session()
 
     async def yield_session(self):
-
-        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-        loop = asyncio.get_event_loop()
-
-        connector = TCPConnector(
-            limit=self._connection_pool_size, 
-            ttl_dns_cache=self._dns_cache, 
-            resolver=AsyncResolver(),
-            keepalive_timeout=self._dns_cache,
-            loop=loop
-        )
-
-        if self.request_timeout:
-            timeout = ClientTimeout(self.request_timeout)
-            return ClientSession(connector=connector, timeout=timeout)
-        
-        else:
-            return ClientSession(connector=connector)
+        return await self.session.create()
 
     def execute(self, action):
         return action.execute(self.session)

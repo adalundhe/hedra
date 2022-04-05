@@ -2,6 +2,13 @@ import functools
 import asyncio
 import psutil
 import httpx
+from hedra.core.engines.types.sessions import (
+    FastHttpSession,
+    HttpSession,
+    Http2Session,
+    GraphQLSession,
+    PlaywrightSession
+)
 from aiohttp import ClientSession, TCPConnector, AsyncResolver
 from aiosonic.resolver import AsyncResolver as AioSonicResolver
 from aiosonic import HTTPClient
@@ -216,6 +223,7 @@ def use(config: Test, inject=None):
 
         async def decorator(selected_config: Test=config):
 
+
             selected_engine = selected_config.engine_type
         
             try:
@@ -228,65 +236,35 @@ def use(config: Test, inject=None):
                 connection_pool_size = 10**3 * (pool_size + 2) * 2
                 dns_cache = 10**6
 
-                if selected_engine == 'http':
+                if selected_engine == 'http' or selected_engine == 'websocket':
 
-                    connection_pool_size = int((psutil.cpu_count(logical=True) * 10**3)/pool_size)
-                    dns_cache = 10**8
-
-                    session = ClientSession(
-                        connector=TCPConnector(
-                            limit=connection_pool_size,
-                            ttl_dns_cache=dns_cache, 
-                            resolver=AsyncResolver(),
-                            keepalive_timeout=dns_cache,
-                            loop=loop
-                        )
+                    session = HttpSession(
+                        pool_size=selected_config.pool_size,
+                        dns_cache_seconds=10**8,
+                        request_timeout=selected_config.request_timeout
                     )
 
                 elif selected_engine == 'http2':
-                    limits = httpx.Limits(
-                        max_keepalive_connections=connection_pool_size,
-                        max_connections=connection_pool_size
-                    )
 
-                    session = httpx.AsyncClient(http2=True, limits=limits)
+                    session = Http2Session(
+                        pool_size=selected_config.pool_size,
+                        request_timeout=selected_config.request_timeout
+                    )
 
                 elif selected_engine == 'fast-http' or selected_engine == 'fast-http2':
-                    connector = AioSonicTCP(
-                        pool_size=connection_pool_size, 
-                        ttl_dns_cache=dns_cache,
-                        resolver=AioSonicResolver()
-                    )
                     
-                    session = HTTPClient(connector)
+                    session = FastHttpSession(
+                        pool_size=selected_config.pool_size,
+                        dns_cache_seconds=10**6,
+                        request_timeout=selected_config.request_timeout
+                    )
 
                 elif selected_engine == 'graphql':
-                    connector = TCPConnector(
-                        limit=connection_pool_size, 
-                        ttl_dns_cache=dns_cache, 
-                        resolver=AsyncResolver(),
-                        keepalive_timeout=dns_cache,
-                        loop=loop
+                    session = GraphQLSession(
+                        pool_size=selected_config.pool_size,
+                        dns_cache_seconds=10**8,
+                        request_timeout=selected_config.request_timeout
                     )
-
-                    transport = AIOHTTPTransport(
-                        url=selected_config.session_url, 
-                        client_session_args={
-                            'connector': connector
-                        }
-                    )
-
-                    await transport.connect()
-                    session = transport
-
-                elif selected_engine == 'grpc':
-                    pass
-
-                elif selected_engine == 'websocket':
-                    pass
-                
-                elif selected_engine == 'playwright':
-                    pass
 
                 cls.session = session
                 cls.engine_type = selected_engine

@@ -1,10 +1,8 @@
 import random
-from hedra.core.engines.types.helpers.playwright_helpers import command_librarian
 from .base_engine import BaseEngine
-from playwright.async_api import async_playwright
-from async_tools.datatypes import AsyncDict, AsyncList
-from .helpers.playwright_helpers import CommandLibrarian
+from async_tools.datatypes import AsyncList
 from .utils.wrap_awaitable import async_execute_or_catch, wrap_awaitable_future
+from .sessions import PlaywrightSession
 
 
 class PlaywrightEngine(BaseEngine):
@@ -14,15 +12,16 @@ class PlaywrightEngine(BaseEngine):
         self.page = None
         self.context = None
         self.browser = None
-        self._device_type = self.config.get('device')
-        self._browser_type = self.config.get('browser')
-        self._locale = self.config.get('locale')
-        self._geolocation = self.config.get('location')
-        self._permissions = self.config.get('permissions')
-        self._color_scheme = self.config.get('color_scheme')
-        self._librarians = AsyncList()
-        self._batch_size = self.config.get('batch_size')
-        self.session = None
+        self._librarians = []
+        self.session = PlaywrightSession(
+            browser_type=self.config.get('browser'),
+            device_type=self.config.get('device'),
+            locale=self.config.get('locale'),
+            geolocations=self.config.get('location'),
+            permissions=self.config.get('permissions'),
+            color_scheme=self.config.get('color_scheme'),
+            batch_size=self.config.get('batch_size')
+        )
         
     @classmethod
     def about(cls):
@@ -89,19 +88,19 @@ class PlaywrightEngine(BaseEngine):
 
     @classmethod
     def about_librarian(cls):
-        return CommandLibrarian.about()
+        return PlaywrightSession.about_librarian()
 
     @classmethod
     def about_library(cls):
-        return CommandLibrarian.about_library()
+        return PlaywrightSession.about_library()
 
     @classmethod
     def about_registered_commands(cls):
-        return CommandLibrarian.about_registered()
+        return PlaywrightSession.about_registered_commands()
 
     @classmethod
     def about_command(cls, command):
-        return CommandLibrarian.about_command(command)
+        return PlaywrightSession.about_command(command)
 
     async def create_session(self, actions=AsyncList()):
 
@@ -111,61 +110,11 @@ class PlaywrightEngine(BaseEngine):
             elif action.is_teardown:
                 self._teardown_actions.append(action)
 
-        self.session = await self.yield_session()
+        await self.yield_session()
 
     async def yield_session(self):
-
-        playwright = await async_playwright().start()
-
-        if self._browser_type == "safari" or self._browser_type == "webkit":
-            self.browser = await playwright.webkit.launch()
-
-        elif self._browser_type == "firefox":
-            self.browser = await playwright.firefox.launch()
-
-        else:
-            self.browser = await playwright.chromium.launch()
-
-
-        config = AsyncDict()
-
-        if self._device_type:
-            device = playwright.devices[self._device_type]
-
-            config = {
-                **device
-            }
-
-        if self._locale:
-            config['locale'] = self._locale
-
-        if self._geolocation:
-            config['geolocation'] = self._geolocation
-
-        if self._permissions:
-            config['permissions'] = self._permissions
-
-        if self._color_scheme:
-            config['color_scheme'] = self._color_scheme
-
-
-        has_options = await config.size() > 0
-
-        for _ in range(self._batch_size):
-
-            if has_options:        
-                context = await self.browser.new_context(
-                    **config.data
-                )
-    
-            else:
-                context = await self.browser.new_context()
-                
-
-            page = await context.new_page()
-            command_librarian = CommandLibrarian(page)
-
-            await self._librarians.append(command_librarian)
+        self._librarians = await self.session.create()
+        return self._librarians
 
     def execute(self, action):
         idx = random.randint(0, len(self._librarians))

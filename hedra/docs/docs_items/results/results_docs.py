@@ -1,4 +1,4 @@
-# from hedra.reporting.handlers import Handler
+# from hedra.reporting import Handler
 # from .reporting_docs import ReportingDocs
 
 
@@ -21,4 +21,4 @@ class ResultsDocs:
 
         else:
             # print(Handler.about())
-            print("Hi!")
+            print('HI!')

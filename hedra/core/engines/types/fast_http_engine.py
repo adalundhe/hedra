@@ -8,6 +8,7 @@ uvloop.install()
 from aiosonic import HTTPClient
 from aiosonic.connectors import TCPConnector
 from aiosonic.timeout import Timeouts
+from .sessions import FastHttpSession
 from .http_engine import HttpEngine
 from .utils.wrap_awaitable import async_execute_or_catch
 
@@ -19,11 +20,12 @@ class FastHttpEngine(HttpEngine):
             config,
             handler
         )
-        self.headers = {}
-        self._timeout = None
-        self._dns_cache = 10**6
-        loop = asyncio.get_event_loop()
-        asyncio.set_event_loop(loop)
+
+        self.session = FastHttpSession(
+            pool_size=self._pool_size,
+            dns_cache_seconds=10**6,
+            request_timeout=self.config.get('request_timeout'),
+        )
 
     @classmethod
     def about(cls):
@@ -57,25 +59,7 @@ class FastHttpEngine(HttpEngine):
         '''
 
     async def yield_session(self):
-        
-        timeouts = Timeouts(request_timeout=self.request_timeout)
-
-        if self.request_timeout:
-            connector = TCPConnector(
-                pool_size=self._connection_pool_size, 
-                ttl_dns_cache=self._dns_cache, 
-                timeouts=timeouts,
-                resolver=AsyncResolver()
-            )
-
-        else:
-            connector = TCPConnector(
-                pool_size=self._connection_pool_size, 
-                ttl_dns_cache=self._dns_cache,
-                resolver=AsyncResolver()
-            )
-
-        return HTTPClient(connector)
+        return await self.session.create()
 
     @async_execute_or_catch()
     async def close(self):

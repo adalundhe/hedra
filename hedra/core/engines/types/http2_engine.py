@@ -1,6 +1,8 @@
 import time
 import httpx
 from async_tools.datatypes.async_list import AsyncList
+
+from .sessions import Http2Session
 from .http_engine import HttpEngine
 from .utils.wrap_awaitable import async_execute_or_catch, wrap_awaitable_future
 
@@ -13,19 +15,13 @@ class Http2Engine(HttpEngine):
             handler
         )
 
-    async def yield_session(self):
-
-        limits = httpx.Limits(
-            max_keepalive_connections=self._connection_pool_size,
-            max_connections=self._connection_pool_size
+        self.session = Http2Session(
+            pool_size=self._pool_size,
+            request_timeout=self.config.get('request_timeout')
         )
 
-        if self.request_timeout:
-            timeout = httpx.Timeout(self.request_timeout)
-            return httpx.AsyncClient(http2=True, timeout=timeout, limits=limits)
-        
-        else:
-            return httpx.AsyncClient(http2=True, limits=limits)
+    async def yield_session(self):
+        return await self.session.create()
 
     @classmethod
     def about(cls):
@@ -56,6 +52,7 @@ class Http2Engine(HttpEngine):
         - order: (optional) <action_order_for_sequence_personas>
         
         '''
+        
     @async_execute_or_catch()
     async def close(self):
         for teardown_action in self._teardown_actions:
