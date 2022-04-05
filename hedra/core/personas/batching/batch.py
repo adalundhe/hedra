@@ -1,22 +1,14 @@
-import psutil
 from .batch_interval import BatchInterval
-from hedra.core.personas.utils import parse_time
 
 
 class Batch:
 
     def __init__(self, config) -> None:
         self.config = config
-        total_time = parse_time(
-            self.config.get('total_time', 60)
-        )
         self.gradient = self.config.get('gradient', 0.1)
-        self.time = self.config.get('batch_time', total_time * 0.2)
+        self.time = self.config.get('batch_time', 0.5)
 
-        cpu_count = psutil.cpu_count(logical=False)
-        default_batch_size = (cpu_count + 2)**4
-
-        self.size = self.config.get('batch_size', default_batch_size)
+        self.size = self.config.get('batch_size', 1000)
         self.count = self.config.get('batch_count', 10)
 
         self.interval = BatchInterval(self.config)

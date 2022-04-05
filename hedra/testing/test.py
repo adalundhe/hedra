@@ -9,7 +9,7 @@ class Test:
     persona_type='simple'
     total_time='00:01:00'
     batch_size=1000
-    batch_time=10
+    batch_time=0.5
     batch_count=0
     batch_interval=0
     batch_interval_range=None
