@@ -188,10 +188,14 @@ class WorkerServicesManager:
         ], timeout=self.worker_request_timeout)
 
         results = await asyncio.gather(*worker_job_responses)
-            
-        return [
-            MessageToDict(worker_job).get('jobResults', {}) for worker_job in results
-        ]
+        parsed_results = [MessageToDict(result) for result in results]
+
+        aggregated_events = []
+        
+        for parsed_result in parsed_results:
+            aggregated_events.extend(parsed_result.get('jobResults').get('aggregated'))
+
+        return aggregated_events
 
     @connect_with_retry_async(wait_buffer=5, timeout_threshold=15)
     async def _get_worker_job_results(self, worker, job):

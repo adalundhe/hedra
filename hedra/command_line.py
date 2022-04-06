@@ -18,9 +18,11 @@ class CommandLine(BaseConfig):
         self.reporter_config = {}
         self.actions = {}
         self.as_server = False
+        self.docs_arg = None
         self.runner_mode = 'local'
         self.embedded_stats = False
         self.log_level = 'info'
+        self.show_docs = False
 
     def execute_cli(self):
 
@@ -37,75 +39,79 @@ class CommandLine(BaseConfig):
         
         return copy_result
 
+    def print_docs(self):
+
+        docs_arg = self.config_helper["about"]
+
+        config_help_string = self.config_helper.generate_help_string()
+        docs_manager = DocsManager(docs_arg, config_help_string=config_help_string)
+
+        docs_manager.print_docs()
+        
+        exit(0)
+
     def generate_config(self, is_server=False):
 
         if self.config_helper["about"]:
+            self.show_docs = True
 
-            docs_arg = self.config_helper["about"]
+        else:
+            self.config_helper.merge('config', 'executor_config', sub_key='executor_config')
+            self.config_helper.merge('config', 'distributed_config', sub_key='distributed_config')
+            self.config_helper.merge('config', 'jobs_config', sub_key='jobs_config')
+            self.config_helper.merge('config', 'reporter_config', sub_key='reporter_config')
 
-            config_help_string = self.config_helper.generate_help_string()
-            docs_manager = DocsManager(docs_arg, config_help_string=config_help_string)
+            self.embedded_stats = self.config_helper['embedded_stats']
 
-            docs_manager.print_docs()
+            self.runner_mode = self.config_helper['runner_mode']
+            self.log_level = self.config_helper['log_level']
+
+            jobs_config = self.config_helper['jobs_config']
+            if jobs_config:
+                self.jobs_config.update(jobs_config)
+
+            distributed_config = self.config_helper['distributed_config']
+            if distributed_config:
+                self.distributed_config.update(distributed_config)
             
-            exit(0)
-        
-        self.config_helper.merge('config', 'executor_config', sub_key='executor_config')
-        self.config_helper.merge('config', 'distributed_config', sub_key='distributed_config')
-        self.config_helper.merge('config', 'jobs_config', sub_key='jobs_config')
-        self.config_helper.merge('config', 'reporter_config', sub_key='reporter_config')
+            executor_config = self.config_helper['executor_config']
+            if executor_config:
+                self.executor_config.update(executor_config)
 
-        self.embedded_stats = self.config_helper['embedded_stats']
+            reporter_config = self.config_helper['reporter_config']
+            if reporter_config:
+                self.reporter_config = self.config_helper['reporter_config']
+                
+            self.actions = self.config_helper['actions']
 
-        self.runner_mode = self.config_helper['runner_mode']
-        self.log_level = self.config_helper['log_level']
+            code_actions = self.config_helper['code_actions']
+            if code_actions and len(code_actions) > 0:
 
-        jobs_config = self.config_helper['jobs_config']
-        if jobs_config:
-            self.jobs_config.update(jobs_config)
+                config_map = self.config_helper._assembler.mapped.get('code_actions')
+                if config_map.argument:
+                    bundler = Bundler(options={
+                        'class_type': Test,
+                        'package_name': config_map.argument.original_arg
+                    })
 
-        distributed_config = self.config_helper['distributed_config']
-        if distributed_config:
-            self.distributed_config.update(distributed_config)
-        
-        executor_config = self.config_helper['executor_config']
-        if executor_config:
-            self.executor_config.update(executor_config)
+                    discovered = bundler.discover()
 
-        reporter_config = self.config_helper['reporter_config']
-        if reporter_config:
-            self.reporter_config = self.config_helper['reporter_config']
-            
-        self.actions = self.config_helper['actions']
+                    if len(discovered) > 0:
+                        test_config = discovered.pop()()
+                        self.executor_config.update(test_config.executor_config)
+                        self.reporter_config.update(test_config.reporter_config)
+                        self.embedded_stats = test_config.embedded_stats
+                        self.log_level = test_config.log_level
+                        self.runner_mode = test_config.runner_mode
 
-        code_actions = self.config_helper['code_actions']
-        if code_actions and len(code_actions) > 0:
+                    self.executor_config['actions_code_filepath'] = config_map.argument.original_arg
 
-            config_map = self.config_helper._assembler.mapped.get('code_actions')
-            if config_map.argument:
-                bundler = Bundler(options={
-                    'class_type': Test,
-                    'package_name': config_map.argument.original_arg
-                })
+                self.actions = code_actions
+                self.executor_config['engine_type'] = 'action-set'
 
-                discovered = bundler.discover()
+            logger = Logger()
+            session_logger = logger.generate_logger('hedra')
 
-                if len(discovered) > 0:
-                    test_config = discovered.pop()()
-                    self.executor_config.update(test_config.executor_config)
-                    self.reporter_config.update(test_config.reporter_config)
-                    self.embedded_stats = test_config.embedded_stats
-                    self.log_level = test_config.log_level
-                    self.runner_mode = test_config.runner_mode
-
-                self.executor_config['actions_code_filepath'] = config_map.argument.original_arg
-
-            self.actions = code_actions
-            self.executor_config['engine_type'] = 'action-set'
-
-        logger = Logger()
-        session_logger = logger.generate_logger('hedra')
-
-        if self.as_server is False and len(self.executor_config) == 0:
-            session_logger.error('Error: No config JSON or CLI args specified.')
-            exit(0)
+            if self.as_server is False and len(self.executor_config) == 0:
+                session_logger.error('Error: No config JSON or CLI args specified.')
+                exit(0)

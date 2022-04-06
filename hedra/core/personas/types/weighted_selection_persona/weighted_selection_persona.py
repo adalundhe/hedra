@@ -1,7 +1,6 @@
 import random
 import time
 import asyncio
-import math
 from async_tools.datatypes.async_list import AsyncList
 from async_tools.functions import awaitable
 from hedra.core.engines import Engine
@@ -51,22 +50,28 @@ class WeightedSelectionPersona(DefaultPersona):
         self.start = time.time()
 
         while elapsed < self.duration:
-            deferred_actions, _ = await asyncio.wait([
+            batch = await asyncio.wait([
                 request async for request in self.engine.defer_all(self.sampled_actions)
             ], timeout=self.batch.time)
 
             elapsed = time.time() - self.start
 
             await self.batch.interval.wait()
-            deferred_batches += [deferred_actions]
+            deferred_batches.append(batch)
             self.sampled_actions = await self._sample()
 
         self.end = time.time()
 
         await self.stop_updates()
 
-        for deferred_batch in deferred_batches:
-            results += await asyncio.gather(*deferred_batch)
+        for deferred_batch, pending in deferred_batches:
+            completed = await asyncio.gather(*deferred_batch)
+            results.extend(completed)
+
+            try:
+                await asyncio.gather(*pending)
+            except Exception:
+                pass
 
         self.total_actions = len(results)
         self.total_elapsed = elapsed

@@ -79,12 +79,13 @@ class ElectionManager:
 
                 if self.elected_leader:
                     self.session_logger.info(f'Elected leader at - {self.elected_leader.service_address} - to submit results.')
-                    
-                    await handler.merge(job_results)
 
                 if self.is_leader:
+                    await handler.merge(job_results)
+                    stats = await handler.get_stats()
+
                     self.session_logger.info(f'Leader - {self.leader_address} - submitting session results...')
-                    submitted = await handler.submit()
+                    submitted = await handler.submit(stats)
                     self.session_logger.info(f'Results submitted!\n')
                     self.poll_completed = submitted
                     await self.wait_until_poll_complete()
@@ -106,9 +107,9 @@ class ElectionManager:
 
         if submitted is False:
             self.session_logger.info(f'Elected leader at - {self.leader_address} - to submit results.\n')
-
-            aggregate_events = await handler.get_stats()
-            await handler.submit(aggregate_events)
+            await handler.merge(job_results)
+            stats = await handler.get_stats()
+            await handler.submit(stats)
             self.session_logger.info(f'Results submitted!\n')
 
     async def elect_leader(self):

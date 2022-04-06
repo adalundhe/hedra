@@ -18,7 +18,7 @@ from .types import (
 
 class Metric:
 
-    metrics = {
+    metric_types = {
         'datadog': DataDogMetric,
         'statserve': StatServeMetric,
         'cassandra': CassandraMetric,
@@ -34,7 +34,7 @@ class Metric:
     }
 
     def __init__(self, reporter_type=None, stat=None, value=None, metadata=None):
-        self.metric = self.metrics.get(
+        self.metric = self.metric_types.get(
             reporter_type, 'statserve'
         )(
             stat=stat,
@@ -51,7 +51,7 @@ class Metric:
     @classmethod
     def about(cls):
 
-        metric_types = '\n\t'.join([f'- {metric_type}' for metric_type in cls.metrics])
+        metric_types = '\n\t'.join([f'- {metric_type}' for metric_type in cls.metric_types])
 
         return f'''
         Reporter Metrics

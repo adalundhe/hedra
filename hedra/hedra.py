@@ -5,7 +5,6 @@ from easy_logger import Logger
 from .runners import (
     ParallelLocalWorker,
     LocalWorker,
-    EmbeddedStatserve,
     LeaderJobServer,
     DistributedWorkerServer,
     BootstrapServer
@@ -35,6 +34,9 @@ def run():
     check_event_loop(session_logger)
 
     session_logger.info(f'\n{header_text} {hedra_version}\n\n')
+
+    if command_line.show_docs:
+        command_line.print_docs()
 
     if command_line.runner_mode == 'ephemeral-leader':
         leader = LeaderJobServer(command_line)

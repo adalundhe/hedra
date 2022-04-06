@@ -161,7 +161,7 @@ class ActionSetParser(MultiUserSequenceParser):
         return sorted_sequences
 
     async def sort_sequence(self):
-        actions = AsyncList(self.parser.actions)
+        actions = AsyncList(self.actions)
         return await actions.sort(key=lambda action: action.order)
 
 

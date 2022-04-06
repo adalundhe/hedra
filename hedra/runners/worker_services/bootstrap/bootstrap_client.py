@@ -19,6 +19,10 @@ class BoostrapClient:
         logger = Logger()
         self.session_logger = logger.generate_logger()
 
+        self.use_bootstrap = config.distributed_config.get(
+            'use_bootstrap'
+        )
+
         self.bootsrap_ip = config.distributed_config.get(
             'bootstrap_ip',
             os.getenv('BOOSTRAP_SERVER_IP')

@@ -6,41 +6,11 @@ from hedra.reporting.connectors.types.statstream_connector import StatStreamConn
 from statstream.streaming import StatStream
 from async_tools.datatypes import AsyncList
 from hedra.command_line import CommandLine
-from .reporters.types import (
-    DatadogReporter,
-    JSONReporter,
-    CassandraReporter,
-    StatStreamReporter,
-    StatServeReporter,
-    MongoDBReporter,
-    PostgresReporter,
-    PrometheusReporter,
-    KafkaReporter,
-    S3Reporter,
-    GoogleCloudStorageReporter,
-    SnowflakeReporter,
-    RedisReporter
-)
-
+from .reporters import Reporter
 
 
 class Handler:
 
-    reporters = {
-        'datadog': DatadogReporter,
-        'json': JSONReporter,
-        'cassandra': CassandraReporter,
-        'statserve': StatServeReporter,
-        'statstream': StatStreamReporter,
-        'mongodb': MongoDBReporter,
-        'postgres': PostgresReporter,
-        'prometheus': PrometheusReporter,
-        'kafka': KafkaReporter,
-        's3': S3Reporter,
-        'gcs': GoogleCloudStorageReporter,
-        'snowflake': SnowflakeReporter,
-        'redis': RedisReporter
-    }
 
     def __init__(self, config: CommandLine):
         self.config = config
@@ -59,54 +29,10 @@ class Handler:
 
         logger = Logger()
         self.session_logger = logger.generate_logger('hedra')
-        self.reporter_config = config.reporter_config
-
-        self.reporter_type = self.reporter_config.get('reporter_type', 'statstream')
-        self.reporter = None
-
-    @classmethod
-    def about(cls):
-        return '''
-        Results
-
-        key-arguments:
-
-        --reporter-config-filepath <path_to_reporter_config_JSON_file> (required but defaults to the directory in which hedra is running)
-
-        Hedra will automatically process results at the end of execution based on the configuration stored in
-        and provided by the config.json. For exmaple, a file title reporter-config.json containing:
-
-        {
-            "reporter_config": {
-                "reporter_type": "statstream",
-                "stream_config": {
-                    "stream_name": "hedra",
-                    "fields": {}
-                }
-            }
-        }
-
-        will tell Hedra to use Statserve for results aggregation/computation and then output a JSON file of aggregated 
-        metrics and results at the end.
-
-        Depdending on the executor seleted, Hedra will either attempt to connect to the specified reporter resources
-        prior to execution or (specifically for the parallel executor) after execution has completed. For more information
-        on how reporters work, run the command:
-
-            hedra --about results:reporting
-
-        Related Topics:
-
-        - runners
-        
-        '''
+        self.reporter = Reporter(config.reporter_config)
 
     async def initialize_reporter(self):
-        self.reporter = self.reporters.get(self.reporter_type)(
-            self.reporter_config
-        )
-
-        await self.reporter.init()
+        await self.reporter.selected.init()
 
     async def merge(self, aggregate_events):
 
@@ -167,7 +93,7 @@ class Handler:
                 for stat_name, stat in stats.items():
 
                     metric = Metric(
-                        reporter_type=self.reporter_type,
+                        reporter_type=self.reporter.type,
                         stat=stat_name,
                         value=stat,
                         metadata=metadata
@@ -177,7 +103,7 @@ class Handler:
 
                 for quantile_name, quantile in quantiles.items():
                     metric = Metric(
-                        reporter_type=self.reporter_type,
+                        reporter_type=self.reporter.type,
                         stat=quantile_name,
                         value=quantile,
                         metadata=metadata
@@ -187,7 +113,7 @@ class Handler:
 
                 for count_name, count in counts.items():
                     metric = Metric(
-                        reporter_type=self.reporter_type,
+                        reporter_type=self.reporter.type,
                         stat=count_name,
                         value=count,
                         metadata=metadata
@@ -197,8 +123,8 @@ class Handler:
                     
 
                 for metric in metrics:
-                    await self.reporter.submit(metric)
+                    await self.reporter.selected.submit(metric)
 
-        await self.reporter.close()
+        await self.reporter.selected.close()
 
         return True

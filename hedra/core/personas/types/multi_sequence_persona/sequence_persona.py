@@ -61,16 +61,22 @@ class SequencedPersonaCollection(DefaultPersona):
 
         while elapsed < self.total_time:
             async for sequence_step in self.actions:
-                deferred_step, _ = await asyncio.wait([
+                batch = await asyncio.wait([
                     action async for action in self.engine.defer_all(sequence_step)
                 ], timeout=self.batch.time)
 
-                self.batch.deferred += [deferred_step]
+                self.batch.deferred.append(batch)
 
             elapsed = time.time() - self.start
 
-        for deferred_sequence_step in self.batch.deferred:
-            results += await asyncio.gather(*deferred_sequence_step)
+        for deferred_sequence_step, pending in self.batch.deferred:
+            completed = await asyncio.gather(*deferred_sequence_step)
+            results.extend(completed)
+
+            try:
+                await asyncio.gather(*pending)
+            except Exception:
+                pass
 
         return results
         

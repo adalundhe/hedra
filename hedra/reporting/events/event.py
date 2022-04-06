@@ -14,18 +14,18 @@ from .types import (
 
 
 class Event:
+    event_types = {
+        'http': HttpEvent,
+        'fast-http': FastHttpEvent,
+        'playwright': PlaywrightEvent,
+        'custom': CustomEvent,
+        'websocket': WebsocketEvent,
+        'grpc': GrpcEvent,
+        'graphql': GraphQLEvent
+    }
 
     def __init__(self, action):
-        event_types = {
-            'http': HttpEvent,
-            'fast-http': FastHttpEvent,
-            'playwright': PlaywrightEvent,
-            'custom': CustomEvent,
-            'websocket': WebsocketEvent,
-            'grpc': GrpcEvent,
-            'graphql': GraphQLEvent
-        }
-        self.data = event_types.get(
+        self.data = self.event_types.get(
             action.get('action_type'),
             CustomEvent
         )(action)
@@ -37,7 +37,7 @@ class Event:
     @classmethod
     def about(cls):
 
-        event_types = '\n\t'.join([f'- {event_type}' for event_type in cls.events])
+        event_types = '\n\t'.join([f'- {event_type}' for event_type in cls.event_types])
 
         return f'''
         Reporter Events

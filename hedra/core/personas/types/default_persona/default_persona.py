@@ -112,7 +112,15 @@ class DefaultPersona:
         await self.stop_updates()
 
         for deferred_batch in self.batch.deferred:
-            results.extend(await deferred_batch)
+            batch, pending = await deferred_batch
+            collected = await asyncio.gather(*batch, return_exceptions=True)
+            results.extend(collected)
+            
+            try:
+                await asyncio.gather(*pending)
+            except Exception:
+                pass
+            
             
         self.total_actions = len(results)
         self.total_elapsed = elapsed
@@ -121,13 +129,11 @@ class DefaultPersona:
         return results
 
     async def _execute_batch(self):
-        next_timeout = self.duration - (time.time() - self.start)
-        
-        batch, _ = await asyncio.wait(
+        next_timeout = self.duration - (time.time() - self.start)    
+        return await asyncio.wait(
             [ request async for request in self.engine.defer_all(self.actions)], 
             timeout=next_timeout if next_timeout > 0 else 1
         )
-        return await asyncio.gather(*batch, return_exceptions=True)
 
     async def close(self):
         await self.engine.close()

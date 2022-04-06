@@ -18,7 +18,7 @@ class FixedWaitPersona(DefaultPersona):
         self.start = time.time()
 
         while elapsed < self.duration:
-            batch, _ = await asyncio.wait(
+            batch = await asyncio.wait(
                 [ request async for request in self.engine.defer_all(self.actions)], 
                 timeout=self.batch.time
             )
@@ -28,9 +28,14 @@ class FixedWaitPersona(DefaultPersona):
         self.end = elapsed + self.start
         await self.stop_updates()
 
-        for deferred_batch in self.batch.deferred:
+        for deferred_batch, pending in self.batch.deferred:
             batch = await asyncio.gather(*deferred_batch, return_exceptions=True)
             results.extend(batch)
+            
+            try:
+                await asyncio.gather(*pending)
+            except Exception:
+                pass
             
         self.total_actions = len(results)
         self.total_elapsed = elapsed

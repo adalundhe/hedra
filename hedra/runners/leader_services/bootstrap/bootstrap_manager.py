@@ -6,6 +6,7 @@ class BootstrapManager:
 
     def __init__(self, config) -> None:
         self.client = BoostrapClient(config)
+        self.use_bootstrap = self.client.use_bootstrap
 
     async def register_leader(self, leader_address):
         await self.client.register_self(leader_address)

@@ -30,6 +30,7 @@ class WorkerPipeline:
         self.worker_id = worker_id
         self.stage_completed = False
         self.leaders = []
+        self.aggregate_events = []
         self.status = None
         self.timeout = timeout
 
@@ -73,7 +74,7 @@ class WorkerPipeline:
             completed_actions = self.executor.pipeline.stats.get('completed_actions')
             self.executor.session_logger.info(f'Processing - {completed_actions} - action results.')
 
-            await self.handler.aggregate(
+            self.aggregate_events = await self.handler.aggregate(
                 self.executor.pipeline.results
             )
 
@@ -96,7 +97,9 @@ class WorkerPipeline:
 
         self.status = 'completed'
         
-        return await self.handler.get_stats()
+        return {
+            'aggregated': self.aggregate_events
+        }
 
     async def check_for_completion(self, job_id=None):
         

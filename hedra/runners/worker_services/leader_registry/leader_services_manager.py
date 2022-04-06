@@ -94,7 +94,7 @@ class LeaderServicesManager:
     async def register_worker(self, leaders=None):
 
         if leaders is None:
-            if self.broadkast_manager.use_discovery:
+            if self.broadkast_manager.use_bootstrap:
                 await self.broadkast_manager.client.discover()
                 leaders = self.broadkast_manager.client.registry
 
