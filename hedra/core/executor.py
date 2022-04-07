@@ -78,15 +78,10 @@ class Executor:
             actions_per_second = self.pipeline.stats.get('actions_per_second')
             completed_actions = self.pipeline.stats.get('completed_actions')
             total_time = self.pipeline.stats.get('total_time')
-            start_time = self.pipeline.stats.get('start_time')
-            end_time = self.pipeline.stats.get('end_time')
-
-            true_elapsed = end_time - start_time
 
             self.session_logger.info('\n')
             self.session_logger.info(f'Calculated APS of - {actions_per_second} - actions per second.')
             self.session_logger.info(f'Total action completed - {completed_actions} over actual runtime of - {total_time} - seconds.')
-            self.session_logger.info(f'Total actions completed - {completed_actions} - over wall-clock runtime of - {true_elapsed} - seconds')
             self.session_logger.info('\n')
 
             self.session_logger.info(f'Processing - {completed_actions} - action results.')
