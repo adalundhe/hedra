@@ -1,8 +1,10 @@
 import time
 import asyncio
 from async_tools.datatypes.async_list import AsyncList
+from hedra.core.personas.batching.batch_interval import BatchInterval
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.engines import Engine
+from hedra.core.personas.batching import SequenceStep
 
 
 class SequencedPersonaCollection(DefaultPersona):
@@ -39,13 +41,21 @@ class SequencedPersonaCollection(DefaultPersona):
 
         actions_list = await self.actions.parser.sort()
         self.actions_count = await actions_list.size()
-
+ 
         batched_sequences = AsyncList()
         async for action in actions_list:
             if action.is_setup is False and action.is_teardown is False:        
-                sequence_step = AsyncList()
+                sequence_step = SequenceStep()
                 for _ in range(self.batch.size):
-                    await sequence_step.append(action)
+                    await sequence_step.add_action(action)
+
+                if action.wait_interval:
+                    sequence_step.wait_interval = BatchInterval({
+                        'batch_interval': action.wait_interval
+                    })
+
+                else:
+                    sequence_step.wait_interval = self.batch.interval
 
                 await batched_sequences.append(sequence_step)
 
@@ -63,21 +73,22 @@ class SequencedPersonaCollection(DefaultPersona):
         while elapsed < self.duration:
 
             async for sequence_step in self.actions:
-                batch = await asyncio.wait([
-                    action async for action in self.engine.defer_all(sequence_step)
-                ], timeout=self.batch.time)
+                self.batch.deferred.append(
+                    asyncio.create_task(
+                        self._execute_batch(sequence_step)
+                    )
+                )
 
+                await sequence_step.wait_interval.wait()
                 elapsed = time.time() - self.start
 
-                await self.batch.interval.wait()
-                self.batch.deferred.append(batch)
-
-        self.end = time.time()
+        self.end = elapsed + self.start
 
         await self.stop_updates()
 
-        for completed_set, pending in self.batch.deferred:
-            completed = await asyncio.gather(*completed_set)
+        for deferred_batch in self.batch.deferred:
+            completed, pending = await deferred_batch
+            completed = await asyncio.gather(*completed)
             results.extend(completed)
             
             try:
@@ -89,3 +100,9 @@ class SequencedPersonaCollection(DefaultPersona):
         self.total_elapsed = elapsed
 
         return results
+
+    async def _execute_batch(self, sequence_step: SequenceStep):
+        next_timeout = self.duration - (time.time() - self.start)  
+        return await asyncio.wait([
+            action async for action in self.engine.defer_all(sequence_step.actions)
+        ], timeout=next_timeout)

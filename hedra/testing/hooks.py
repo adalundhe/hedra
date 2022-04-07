@@ -1,7 +1,5 @@
 import functools
 import asyncio
-import psutil
-import httpx
 from hedra.core.engines.types.sessions import (
     FastHttpSession,
     HttpSession,
@@ -9,16 +7,11 @@ from hedra.core.engines.types.sessions import (
     GraphQLSession,
     PlaywrightSession
 )
-from aiohttp import ClientSession, TCPConnector, AsyncResolver
-from aiosonic.resolver import AsyncResolver as AioSonicResolver
-from aiosonic import HTTPClient
-from aiosonic.connectors import TCPConnector as AioSonicTCP
-from gql.transport.aiohttp import AIOHTTPTransport
 from easy_logger import Logger
 from .test import Test
 
 
-def action(name, group=None, weight=1, order=1, metadata={}, success_condition=None):
+def action(name, group=None, weight=1, order=1, timeout=None, wait_interval=None, metadata={}, success_condition=None):
     '''
     Action Hook
 
@@ -32,6 +25,8 @@ def action(name, group=None, weight=1, order=1, metadata={}, success_condition=N
     - group (optional:string - keyword)
     - weight (optional:decimal - keyword)
     - order (optional:integer - keyword)
+    - timeout (optional:integer - keyword - use in place of request_timeout)
+    - wait_interval (optional:integer - keyword - used in place of batch interval for Sequence based personas)
     - metadata (optional:dict - keyword - may include env, user, type, tags [list:string], and url)
     - success_condition (optional:function - keyword)
 
@@ -56,6 +51,8 @@ def action(name, group=None, weight=1, order=1, metadata={}, success_condition=N
         func.weight = weight
         func.order = order
         func.group = group
+        func.timeout = timeout
+        func.wait_interval = wait_interval
         func.env = metadata.get('env')
         func.user = metadata.get('user')
         func.type = metadata.get('type')
@@ -97,6 +94,8 @@ def setup(name, group=None, metadata={}):
         func.order = 0
         func.group = group
         func.method = func
+        func.timeout = None
+        func.wait_interval = None
         func.env = metadata.get('env')
         func.user = metadata.get('user')
         func.type = metadata.get('type')
@@ -136,6 +135,8 @@ def teardown(name, group=None, metadata={}):
         func.weight = 0
         func.order = float('inf')
         func.group = group
+        func.timeout = None
+        func.wait_interval = None
         func.env = metadata.get('env')
         func.user = metadata.get('user')
         func.type = metadata.get('type')
@@ -232,9 +233,6 @@ def use(config: Test, inject=None):
                     session = inject
                 
                 session = None
-                pool_size = selected_config.pool_size
-                connection_pool_size = 10**3 * (pool_size + 2) * 2
-                dns_cache = 10**6
 
                 if selected_engine == 'http' or selected_engine == 'websocket':
 

@@ -109,6 +109,8 @@ class ActionSetParser(MultiUserSequenceParser):
                 'url': method.url,
                 'env': method.env,
                 'type': method.type,
+                'timeout': method.timeout,
+                'wait_interval': method.wait_interval,
                 'user': user,
                 'action': method,
                 'success_condition': method.success_condition
