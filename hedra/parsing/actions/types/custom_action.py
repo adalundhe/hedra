@@ -13,7 +13,7 @@ class CustomAction:
         self.type = action.get('type')
         self.timeout = action.get('timeout')
         self.wait_interval = action.get('wait_interval', 0)
-        self.success_condition = action.get('success_condition')
+        self.checks = action.get('checks')
         self.action_type = 'custom'
         self.is_setup = self.action.is_setup
         self.is_teardown = self.action.is_teardown

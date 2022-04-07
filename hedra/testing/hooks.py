@@ -11,7 +11,7 @@ from easy_logger import Logger
 from .test import Test
 
 
-def action(name, group=None, weight=1, order=1, timeout=None, wait_interval=None, metadata={}, success_condition=None):
+def action(name, group=None, weight=1, order=1, timeout=None, wait_interval=None, metadata={}, checks=None):
     '''
     Action Hook
 
@@ -58,7 +58,7 @@ def action(name, group=None, weight=1, order=1, timeout=None, wait_interval=None
         func.type = metadata.get('type')
         func.tags = metadata.get('tags')
         func.url = metadata.get('url')
-        func.success_condition = success_condition
+        func.checks = checks
 
         @functools.wraps(func)
         async def decorator(*args, **kwargs):
@@ -101,7 +101,7 @@ def setup(name, group=None, metadata={}):
         func.type = metadata.get('type')
         func.tags = metadata.get('tags')
         func.url = metadata.get('url')
-        func.success_condition = None
+        func.checks = None
 
         @functools.wraps(func)
         async def decorator(*args, **kwargs):
@@ -142,7 +142,7 @@ def teardown(name, group=None, metadata={}):
         func.type = metadata.get('type')
         func.tags = metadata.get('tags')
         func.url = metadata.get('url')
-        func.success_condition = None
+        func.checks = None
 
         @functools.wraps(func)
         async def decorator(*args, **kwargs):
@@ -152,7 +152,7 @@ def teardown(name, group=None, metadata={}):
     return wrapper
 
 
-def use(config: Test, inject=None):
+def use(config: Test, fixtures={}, inject=None):
 
     '''
     Use
@@ -265,6 +265,7 @@ def use(config: Test, inject=None):
                     )
 
                 cls.session = session
+                cls.fixtures = fixtures
                 cls.engine_type = selected_engine
 
             except Exception as err:

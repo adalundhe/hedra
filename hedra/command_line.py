@@ -9,6 +9,7 @@ from hedra.testing import Test
 from .config.cli.hedra import hedra_cli
 from .docs import DocsManager
 
+
 class CommandLine(BaseConfig):
     def __init__(self):
         super(CommandLine, self).__init__(cli=hedra_cli, package_version=version('hedra'))
@@ -88,6 +89,7 @@ class CommandLine(BaseConfig):
             if code_actions and len(code_actions) > 0:
 
                 config_map = self.config_helper._assembler.mapped.get('code_actions')
+    
                 if config_map.argument:
                     bundler = Bundler(options={
                         'class_type': Test,

@@ -14,14 +14,14 @@ class CustomEvent:
         self.tags = EventTagCollection(action.get('tags', []))
         self._response = action.get('response')
         self._error = action.get('error')
-        self.success_condition = action.get('success_condition')
+        self.checks = action.get('checks', [])
         self.status = None
         self.context = None
 
     async def assert_result(self):
         try:
-            if self.success_condition:
-                self.success_condition(self._response)
+            for check in self.checks:
+                await check(self._response, self.time)
 
             if self._error:
                 raise self._error
