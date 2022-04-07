@@ -7,7 +7,7 @@ from async_tools.functions import awaitable
 class BatchInterval:
     
     def __init__(self, config) -> None:
-        self.period = config.get('batch_interval', 1)
+        self.period = config.get('batch_interval', 0)
         interval_range = config.get('batch_interval_range')
         self.period_min = None
         self.period_max = None

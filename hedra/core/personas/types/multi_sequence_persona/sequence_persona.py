@@ -56,7 +56,11 @@ class SequencedPersonaCollection(DefaultPersona):
                     })
 
                 else:
-                    sequence_step.wait_interval = self.batch.interval
+                    if self.batch.interval.interval_type == 'no-op':
+                        sequence_step.wait_interval = self.batch.time
+
+                    else:
+                        sequence_step.wait_interval = self.batch.interval
 
                 await batched_sequences.append(sequence_step)
 
