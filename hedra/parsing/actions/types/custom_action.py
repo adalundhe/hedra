@@ -64,5 +64,5 @@ class CustomAction:
             'order': self.order,
             'weight': self.weight,
             'action_type': self.action_type,
-            'success_condition': self.success_condition
+            'checks': self.checks
         }
