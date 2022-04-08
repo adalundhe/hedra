@@ -265,7 +265,6 @@ def use(config: Test, fixtures={}, inject=None):
                     )
 
                 cls.session = session
-                cls.fixtures = fixtures
                 cls.engine_type = selected_engine
 
             except Exception as err:

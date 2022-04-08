@@ -16,7 +16,6 @@ class ActionSet:
     name=None
     engine_type='http'
     session=None
-    fixtures={}
     config={}
 
     def __init__(self) -> None:
@@ -27,7 +26,6 @@ class ActionSet:
         self.engine = engine.engine
         self.actions = AsyncList()
         self.action_type = Action.action_types.get(self.engine_type, HttpAction)
-        self.fixtures = self.fixtures
 
     @classmethod
     def about(cls):
