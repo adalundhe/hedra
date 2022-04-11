@@ -33,13 +33,13 @@ class SequencedPersonaCollection(DefaultPersona):
             config,
             handler
         )
+        
 
     async def setup(self, actions):
         self.actions = actions
         self.actions_count = await actions.size()
 
         self.engine = Engine(self.config, self.handler)
-        await self.engine.setup(actions)
 
 
     async def load_batches(self):
@@ -57,7 +57,9 @@ class SequencedPersonaCollection(DefaultPersona):
 
                 else:
                     if self.batch.interval.interval_type == 'no-op':
-                        sequence_step.wait_interval = self.batch.time
+                        sequence_step.wait_interval = BatchInterval({
+                            'batch_interval': self.batch.time
+                        })
 
                     else:
                         sequence_step.wait_interval = self.batch.interval
@@ -90,12 +92,8 @@ class SequencedPersonaCollection(DefaultPersona):
             results.extend(completed)
             
             try:
-                await asyncio.gather(*pending)
-            except Exception:
-                pass
-
-            try:
-                await asyncio.gather(*pending)
+                for pend in pending:
+                    pend.cancel()
             except Exception:
                 pass
 
@@ -106,4 +104,7 @@ class SequencedPersonaCollection(DefaultPersona):
         return await asyncio.wait([
             action async for action in self.engine.defer_all(sequence_step.actions)
         ], timeout=next_timeout)
-        
+
+
+    async def close(self):
+        await self.engine.close()

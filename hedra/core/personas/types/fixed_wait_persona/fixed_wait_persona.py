@@ -33,7 +33,8 @@ class FixedWaitPersona(DefaultPersona):
             results.extend(batch)
             
             try:
-                await asyncio.gather(*pending)
+                for pend in pending:
+                    pend.cancel()
             except Exception:
                 pass
             
@@ -42,4 +43,3 @@ class FixedWaitPersona(DefaultPersona):
         self.optimized_params = None
 
         return results
-

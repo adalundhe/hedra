@@ -1,6 +1,7 @@
 import threading
 import time
 import asyncio
+from typing import List, Tuple
 import psutil
 import uvloop
 from async_tools.functions.awaitable import awaitable
@@ -78,8 +79,9 @@ class DefaultPersona:
 
         self._parsed_actions = await actions.to_async_list()
         self.actions_count = await self._parsed_actions.size()
-        
-        await self.engine.setup(self._parsed_actions)  
+
+        await self.engine.setup(AsyncList(actions.parser.setup_actions))  
+        await self.engine.set_teardown_actions(actions.parser.teardown_actions)
 
         self.duration = self.total_time
 
@@ -88,9 +90,7 @@ class DefaultPersona:
         for idx in range(self.batch.size):
             action_idx = idx % self.actions_count
             action = self._parsed_actions[action_idx]
-
-            if action.is_setup is False and action.is_teardown is False:
-                await self.actions.append(action)
+            await self.actions.append(action)
 
     async def execute(self):
 
@@ -117,7 +117,8 @@ class DefaultPersona:
             results.extend(collected)
             
             try:
-                await asyncio.gather(*pending)
+                for pend in pending:
+                    pend.cancel()
             except Exception:
                 pass
             

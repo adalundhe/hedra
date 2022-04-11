@@ -28,48 +28,58 @@ class WeightedSelectionPersona(DefaultPersona):
 
         self.session_logger.debug('Setting up persona...')
 
-        self.actions = await actions.to_async_list()
-        self.weights = await actions.persona.weights()
-        self.actions_count = await self.actions.size()
+        self._parsed_actions = await actions.to_async_list()
+        self.actions_count = await self._parsed_actions.size()
 
         self.engine = Engine(self.config, self.handler)
+        await self.engine.setup(AsyncList(actions.parser.setup_actions))
+        await self.engine.set_teardown_actions(
+            actions.parser.teardown_actions
+        )
 
-        actions_list = await self.actions.to_async_list()
-        await self.engine.setup(actions_list)
-
-        self.sampled_actions = await self._sample()
         self.duration = self.total_time
+
+    async def load_batches(self):
+        self.actions = AsyncList()
+        for idx in range(self.batch.size):
+            action_idx = idx % self.actions_count
+            action = self._parsed_actions[action_idx]
+
+            if action.is_setup is False and action.is_teardown is False:
+                await self.actions.append(action)
+                self.weights.append(action.weight)
+        
+        self.sampled_actions = await self._sample()
 
     async def execute(self):
         elapsed = 0
         results = []
-        deferred_batches = []
 
         await self.start_updates()
 
         self.start = time.time()
 
         while elapsed < self.duration:
-            batch = await asyncio.wait([
-                request async for request in self.engine.defer_all(self.sampled_actions)
-            ], timeout=self.batch.time)
+            self.batch.deferred.append(asyncio.create_task(
+                self._execute_batch()
+            ))
+            await self.batch.interval.wait()
 
             elapsed = time.time() - self.start
-
-            await self.batch.interval.wait()
-            deferred_batches.append(batch)
             self.sampled_actions = await self._sample()
 
         self.end = time.time()
 
         await self.stop_updates()
 
-        for deferred_batch, pending in deferred_batches:
-            completed = await asyncio.gather(*deferred_batch)
+        for deferred_batch in self.batch.deferred:
+            batch, pending = await deferred_batch
+            completed = await asyncio.gather(*batch, return_exceptions=True)
             results.extend(completed)
 
             try:
-                await asyncio.gather(*pending)
+                for pend in pending:
+                    pend.cancel()
             except Exception:
                 pass
 
@@ -92,3 +102,10 @@ class WeightedSelectionPersona(DefaultPersona):
         )
 
         return AsyncList(resampled_actions)
+
+    async def _execute_batch(self):
+        next_timeout = self.duration - (time.time() - self.start)    
+        return await asyncio.wait(
+            [ request async for request in self.engine.defer_all(self.sampled_actions)], 
+            timeout=next_timeout if next_timeout > 0 else 1
+        )

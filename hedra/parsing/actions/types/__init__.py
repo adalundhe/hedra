@@ -6,3 +6,4 @@ from .playwright_action import PlaywrightAction
 from .websocket_action import WebsocketAction
 from .grpc_action import GrpcAction
 from .graphql_action import GraphQLAction
+from .mercury_http_action import MercuryHttpAction

@@ -34,10 +34,10 @@ class MultiSequencePersona(DefaultPersona):
 
     async def load_batches(self):
         sequences = await self.actions.parser.sort()
-        sequences_count = await self.actions.parser.count()
+        sequences_count = len(sequences)
+        self._teardown_actions = self.actions.parser.teardown_actions
 
-
-        for sequence_name in sequences:
+        for sequence_idx, sequence_name in enumerate(sequences):
             
             sequence = SequencedPersonaCollection(
                 self._sequence_config,
@@ -51,6 +51,19 @@ class MultiSequencePersona(DefaultPersona):
             )
             
             await sequence.setup(sequence_actions)
+
+            if sequence_idx == 0:
+                await sequence.engine.setup(
+                    AsyncList(self.actions.parser.setup_actions)
+                )
+                
+                await sequence.engine.set_teardown_actions(
+                    self.actions.parser.teardown_actions
+                )
+
+            else:
+                await sequence.engine.setup(AsyncList())
+
             await sequence.load_batches()
             await self.sequences.append(sequence)
             
@@ -94,8 +107,6 @@ class MultiSequencePersona(DefaultPersona):
 
         return total_actions
 
-            
-
-
-        
-            
+    async def close(self):
+        for sequence in self.sequences:
+            await sequence.close()

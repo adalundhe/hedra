@@ -14,9 +14,6 @@ class Calibrate(Warmup):
         self.selected_persona.duration = 60
         calibration_results_completed = 0
 
-        if self.selected_persona.is_parallel is False:
-            self.session_logger.info(f'Running post-optimize calibration for - {self.duration} seconds...')
-
         if self._no_run_visuals is False and self.selected_persona.is_parallel is False:
 
             with alive_bar(title='Calibrating', bar=None, spinner='dots_waves2', monitor=False, stats=False) as bar:
@@ -31,7 +28,7 @@ class Calibrate(Warmup):
 
         if self.selected_persona.is_parallel is False:
             self.session_logger.info(
-                f'\nCalibration complete - finished {calibration_results_completed} - actions over - {self.duration} - seconds.\n'
+                f'\nCalibration complete - finished {calibration_results_completed} - actions over - {self.selected_persona.duration} - seconds.\n'
             )
 
         self.selected_persona.duration = self.total_time

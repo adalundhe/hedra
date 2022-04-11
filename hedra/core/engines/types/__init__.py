@@ -7,3 +7,4 @@ from .playwright_engine import PlaywrightEngine
 from .websocket_engine import WebsocketEngine
 from .grpc_engine import GrpcEngine
 from .graphql_engine import GraphQLEngine
+from .mercury_engine import MercuryHTTPEngine

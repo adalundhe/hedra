@@ -32,6 +32,9 @@ class MultiUserSequencePersona(DefaultPersona):
     async def setup(self, actions):
 
         user_names = await actions.parser.users()
+        user_setup_actions = actions.parser.user_setup_actions
+        user_teardown_actions = actions.parser.user_teardown_actions
+        
         users_count = await user_names.size()
         actions = await actions.parser.sort()
 
@@ -41,14 +44,18 @@ class MultiUserSequencePersona(DefaultPersona):
                 config=self._cli_config,
                 handler=self.handler
             )
-
+            
             user_actions = actions[user_name]
+            user_sequence_persona.user_setup_actions = user_setup_actions[user_name]
+            user_sequence_persona.user_teardown_actions = user_teardown_actions[user_name]
             user_sequence_persona.batch.size = await awaitable(
                 math.ceil,
                 self.batch.size/users_count
             )
             
-            await user_sequence_persona.setup(user_actions)
+            await user_sequence_persona.setup(
+                user_actions
+            )
             await self.users.append(user_sequence_persona)
 
     async def load_batches(self):

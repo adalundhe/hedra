@@ -33,7 +33,10 @@ class RampedPersona(DefaultPersona):
         self.actions_count = await self._initial_actions.size()
 
         self.engine = Engine(self.config, self.handler)
-        await self.engine.setup(self._initial_actions)
+        await self.engine.setup(AsyncList(actions.parser.setup_actions))
+        await self.engine.set_teardown_actions(
+            actions.parser.teardown_actions
+        )
 
 
     async def load_batches(self):
@@ -68,27 +71,27 @@ class RampedPersona(DefaultPersona):
         self.start = time.time()
 
         while elapsed < self.duration:
-            batch = await asyncio.wait([
-                request async for request in self.engine.defer_all(self.actions)
-            ], timeout=self.batch.time)
-
-            elapsed = time.time() - self.start
+            self.batch.deferred.append(asyncio.create_task(
+                self._execute_batch()
+            ))
 
             await self.batch.interval.wait()
-
-            self.batch.deferred.append(batch)
+            elapsed = time.time() - self.start
+            
             self.actions = await self.next_batch()
 
         self.end = time.time()
 
         await self.stop_updates()
 
-        for deferred_batch, pending in self.batch.deferred:
-            completed = await asyncio.gather(*deferred_batch)
+        for deferred_batch in self.batch.deferred:
+            batch, pending = await deferred_batch
+            completed = await asyncio.gather(*batch, return_exceptions=True)
             results.extend(completed)
 
             try:
-                await asyncio.gather(*pending)
+                for pend in pending:
+                    pend.cancel()
             except Exception:
                 pass
 
@@ -96,3 +99,10 @@ class RampedPersona(DefaultPersona):
         self.total_elapsed = elapsed
 
         return results
+
+    async def _execute_batch(self):
+        next_timeout = self.duration - (time.time() - self.start)    
+        return await asyncio.wait(
+            [ request async for request in self.engine.defer_all(self.actions)], 
+            timeout=next_timeout if next_timeout > 0 else 1
+        )

@@ -4,3 +4,4 @@ from .graphql_session import GraphQLSession
 from .http_session import HttpSession
 from .http2_session import Http2Session
 from .playwright_session import PlaywrightSession
+from .mercury_engine import MercuryHTTPSession

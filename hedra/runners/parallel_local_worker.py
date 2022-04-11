@@ -1,3 +1,4 @@
+import enum
 import statistics
 import multiprocessing
 import psutil
@@ -90,8 +91,13 @@ class ParallelLocalWorker:
     def _partition_actions(self, action=None):
 
         configs = []
+        batch_size = self.config.executor_config.get('batch_size', 10**3)
+        worker_batch_size = int(batch_size/self._workers)
+        last_batch_size = worker_batch_size + (batch_size%self._workers)
+        last_batch_idx = self._workers - 1
+
         with alive_bar(self._workers, title='Setting up workers...') as bar:
-            for worker in range(self._workers):
+            for idx, worker in enumerate(range(self._workers)):
                 command_line = CommandLine()
                 command_line.runner_mode = 'parallel'
                 command_line = self.config.copy(command_line)
@@ -106,6 +112,11 @@ class ParallelLocalWorker:
                 else:
                     command_line.actions = dict(self.config.actions)
                 
+                if idx == last_batch_idx:
+                    command_line.executor_config['batch_size'] = last_batch_size
+                else:
+                    command_line.executor_config['batch_size'] = worker_batch_size
+
                 reporter_config = dict(self.reporter_config.copy())
                 configs.append(dill.dumps({
                     'config': command_line,
@@ -114,7 +125,7 @@ class ParallelLocalWorker:
                 }))
 
                 bar()
-    
+
         return configs
 
     def run(self):

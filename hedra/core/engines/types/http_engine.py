@@ -49,14 +49,10 @@ class HttpEngine(BaseEngine):
         
         '''
 
-    async def create_session(self, actions=AsyncList()):
-        for action in actions.data:
-            if action.is_setup:
-                await action.execute(self.session)
-            elif action.is_teardown:
-                self._teardown_actions.append(action)
-
+    async def create_session(self, actions=[]):
         self.session = await self.yield_session()
+        for action in actions:
+            await action.execute(self.session)
 
     async def yield_session(self):
         return await self.session.create()

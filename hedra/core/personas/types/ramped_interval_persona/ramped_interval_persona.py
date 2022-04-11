@@ -24,51 +24,47 @@ class RampedIntervalPersona(DefaultPersona):
             
     async def execute(self):
         results = []
-        elapsed_all = 0
-        wait_timings = []
+        elapsed = 0
 
         await self.start_updates()
 
         self.start = time.time()
         
-        while elapsed_all < self.duration:
-            for _ in range(self.batch.count):
+        while elapsed < self.duration:
+
+            self.batch.deferred.append(asyncio.create_task(
+                self._execute_batch()
+            ))
+            await self.batch.interval.wait()
+            self.batch.time = await self._next_batch_time_limit()
                 
-                elapsed_batch = 0
-                start = time.time()
+            elapsed = time.time() - self.start
 
-                while elapsed_batch < self.batch.time:
-                    batch = await asyncio.wait([
-                        request async for request in self.engine.defer_all(self.actions)
-                    ], timeout=self.batch.time)
-
-                    elapsed_batch = time.time() - start
-                    self.batch.deferred.append(batch)
-
-                await self.batch.interval.wait()
-                wait_timings += [self.batch.interval.period]
-                self.batch.time = await self._next_batch_time_limit()
-                
-            elapsed_all = time.time() - self.start
-
-        self.end = time.time()
-
+        self.end = elapsed + self.start
         await self.stop_updates()
 
 
-        for deferred_batch, pending in self.batch.deferred:
-            completed = await asyncio.gather(*deferred_batch)
+        for deferred_batch in self.batch.deferred:
+            batch, pending = await deferred_batch
+            completed = await asyncio.gather(*batch, return_exceptions=True)
             results.extend(completed)
             
             try:
-                await asyncio.gather(pending)
+                for pend in pending:
+                    pend.cancel()
             except Exception:
                 pass
 
         self.total_actions = len(results)
-        self.total_elapsed = (self.end - self.start) - sum(wait_timings)
+        self.total_elapsed = elapsed
 
         return results
+
+    async def _execute_batch(self):  
+        return await asyncio.wait(
+            [ request async for request in self.engine.defer_all(self.actions)], 
+            timeout=self.batch.time
+        )
 
     async def _next_batch_time_limit(self):
         return await awaitable(

@@ -38,8 +38,9 @@ class GrpcEngine(BaseEngine):
 
         '''
 
-    async def create_session(self, actions=AsyncList()):
-        pass
+    async def create_session(self, actions=[]):
+        for action in actions:
+            await action.execute(action)
 
     async def yield_session(self):
         pass

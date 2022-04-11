@@ -7,7 +7,8 @@ from .types import (
     PlaywrightEngine,
     WebsocketEngine,
     GrpcEngine,
-    GraphQLEngine
+    GraphQLEngine,
+    MercuryHTTPEngine
 )
 from easy_logger import Logger
 
@@ -23,7 +24,8 @@ class Engine:
         'playwright': PlaywrightEngine,
         'websocket': WebsocketEngine,
         'grpc': GrpcEngine,
-        'graphql': GraphQLEngine
+        'graphql': GraphQLEngine,
+        'mercury-http': MercuryHTTPEngine
     }
 
     def __init__(self, config, handler):
@@ -94,6 +96,9 @@ class Engine:
     async def defer_all(self, actions):
         async for response in self.engine.defer_all(actions):
             yield response
+
+    async def set_teardown_actions(self, teardown_actions):
+        self.engine._teardown_actions = teardown_actions
 
     async def close(self):
         return await self.engine.close()

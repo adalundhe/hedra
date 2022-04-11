@@ -50,6 +50,9 @@ class CustomAction:
 
         '''
 
+    async def parse_data(self):
+        pass
+
     def execute(self, context):
         return self.action()
         

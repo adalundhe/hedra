@@ -35,13 +35,9 @@ class ActionSetEngine(BaseEngine):
 
         '''
 
-    async def create_session(self, actions=AsyncList()) -> None:
-        for action in actions.data:
-            if action.is_setup:
-                await action.execute(action)
-            elif action.is_teardown:
-                self._teardown_actions.append(action)
-        
+    async def create_session(self, actions=[]) -> None:
+        for action in actions:
+            await action.execute(action)
 
     async def yield_session(self) -> None:
         pass

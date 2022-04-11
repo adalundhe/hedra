@@ -6,7 +6,8 @@ from .types import (
     PlaywrightAction,
     WebsocketAction,
     GrpcAction,
-    GraphQLAction
+    GraphQLAction,
+    MercuryHttpAction
 )
 
 
@@ -20,7 +21,8 @@ class Action:
         'playwright': PlaywrightAction,
         'websocket': WebsocketAction,
         'grpc': GrpcAction,
-        'graphql': GraphQLAction
+        'graphql': GraphQLAction,
+        'mercury-http': MercuryHttpAction
     }
 
     def __init__(self, action, type, group=None):

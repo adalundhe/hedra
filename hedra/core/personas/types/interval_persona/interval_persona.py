@@ -1,7 +1,6 @@
 import time
 import asyncio
 from hedra.core.personas.types.default_persona import DefaultPersona
-from hedra.core.personas.batching import Batch
 
 
 class IntervalPersona(DefaultPersona):
@@ -30,25 +29,25 @@ class IntervalPersona(DefaultPersona):
         self.start = time.time()
 
         while elapsed < self.duration:
-            batch = await asyncio.wait([
-                request async for request in self.engine.defer_all(self.actions)
-            ], timeout=self.batch.time)
-
-            elapsed = time.time() - self.start
+            self.batch.deferred.append(asyncio.create_task(
+                self._execute_batch()
+            ))
 
             await self.batch.interval.wait()
-            self.batch.deferred.append(batch)
+            elapsed = time.time() - self.start
 
-        self.end = time.time()
+        self.end = elapsed + self.start
 
         await self.stop_updates()
 
-        for deferred_batch, pending in self.batch.deferred:
-            completed = await asyncio.gather(*deferred_batch)
+        for deferred_batch in self.batch.deferred:
+            batch, pending = await deferred_batch
+            completed = await asyncio.gather(*batch, return_exceptions=True)
             results.extend(completed)
             
             try:
-                await asyncio.gather(*pending)
+                for pend in pending:
+                    pend.cancel()
             except Exception:
                 pass
 
@@ -56,3 +55,9 @@ class IntervalPersona(DefaultPersona):
         self.total_elapsed = elapsed
 
         return results
+
+    async def _execute_batch(self):
+        return await asyncio.wait(
+            [ request async for request in self.engine.defer_all(self.actions)], 
+            timeout=self.batch.time
+        )

@@ -1,39 +1,30 @@
-import asyncio
-import uvloop
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-uvloop.install()
-from .sessions import FastHttpSession
-from .http_engine import HttpEngine
+from .base_engine import BaseEngine
+from .sessions import MercuryHTTPSession
 from .utils.wrap_awaitable import async_execute_or_catch
 
 
-class FastHttpEngine(HttpEngine):
+class MercuryHTTPEngine(BaseEngine):
 
     def __init__(self, config, handler):
-        super(FastHttpEngine, self).__init__(
-            config,
-            handler
-        )
-
-        self.session = FastHttpSession(
-            pool_size=self._pool_size,
-            dns_cache_seconds=10**6,
+        super(MercuryHTTPEngine, self).__init__(config, handler)
+        self.session = MercuryHTTPSession(
+            pool_size=self.config.get('batch_size', 10**3),
             request_timeout=self.config.get('request_timeout'),
+            hard_cache=self.config.get('hard_cache')
         )
 
     @classmethod
     def about(cls):
         return '''
-        Fast HTTP - (fast-http)
+        Mercury HTTP - (mercury-http)
 
         key-arguments:
 
         --request-timeout <seconds_timeout_for_individual_requests>
         
-        The Fast HTTP engine is a significantly faster albeit more limited version of the HTTP engine, ideal
-        for REST requests against APIs. In general, the Fast HTTP engine is 40-60 percent faster than the 
-        default HTTP engine. However, the Fast HTTP engine will return errors if the request target performs 
-        too slowly or is resource-intensive, and should not be used to load pages (etc.).
+        The Mercury HTTP engine is a prototype HTTP engine, ideal for REST requests against APIs. In general, 
+        the Mercury HTTP engine is two to three times faster than the default HTTP engine. However, the Mercury HTTP 
+        engine will return errors if the request target performs too slowly or is resource-intensive.
 
 
         Actions are specified as:
@@ -55,8 +46,16 @@ class FastHttpEngine(HttpEngine):
     async def yield_session(self):
         return await self.session.create()
 
+    def execute(self, action):
+        return action.execute(self.session)
+
+    async def defer_all(self, actions):
+        async for action in actions:
+            yield action.execute(self.session)
+
     @async_execute_or_catch()
     async def close(self):
         for teardown_action in self._teardown_actions:
             await teardown_action.execute(self.session)
         
+

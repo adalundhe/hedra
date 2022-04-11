@@ -103,18 +103,14 @@ class PlaywrightEngine(BaseEngine):
         return PlaywrightSession.about_command(command)
 
     async def create_session(self, actions=AsyncList()):
+        self._librarians = await self.yield_session()
 
         for action in actions.data:
-            if action.is_setup:
-                await action.execute()
-            elif action.is_teardown:
-                self._teardown_actions.append(action)
-
-        await self.yield_session()
+            async for command in self._librarians[0].lookup(action):
+                await action.execute(command)
 
     async def yield_session(self):
-        self._librarians = await self.session.create()
-        return self._librarians
+        return await self.session.create()
 
     def execute(self, action):
         idx = random.randint(0, len(self._librarians))

@@ -26,6 +26,9 @@ class Test:
     reporter_config={
         "save_to_file": True
     }
+    options={
+        
+    }
 
     def __init__(self) -> None:
         self.executor_config = {

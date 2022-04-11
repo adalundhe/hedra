@@ -87,7 +87,7 @@ class ActionsParser:
         return self.actions.get(key)
 
     async def to_async_list(self):
-        return AsyncList(self.parser.actions)
+        return AsyncList([action for action in self.parser.actions if action.is_setup is False and action.is_teardown is False])
 
     async def parse(self):
         return await self.parser.parse()

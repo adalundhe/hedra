@@ -5,13 +5,14 @@ from hedra.core.engines.types.sessions import (
     HttpSession,
     Http2Session,
     GraphQLSession,
+    MercuryHTTPSession,
     PlaywrightSession
 )
 from easy_logger import Logger
 from .test import Test
 
 
-def action(name, group=None, weight=1, order=1, timeout=None, wait_interval=None, metadata={}, checks=None):
+def action(name, group=None, weight=1, order=1, timeout=None, wait_interval=None, metadata={}, checks=[]):
     '''
     Action Hook
 
@@ -262,6 +263,13 @@ def use(config: Test, fixtures={}, inject=None):
                         pool_size=selected_config.pool_size,
                         dns_cache_seconds=10**8,
                         request_timeout=selected_config.request_timeout
+                    )
+
+                elif selected_engine == 'mercury-http':
+                    session = MercuryHTTPSession(
+                        pool_size=selected_config.batch_size,
+                        request_timeout=selected_config.request_timeout,
+                        hard_cache=selected_config.options.get('hard_cache', False)
                     )
 
                 cls.session = session
