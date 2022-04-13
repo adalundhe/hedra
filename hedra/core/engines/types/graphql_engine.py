@@ -1,8 +1,8 @@
 from .sessions import GraphQLSession
-from .http_engine import HttpEngine
+from .mercury_engine import MercuryHTTPEngine
 
 
-class GraphQLEngine(HttpEngine):
+class GraphQLEngine(MercuryHTTPEngine):
 
     def __init__(self, config, handler):
         super().__init__(config, handler)

@@ -5,12 +5,12 @@ from aiohttp.connector import TCPConnector
 from aiohttp.resolver import AsyncResolver
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.aiohttp import log as aiohttp_logger
-from .http_session import HttpSession
+from .base_session import BaseSession
 
 aiohttp_logger.setLevel(logging.ERROR)
 
 
-class GraphQLSession(HttpSession):
+class GraphQLSession(BaseSession):
 
     def __init__(self, pool_size=None, dns_cache_seconds=None, session_url=None, request_timeout=None) -> None:
         super(GraphQLSession, self).__init__(

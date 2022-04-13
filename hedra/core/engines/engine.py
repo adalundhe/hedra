@@ -1,14 +1,11 @@
 from .types import (
-    HttpEngine,
-    Http2Engine,
     ActionSetEngine,
-    FastHttpEngine,
-    FastHttp2Engine,
     PlaywrightEngine,
     WebsocketEngine,
     GrpcEngine,
     GraphQLEngine,
-    MercuryHTTPEngine
+    MercuryHTTPEngine,
+    MercuryHTTP2Engine
 )
 from easy_logger import Logger
 
@@ -16,16 +13,13 @@ from easy_logger import Logger
 class Engine:
 
     registered_engines = {
-        'http': HttpEngine,
-        'http2': Http2Engine,
-        'fast-http': FastHttpEngine,
-        'fast-http2': FastHttp2Engine,
         'action-set': ActionSetEngine,
         'playwright': PlaywrightEngine,
         'websocket': WebsocketEngine,
         'grpc': GrpcEngine,
         'graphql': GraphQLEngine,
-        'mercury-http': MercuryHTTPEngine
+        'http': MercuryHTTPEngine,
+        'http2': MercuryHTTP2Engine
     }
 
     def __init__(self, config, handler):
@@ -40,7 +34,7 @@ class Engine:
 
         self.engine = self.registered_engines.get(
             self.type,
-            HttpEngine
+            MercuryHTTPEngine
         )(
             self.config,
             self.handler

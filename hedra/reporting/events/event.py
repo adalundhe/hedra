@@ -3,25 +3,25 @@ import datetime
 import time
 import tzlocal
 from .types import (
-    HttpEvent,
     PlaywrightEvent,
-    FastHttpEvent,
     CustomEvent,
     WebsocketEvent,
     GrpcEvent,
-    GraphQLEvent
+    GraphQLEvent,
+    MercuryHTTPEvent,
+    MercuryHTTP2Event
 )
 
 
 class Event:
     event_types = {
-        'http': HttpEvent,
-        'fast-http': FastHttpEvent,
         'playwright': PlaywrightEvent,
         'custom': CustomEvent,
         'websocket': WebsocketEvent,
         'grpc': GrpcEvent,
-        'graphql': GraphQLEvent
+        'graphql': GraphQLEvent,
+        'http': MercuryHTTPEvent,
+        'http2': MercuryHTTP2Event
     }
 
     def __init__(self, action):

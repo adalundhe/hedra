@@ -27,9 +27,6 @@ setup(
     install_requires=[
         'mercury-http',
         'aiohttp[speedups]',
-        'aiosonic',
-        'httpx',
-        'httpx[http2]',
         'pytz',
         'playwright',
         'tzlocal',

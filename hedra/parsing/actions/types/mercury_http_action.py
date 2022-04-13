@@ -1,10 +1,32 @@
-from mercury_http.http import MercuryHTTPClient
-from .http_action import HttpAction
+from .utils import (
+    convert_data,
+    stringify_params
+)
 
-class MercuryHttpAction(HttpAction):
+from mercury_http.http import MercuryHTTPClient
+
+class MercuryHTTPAction:
 
     def __init__(self, action, group=None):
-        super(MercuryHttpAction, self).__init__(action, group)
+        self.name = action.get('name')
+        self.host = action.get('host', group)
+        self.endpoint = action.get('endpoint')
+        self.user = action.get('user')
+        self.tags = action.get('tags', [])
+        self.url = action.get(
+            'url',
+            f'{self.host}{self.endpoint}'
+        )
+        self.method = action.get('method')
+        self.headers = action.get('headers', {})
+        self.params = action.get('params')
+        self.auth = action.get('auth')
+        self.data = action.get('data')
+        self.weight = action.get('weight', 1)
+        self.order = action.get('order', 1)
+        self.action_type = 'http'
+        self.is_setup = action.get('is_setup', False)
+        self.is_teardown = action.get('is_teardown', False)
         self.ssl = action.get('ssl', False)
         self.action_type = 'mercury-http'
 
@@ -13,8 +35,8 @@ class MercuryHttpAction(HttpAction):
         return '''
         Mercury-HTTP Action
 
-        Mercury-HTTP Actions represent a single HTTP 1.X/2.X REST call using Hedra's Mercury-HTTP
-        or Mercury-HTTP2 engine. For example - a GET request to https://www.google.com/.
+        Mercury-HTTP Actions represent a single HTTP 1.X REST call using Hedra's Mercury-HTTP
+        engine. For example - a GET request to https://www.google.com/.
 
         Actions are specified as:
 
@@ -33,7 +55,20 @@ class MercuryHttpAction(HttpAction):
         - order: (optional) <action_order_for_sequence_personas>
 
         '''
-    
+
+    async def update_headers(self, headers) -> dict:
+        return self.headers.update(headers)
+        
+    async def parse_data(self) -> None:
+        self.params = await stringify_params(
+            params=self.params
+        )
+        self.data = await convert_data(
+            self.data,
+            method=self.method,
+            mime_type=self.headers.get('Content-Type')
+        )
+
     def execute(self, session: MercuryHTTPClient):
         return session.request(
             self.name,
@@ -44,3 +79,21 @@ class MercuryHttpAction(HttpAction):
             data=self.data,
             ssl=self.ssl
         )
+
+    def to_dict(self) -> dict:
+        return {
+            'name': self.name,
+            'host': self.host,
+            'endpoint': self.endpoint,
+            'user': self.user,
+            'tags': self.tags,
+            'url': self.url,
+            'method': self.method,
+            'headers': self.headers,
+            'params': self.params,
+            'auth': self.auth,
+            'data': self.data,
+            'order': self.order,
+            'weight': self.weight,
+            'action_type': self.action_type
+        }

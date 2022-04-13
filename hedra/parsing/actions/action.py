@@ -1,34 +1,30 @@
 from .types import (
-    HttpAction,
-    FastHttpAction,
-    FastHttp2Action,
     CustomAction,
     PlaywrightAction,
     WebsocketAction,
     GrpcAction,
     GraphQLAction,
-    MercuryHttpAction
+    MercuryHTTPAction,
+    MercuryHTTP2Action
 )
 
 
 class Action:
 
     action_types={
-        'http': HttpAction,
-        'fast-http': FastHttpAction,
-        'fast-http2': FastHttp2Action,
         'action-set':CustomAction,
         'playwright': PlaywrightAction,
         'websocket': WebsocketAction,
         'grpc': GrpcAction,
         'graphql': GraphQLAction,
-        'mercury-http': MercuryHttpAction
+        'http': MercuryHTTPAction,
+        'http2': MercuryHTTP2Action
     }
 
     def __init__(self, action, type, group=None):
         self.type = self.action_types.get(
             type, 
-            HttpAction
+            MercuryHTTPAction
         )(
             action, 
             group=group

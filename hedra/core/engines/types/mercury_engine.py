@@ -1,7 +1,10 @@
+from typing import AsyncIterator
+
+from hedra.parsing.actions.types.mercury_http_action import MercuryHTTPAction
 from .base_engine import BaseEngine
 from .sessions import MercuryHTTPSession
 from .utils.wrap_awaitable import async_execute_or_catch
-
+from mercury_http.http import MercuryHTTPClient
 
 class MercuryHTTPEngine(BaseEngine):
 
@@ -45,6 +48,21 @@ class MercuryHTTPEngine(BaseEngine):
 
     async def yield_session(self):
         return await self.session.create()
+
+    
+    async def prepare(self, actions: AsyncIterator[MercuryHTTPAction]):
+        for action in actions:
+            await self.session.prepare_request(
+                action.name,
+                action.url,
+                method=action.method,
+                headers=action.headers,
+                params=action.params,
+                data=action.data,
+                ssl=action.ssl,
+                user=action.user,
+                tags=action.tags
+            )
 
     def execute(self, action):
         return action.execute(self.session)

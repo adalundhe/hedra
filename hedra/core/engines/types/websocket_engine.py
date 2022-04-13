@@ -1,7 +1,7 @@
-from .http_engine import HttpEngine
-from .utils.wrap_awaitable import wrap_awaitable_future
+from .mercury_engine import MercuryHTTPEngine
 
-class WebsocketEngine(HttpEngine):
+
+class WebsocketEngine(MercuryHTTPEngine):
 
     def __init__(self, config, handler):
         super().__init__(config, handler)

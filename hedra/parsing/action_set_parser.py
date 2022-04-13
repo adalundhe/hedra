@@ -122,6 +122,7 @@ class ActionSetParser(MultiUserSequenceParser):
                         method, 
                         user=class_instance.name
                     )
+                    
                     if action.is_setup:
                         self.setup_actions.append(action)
 

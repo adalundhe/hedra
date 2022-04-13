@@ -3,7 +3,7 @@ from hedra.core.engines import Engine
 from hedra.parsing.actions.action import Action
 from async_tools.datatypes.async_list import AsyncList
 
-from hedra.parsing.actions.types.http_action import HttpAction
+from hedra.parsing.actions.types.mercury_http_action import MercuryHTTPAction
 from .hooks import setup, teardown
 from hedra.parsing.actions import Action
 from .hooks import (
@@ -17,6 +17,7 @@ class ActionSet:
     engine_type='http'
     session=None
     config={}
+    actions = []
 
     def __init__(self) -> None:
         engine = Engine({
@@ -24,8 +25,8 @@ class ActionSet:
             **self.config
         }, None)
         self.engine = engine.engine
-        self.actions = AsyncList()
-        self.action_type = Action.action_types.get(self.engine_type, HttpAction)
+        self.actions = self.actions
+        self.action_type = Action.action_types.get(self.engine_type, MercuryHTTPAction)
 
     @classmethod
     def about(cls):
@@ -102,6 +103,9 @@ class ActionSet:
     @setup('setup_action_set')
     async def setup(self):
         self.engine.session = await self.session.create()
+        await self.engine.prepare([
+            self.action_type(action) for action in self.actions
+        ])
 
     def execute(self, action_data: dict, group: str=None):
         return self.engine.execute(

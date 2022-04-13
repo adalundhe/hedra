@@ -1,18 +1,23 @@
-from .fast_http_action import FastHttpAction
+from mercury_http.http2 import MercuryHTTP2Client
+from .mercury_http_action import MercuryHTTPAction
 
-class FastHttp2Action(FastHttpAction):
+
+class MercuryHTTP2Action(MercuryHTTPAction):
 
     def __init__(self, action, group=None):
-        super(FastHttpAction, self).__init__(action, group=group)
-        self.action_type = 'fast-http'
+        super(
+            MercuryHTTP2Action,
+            self
+        ).__init__(action, group)
+
 
     @classmethod
     def about(cls):
         return '''
-        Fast-HTTP2 Action
+        Mercury-HTTP2 Action
 
-        Fast-HTTP2 Actions represent a single HTTP 2.X REST call using Hedra's Fast-HTTP2
-        engine. For example - a GET request to https://www.google.com/.
+        Mercury-HTTP2 Actions represent a single HTTP2 2.X REST call using Hedra's Mercury-HTTP2 
+        engine. For example - a GET request to https://httpbin.org/get.
 
         Actions are specified as:
 
@@ -26,17 +31,19 @@ class FastHttp2Action(FastHttpAction):
         - name: <action_name>
         - user: <user_associated_with_action>
         - tags: <list_of_tags_for_aggregating_actions>
+        - ssl: <boolean_to_use_ssl> (defaults to False)
         - weight: (optional) <action_weighting_for_weighted_persona>
         - order: (optional) <action_order_for_sequence_personas>
 
         '''
     
-    async def execute(self, session):
-        return await session.request(
+    def execute(self, session: MercuryHTTP2Client):
+        return session.request(
+            self.name,
             self.url,
-            self.method,
+            method=self.method,
             headers=self.headers,
-            params=self.params,
             data=self.data,
-            http2=True
+            ssl=self.ssl
         )
+

@@ -1,11 +1,9 @@
 import functools
 import asyncio
 from hedra.core.engines.types.sessions import (
-    FastHttpSession,
-    HttpSession,
-    Http2Session,
     GraphQLSession,
     MercuryHTTPSession,
+    MercuryHTTP2Session,
     PlaywrightSession
 )
 from easy_logger import Logger
@@ -94,7 +92,6 @@ def setup(name, group=None, metadata={}):
         func.weight = 0
         func.order = 0
         func.group = group
-        func.method = func
         func.timeout = None
         func.wait_interval = None
         func.env = metadata.get('env')
@@ -237,25 +234,18 @@ def use(config: Test, fixtures={}, inject=None):
 
                 if selected_engine == 'http' or selected_engine == 'websocket':
 
-                    session = HttpSession(
-                        pool_size=selected_config.pool_size,
-                        dns_cache_seconds=10**8,
-                        request_timeout=selected_config.request_timeout
+                    session = MercuryHTTPSession(
+                        pool_size=selected_config.batch_size,
+                        request_timeout=selected_config.request_timeout,
+                        hard_cache=selected_config.options.get('hard_cache', False)
                     )
 
                 elif selected_engine == 'http2':
 
-                    session = Http2Session(
-                        pool_size=selected_config.pool_size,
-                        request_timeout=selected_config.request_timeout
-                    )
-
-                elif selected_engine == 'fast-http' or selected_engine == 'fast-http2':
-                    
-                    session = FastHttpSession(
-                        pool_size=selected_config.pool_size,
-                        dns_cache_seconds=10**6,
-                        request_timeout=selected_config.request_timeout
+                    session = MercuryHTTP2Session(
+                        pool_size=selected_config.batch_size,
+                        request_timeout=selected_config.request_timeout,
+                        hard_cache=selected_config.options.get('hard_cache', False)
                     )
 
                 elif selected_engine == 'graphql':
@@ -263,13 +253,6 @@ def use(config: Test, fixtures={}, inject=None):
                         pool_size=selected_config.pool_size,
                         dns_cache_seconds=10**8,
                         request_timeout=selected_config.request_timeout
-                    )
-
-                elif selected_engine == 'mercury-http':
-                    session = MercuryHTTPSession(
-                        pool_size=selected_config.batch_size,
-                        request_timeout=selected_config.request_timeout,
-                        hard_cache=selected_config.options.get('hard_cache', False)
                     )
 
                 cls.session = session
