@@ -1,6 +1,9 @@
+from tabnanny import check
+
+
 class CustomAction:
 
-    def __init__(self, action, group=None, engine=None) -> None:
+    def __init__(self, action, group=None, session=None) -> None:
         
         self.name = action.get('name')
         self.user = action.get('user')
@@ -18,7 +21,10 @@ class CustomAction:
         self.is_setup = self.action.is_setup
         self.is_teardown = self.action.is_teardown
         self.group = group
-        self.engine = engine
+        self.session = session
+
+        if self.checks is None:
+            self.checks = []
 
         if self.type is None:
             self.type = self.action_type
@@ -50,11 +56,15 @@ class CustomAction:
 
         '''
 
-    async def parse_data(self):
-        pass
+    async def execute_setup_or_teardown(self):
+        await self.action()
 
-    def execute(self, context):
-        return self.action()
+    async def execute(self, timeout):
+        return await self.session.batch_request(
+            self.action(),
+            checks=self.checks,
+            timeout=timeout
+        )
         
     def to_dict(self) -> dict:
         return {

@@ -1,8 +1,8 @@
-from mercury_http.http2 import MercuryHTTP2Client
+from mercury_http.graphql import MercuryGraphQLClient
 from mercury_http.common import Request
 
 
-class MercuryHTTP2Action:
+class MercuryGraphQLAction:
 
     def __init__(self, action, group=None, session=None):
 
@@ -11,6 +11,7 @@ class MercuryHTTP2Action:
             action.get('url'),
             method=action.get('method'),
             headers=action.get('headers', {}),
+            params=action.get('params', {}),
             payload=action.get('data'),
             checks=action.get('checks')
         )
@@ -23,15 +24,16 @@ class MercuryHTTP2Action:
         self.is_setup = action.get('is_setup', False)
         self.is_teardown = action.get('is_teardown', False)
         self.group = group
-        self.action_type = 'http2'
+        self.action_type = 'graphql'
+        self.use_http2 = action.get('http2', False)
 
     @classmethod
     def about(cls):
         return '''
-        Mercury-HTTP2 Action
+        Mercury-GraphQL Action
 
-        Mercury-HTTP2 Actions represent a single HTTP/2 REST call using Hedra's Mercury-HTTP2
-        engine. For example - a GET request to https://www.google.com/.
+        Mercury-GraphQL Actions represent a single HTTP/1 or HTTP/2 REST call using Hedra's 
+        Mercury-GraphQL engine. For example - a GET request to https://www.google.com/.
 
         Actions are specified as:
 
@@ -51,10 +53,12 @@ class MercuryHTTP2Action:
         '''
         
     async def setup(self) -> None:
-        await self.request.setup_http_request()
+        await self.request.setup_graphql_request(
+            use_http2=self.use_http2
+        )
         await self.request.url.lookup()
     
-    def execute(self, session: MercuryHTTP2Client):
+    def execute(self, session: MercuryGraphQLClient):
         return session.request(self.request)
 
     def to_dict(self) -> dict:

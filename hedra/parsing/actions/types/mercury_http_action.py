@@ -1,34 +1,30 @@
-from .utils import (
-    convert_data,
-    stringify_params
-)
-
 from mercury_http.http import MercuryHTTPClient
+from mercury_http.common import Request
+
 
 class MercuryHTTPAction:
 
-    def __init__(self, action, group=None):
-        self.name = action.get('name')
-        self.host = action.get('host', group)
-        self.endpoint = action.get('endpoint')
-        self.user = action.get('user')
-        self.tags = action.get('tags', [])
-        self.url = action.get(
-            'url',
-            f'{self.host}{self.endpoint}'
+    def __init__(self, action, group=None, session=None):
+
+        self.request = Request(
+            action.get('name'),
+            action.get('url'),
+            method=action.get('method'),
+            headers=action.get('headers', {}),
+            params=action.get('params', {}),
+            payload=action.get('data'),
+            checks=action.get('checks')
         )
-        self.method = action.get('method')
-        self.headers = action.get('headers', {})
-        self.params = action.get('params')
-        self.auth = action.get('auth')
-        self.data = action.get('data')
+
+        self.request.metadata.user = action.get('user')
+        self.request.metadata.tags = action.get('tags', [])
+        
         self.weight = action.get('weight', 1)
         self.order = action.get('order', 1)
-        self.action_type = 'http'
         self.is_setup = action.get('is_setup', False)
         self.is_teardown = action.get('is_teardown', False)
-        self.ssl = action.get('ssl', False)
-        self.action_type = 'mercury-http'
+        self.group = group
+        self.action_type = 'http'
 
     @classmethod
     def about(cls):
@@ -50,49 +46,21 @@ class MercuryHTTPAction:
         - name: <action_name>
         - user: <user_associated_with_action>
         - tags: <list_of_tags_for_aggregating_actions>
-        - ssl: <boolean_to_use_ssl> (defaults to False)
         - weight: (optional) <action_weighting_for_weighted_persona>
         - order: (optional) <action_order_for_sequence_personas>
 
         '''
-
-    async def update_headers(self, headers) -> dict:
-        return self.headers.update(headers)
         
-    async def parse_data(self) -> None:
-        self.params = await stringify_params(
-            params=self.params
-        )
-        self.data = await convert_data(
-            self.data,
-            method=self.method,
-            mime_type=self.headers.get('Content-Type')
-        )
-
+    async def setup(self) -> None:
+        await self.request.setup_http_request()
+        await self.request.url.lookup()
+    
     def execute(self, session: MercuryHTTPClient):
-        return session.request(
-            self.name,
-            self.url,
-            method=self.method,
-            headers=self.headers,
-            params=self.params,
-            data=self.data,
-            ssl=self.ssl
-        )
+        return session.request(self.request)
 
     def to_dict(self) -> dict:
         return {
-            'name': self.name,
-            'host': self.host,
-            'endpoint': self.endpoint,
-            'user': self.user,
-            'tags': self.tags,
-            'url': self.url,
-            'method': self.method,
-            'headers': self.headers,
-            'params': self.params,
-            'auth': self.auth,
-            'data': self.data,
+            'request': self.request,
             'order': self.order,
             'weight': self.weight,
             'action_type': self.action_type

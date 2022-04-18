@@ -1,11 +1,13 @@
 from telnetlib import EXOPL
+
+from requests import session
 from hedra.core.engines import Engine
-from hedra.parsing.actions.action import Action
 from async_tools.datatypes.async_list import AsyncList
 
 from hedra.parsing.actions.types.mercury_http_action import MercuryHTTPAction
 from .hooks import setup, teardown
 from hedra.parsing.actions import Action
+from .actions import HTTPAction
 from .hooks import (
     setup,
     teardown
@@ -102,23 +104,16 @@ class ActionSet:
 
     @setup('setup_action_set')
     async def setup(self):
-        self.engine.session = await self.session.create()
-        await self.engine.prepare([
-            self.action_type(action) for action in self.actions
-        ])
-
+        self.session = await self.session.create()
+        
     def execute(self, action_data: dict, group: str=None):
-        return self.engine.execute(
-            self.action_type(
-                action_data,
-                group=group
-            )
-        )
+        action = self.action_type(action_data, group=group, session=self.session)
+        return action.request
 
     @teardown('teardown_action_set')
     async def close(self):
         try:
-            await self.engine.close()
+            await self.session.close()
         except Exception:
             pass
     

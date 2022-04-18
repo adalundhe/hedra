@@ -1,11 +1,11 @@
 from .types import (
     CustomAction,
     PlaywrightAction,
-    WebsocketAction,
-    GrpcAction,
-    GraphQLAction,
+    MercuryWebsocketAction,
+    MercuryGRPCAction,
     MercuryHTTPAction,
-    MercuryHTTP2Action
+    MercuryHTTP2Action,
+    MercuryGraphQLAction
 )
 
 
@@ -14,9 +14,9 @@ class Action:
     action_types={
         'action-set':CustomAction,
         'playwright': PlaywrightAction,
-        'websocket': WebsocketAction,
-        'grpc': GrpcAction,
-        'graphql': GraphQLAction,
+        'websocket': MercuryWebsocketAction,
+        'grpc': MercuryGRPCAction,
+        'graphql': MercuryGraphQLAction,
         'http': MercuryHTTPAction,
         'http2': MercuryHTTP2Action
     }

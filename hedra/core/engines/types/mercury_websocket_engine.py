@@ -1,24 +1,35 @@
-from .mercury_engine import MercuryHTTPEngine
+from .sessions import MercuryWebsocketSession
+from .mercury_http_engine import MercuryHTTPEngine
 
 
-class WebsocketEngine(MercuryHTTPEngine):
+class MercuryWebsocketEngine(MercuryHTTPEngine):
 
     def __init__(self, config, handler):
-        super().__init__(config, handler)
+        super(
+            MercuryHTTPEngine,
+            self
+        ).__init__(config, handler)
+        self.session = MercuryWebsocketSession(
+            pool_size=self.config.get('batch_size', 10**3),
+            request_timeout=self.config.get('request_timeout'),
+            hard_cache=self.config.get('hard_cache'),
+            reset_connections=self.config.get('reset_connections')
+        )
+
 
     @classmethod
     def about(cls):
         return '''
-        Websocket Engine - (websocket)
+        Mercury Websocket Engine - (websocket)
 
-        The Websocket Engine makes requests to websockets - each request connecting, receiving/sending
+        The Mercury Websocket Engine makes requests to websockets - each request connecting, receiving/sending
         then disconnecting. This is intentional - designed to test how well websockets handle large amounts 
         of varied traffic.
 
         Actions are specified as:
 
         - endpoint: <host_endpoint>
-        - host: <host_address_or_ip_of_target> (defaults to the action's group)
+        - url: <full_url_to_target>
         - method: <webocket_request_method> (must be GET or POST)
         - headers: <websocket_request_headers>
         - auth: <websocket_request_auth>

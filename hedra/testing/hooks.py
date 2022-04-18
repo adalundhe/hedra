@@ -1,16 +1,19 @@
 import functools
 import asyncio
+import psutil
 from hedra.core.engines.types.sessions import (
-    GraphQLSession,
+    MercuryGraphQLSession,
     MercuryHTTPSession,
     MercuryHTTP2Session,
+    MercuryWebsocketSession,
+    MercuryGRPCSession,
     PlaywrightSession
 )
 from easy_logger import Logger
 from .test import Test
 
 
-def action(name, group=None, weight=1, order=1, timeout=None, wait_interval=None, metadata={}, checks=[]):
+def action(name, group=None, weight=1, order=1, timeout=None, wait_interval=None, metadata={}, checks=None):
     '''
     Action Hook
 
@@ -59,9 +62,10 @@ def action(name, group=None, weight=1, order=1, timeout=None, wait_interval=None
         func.url = metadata.get('url')
         func.checks = checks
 
+        @functools.lru_cache(maxsize=128)
         @functools.wraps(func)
-        async def decorator(*args, **kwargs):
-            return await func(*args, **kwargs)
+        def decorator(*args, **kwargs):
+            return func(*args, **kwargs)
                 
         return decorator  
     return wrapper
@@ -224,7 +228,16 @@ def use(config: Test, fixtures={}, inject=None):
 
 
             selected_engine = selected_config.engine_type
-        
+            pool_size = 1
+            pool_concurrency = selected_config.options.get('session_max_connections')
+
+            if selected_config.runner_mode == 'parallel' and pool_concurrency is None:
+                pool_size = selected_config.pool_size
+                pool_concurrency = int(selected_config.batch_size/pool_size)  
+
+            elif pool_concurrency is None:
+                pool_concurrency = selected_config.batch_size            
+
             try:
                 if inject:
                     selected_engine = 'custom'
@@ -232,27 +245,60 @@ def use(config: Test, fixtures={}, inject=None):
                 
                 session = None
 
-                if selected_engine == 'http' or selected_engine == 'websocket':
-
+                if selected_engine == 'http':
                     session = MercuryHTTPSession(
-                        pool_size=selected_config.batch_size,
+                        pool_size=selected_config.options.get(
+                            'session_max_connections', 
+                            pool_concurrency
+                        ),
                         request_timeout=selected_config.request_timeout,
-                        hard_cache=selected_config.options.get('hard_cache', False)
+                        hard_cache=selected_config.options.get('hard_cache', False),
+                        reset_connections=selected_config.options.get('reset_connections')
                     )
 
-                elif selected_engine == 'http2':
-
+                elif selected_engine == 'http2':              
                     session = MercuryHTTP2Session(
-                        pool_size=selected_config.batch_size,
+                        pool_size=selected_config.options.get(
+                            'session_max_connections', 
+                            pool_concurrency
+                        ),
                         request_timeout=selected_config.request_timeout,
-                        hard_cache=selected_config.options.get('hard_cache', False)
+                        hard_cache=selected_config.options.get('hard_cache', False),
+                        reset_connections=selected_config.options.get('reset_connections')
                     )
 
                 elif selected_engine == 'graphql':
-                    session = GraphQLSession(
-                        pool_size=selected_config.pool_size,
-                        dns_cache_seconds=10**8,
-                        request_timeout=selected_config.request_timeout
+                    session = MercuryGraphQLSession(
+                        pool_size=selected_config.options.get(
+                            'session_max_connections', 
+                            pool_concurrency
+                        ),
+                        request_timeout=selected_config.request_timeout,
+                        hard_cache=selected_config.options.get('hard_cache', False),
+                        use_http2=selected_config.options.get('user_http2', False),
+                        reset_connections=selected_config.options.get('reset_connections')
+                    )
+                    
+                elif selected_engine == 'websocekt':
+                    session = MercuryWebsocketSession(
+                        pool_size=selected_config.options.get(
+                            'session_max_connections', 
+                            pool_concurrency
+                        ),
+                        request_timeout=selected_config.request_timeout,
+                        hard_cache=selected_config.options.get('hard_cache', False),
+                        reset_connections=selected_config.options.get('reset_connections')
+                    )
+
+                elif selected_engine == 'grpc':
+                    session = MercuryGRPCSession(
+                        pool_size=selected_config.options.get(
+                            'session_max_connections', 
+                            pool_concurrency
+                        ),
+                        request_timeout=selected_config.request_timeout,
+                        hard_cache=selected_config.options.get('hard_cache', False),
+                        reset_connections=selected_config.options.get('reset_connections')
                     )
 
                 cls.session = session

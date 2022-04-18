@@ -1,4 +1,6 @@
-from .graphql_session import GraphQLSession
 from .playwright_session import PlaywrightSession
 from .mercury_http_session import MercuryHTTPSession
 from .mercury_http2_session import MercuryHTTP2Session
+from .mercury_websocket_session import MercuryWebsocketSession
+from .mercury_graphql_session import MercuryGraphQLSession
+from .mercury_grpc_session import MercuryGRPCSession

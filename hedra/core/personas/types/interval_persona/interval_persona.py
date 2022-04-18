@@ -28,13 +28,17 @@ class IntervalPersona(DefaultPersona):
 
         self.start = time.time()
 
+        current_action_idx = 0
+        
         while elapsed < self.duration:
             self.batch.deferred.append(asyncio.create_task(
-                self._execute_batch()
+                current_action_idx = (current_action_idx + 1) % self.actions_count
             ))
 
             await self.batch.interval.wait()
             elapsed = time.time() - self.start
+            
+            current_action_idx = (current_action_idx + 1) % self.actions_count
 
         self.end = elapsed + self.start
 
@@ -58,6 +62,6 @@ class IntervalPersona(DefaultPersona):
 
     async def _execute_batch(self):
         return await asyncio.wait(
-            [ request async for request in self.engine.defer_all(self.actions)], 
+            [ action async for action in self.engine.defer_all(self.actions)], 
             timeout=self.batch.time
         )

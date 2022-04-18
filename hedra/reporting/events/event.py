@@ -2,14 +2,12 @@ import json
 import datetime
 import time
 import tzlocal
+from mercury_http.common import Response
 from .types import (
     PlaywrightEvent,
     CustomEvent,
-    WebsocketEvent,
     GrpcEvent,
-    GraphQLEvent,
-    MercuryHTTPEvent,
-    MercuryHTTP2Event
+    MercuryHTTPEvent
 )
 
 
@@ -17,18 +15,15 @@ class Event:
     event_types = {
         'playwright': PlaywrightEvent,
         'custom': CustomEvent,
-        'websocket': WebsocketEvent,
-        'grpc': GrpcEvent,
-        'graphql': GraphQLEvent,
+        'websocket': MercuryHTTPEvent,
+        'grpc': MercuryHTTPEvent,
+        'graphql': MercuryHTTPEvent,
         'http': MercuryHTTPEvent,
-        'http2': MercuryHTTP2Event
+        'http2': MercuryHTTPEvent
     }
 
-    def __init__(self, action):
-        self.data = self.event_types.get(
-            action.get('action_type'),
-            CustomEvent
-        )(action)
+    def __init__(self, response: Response):
+        self.data = self.event_types.get(response.type)(response)
 
         self.event_time = datetime.datetime.now()
         self.machine_timezone = tzlocal.get_localzone()

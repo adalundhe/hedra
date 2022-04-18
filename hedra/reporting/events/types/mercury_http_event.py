@@ -1,4 +1,4 @@
-from mercury_http.http.response import Response
+from mercury_http.common import Response
 from .event_tags import EventTagCollection
 
 
@@ -16,16 +16,16 @@ class MercuryHTTPEvent:
         self._error = action.error
         self.status = None
         self.url = action.url
-        self.context = self._response.reason
+        self.context = self._response.reason or ''
         self._response_status = self._response.status
         self._response_reason = self._response.reason
 
     async def assert_result(self):
         try:
-            if self._error is None:
+            if self._error is not None:
                 raise self._error
             
-            if self._response.status < 200 or self._response.status >= 300:
+            if self._response.status is None or self._response.status < 200 or self._response.status >= 300:
                 raise Exception(f'Request Failed - Status: {self._response_status}')
 
             self.status = 'SUCCESS'

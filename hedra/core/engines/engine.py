@@ -1,9 +1,9 @@
 from .types import (
     ActionSetEngine,
     PlaywrightEngine,
-    WebsocketEngine,
-    GrpcEngine,
-    GraphQLEngine,
+    MercuryWebsocketEngine,
+    MercuryGRPCEngine,
+    MercuryGraphQLEngine,
     MercuryHTTPEngine,
     MercuryHTTP2Engine
 )
@@ -15,11 +15,11 @@ class Engine:
     registered_engines = {
         'action-set': ActionSetEngine,
         'playwright': PlaywrightEngine,
-        'websocket': WebsocketEngine,
-        'grpc': GrpcEngine,
-        'graphql': GraphQLEngine,
+        'grpc': MercuryGRPCEngine,
+        'graphql': MercuryGraphQLEngine,
         'http': MercuryHTTPEngine,
-        'http2': MercuryHTTP2Engine
+        'http2': MercuryHTTP2Engine,
+        'websocket': MercuryWebsocketEngine
     }
 
     def __init__(self, config, handler):

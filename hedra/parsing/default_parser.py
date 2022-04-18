@@ -49,7 +49,6 @@ class DefaultParser:
             for action in self._raw_actions.get(group):
                 action = Action(action, self.engine_type, group=group)
                 action = action.type
-                await action.parse_data()
                 self.actions.append(action)
 
         return self.actions

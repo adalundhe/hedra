@@ -1,7 +1,5 @@
 import inspect
 from easy_logger import Logger
-from hedra.core.engines import engine
-
 from .actions import Action
 from async_tools.datatypes import AsyncList
 from .multi_user_sequence_persona import MultiUserSequenceParser
@@ -62,6 +60,7 @@ class ActionSetParser(MultiUserSequenceParser):
         methods = inspect.getmembers(class_instance, predicate=inspect.ismethod) 
 
         user = type(class_instance).__name__
+        new_session = await class_instance.session.create()
 
         if self._is_multi_user_sequence:
 
@@ -120,7 +119,8 @@ class ActionSetParser(MultiUserSequenceParser):
                 if hasattr(method, 'is_action'):
                     action = await self._parse_action(
                         method, 
-                        user=class_instance.name
+                        user=class_instance.name,
+                        session=new_session
                     )
                     
                     if action.is_setup:
@@ -132,7 +132,7 @@ class ActionSetParser(MultiUserSequenceParser):
                     else:
                         self.actions.append(action)
 
-    async def _parse_action(self, method, user=None):
+    async def _parse_action(self, method, user=None, session=None):
         action = Action(
             {
                 'name': method.action_name,
@@ -154,8 +154,7 @@ class ActionSetParser(MultiUserSequenceParser):
         )
 
         action = action.type
-        await action.parse_data()
-
+        action.session = session
         return action
 
     async def weights(self):

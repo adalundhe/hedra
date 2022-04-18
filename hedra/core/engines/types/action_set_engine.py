@@ -1,3 +1,4 @@
+import asyncio
 from async_tools.datatypes.async_list import AsyncList
 from .base_engine import BaseEngine
 from .utils.wrap_awaitable import async_execute_or_catch, wrap_awaitable_future
@@ -37,19 +38,16 @@ class ActionSetEngine(BaseEngine):
 
     async def create_session(self, actions=[]) -> None:
         for action in actions:
-            await action.execute(action)
+            await action.execute_setup_or_teardown()
 
     async def yield_session(self) -> None:
         pass
 
     async def defer_all(self, actions):
         async for action in actions:
-            yield wrap_awaitable_future(
-                action,
-                action
-            )
+            yield wrap_awaitable_future(action)
 
     @async_execute_or_catch()
     async def close(self):
         for teardown_action in self._teardown_actions:
-            await teardown_action.execute(teardown_action)
+            await teardown_action.execute_setup_or_teardown(teardown_action)

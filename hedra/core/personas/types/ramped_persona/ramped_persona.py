@@ -103,6 +103,6 @@ class RampedPersona(DefaultPersona):
     async def _execute_batch(self):
         next_timeout = self.duration - (time.time() - self.start)    
         return await asyncio.wait(
-            [ request async for request in self.engine.defer_all(self.actions)], 
+            [ action async for action in self.engine.defer_all(self.actions)], 
             timeout=next_timeout if next_timeout > 0 else 1
         )

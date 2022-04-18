@@ -18,7 +18,7 @@ class PlaywrightAction:
         self.is_teardown = action.get('is_teardown', False)
         self.action_type = 'playwright'
 
-    async def parse_data(self):
+    async def setup(self):
         pass
 
     @classmethod

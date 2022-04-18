@@ -9,7 +9,7 @@ class Test:
     persona_type='simple'
     total_time='00:01:00'
     batch_size=1000
-    batch_time=0.5
+    batch_time=1
     batch_count=0
     batch_interval=0
     batch_interval_range=None
@@ -21,7 +21,7 @@ class Test:
     pool_size=psutil.cpu_count(logical=False)
     no_run_visuals=False
     session_url=None
-    request_timeout=None
+    request_timeout=60
     reporter_type='statstream'
     reporter_config={
         "save_to_file": True

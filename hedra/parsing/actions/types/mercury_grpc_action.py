@@ -1,8 +1,8 @@
-from mercury_http.http2 import MercuryHTTP2Client
+from mercury_http.grpc import MercuryGRPCClient
 from mercury_http.common import Request
 
 
-class MercuryHTTP2Action:
+class MercuryGRPCAction:
 
     def __init__(self, action, group=None, session=None):
 
@@ -23,25 +23,21 @@ class MercuryHTTP2Action:
         self.is_setup = action.get('is_setup', False)
         self.is_teardown = action.get('is_teardown', False)
         self.group = group
-        self.action_type = 'http2'
+        self.action_type = 'grpc'
 
     @classmethod
     def about(cls):
         return '''
-        Mercury-HTTP2 Action
+        Mercury-GRPC Action
 
-        Mercury-HTTP2 Actions represent a single HTTP/2 REST call using Hedra's Mercury-HTTP2
-        engine. For example - a GET request to https://www.google.com/.
+        Mercury-GRPC Actions represent a single GRPC call using Hedra's Mercury-GRPC engine.
 
         Actions are specified as:
 
         - endpoint: <host_endpoint>
-        - host: <host_address_or_ip_of_target> (defaults to the action's group)
-        - url: (optional) <full_target_url> (overrides host and endpoint if provided)
-        - method: <rest_request_method>
+        - url: <full_url_to_target>
         - headers: <rest_request_headers>
-        - params: <rest_request_params>
-        - data: <rest_request_data>
+        - data: <grpc_protobuf_object>
         - name: <action_name>
         - user: <user_associated_with_action>
         - tags: <list_of_tags_for_aggregating_actions>
@@ -54,7 +50,7 @@ class MercuryHTTP2Action:
         await self.request.setup_http_request()
         await self.request.url.lookup()
     
-    def execute(self, session: MercuryHTTP2Client):
+    def execute(self, session: MercuryGRPCClient):
         return session.request(self.request)
 
     def to_dict(self) -> dict:

@@ -4,7 +4,7 @@ from hedra.parsing.actions.types.mercury_http_action import MercuryHTTPAction
 from .base_engine import BaseEngine
 from .sessions import MercuryHTTPSession
 from .utils.wrap_awaitable import async_execute_or_catch
-from mercury_http.http import MercuryHTTPClient
+
 
 class MercuryHTTPEngine(BaseEngine):
 
@@ -13,7 +13,8 @@ class MercuryHTTPEngine(BaseEngine):
         self.session = MercuryHTTPSession(
             pool_size=self.config.get('batch_size', 10**3),
             request_timeout=self.config.get('request_timeout'),
-            hard_cache=self.config.get('hard_cache')
+            hard_cache=self.config.get('hard_cache'),
+            reset_connections=self.config.get('reset_connections')
         )
 
     @classmethod
@@ -33,7 +34,7 @@ class MercuryHTTPEngine(BaseEngine):
         Actions are specified as:
 
         - endpoint: <host_endpoint>
-        - host: <host_address_or_ip_of_target> (defaults to the action's group)
+        - url: <full_url_to_target>
         - method: <rest_request_method>
         - headers: <rest_request_headers>
         - params: <rest_request_params>
@@ -52,17 +53,7 @@ class MercuryHTTPEngine(BaseEngine):
     
     async def prepare(self, actions: AsyncIterator[MercuryHTTPAction]):
         for action in actions:
-            await self.session.prepare_request(
-                action.name,
-                action.url,
-                method=action.method,
-                headers=action.headers,
-                params=action.params,
-                data=action.data,
-                ssl=action.ssl,
-                user=action.user,
-                tags=action.tags
-            )
+            await self.session.prepare_request(action.request)
 
     def execute(self, action):
         return action.execute(self.session)

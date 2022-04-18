@@ -22,10 +22,10 @@ def async_execute_or_catch():
 
 
 
-async def wrap_awaitable_future(action, context):
+async def wrap_awaitable_future(action):
     start = time.time()
     try:
-        response = await action.execute(context)
+        response = await action.execute()
         return {
             'total_time': time.time() - start,
             'response': response,

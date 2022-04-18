@@ -1,7 +1,9 @@
 import threading
 import time
 import asyncio
+import traceback
 from typing import List, Tuple
+from urllib.request import Request
 import psutil
 import uvloop
 from async_tools.functions.awaitable import awaitable
@@ -55,6 +57,7 @@ class DefaultPersona:
         logger = Logger()
         self.session_logger = logger.generate_logger('hedra')
         self.loop = None
+        self.current_action_idx = 0
 
     @classmethod
     def about(cls):
@@ -83,14 +86,17 @@ class DefaultPersona:
         await self.engine.setup(AsyncList(actions.parser.setup_actions))  
         await self.engine.set_teardown_actions(actions.parser.teardown_actions)
 
+        self.engine = self.engine.engine
+
         self.duration = self.total_time
 
     async def load_batches(self):
-        self.actions = AsyncList()
-        for idx in range(self.batch.size):
-            action_idx = idx % self.actions_count
-            action = self._parsed_actions[action_idx]
-            await self.actions.append(action)
+        # self.actions = AsyncList()
+        # for idx in range(self.batch.size):
+        #     action_idx = idx % self.actions_count
+        #     action = self._parsed_actions[action_idx]
+        #     await self.actions.append(action)
+        pass
 
     async def execute(self):
 
@@ -101,12 +107,19 @@ class DefaultPersona:
         
         self.start = time.time()
 
+        current_action_idx = 0
+
         while elapsed < self.duration:
+            next_timeout = self.duration - (time.time() - self.start)   
+            
             self.batch.deferred.append(asyncio.create_task(
-                self._execute_batch()
+                self._parsed_actions[current_action_idx].execute(next_timeout)
             ))
+            
             await asyncio.sleep(self.batch.time)
             elapsed = time.time() - self.start
+
+            current_action_idx = (current_action_idx + 1) % self.actions_count
 
         self.end = elapsed + self.start
         await self.stop_updates()
@@ -119,7 +132,7 @@ class DefaultPersona:
             try:
                 for pend in pending:
                     pend.cancel()
-            except Exception:
+            except Exception as e:
                 pass
             
             
@@ -132,7 +145,7 @@ class DefaultPersona:
     async def _execute_batch(self):
         next_timeout = self.duration - (time.time() - self.start)    
         return await asyncio.wait(
-            [ request async for request in self.engine.defer_all(self.actions)], 
+            [ action async for action in self.engine.defer_all(self.actions)], 
             timeout=next_timeout if next_timeout > 0 else 1
         )
 

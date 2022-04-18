@@ -17,13 +17,14 @@ class FixedWaitPersona(DefaultPersona):
         
         self.start = time.time()
 
+        current_action_idx = 0
+
         while elapsed < self.duration:
-            batch = await asyncio.wait(
-                [ request async for request in self.engine.defer_all(self.actions)], 
-                timeout=self.batch.time
-            )
+            batch = await self._parsed_actions[current_action_idx].execute(self.batch.time)
             self.batch.deferred.append(batch)
             elapsed = time.time() - self.start
+
+            current_action_idx = (current_action_idx + 1) % self.actions_count
 
         self.end = elapsed + self.start
         await self.stop_updates()

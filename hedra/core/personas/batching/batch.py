@@ -6,7 +6,7 @@ class Batch:
     def __init__(self, config) -> None:
         self.config = config
         self.gradient = self.config.get('gradient', 0.1)
-        self.time = self.config.get('batch_time', 0.5)
+        self.time = self.config.get('batch_time', 1)
 
         self.size = self.config.get('batch_size', 1000)
         self.count = self.config.get('batch_count', 10)

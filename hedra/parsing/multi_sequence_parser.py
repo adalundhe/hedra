@@ -48,7 +48,6 @@ class MultiSequenceParser:
                 http_action = Action(action, self.engine_type, group=group)
                 http_action = http_action.type
                 http_action.user = http_action.user
-                await http_action.parse_data()
                 actions.append(http_action)
         
             self.sequences[group] = actions
