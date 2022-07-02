@@ -19,9 +19,19 @@ class FixedWaitPersona(DefaultPersona):
 
         current_action_idx = 0
 
-        while elapsed < self.duration:
-            batch = await self._parsed_actions[current_action_idx].execute(self.batch.time)
-            self.batch.deferred.append(batch)
+        while elapsed < self.total_time:
+            next_timeout = self.total_time - elapsed
+            action = self._parsed_actions[current_action_idx]
+            
+            self.batch.deferred.append(asyncio.create_task(
+                action.session.batch_request(
+                    action.data,
+                    concurrency=self.batch.size,
+                    timeout=self.batch.interval.period
+                )
+            ))
+
+            await asyncio.sleep(self.batch.interval.period)
             elapsed = time.time() - self.start
 
             current_action_idx = (current_action_idx + 1) % self.actions_count
@@ -29,15 +39,17 @@ class FixedWaitPersona(DefaultPersona):
         self.end = elapsed + self.start
         await self.stop_updates()
 
-        for deferred_batch, pending in self.batch.deferred:
-            batch = await asyncio.gather(*deferred_batch, return_exceptions=True)
-            results.extend(batch)
+        for deferred_batch in self.batch.deferred:
+            batch, pending = await deferred_batch
+            collected = await asyncio.gather(*batch)
+            results.extend(collected)
             
             try:
                 for pend in pending:
                     pend.cancel()
-            except Exception:
+            except Exception as e:
                 pass
+            
             
         self.total_actions = len(results)
         self.total_elapsed = elapsed

@@ -11,12 +11,12 @@ class Test:
     batch_size=1000
     batch_time=1
     batch_count=0
-    batch_interval=0
+    batch_interval=1
     batch_interval_range=None
     warmup=0
     optimize=0
     optimize_iter_duration=10
-    optimizer_type='shgo'
+    optimizer_type='shg'
     gradient=0.1
     pool_size=psutil.cpu_count(logical=False)
     no_run_visuals=False

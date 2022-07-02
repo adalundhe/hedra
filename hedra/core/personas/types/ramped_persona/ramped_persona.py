@@ -3,7 +3,6 @@ import asyncio
 import math
 from async_tools.functions import awaitable
 from async_tools.datatypes.async_list import AsyncList
-from hedra.core.engines import Engine
 from hedra.core.personas.types.default_persona import DefaultPersona
 
 
@@ -26,67 +25,44 @@ class RampedPersona(DefaultPersona):
         via the --batch-interval argument.
         '''
 
-    async def setup(self, actions):
-        self.session_logger.debug('Setting up persona...')
-
-        self._initial_actions = await actions.to_async_list()
-        self.actions_count = await self._initial_actions.size()
-
-        self.engine = Engine(self.config, self.handler)
-        await self.engine.setup(AsyncList(actions.parser.setup_actions))
-        await self.engine.set_teardown_actions(
-            actions.parser.teardown_actions
-        )
-
-
-    async def load_batches(self):
-        self.actions = await self.next_batch()
-        self.duration = self.total_time
-
-    async def next_batch(self):
-        batch_size = await self._next_batch_size()
-
-        actions = AsyncList()
-        for idx in range(batch_size):
-            action_idx = idx % self.actions_count
-            await actions.append(self._initial_actions[action_idx])
-
-        self._current_batch += 1
-
-        return actions
-
-    async def _next_batch_size(self):
-        return await awaitable(
-            math.ceil,
-            (self._current_batch * self.batch.gradient * self.batch.size)
-        )
-
     async def execute(self):
 
         elapsed = 0
         results = []
 
         await self.start_updates()
+        current_action_idx = 0
 
         self.start = time.time()
 
-        while elapsed < self.duration:
-            self.batch.deferred.append(asyncio.create_task(
-                self._execute_batch()
-            ))
+        batch_size = math.ceil(self.batch.size * self.batch.gradient)
 
-            await self.batch.interval.wait()
-            elapsed = time.time() - self.start
+        while elapsed < self.total_time:
+            next_timeout = self.total_time - elapsed
+            action = self._parsed_actions[current_action_idx]
             
-            self.actions = await self.next_batch()
+            self.batch.deferred.append(asyncio.create_task(
+                action.session.batch_request(
+                    action.data,
+                    concurrency=batch_size,
+                    timeout=next_timeout
+                )
+            ))
+            
 
-        self.end = time.time()
+            await asyncio.sleep(self.batch.interval.period)
+            elapsed = time.time() - self.start
+
+            batch_size = math.ceil(batch_size * (1 + self.batch.gradient))
+            current_action_idx = (current_action_idx + 1) % self.actions_count
+            
+        self.end = elapsed + self.start
 
         await self.stop_updates()
 
         for deferred_batch in self.batch.deferred:
             batch, pending = await deferred_batch
-            completed = await asyncio.gather(*batch, return_exceptions=True)
+            completed = await asyncio.gather(*batch)
             results.extend(completed)
 
             try:
@@ -99,10 +75,3 @@ class RampedPersona(DefaultPersona):
         self.total_elapsed = elapsed
 
         return results
-
-    async def _execute_batch(self):
-        next_timeout = self.duration - (time.time() - self.start)    
-        return await asyncio.wait(
-            [ action async for action in self.engine.defer_all(self.actions)], 
-            timeout=next_timeout if next_timeout > 0 else 1
-        )

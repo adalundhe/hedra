@@ -30,7 +30,6 @@ class Setup(BaseStage):
 
         self.selected_persona = persona
         await self.selected_persona.setup(self.actions)
-        await self.selected_persona.load_batches()
 
         await asyncio.sleep(1)
 

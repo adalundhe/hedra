@@ -2,8 +2,6 @@ from .types.default_persona import DefaultPersona
 from .types.fixed_wait_persona import FixedWaitPersona
 from .types.sequenced_persona import SequencedPersonaCollection
 from .types.multi_sequence_persona import MultiSequencePersona
-from .types.multi_user_sequence_persona import MultiUserSequencePersona
-from .types.interval_persona import IntervalPersona
 from .types.ramped_persona import RampedPersona
 from .types.ramped_interval_persona import RampedIntervalPersona
 from .types.weighted_selection_persona import WeightedSelectionPersona
@@ -14,9 +12,7 @@ class PersonaManager:
     registered_personas = {
         'default': DefaultPersona,
         'fixed-wait': FixedWaitPersona,
-        'interval': IntervalPersona,
         'multi-sequence': MultiSequencePersona,
-        'multi-user-sequence': MultiUserSequencePersona,
         'ramped': RampedPersona,
         'ramped-interval': RampedIntervalPersona,
         'sequence': SequencedPersonaCollection,
@@ -50,8 +46,6 @@ class PersonaManager:
         main methods.
         
         - setup (Initializes the Persona and attaches the engine of the specified type to the persona. Accepts a single positional argument for parsed actions)
-
-        - load_batches (Takes the parsed actions and organizes them into batches, sequences batches, etc.)
 
         - execute (Iterates over the created batches [sometimes creating a new batch after iteration] and passes batches of actions to the engine for execution, returning unaggregated results)
 

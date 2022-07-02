@@ -12,6 +12,7 @@ class Warmup(BaseStage):
         self.name = b'warmup'
         self.duration = config.executor_config.get('warmup', 0)
         self.execute_stage = self.duration > 0
+        self._total_time = None
 
         if self.duration > 60:
             self.duration = 60
@@ -34,7 +35,8 @@ class Warmup(BaseStage):
 
     async def execute(self, persona):
         self.selected_persona = persona
-        self.selected_persona.duration = self.duration
+        self._total_time = persona.total_time
+        self.selected_persona.total_time = self.duration
         warmup_results_completed = 0
 
         if self.selected_persona.is_parallel is False:
@@ -57,6 +59,6 @@ class Warmup(BaseStage):
                 f'\nWarmup complete - finished {warmup_results_completed} - actions over - {self.duration} - seconds.\n'
             )
 
-        self.selected_persona.duration = self.total_time
+        self.selected_persona.total_time = self._total_time
 
         return self.selected_persona

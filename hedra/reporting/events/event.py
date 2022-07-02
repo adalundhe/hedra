@@ -4,16 +4,15 @@ import time
 import tzlocal
 from mercury_http.common import Response
 from .types import (
-    PlaywrightEvent,
+    MercuryPlaywrightResult,
     CustomEvent,
-    GrpcEvent,
     MercuryHTTPEvent
 )
 
 
 class Event:
     event_types = {
-        'playwright': PlaywrightEvent,
+        'playwright': MercuryPlaywrightResult,
         'custom': CustomEvent,
         'websocket': MercuryHTTPEvent,
         'grpc': MercuryHTTPEvent,

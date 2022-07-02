@@ -73,6 +73,7 @@ class Executor:
 
         await self.pipeline.get_results()
 
+        results = None
         if self._is_parallel is False:
 
             actions_per_second = self.pipeline.stats.get('actions_per_second')
@@ -92,10 +93,14 @@ class Executor:
                 bar=None, 
                 spinner='dots_waves2'
             ) as bar:
-                return await self.handler.aggregate(self.pipeline.results, bar=bar)
+                results = await self.handler.aggregate(self.pipeline.results, bar=bar)
 
         else:
-            return await self.handler.aggregate(self.pipeline.results)
+            results = await self.handler.aggregate(self.pipeline.results)
+
+        await self.pipeline.selected_persona.close()
+
+        return results
 
     async def submit_results(self, aggregate_events):
         await self.handler.merge(aggregate_events)

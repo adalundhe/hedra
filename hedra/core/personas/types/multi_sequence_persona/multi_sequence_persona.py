@@ -2,11 +2,11 @@ import math
 from re import S
 import time
 import asyncio
+from typing import List
 from hedra.core.personas.types.default_persona import DefaultPersona
 from .sequence_persona import SequencedPersonaCollection
 from async_tools.datatypes import AsyncList
-from async_tools.functions import awaitable
-from hedra.core.engines import Engine
+from hedra.parsing import ActionsParser
 
 
 class MultiSequencePersona(DefaultPersona):
@@ -14,7 +14,8 @@ class MultiSequencePersona(DefaultPersona):
     def __init__(self, config=None, handler=None, user=None):
         super(MultiSequencePersona, self).__init__(config, handler)
         self._sequence_config = config
-        self.sequences = AsyncList()
+        self.sequences: List[SequencedPersonaCollection] = []
+        self._utility_sequences: List[SequencedPersonaCollection] = []
 
     @classmethod
     def about(cls):
@@ -28,74 +29,60 @@ class MultiSequencePersona(DefaultPersona):
         argument. You may specify a wait between batches (between each step) by specifying an integer number of seconds via the --batch-interval argument.
         '''
 
-    async def setup(self, actions):
-        self.actions = actions
+    async def setup(self, parser: ActionsParser):
+
         self.session_logger.debug('Setting up persona...')
 
-    async def load_batches(self):
-        sequences = await self.actions.parser.sort()
-        sequences_count = len(sequences)
-        self._teardown_actions = self.actions.parser.teardown_actions
+        sorted_actions = await parser.sort_multi_sequence()
 
-        for sequence_idx, sequence_name in enumerate(sequences):
-            
+        for sequence_actions in sorted_actions.values():
             sequence = SequencedPersonaCollection(
-                self._sequence_config,
+                self._sequence_config, 
                 self.handler
-            )
-
-            sequence_actions = sequences[sequence_name]
-            sequence.batch.size = await awaitable(
-                math.ceil,
-                self.batch.size/sequences_count
             )
             
             await sequence.setup(sequence_actions)
 
-            if sequence_idx == 0:
-                await sequence.engine.setup(
-                    AsyncList(self.actions.parser.setup_actions)
-                )
-                
-                await sequence.engine.set_teardown_actions(
-                    self.actions.parser.teardown_actions
-                )
-
+            if sequence.no_execution_actions is False:
+                self.sequences.append(sequence)
             else:
-                await sequence.engine.setup(AsyncList())
+                self._utility_sequences.append(sequence)
 
-            await sequence.load_batches()
-            await self.sequences.append(sequence)
-            
+        sequences_count = len(self.sequences)
+        batch_sizes = [int(self.batch.size/sequences_count) for _ in range(sequences_count)]
+        batch_sizes[-1] += self.batch.size%sequences_count
+
+        for sequence_batch_size, sequence in zip(batch_sizes,self.sequences):
+            sequence.batch.size = sequence_batch_size
+
         
-        self.duration = self.total_time
+        self.sequences = AsyncList(self.sequences)
+        self._utility_sequences = AsyncList(self._utility_sequences)
 
     async def execute(self):
         results = []
 
         await self.start_updates()
 
-        self.start = time.time()
-
-        completed_sequences, _ = await asyncio.wait([
-            sequence.execute() async for sequence in self.sequences
-        ])
-
-        self.batch.deferred += [completed_sequences]
-
-        await self.batch.interval.wait()
-
-        self.end = time.time()
+        sequences = []
+        async for sequence in self.sequences:
+            sequences.append(
+                asyncio.create_task(sequence.execute())
+            )
 
         await self.stop_updates()
 
-        self.total_elapsed = self.end - self.start
+        completed = await asyncio.gather(*sequences, return_exceptions=True)
+        
+        for complete in completed:
+            results.extend(complete)
 
-        for deferred_sequence_step in self.batch.deferred:
-            results_batch = await asyncio.gather(*deferred_sequence_step)
-            for batch in results_batch:
-                results += batch
+        elapsed_times = []
 
+        async for sequence in self.sequences:
+            elapsed_times.append(sequence.elapsed)
+
+        self.total_elapsed = sum(elapsed_times)/len(elapsed_times)
         self.total_actions = len(results)
 
         return results
@@ -108,5 +95,8 @@ class MultiSequencePersona(DefaultPersona):
         return total_actions
 
     async def close(self):
-        for sequence in self.sequences:
+        async for sequence in self.sequences:
+            await sequence.close()
+
+        async for sequence in self._utility_sequences:
             await sequence.close()

@@ -1,28 +1,21 @@
-import asyncio
-from hedra.core.personas.utils import time
 import random
-from async_tools.functions import awaitable
 
 
 class BatchInterval:
     
     def __init__(self, config) -> None:
-        self.period = config.get('batch_interval', 0)
+        self.wait_period = config.get('batch_interval', 1)
         interval_range = config.get('batch_interval_range')
         self.period_min = None
         self.period_max = None
         
-        if self.period == 0:
-            self._wait_function = self._noop_wait
-            self.interval_type = 'no-op'
-        elif interval_range:
-            self._wait_function = self._wait_random_interval
+        if interval_range:
             interval_range = interval_range.split(':')
             self.period_min = int(interval_range[0])
             self.period_max = int(interval_range[1])
             self.interval_type = 'range'
+
         else:
-            self._wait_function = self._wait_static_interval
             self.interval_type = 'static'
 
     @classmethod
@@ -56,31 +49,19 @@ class BatchInterval:
         '''
 
     def __mul__(self, other):
-        if self.interval_type == 'no-op':
-            return 0
-
-        elif self.interval_type == 'range':
+        if self.interval_type == 'range':
             return self.period_max * other
 
         else:
-            return self.period * other
+            return self.wait_period * other
 
     def __rmul__(self, other):
         return self.__mul__(other)
 
-    async def wait(self):
-        return await self._wait_function()
+    @property
+    def period(self):
+        if self.interval_type == 'range':
+            return random.randint(self.period_min, self.period_max)
 
-    async def _noop_wait(self):
-        pass
-
-    async def _wait_static_interval(self):
-        return await asyncio.sleep(self.period)
-
-    async def _wait_random_interval(self):
-        self.period = await awaitable(
-            random.randint,
-            self.period_min,
-            self.period_max
-        )
-        return await awaitable(time.sleep, self.period)
+        else:
+            return self.wait_period

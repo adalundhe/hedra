@@ -1,36 +1,23 @@
+import inspect
 from easy_logger import Logger
-from .multi_user_sequence_persona import MultiUserSequenceParser
-from .multi_sequence_parser import MultiSequenceParser
-from .default_parser import DefaultParser
-from .action_set_parser import ActionSetParser
 from async_tools.datatypes import AsyncList
 
 class ActionsParser:
 
-    parsers = {
-        'multi-sequence': MultiSequenceParser,
-        'multi-user-sequence': MultiUserSequenceParser,
-        'sequence': DefaultParser,
-        'default': DefaultParser,
-        'action-set': ActionSetParser
-    }
-
     def __init__(self, config):
         logger = Logger()
         self.session_logger = logger.generate_logger('hedra')
-        engine_type = config.executor_config.get('engine_type')
-
-        if engine_type == 'action-set':
-            self.parser = self.parsers.get('action-set')(config)
-        else:
-            persona_type = config.executor_config.get('persona_type')
-            self.parser = self.parsers.get(
-                persona_type, 
-                DefaultParser
-            )(config)
-
-        self.actions = {}
-        self.engine = self.parser.engine_type
+        self._raw_actions = config.actions
+        self.sorted = config.executor_config.get('sorted')
+        self._is_multi_sequence = config.executor_config.get('persona_type') == 'multi-sequence'
+        self._is_multi_user_sequence = config.executor_config.get('persona_type') == 'multi-user-sequence'
+        self.actions = []
+        self.sequences = {}
+        self.user_setup_actions = {}
+        self.user_teardown_actions = {}
+        self.setup_actions = []
+        self.teardown_actions = []
+        self.engine_type = config.executor_config.get('engine_type')
 
     @classmethod
     def about(cls):
@@ -72,22 +59,96 @@ class ActionsParser:
         '''
 
     def __len__(self):
-        return self.parser.__len__()
+        return len(self.actions)
 
     def __iter__(self):
-        return self.parser.__iter__()
+        for action in self.actions:
+            yield action
 
     def __getitem__(self, index):
-        return self.parser.__getitem__(index)
-
-    def __setitem__(self, key, value):
-        self.actions[key] = value
-
-    def get(self, key):
-        return self.actions.get(key)
-
-    async def to_async_list(self):
-        return AsyncList([action for action in self.parser.actions if action.is_setup is False and action.is_teardown is False])
+        return self.actions[index]
 
     async def parse(self):
-        return await self.parser.parse()
+        for python_class in self._raw_actions:
+            class_instance = python_class()
+            await self._parse(class_instance)
+
+        if self._is_multi_user_sequence or self._is_multi_sequence:
+            self.actions = self.sequences
+            
+        return self.actions
+
+    async def _parse(self, class_instance):
+        methods = inspect.getmembers(class_instance, predicate=inspect.ismethod) 
+
+        user = type(class_instance).__name__
+            
+        if self._is_multi_sequence:
+
+            for _, method in methods:
+
+                if hasattr(method, 'is_action'):
+                    group = method.metadata.get('group')
+                    if group is None:
+                        group = user
+                    
+                    if self.sequences.get(group) is None:
+                        self.sequences[group] = {
+                            'setup': [],
+                            'teardown': []
+                        }
+
+                    if method.is_setup:
+                        self.sequences[group]['setup'].append(method)
+
+                    elif method.is_teardown:
+                        self.sequences[group]['teardown'].append(method)
+
+                    else:
+                        if self.sequences[group].get('execute') is None:
+                            self.sequences[group]['execute'] = [method]
+
+                        else:
+                            self.sequences[group]['execute'].append(method)
+        
+        else:
+            for _, method in methods:
+                if hasattr(method, 'is_action'):
+                    
+                    if method.is_setup:
+                        self.setup_actions.append(method)
+
+                    elif method.is_teardown:
+                        self.teardown_actions.append(method)
+
+                    else:
+                        self.actions.append(method)
+
+    async def weights(self):
+        actions  = [action for action in self.actions if action.is_setup is False and action.is_teardown is False]
+        return [action.weight if action.weight else 1 for action in actions]
+
+    async def sort(self):
+        if self._is_multi_sequence:
+            return await self.sort_multi_sequence()
+
+        else:
+            return await self.sort_sequence()
+
+    async def sort_multi_sequence(self):
+        sorted_sequences = {}
+        for sequence_name, sequence in self.sequences.items():
+            sorted_sequences[sequence_name] = sequence
+            unsorted_sequence = self.sequences[sequence_name].get('execute')
+
+            if unsorted_sequence:
+                sorted_sequence = AsyncList(unsorted_sequence)
+                sorted_sequence = await sorted_sequence.sort(key=lambda action: action.order)
+
+                sorted_sequences[sequence_name]['execute'] = sorted_sequence
+
+        return sorted_sequences
+
+    async def sort_sequence(self):
+        actions = AsyncList(self.actions)
+        return await actions.sort(key=lambda action: action.order)

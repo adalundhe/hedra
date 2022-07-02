@@ -1,4 +1,4 @@
-from zebra_async_tools.datatypes import AsyncList
+from async_tools.datatypes import AsyncList
 
 
 class SequenceStep:

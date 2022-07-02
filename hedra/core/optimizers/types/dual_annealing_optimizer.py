@@ -8,6 +8,7 @@ class DualAnnealingOptimizer:
         self.bounds = bounds
         self.max_iter = max_iter
         self.fixed_iters = True
+        self.iters = 0
     
     @classmethod
     def about(cls):
@@ -21,6 +22,8 @@ class DualAnnealingOptimizer:
         spaces.
 
         '''
+    def callback(self, x):
+        return True
 
     async def optimize(self, func):
         return await awaitable(
@@ -29,5 +32,6 @@ class DualAnnealingOptimizer:
                 self.bounds,
                 maxiter=self.max_iter,
                 maxfun=self.max_iter,
-                no_local_search=True
+                no_local_search=True,
+                callback=self.callback
             )

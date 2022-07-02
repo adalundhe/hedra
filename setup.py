@@ -11,7 +11,7 @@ with open(os.path.join(current_directory, 'README.md'), "r") as readme:
 
 setup(
     name="hedra",
-    version="0.3.1",
+    version="0.4.0",
     description="Powerful performance testing made easy.",
     long_description=package_description,
     long_description_content_type="text/markdown",
@@ -25,7 +25,6 @@ setup(
         "Operating System :: OS Independent"
     ],
     install_requires=[
-        'mercury-http',
         'py3cli-tools',
         'py3-async-tools',
         'easy-logger-py',
@@ -33,7 +32,6 @@ setup(
         'statstream-py',
         'statserve',
         'pytz',
-        'playwright',
         'tzlocal',
         'eventlet',
         'psutil',
@@ -45,7 +43,6 @@ setup(
         'art',
         'scikit-learn',
         'uvloop',
-        'playwright',
         'aiopg',
         'prometheus-client',
         'prometheus-api-client',

@@ -2,6 +2,7 @@ import threading
 import time
 import asyncio
 import traceback
+from turtle import st
 from typing import List, Tuple
 from urllib.request import Request
 import psutil
@@ -17,6 +18,7 @@ from hedra.core.personas.batching import Batch
 from hedra.core.personas.batching.batch_interval import BatchInterval
 from hedra.core.engines import Engine
 from hedra.core.personas.utils import parse_time
+from hedra.parsing import ActionsParser
 
 
 class DefaultPersona:
@@ -77,56 +79,54 @@ class DefaultPersona:
     def about_batch_intervals(cls):
         return BatchInterval.about()
 
-    async def setup(self, actions):
+    async def setup(self, parser: ActionsParser):
         self.session_logger.debug('Setting up persona...')
 
-        self._parsed_actions = await actions.to_async_list()
-        self.actions_count = await self._parsed_actions.size()
+        self.actions = parser.actions
+        self.actions_count = len(self.actions)
 
-        await self.engine.setup(AsyncList(actions.parser.setup_actions))  
-        await self.engine.set_teardown_actions(actions.parser.teardown_actions)
+        await self.engine.create_session(parser.setup_actions)  
+        self.engine.teardown_actions = parser.teardown_actions
 
-        self.engine = self.engine.engine
-
-        self.duration = self.total_time
-
-    async def load_batches(self):
-        # self.actions = AsyncList()
-        # for idx in range(self.batch.size):
-        #     action_idx = idx % self.actions_count
-        #     action = self._parsed_actions[action_idx]
-        #     await self.actions.append(action)
-        pass
-
+        for action in self.actions:
+            parsed_action =  await action()
+            self._parsed_actions.data.append(parsed_action)
+        
     async def execute(self):
 
         elapsed = 0
         results = []
 
         await self.start_updates()
-        
-        self.start = time.time()
-
         current_action_idx = 0
+        
+        start = time.time()
 
-        while elapsed < self.duration:
-            next_timeout = self.duration - (time.time() - self.start)   
+        while elapsed < self.total_time:
+            
+            next_timeout = self.total_time - elapsed
+            action = self._parsed_actions[current_action_idx]
             
             self.batch.deferred.append(asyncio.create_task(
-                self._parsed_actions[current_action_idx].execute(next_timeout)
+                action.session.batch_request(
+                    action.data,
+                    concurrency=self.batch.size,
+                    timeout=next_timeout
+                )
             ))
             
-            await asyncio.sleep(self.batch.time)
-            elapsed = time.time() - self.start
+            await asyncio.sleep(self.batch.interval.period)
+            elapsed = time.time() - start
 
             current_action_idx = (current_action_idx + 1) % self.actions_count
-
+        
+        self.start = start
         self.end = elapsed + self.start
         await self.stop_updates()
 
         for deferred_batch in self.batch.deferred:
             batch, pending = await deferred_batch
-            collected = await asyncio.gather(*batch, return_exceptions=True)
+            collected = await asyncio.gather(*batch)
             results.extend(collected)
             
             try:
@@ -135,35 +135,23 @@ class DefaultPersona:
             except Exception as e:
                 pass
             
-            
         self.total_actions = len(results)
         self.total_elapsed = elapsed
         self.optimized_params = None
 
         return results
 
-    async def _execute_batch(self):
-        next_timeout = self.duration - (time.time() - self.start)    
-        return await asyncio.wait(
-            [ action async for action in self.engine.defer_all(self.actions)], 
-            timeout=next_timeout if next_timeout > 0 else 1
-        )
-
     async def close(self):
         await self.engine.close()
 
     async def start_updates(self):
         if self._live_updates:
-            self.loop = asyncio.get_running_loop()
-
-            self.timer_thread = threading.Thread(target=self.run_updates_in_background)
-            await self.loop.run_in_executor(None, self.timer_thread.start)
+            self.timer_thread = asyncio.create_task(self._run_timer_in_background())
     
     async def stop_updates(self):
         if self._live_updates:
             self.run_timer = False
-            await self.loop.run_in_executor(None, self.timer_thread.join)
-            self.completed_actions
+            await self.timer_thread
 
     def run_updates_in_background(self):
         loop = asyncio.new_event_loop()

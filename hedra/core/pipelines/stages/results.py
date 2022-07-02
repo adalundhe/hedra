@@ -28,5 +28,5 @@ class Results(BaseStage):
         self.stats = self.selected_persona.stats
 
         await asyncio.sleep(1)
-        
+
         return self.selected_persona

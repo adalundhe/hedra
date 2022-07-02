@@ -1,3 +1,4 @@
+import traceback
 from alive_progress import alive_bar
 from .base_stage import BaseStage
 
@@ -26,33 +27,37 @@ class Execution(BaseStage):
     async def execute(self, persona):
         self.selected_persona = persona
 
-        if self._is_parallel is False:
-            self.session_logger.info('Running load testing...')
+        try:
+            if self._is_parallel is False:
+                self.session_logger.info('Running load testing...')
 
-        if self._no_run_visuals is False and self._is_parallel is False:
-            with alive_bar(title='Executing test', bar=None, spinner='arrows_in', monitor=False, stats=False) as bar:  
+            if self._no_run_visuals is False and self._is_parallel is False:
+                with alive_bar(title='Executing test', bar=None, spinner='arrows_in', monitor=False, stats=False) as bar:  
+                    self.results = await self.selected_persona.execute()
+
+            else:
                 self.results = await self.selected_persona.execute()
 
-        else:
-            self.results = await self.selected_persona.execute()
+            completed_actions = self.selected_persona.total_actions
+            total_time = self.selected_persona.total_elapsed
+            actions_per_second = completed_actions / total_time
 
-        completed_actions = self.selected_persona.total_actions
-        total_time = self.selected_persona.total_elapsed
-        actions_per_second = completed_actions / total_time
+            if self._is_parallel is False:
+                self.session_logger.debug(f'\nCompleted actions at - {actions_per_second} - actions per second')
+                self.session_logger.debug(f'Total actions completed - {completed_actions} - over - {total_time} - seconds')
 
-        if self._is_parallel is False:
-            self.session_logger.debug(f'\nCompleted actions at - {actions_per_second} - actions per second')
-            self.session_logger.debug(f'Total actions completed - {completed_actions} - over - {total_time} - seconds')
 
-        await self.selected_persona.close()
+            self.selected_persona.results = list(self.results)
+            self.selected_persona.stats = {
+                'actions_per_second': actions_per_second,
+                'completed_actions': self.selected_persona.total_actions,
+                'total_time': self.selected_persona.total_elapsed,
+                'end_time': self.selected_persona.end,
+                'start_time': self.selected_persona.start
+            }
 
-        self.selected_persona.results = list(self.results)
-        self.selected_persona.stats = {
-            'actions_per_second': actions_per_second,
-            'completed_actions': self.selected_persona.total_actions,
-            'total_time': self.selected_persona.total_elapsed,
-            'end_time': self.selected_persona.end,
-            'start_time': self.selected_persona.start
-        }
+        except Exception as e:
+            print(traceback.format_exc())
+            pass
 
         return self.selected_persona

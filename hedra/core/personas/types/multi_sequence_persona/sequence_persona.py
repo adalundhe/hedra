@@ -33,59 +33,51 @@ class SequencedPersonaCollection(DefaultPersona):
             config,
             handler
         )
-        
+
+        self.elapsed = 0
+        self.no_execution_actions = True
 
     async def setup(self, actions):
-        self.actions = actions
-        self.actions_count = await actions.size()
+        self.session_logger.debug('Setting up persona...')
 
-        self.engine = Engine(self.config, self.handler)
+        setup_actions = actions.get('setup')
+        teardown_actions = actions.get('teardown')
+        execution_actions = actions.get('execute')
+        await self.engine.create_session(setup_actions)
+        self.engine.teardown_actions = teardown_actions
 
+        if execution_actions and len(execution_actions.data) > 0:
+            self.actions_count = len(execution_actions.data)
+            self.no_execution_actions = False
 
-    async def load_batches(self):
-        batched_sequences = AsyncList()
-        async for action in self.actions:
-            if action.is_setup is False and action.is_teardown is False:        
-                sequence_step = SequenceStep()
-                for _ in range(self.batch.size):
-                    await sequence_step.add_action(action)
+            async for action in execution_actions:
+                parsed_action = await action()
+                self._parsed_actions.data.append(parsed_action)
 
-                if action.wait_interval:
-                    sequence_step.wait_interval = BatchInterval({
-                        'batch_interval': action.wait_interval
-                    })
-
-                else:
-                    if self.batch.interval.interval_type == 'no-op':
-                        sequence_step.wait_interval = BatchInterval({
-                            'batch_interval': self.batch.time
-                        })
-
-                    else:
-                        sequence_step.wait_interval = self.batch.interval
-
-                await batched_sequences.append(sequence_step)
-
-        self.actions = batched_sequences
-        self.duration = self.total_time
 
     async def execute(self):
-        elapsed = 0
         results = []
+        current_action_idx = 0
 
         self.start = time.time()
+        while self.elapsed < self.total_time:
+            next_timeout = self.total_time - (time.time() - self.start)
+            action = self._parsed_actions[current_action_idx] 
 
-        while elapsed < self.duration:
-            self.batch.deferred.append(
-                asyncio.create_task(
-                    self._execute_batch(sequence_step)
+            self.batch.deferred.append(asyncio.create_task(
+                action.session.batch_request(
+                    action.data,
+                    concurrency=self.batch.size,
+                    timeout=next_timeout
                 )
-            )
+            ))
 
-            await sequence_step.wait_interval.wait()
-            elapsed = time.time() - self.start
+            await asyncio.sleep(self.batch.interval.period)
+            self.elapsed = time.time() - self.start
 
             current_action_idx = (current_action_idx + 1) % self.actions_count
+        
+        self.end = self.elapsed + self.start
 
         for deferred_batch in self.batch.deferred:
             completed, pending = await deferred_batch
@@ -97,15 +89,8 @@ class SequencedPersonaCollection(DefaultPersona):
                     pend.cancel()
             except Exception:
                 pass
-
+        
         return results
-
-    async def _execute_batch(self, sequence_step: SequenceStep):
-        next_timeout = self.duration - (time.time() - self.start)   
-        return await asyncio.wait([
-            action async for action in self.engine.defer_all(sequence_step.actions)
-        ], timeout=next_timeout)
-
 
     async def close(self):
         await self.engine.close()

@@ -5,6 +5,7 @@ from hedra.core.personas.batching.batch_interval import BatchInterval
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.engines import Engine
 from hedra.core.personas.batching import SequenceStep
+from hedra.parsing import ActionsParser
 
 
 class SequencedPersonaCollection(DefaultPersona):
@@ -27,68 +28,47 @@ class SequencedPersonaCollection(DefaultPersona):
         argument. You may specify a wait between batches (between each step) by specifying an integer number of seconds via the --batch-interval argument.
         '''
 
-    async def setup(self, actions):
+    async def setup(self, parser: ActionsParser):
 
         self.session_logger.debug('Setting up persona...')
 
-        self.actions = actions
+        self._parsed_actions = await parser.sort_sequence()
+        self.actions_count = await self._parsed_actions.size()
         self.engine = Engine(self.config, self.handler)
 
-        await self.engine.setup(AsyncList(self.actions.parser.setup_actions))
-        await self.engine.set_teardown_actions(
-            self.actions.parser.teardown_actions
-        )
+        await self.engine.create_session(parser.setup_actions)
+        self.engine.teardown_actions = parser.teardown_actions
 
-    async def load_batches(self):
-
-        actions_list = await self.actions.parser.sort()
-        self.actions_count = await actions_list.size()
- 
-        batched_sequences = AsyncList()
-        async for action in actions_list:
-            if action.is_setup is False and action.is_teardown is False:        
-                sequence_step = SequenceStep()
-                for _ in range(self.batch.size):
-                    await sequence_step.add_action(action)
-
-                if action.wait_interval:
-                    sequence_step.wait_interval = BatchInterval({
-                        'batch_interval': action.wait_interval
-                    })
-
-                else:
-                    if self.batch.interval.interval_type == 'no-op':
-                        sequence_step.wait_interval = BatchInterval({
-                            'batch_interval': self.batch.time
-                        })
-
-                    else:
-                        sequence_step.wait_interval = self.batch.interval
-
-                await batched_sequences.append(sequence_step)
-
-        self.actions = batched_sequences
-        self.duration = self.total_time
+        for action in self.actions:
+            parsed_action =  await action()
+            self._parsed_actions.data.append(parsed_action)
 
     async def execute(self):
         elapsed = 0
         results = []
+        current_action_idx = 0
 
         await self.start_updates()
 
         self.start = time.time()
 
-        while elapsed < self.duration:
-
-            async for sequence_step in self.actions:
-                self.batch.deferred.append(
-                    asyncio.create_task(
-                        self._execute_batch(sequence_step)
-                    )
+        while elapsed < self.total_time:
+            next_timeout = self.total_time - elapsed
+            action = self._parsed_actions[current_action_idx]
+            
+            self.batch.deferred.append(asyncio.create_task(
+                action.session.batch_request(
+                    action.data,
+                    concurrency=self.batch.size,
+                    timeout=next_timeout
                 )
+            ))
+            
 
-                await sequence_step.wait_interval.wait()
-                elapsed = time.time() - self.start
+            await asyncio.sleep(self.batch.interval.period)
+            elapsed = time.time() - self.start
+
+            current_action_idx = (current_action_idx + 1) % self.actions_count
 
         self.end = elapsed + self.start
 
@@ -109,9 +89,3 @@ class SequencedPersonaCollection(DefaultPersona):
         self.total_elapsed = elapsed
 
         return results
-
-    async def _execute_batch(self, sequence_step: SequenceStep):
-        next_timeout = self.duration - (time.time() - self.start)  
-        return await asyncio.wait([
-            action async for action in self.engine.defer_all(sequence_step.actions)
-        ], timeout=next_timeout)

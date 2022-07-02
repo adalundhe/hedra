@@ -3,6 +3,7 @@ import math
 import json
 from re import S
 import time
+from unittest import result
 from easy_logger import Logger
 from alive_progress import alive_bar
 from async_tools.functions import awaitable
@@ -23,7 +24,7 @@ class Optimizer:
     }
 
     def __init__(self, persona) -> None:
-
+        
         self.persona = persona
         self.actions = AsyncList()
         self.config = persona.config
@@ -33,25 +34,40 @@ class Optimizer:
         self.session_logger = logger.generate_logger()
 
         self._persona_total_time = persona.total_time
-        self.batch_max_time = persona.batch.time
+
+        if persona.total_time <= 60:
+            self.batch_max_time = persona.total_time
+        else:
+            self.batch_max_time = 60
+
         self._target_aps = []
         self._actual_aps = []
 
-        if self.batch_max_time > 60:
-            self.session_logger.warning('Warning - provided iter duration greater than 60 sec. Setting duratin to 60 sec.')
-            self.batch_max_time = 60
+        # if self.batch_max_time > 60:
+        #     self.session_logger.warning('Warning - provided iter duration greater than 60 sec. Setting duratin to 60 sec.')
+        #     self.batch_max_time = 60
 
-        self.batch_min_time = self.batch_max_time * 0.1
+        # elif self.batch_max_time < 1:
+        #     self.batch_max_time = 30
 
-        self.batch_max_size = int(persona.batch.size * 1.5)
+        self.batch_min_time = 1
+
+        self.batch_max_size = int(persona.batch.size * 10)
         self.batch_min_size = int(persona.batch.size * 0.5)
+        self.batch_min_interval = 0
+
+        if persona.total_time > 60:
+            self.batch_max_interval = 6
+        else:
+            self.batch_max_interval = math.ceil(persona.total_time * 0.1)
+
         self.optimize_iters = self.config.get('optimize', 0)
         self.optimizer_type = self.config.get('optimizer_type', 'shg')
 
         self.optimizer = self.optimizer_types.get(self.optimizer_type)(
             [
                 (self.batch_min_size, self.batch_max_size),
-                (self.batch_min_time, self.batch_max_time)
+                (self.batch_min_interval, self.batch_max_interval)
             ],
             max_iter=self.optimize_iters
         )
@@ -63,7 +79,7 @@ class Optimizer:
         self.optimized_results = {}
         self.total_optimization_time = 0
         self._no_run_visuals = self.config.get('no_run_visuals', False)
-        self._max_actions_completed = 0
+        self._max_aps = 0
 
 
     @classmethod
@@ -136,12 +152,14 @@ class Optimizer:
         
         self.optimized_results = {
             'optimized_batch_size': int(results.x[0]),
-            'optimized_batch_time': results.x[1],
+            'optimized_batch_interval': results.x[1],
             'optimization_iters': self.optimize_iters,
             'optimization_iter_duation': self.batch_max_time,
             'optimization_total_time': self.total_optimization_time,
-            'max_actions_completed': self._max_actions_completed
+            'optimization_max_aps': self._max_aps
         }
+
+        self.persona.total_time = self._persona_total_time
 
         if self.save_optimized_path:
             with open(self.save_optimized_path) as params_file:
@@ -149,52 +167,44 @@ class Optimizer:
 
         return self.optimized_results
 
-    async def _optimize(self, batch_size, batch_time):
-        
-        self.persona.batch.size = batch_size
-        self.persona.batch.time = batch_time
+    async def _optimize(self, batch_size, batch_interval):
+        completed = []
 
-        await self.persona.load_batches()
-        self.actions = self.persona.actions
-        
-        start = time.time()
+        if self.persona.total_time > 60:
+            self.persona.total_time = 60
 
-        completed, incomplete = await asyncio.wait([
-            result async for result in self.persona.engine.defer_all(self.actions)
-        ], timeout=batch_time)
+        if self._current_iter <= self.optimize_iters:
 
-        elapsed = time.time() - start
+            self.persona.batch.size = batch_size
+            self.persona.batch.interval.wait_period = batch_interval
+            
+            completed = await self.persona.execute()
+            completed_count = len(completed)
 
-        completed = await asyncio.gather(*completed)
+            elapsed = self.persona.end - self.persona.start
+            actions_per_section = completed_count/elapsed
 
-        completed = AsyncList(completed)
-        completed_count = await completed.size()
+            if actions_per_section > self._max_aps:
+                self._max_aps = actions_per_section
 
-        incomplete = AsyncList([pending for  pending in incomplete])
+            if self._no_run_visuals is False and self._is_parallel is False:
+                await awaitable(
+                    self.active_bar
+                )
 
-        async for incomplete_action in incomplete:
-            incomplete_action.cancel()
+            return actions_per_section
 
-        if completed_count > self._max_actions_completed:
-            self._max_actions_completed = completed_count
-
-        actions_per_section = completed_count/elapsed
-
-        if self._no_run_visuals is False and self._is_parallel is False:
-            await awaitable(
-                self.active_bar
-            )
-
-        return actions_per_section
+        return 0
 
     def _run_optimize(self, xargs):
-        batch_size, batch_time = xargs
-        optimization = asyncio.run_coroutine_threadsafe(self._optimize(int(batch_size), int(batch_time)), self._event_loop)
-        actions_per_section = optimization.result()
+        batch_size, batch_interval = xargs
+        optimization = asyncio.run_coroutine_threadsafe(self._optimize(int(batch_size), batch_interval), self._event_loop)
+        actions_per_second = optimization.result()
 
-        self._target_aps.append(self.batch_max_size)
-        self._actual_aps.append(actions_per_section)
-        error = math.sqrt(sum([target_aps - actual_aps for target_aps, actual_aps in zip(self._target_aps, self._actual_aps)])**2/self._current_iter)
+        self._target_aps.append(self._max_aps)
+        self._actual_aps.append(actions_per_second)
+        # error = math.sqrt(sum([target_aps - actual_aps for target_aps, actual_aps in zip(self._target_aps, self._actual_aps)])**2/self._current_iter)
         self._current_iter += 1
 
-        return error
+
+        return actions_per_second * -1 

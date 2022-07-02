@@ -1,3 +1,4 @@
+import time
 from async_tools.functions import awaitable
 from scipy.optimize import shgo
 
@@ -8,6 +9,7 @@ class SHGOptimizer:
         self.bounds = bounds
         self.max_iter = max_iter
         self.fixed_iters = False
+        self.iters = 0
 
     @classmethod
     def about(cls):
@@ -19,6 +21,9 @@ class SHGOptimizer:
         a good balance between finding optimal parameters and number of iterations.
         '''
 
+    def callback(self, x):
+        return True
+
     async def optimize(self, func):
         return await awaitable(
             shgo,
@@ -27,6 +32,7 @@ class SHGOptimizer:
             options={
                 'maxfev': self.max_iter,
                 'maxiter': self.max_iter,
-                'local_iter': 0
-            }
+                'local_iter': 1
+            },
+            callback=self.callback
         )

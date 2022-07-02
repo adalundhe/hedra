@@ -8,6 +8,7 @@ class DifferentialEvolutionOptimizer:
         self.bounds = bounds
         self.max_iter = max_iter
         self.fixed_iters = False
+        self.iters = 0
 
     @classmethod
     def about(cls):
@@ -19,10 +20,14 @@ class DifferentialEvolutionOptimizer:
         amount of iterations to find optimal parameters.
         '''
 
+    def callback(self, x):
+        return True
+
     async def optimize(self, func):
         return await awaitable(
             differential_evolution,
             func,
             self.bounds,
-            maxiter=self.max_iter
+            maxiter=self.max_iter,
+            callback=self.callback
         )

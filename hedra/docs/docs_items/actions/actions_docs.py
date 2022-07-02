@@ -1,4 +1,3 @@
-from hedra.parsing.actions import Action
 from hedra.parsing.actions_parser import ActionsParser
 
 
@@ -27,11 +26,3 @@ class ActionsDocs:
 
                 else:
                     print(ActionsParser.about())
-
-            else:
-                action_type = Action.action_types.get(docs_item)
-                print(action_type.about())
-
-        else:
-
-            print(Action.about())

@@ -5,6 +5,7 @@ from async_tools.datatypes.async_list import AsyncList
 from async_tools.functions import awaitable
 from hedra.core.engines import Engine
 from hedra.core.personas.types.default_persona import DefaultPersona
+from hedra.parsing import ActionsParser
 
 
 class WeightedSelectionPersona(DefaultPersona):
@@ -24,32 +25,23 @@ class WeightedSelectionPersona(DefaultPersona):
         argument. You may specify a wait between batches (between each step) by specifying an integer number of seconds via the --batch-interval argument.
         '''
 
-    async def setup(self, actions):
+    async def setup(self, parser: ActionsParser):
 
         self.session_logger.debug('Setting up persona...')
 
-        self._parsed_actions = await actions.to_async_list()
-        self.actions_count = await self._parsed_actions.size()
+        self.actions = parser.actions
+        self.actions_count = len(self.actions)
+        self.weights = await parser.weights()
 
-        self.engine = Engine(self.config, self.handler)
-        await self.engine.setup(AsyncList(actions.parser.setup_actions))
-        await self.engine.set_teardown_actions(
-            actions.parser.teardown_actions
-        )
+        await self.engine.create_session(parser.setup_actions)  
+        self.engine.teardown_actions = parser.teardown_actions
 
+        for action in self.actions:
+            parsed_action =  await action()
+            self._parsed_actions.data.append(parsed_action)
+
+        self.sampled_actions = self._sample()
         self.duration = self.total_time
-
-    async def load_batches(self):
-        self.actions = AsyncList()
-        for idx in range(self.batch.size):
-            action_idx = idx % self.actions_count
-            action = self._parsed_actions[action_idx]
-
-            if action.is_setup is False and action.is_teardown is False:
-                await self.actions.append(action)
-                self.weights.append(action.weight)
-        
-        self.sampled_actions = await self._sample()
 
     async def execute(self):
         elapsed = 0
@@ -59,16 +51,28 @@ class WeightedSelectionPersona(DefaultPersona):
 
         self.start = time.time()
 
-        while elapsed < self.duration:
+        while elapsed < self.total_time:
+            next_timeout = self.total_time - (time.time() - self.start)
+
+            action = self.sampled_actions.pop()
+            next_timeout = self.total_time - elapsed
+            
             self.batch.deferred.append(asyncio.create_task(
-                self._execute_batch()
+                action.session.batch_request(
+                    action.data,
+                    concurrency=self.batch.size,
+                    timeout=next_timeout
+                )
             ))
-            await self.batch.interval.wait()
+            
 
+            await asyncio.sleep(self.batch.interval.period)
             elapsed = time.time() - self.start
-            self.sampled_actions = await self._sample()
 
-        self.end = time.time()
+            if len(self.sampled_actions) < 1:
+                self.sampled_actions = self._sample()
+
+        self.end = elapsed + self.start
 
         await self.stop_updates()
 
@@ -88,24 +92,9 @@ class WeightedSelectionPersona(DefaultPersona):
 
         return results
 
-    async def _sample(self):
-        resampled_actions = await awaitable(
-            random.choices,
-            self.actions.data,
+    def _sample(self):
+        return random.choices(
+            self._parsed_actions.data,
             self.weights,
-            k=self.batch.size
-        )
-
-        resampled_actions = filter(
-            lambda action: action.is_setup is False and action.is_teardown is False,
-            resampled_actions
-        )
-
-        return AsyncList(resampled_actions)
-
-    async def _execute_batch(self):
-        next_timeout = self.duration - (time.time() - self.start)    
-        return await asyncio.wait(
-            [ action async for action in self.engine.defer_all(self.sampled_actions)], 
-            timeout=next_timeout if next_timeout > 0 else 1
+            k=self.actions_count
         )

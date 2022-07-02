@@ -1,34 +1,39 @@
-from telnetlib import EXOPL
-
-from requests import session
-from hedra.core.engines import Engine
-from async_tools.datatypes.async_list import AsyncList
-
-from hedra.parsing.actions.types.mercury_http_action import MercuryHTTPAction
+import inspect
+from typing import Union
+from hedra.core.engines.types import (
+    MercuryGraphQLClient,
+    MercuryGRPCClient,
+    MercuryHTTP2Client,
+    MercuryHTTPClient,
+    MercuryPlaywrightClient,
+    MercuryWebsocketClient
+)
 from .hooks import setup, teardown
-from hedra.parsing.actions import Action
-from .actions import HTTPAction
+from .actions import Action
 from .hooks import (
     setup,
     teardown
 )
 
+MercuryEngine = Union[MercuryGraphQLClient, MercuryGRPCClient, MercuryHTTP2Client, MercuryHTTPClient, MercuryPlaywrightClient, MercuryWebsocketClient]
+
 
 class ActionSet:
     name=None
     engine_type='http'
-    session=None
+    session: MercuryEngine =None
     config={}
     actions = []
+    setup_actions = []
+    teardown_actions = []
 
     def __init__(self) -> None:
-        engine = Engine({
-            'engine_type': self.engine_type,
-            **self.config
-        }, None)
-        self.engine = engine.engine
+        self.session = self.session
         self.actions = self.actions
-        self.action_type = Action.action_types.get(self.engine_type, MercuryHTTPAction)
+        self.start = 0
+        self.elapsed = 0
+        self.total_time = 0
+        self.next_timeout = 0
 
     @classmethod
     def about(cls):
@@ -101,14 +106,14 @@ class ActionSet:
 
             hedra --about hooks:<hook_type>        
         '''
-
-    @setup('setup_action_set')
-    async def setup(self):
-        self.session = await self.session.create()
         
-    def execute(self, action_data: dict, group: str=None):
-        action = self.action_type(action_data, group=group, session=self.session)
-        return action.request
+    async def execute(self, action: Action):
+        if action.is_setup == False:
+            await action.setup()
+
+        action.session = self.session
+        
+        return action
 
     @teardown('teardown_action_set')
     async def close(self):

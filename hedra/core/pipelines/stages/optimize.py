@@ -39,22 +39,21 @@ class Optimize(BaseStage):
         self.selected_persona = persona
         self.selected_persona.optimized_params = await self.optmizer.optimize()
         optimized_batch_size = self.selected_persona.optimized_params['optimized_batch_size']
-        optimized_batch_time = self.selected_persona.optimized_params['optimized_batch_time']
+        optimized_batch_interval = self.selected_persona.optimized_params['optimized_batch_interval']
 
         optimization_iters = self.selected_persona.optimized_params['optimization_iters']
         optimization_total_time = self.selected_persona.optimized_params['optimization_total_time']
-        max_actions_completed = self.selected_persona.optimized_params['max_actions_completed']
+        optimization_max_aps = self.selected_persona.optimized_params['optimization_max_aps']
 
         if self._is_parallel is False:
             self.session_logger.info('\nOptimization complete...')
             self.session_logger.info(f'Executed - {optimization_iters} - iterations over - {optimization_total_time} - seconds.')
             self.session_logger.info(f'Best batch size - {optimized_batch_size}')
-            self.session_logger.info(f'Best batch time - {optimized_batch_time}')
-            self.session_logger.info(f'Highest actions per second (APS) - {max_actions_completed/optimized_batch_time}.')
+            self.session_logger.info(f'Best batch interval - {optimized_batch_interval}')
+            self.session_logger.info(f'Highest actions per second (APS) - {optimization_max_aps}.')
             self.session_logger.info('\n')
-
+    
         self.selected_persona.batch.size = optimized_batch_size
-        self.selected_persona.batch.time = optimized_batch_time
-        await self.selected_persona.load_batches()
+        self.selected_persona.batch.interval.wait_period = optimized_batch_interval
 
         return await self.calibration.execute(self.selected_persona)

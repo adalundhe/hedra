@@ -7,5 +7,10 @@ from .hooks import (
 from .action_set import ActionSet
 from .test import Test
 from .actions import (
-    HTTPAction
+    HTTPAction,
+    HTTP2Action,
+    GraphQLAction,
+    GRPCAction,
+    WebsocketAction,
+    PlaywrightAction
 )

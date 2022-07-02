@@ -1,46 +1,29 @@
-from .types import (
-    ActionSetEngine,
-    PlaywrightEngine,
-    MercuryWebsocketEngine,
-    MercuryGRPCEngine,
-    MercuryGraphQLEngine,
-    MercuryHTTPEngine,
-    MercuryHTTP2Engine
-)
+import asyncio
+import uvloop
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+uvloop.install()
 from easy_logger import Logger
+from async_tools.functions import check_event_loop
+
+from .utils.wrap_awaitable import async_execute_or_catch, wrap_awaitable_future
 
 
 class Engine:
 
-    registered_engines = {
-        'action-set': ActionSetEngine,
-        'playwright': PlaywrightEngine,
-        'grpc': MercuryGRPCEngine,
-        'graphql': MercuryGraphQLEngine,
-        'http': MercuryHTTPEngine,
-        'http2': MercuryHTTP2Engine,
-        'websocket': MercuryWebsocketEngine
-    }
-
     def __init__(self, config, handler):
         logger = Logger()
-        self.session_logger = logger.generate_logger()
-        self.type = config.get('engine_type', 'http')
-
-        self._event_loop = None
-        self.engine = None
-        self.config = config
+        self.session_logger = logger.generate_logger('hedra')
         self.handler = handler
+        self.config = config
 
-        self.engine = self.registered_engines.get(
-            self.type,
-            MercuryHTTPEngine
-        )(
-            self.config,
-            self.handler
-        )
+        check_event_loop(self.session_logger)
+        self._event_loop = asyncio.get_event_loop()
+        self.session = None
+        self._pool_size = self.config.get('pool_size', 1)
 
-        self.max_connections = self.engine._connection_pool_size
+        self._connection_pool_size = 10**5 * (self._pool_size + 2) * 2
+        self._setup_action = None
+        self.teardown_actions = []
 
     @classmethod
     def about(cls):
@@ -84,16 +67,19 @@ class Engine:
             
         '''
 
-    async def setup(self, actions):
-        await self.engine.create_session(actions)
-        
+    async def create_session(self, actions=[]) -> None:
+        for action in actions:
+            await action.execute_setup_or_teardown()
+
+    async def yield_session(self) -> None:
+        pass
+
     async def defer_all(self, actions):
-        async for response in self.engine.defer_all(actions):
-            yield response
+        async for action in actions:
+            yield wrap_awaitable_future(action)
 
-    async def set_teardown_actions(self, teardown_actions):
-        self.engine._teardown_actions = teardown_actions
-
+    @async_execute_or_catch()
     async def close(self):
-        return await self.engine.close()
+        for teardown_action in self.teardown_actions:
+            await teardown_action.execute_setup_or_teardown()
         

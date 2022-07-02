@@ -27,26 +27,36 @@ class RampedIntervalPersona(DefaultPersona):
         elapsed = 0
 
         await self.start_updates()
+        current_action_idx = 0
 
         self.start = time.time()
-        
-        while elapsed < self.duration:
 
+        batch_timeout = self.batch.time
+        
+        while elapsed < self.total_time: 
+
+            action = self._parsed_actions[current_action_idx]
+            
             self.batch.deferred.append(asyncio.create_task(
-                self._execute_batch()
+                action.session.batch_request(
+                    action.data,
+                    concurrency=self.batch.size,
+                    timeout=batch_timeout
+                )
             ))
-            await self.batch.interval.wait()
-            self.batch.time = await self._next_batch_time_limit()
-                
+
+            await asyncio.sleep(self.batch.interval.period)
             elapsed = time.time() - self.start
+
+            batch_timeout = batch_timeout + (1 * self.batch.gradient)
+            current_action_idx = (current_action_idx + 1) % self.actions_count
 
         self.end = elapsed + self.start
         await self.stop_updates()
 
-
         for deferred_batch in self.batch.deferred:
             batch, pending = await deferred_batch
-            completed = await asyncio.gather(*batch, return_exceptions=True)
+            completed = await asyncio.gather(*batch)
             results.extend(completed)
             
             try:
