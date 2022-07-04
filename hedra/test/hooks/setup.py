@@ -20,9 +20,11 @@ def setup(name, group=None, metadata={}):
     def wrapper(func):
  
         func.action_name = name
+        func.is_action = True
+        func.is_before = False
+        func.is_after = False
         func.is_setup = True
         func.is_teardown = False
-        func.is_action = True
         func.weight = 0
         func.order = 0
         func.group = group

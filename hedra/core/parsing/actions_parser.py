@@ -1,4 +1,6 @@
 import inspect
+from types import FunctionType
+from typing import Coroutine
 from easy_logger import Logger
 from async_tools.datatypes import AsyncList
 
@@ -13,6 +15,8 @@ class ActionsParser:
         self._is_multi_user_sequence = config.executor_config.get('persona_type') == 'multi-user-sequence'
         self.actions = []
         self.sequences = {}
+        self.before = []
+        self.after = []
         self.user_setup_actions = {}
         self.user_teardown_actions = {}
         self.setup_actions = []
@@ -86,6 +90,7 @@ class ActionsParser:
             for _, method in methods:
 
                 if hasattr(method, 'is_action'):
+
                     group = method.metadata.get('group')
                     if group is None:
                         group = user
@@ -101,6 +106,12 @@ class ActionsParser:
 
                     elif method.is_teardown:
                         self.sequences[group]['teardown'].append(method)
+
+                    elif method.is_before:
+                        self.before.append(method)
+
+                    elif method.is_after:
+                        self.after.append(method)
 
                     else:
                         if self.sequences[group].get('execute') is None:
@@ -119,8 +130,33 @@ class ActionsParser:
                     elif method.is_teardown:
                         self.teardown_actions.append(method)
 
+                    elif method.is_before:
+                        self.before.append(method)
+
+                    elif method.is_after:
+                        self.after.append(method)
+
                     else:
                         self.actions.append(method)
+
+    async def setup(self, action: Coroutine):
+        
+        before_hook = None
+        for hook in self.before:
+            if action.name in hook.names:
+                before_hook = hook
+
+        after_hook = None
+        for hook in self.after:
+
+            if action.name in hook.names:
+                after_hook = hook
+
+        parsed_action = await action()
+        parsed_action.data.before = before_hook
+        parsed_action.data.after = after_hook
+
+        return parsed_action
 
     async def weights(self):
         actions  = [action for action in self.actions if action.is_setup is False and action.is_teardown is False]

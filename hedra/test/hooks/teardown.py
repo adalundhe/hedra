@@ -21,9 +21,11 @@ def teardown(name, group=None, metadata={}):
     def wrapper(func):
 
         func.action_name = name
+        func.is_action = True
+        func.is_before = False
+        func.is_after = False
         func.is_setup = False
         func.is_teardown = True
-        func.is_action = True
         func.weight = 0
         func.order = float('inf')
         func.group = group

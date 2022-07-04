@@ -89,12 +89,12 @@ class DefaultPersona:
         self.engine.teardown_actions = parser.teardown_actions
 
         for action in self.actions:
-            parsed_action =  await action()
-            await parsed_action.session.prepare_request(parsed_action.data, action.checks)
-            self._parsed_actions.data.append(parsed_action)
+            action = await parser.setup(action)
+            await action.session.prepare_request(action.data, action.data.checks)
+            self._parsed_actions.data.append(action)
 
-            parsed_action.session.context.history.add_row(
-                parsed_action.data.name
+            action.session.context.history.add_row(
+                action.data.name
             )
         
     async def execute(self):

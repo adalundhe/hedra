@@ -33,10 +33,12 @@ def action(name, group=None, weight=1, order=1, timeout=None, wait_interval=None
 
     '''
     def wrapper(func):
-        func.action_name = name
+        func.name = name
+        func.is_action = True
+        func.is_before = False
+        func.is_after = False
         func.is_setup = False
         func.is_teardown = False
-        func.is_action = True
         func.weight = weight
         func.order = order
         func.group = group
@@ -53,7 +55,6 @@ def action(name, group=None, weight=1, order=1, timeout=None, wait_interval=None
         func.checks = checks
         func.context = None
 
-        @functools.lru_cache(maxsize=128)
         @functools.wraps(func)
         def decorator(*args, **kwargs):
             return func(*args, **kwargs)
