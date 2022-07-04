@@ -5,7 +5,7 @@ from async_tools.datatypes.async_list import AsyncList
 from async_tools.functions import awaitable
 from hedra.core.engines import Engine
 from hedra.core.personas.types.default_persona import DefaultPersona
-from hedra.parsing import ActionsParser
+from hedra.core.parsing import ActionsParser
 
 
 class WeightedSelectionPersona(DefaultPersona):
@@ -67,6 +67,9 @@ class WeightedSelectionPersona(DefaultPersona):
             
 
             await asyncio.sleep(self.batch.interval.period)
+            if action.session.hard_cache == False:
+                await action.session.update_from_context(action.data.name)
+
             elapsed = time.time() - self.start
 
             if len(self.sampled_actions) < 1:

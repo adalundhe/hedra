@@ -51,6 +51,9 @@ class RampedPersona(DefaultPersona):
             
 
             await asyncio.sleep(self.batch.interval.period)
+            if action.session.hard_cache == False:
+                await action.session.update_from_context(action.data.name)
+
             elapsed = time.time() - self.start
 
             batch_size = math.ceil(batch_size * (1 + self.batch.gradient))

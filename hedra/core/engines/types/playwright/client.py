@@ -5,6 +5,7 @@ from types import FunctionType
 from typing import Awaitable, Dict, List, Optional, Set, Tuple, Union
 from hedra.core.engines.types.common import Timeouts
 from .context_config import ContextConfig
+from .context import Context
 from .pool import ContextPool
 from .command import Command
 from .result import Result
@@ -23,6 +24,7 @@ class MercuryPlaywrightClient:
         self.commands: Dict[str, Command] = {}
         self.sem = asyncio.Semaphore(self.concurrency)
         self.loop = asyncio.get_event_loop()
+        self.context = Context()
 
     async def setup(self, config: ContextConfig):
         self.pool.create_pool(config)
@@ -40,15 +42,23 @@ class MercuryPlaywrightClient:
 
         self.commands[command.name] = command
 
-    async def execute_prepared_command(self, command_name: str) -> PlaywrightResponseFuture:
+    async def execute_prepared_command(self, command_name: str, idx: int) -> PlaywrightResponseFuture:
         command = self.commands[command_name]
         result = Result(command)
+        await self.sem.acquire()
+
+        if command.before:
+            command = await command.before(idx, command)
 
         try:
-            await self.sem.acquire()
 
             context = random.choice(self.pool.contexts)
             result = await context.execute(command)
+
+            self.context.last = result
+
+            if command.after:
+                response = await command.after(response)
 
             self.sem.release()
 
@@ -56,7 +66,14 @@ class MercuryPlaywrightClient:
 
         except Exception as e:
             result.error = e
+            self.context.last = result
+            self.sem.release()
             return result
+
+    async def update_from_context(self, command_name: str):
+        previous_command = self.commands.get(command_name)
+        context_command = self.context.update_command(previous_command)
+        await self.prepare_command(context_command, context_command.checks)
 
     async def request(self, command: Command, checks: Optional[List[FunctionType]]=[]) -> PlaywrightResponseFuture:
 

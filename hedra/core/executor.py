@@ -3,9 +3,9 @@ from alive_progress import alive_bar
 from easy_logger import Logger
 from .personas import PersonaManager
 from hedra.reporting import Handler, ParallelHandler
-from hedra.parsing import ActionsParser
-from .pipelines import Pipeline
 from async_tools.functions import check_event_loop
+from .parsing import ActionsParser
+from .pipelines import Pipeline
 
 
 class Executor:

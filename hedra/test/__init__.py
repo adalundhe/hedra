@@ -4,8 +4,10 @@ from .hooks import (
     teardown,
     use
 )
-from .action_set import ActionSet
-from .test import Test
+from .stages import (
+    Execute
+)
+from .config import Config
 from .actions import (
     HTTPAction,
     HTTP2Action,

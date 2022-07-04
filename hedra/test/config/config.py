@@ -1,7 +1,7 @@
 import psutil
 
 
-class Test:
+class Config:
     log_level='info'
     runner_mode='local'
     embedded_stats=False
@@ -59,13 +59,13 @@ class Test:
     @classmethod
     def about(cls):
         return '''
-        Test
+        Config
 
-        The Test class provides a base class to allow you to write test config as code. Like the 
-        ActionSet, you must write a class that inherits the Test class, the specify test configuration 
+        The Config class provides a base class to allow you to write test config as code. Like the 
+        ActionSet, you must write a class that inherits the Config class, the specify test configuration 
         as class attributes. For example:
 
-        class MyTest(Test):
+        class MyConfig(Config):
             runner_mode='parallel'
             engine='fast-http'
             total_time='00:05:00'
@@ -95,7 +95,7 @@ class Test:
 
             - We want a pool of 8 parallel processes.
 
-        Currently the Test class supports the following config options:
+        Currently the Config class supports the following config options:
 
             ### Run Config ###
             - log_level (default: 'info')
@@ -129,9 +129,9 @@ class Test:
             - fetch_config (default: {"stream_config": { "stream_name": "hedra", "fields": {}})
             - submit_config (default: {"stream_config": { "save_to_file": True, "stream_name": "hedra", "fields": {}})
 
-        We also recommend using the Test class with the:
+        We also recommend using the Config class with the:
 
-            @use(<Test>)
+            @use(<Config>)
 
         hook to minimize boilerplate code to setup Engine sessions.
 

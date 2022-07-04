@@ -1,4 +1,4 @@
-from hedra.parsing.actions_parser import ActionsParser
+from hedra.core.parsing.actions_parser import ActionsParser
 
 
 class ActionsDocs:

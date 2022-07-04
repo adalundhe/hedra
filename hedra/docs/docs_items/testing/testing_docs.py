@@ -1,6 +1,6 @@
-from hedra.testing.action_set import ActionSet
-from hedra.testing.test import Test
-from hedra.testing.hooks import (
+from hedra.test.stages import Execute
+from hedra.test.config import Config
+from hedra.test.hooks import (
     setup,
     action,
     teardown,
@@ -32,16 +32,16 @@ class TestingDocs:
                 hooks_type = docs_items[2]
 
             if item_type == "action-set":
-                print(ActionSet.about())
+                print(Execute.about())
 
             elif item_type == "test": 
-                print(Test.about())
+                print(Config.about())
 
             elif item_type == "hooks":
 
                 if hooks_type is None:
              
-                    print(ActionSet.about_hooks())
+                    print(Execute.about_hooks())
 
                 else:
 

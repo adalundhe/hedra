@@ -6,7 +6,7 @@ from typing import List
 from hedra.core.personas.types.default_persona import DefaultPersona
 from .sequence_persona import SequencedPersonaCollection
 from async_tools.datatypes import AsyncList
-from hedra.parsing import ActionsParser
+from hedra.core.parsing import ActionsParser
 
 
 class MultiSequencePersona(DefaultPersona):

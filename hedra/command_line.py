@@ -4,7 +4,7 @@ from pycli_tools import BaseConfig
 from pycli_tools.arguments.bundler import Bundler
 from importlib.metadata import version
 
-from hedra.testing import Test
+from hedra.test import Config
 
 from .config.cli.hedra import hedra_cli
 from .docs import DocsManager
@@ -92,7 +92,7 @@ class CommandLine(BaseConfig):
     
                 if config_map.argument:
                     bundler = Bundler(options={
-                        'class_type': Test,
+                        'class_type': Config,
                         'package_name': config_map.argument.original_arg
                     })
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Dict, Iterator, Union, List
+from types import FunctionType
+from typing import Coroutine, Dict, Iterator, Union, List
 from .params import Params
 from .metadata import Metadata
 from .url import URL
@@ -8,7 +9,19 @@ from .headers import Headers
 
 class Request:
 
-    def __init__(self, name: str, url: str, method: str = 'GET', headers: Dict[str, str]={}, params: Dict[str, str]={}, payload: Union[str, dict, Iterator, bytes, None]=None, user: str=None, tags: List[Dict[str, str]]=[],  checks=None) -> None:
+    def __init__(self, 
+        name: str, 
+        url: str, 
+        method: str = 'GET', 
+        headers: Dict[str, str] = {}, 
+        params: Dict[str, str] = {}, 
+        payload: Union[str, dict, Iterator, bytes, None] = None, 
+        user: str=None, tags: List[Dict[str, str]] = [],  
+        checks: List[FunctionType] = None, 
+        before: Coroutine = None, 
+        after: Coroutine = None
+    ) -> None:
+
         self.name = name
         self.method = method
         self.url = URL(url)
@@ -19,15 +32,11 @@ class Request:
         self.ssl_context = None
         self.is_setup = False
         self.checks = checks
+        self.before = before
+        self.after = after
 
     def __aiter__(self):
         return self.payload.__aiter__()
-
-    def update(self, request: Request):
-        self.method = request.method
-        self.headers.data = request.headers.data
-        self.payload.data = request.payload.data
-        self.params.data = request.params.data
 
     def setup_http_request(self):
         self.payload.setup_payload()

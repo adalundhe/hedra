@@ -13,8 +13,7 @@ from queue import Queue
 from easy_logger import Logger
 from hedra.command_line import CommandLine
 from hedra.reporting import Handler
-from hedra.parsing import ActionsParser
-from .embedded_statserve import EmbeddedStatserve
+from hedra.core.parsing import ActionsParser
 from .parallel.jobs import (
     create_job,
     run_job

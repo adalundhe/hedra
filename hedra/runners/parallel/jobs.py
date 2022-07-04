@@ -4,8 +4,8 @@ import traceback
 from easy_logger import Logger
 from pycli_tools.arguments.bundler import Bundler
 from hedra.core import Executor
-from hedra.testing import (
-    ActionSet
+from hedra.test import (
+    Execute
 )
 
 
@@ -29,7 +29,7 @@ def run_job(config):
 
         if job_config.executor_config.get('engine_type') == 'action-set':
             bundler = Bundler(options={
-                'class_type': ActionSet,
+                'class_type': Execute,
                 'package_name': job_config.executor_config.get('actions_code_filepath')
             })
 

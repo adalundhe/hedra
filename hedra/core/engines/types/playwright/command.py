@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Coroutine, Dict, List
 from hedra.core.engines.types.common.metadata import Metadata
 
 
@@ -39,7 +39,18 @@ class Options:
 
 class Command:
     
-    def __init__(self, name, command, page: Page=Page(), url: URL=URL(), input: Input=Input(), options: Options=Options(), user: str=None, tags: List[Dict[str, str]]=[], checks=None) -> None:
+    def __init__(self, 
+        name, command, 
+        page: Page = Page(), 
+        url: URL = URL(), 
+        input: Input = Input(), 
+        options: Options = Options(), 
+        user: str = None, 
+        tags: List[Dict[str, str]] = [], 
+        checks = None,
+        before: Coroutine = None,
+        after: Coroutine = None
+    ) -> None:
         self.name = name
         self.command = command
         self.page = page
@@ -48,3 +59,5 @@ class Command:
         self.options = options
         self.checks = checks
         self.metadata = Metadata(user, tags)
+        self.before = before
+        self.after = after

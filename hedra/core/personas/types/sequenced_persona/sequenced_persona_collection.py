@@ -5,7 +5,7 @@ from hedra.core.personas.batching.batch_interval import BatchInterval
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.engines import Engine
 from hedra.core.personas.batching import SequenceStep
-from hedra.parsing import ActionsParser
+from hedra.core.parsing import ActionsParser
 
 
 class SequencedPersonaCollection(DefaultPersona):
@@ -66,6 +66,9 @@ class SequencedPersonaCollection(DefaultPersona):
             
 
             await asyncio.sleep(self.batch.interval.period)
+            if action.session.hard_cache == False:
+                await action.session.update_from_context(action.data.name)
+
             elapsed = time.time() - self.start
 
             current_action_idx = (current_action_idx + 1) % self.actions_count

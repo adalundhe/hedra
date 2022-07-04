@@ -18,7 +18,7 @@ from hedra.core.personas.batching import Batch
 from hedra.core.personas.batching.batch_interval import BatchInterval
 from hedra.core.engines import Engine
 from hedra.core.personas.utils import parse_time
-from hedra.parsing import ActionsParser
+from hedra.core.parsing import ActionsParser
 
 
 class DefaultPersona:
@@ -90,6 +90,7 @@ class DefaultPersona:
 
         for action in self.actions:
             parsed_action =  await action()
+            await parsed_action.session.prepare_request(parsed_action.data, action.checks)
             self._parsed_actions.data.append(parsed_action)
         
     async def execute(self):
@@ -116,6 +117,9 @@ class DefaultPersona:
             ))
             
             await asyncio.sleep(self.batch.interval.period)
+            if action.session.hard_cache == False:
+                await action.session.update_from_context(action.data.name)
+
             elapsed = time.time() - start
 
             current_action_idx = (current_action_idx + 1) % self.actions_count

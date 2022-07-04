@@ -75,8 +75,6 @@ class ActionsParser:
 
         if self._is_multi_user_sequence or self._is_multi_sequence:
             self.actions = self.sequences
-            
-        return self.actions
 
     async def _parse(self, class_instance):
         methods = inspect.getmembers(class_instance, predicate=inspect.ismethod) 

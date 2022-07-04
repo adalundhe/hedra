@@ -1,6 +1,4 @@
-import functools
 import asyncio
-import inspect
 from hedra.core.engines.types.playwright import ContextConfig
 from hedra.core.engines.types import (
     MercuryGraphQLClient,
@@ -13,183 +11,39 @@ from hedra.core.engines.types import (
 from hedra.core.engines.types.common import Timeouts
 from easy_logger import Logger
 from hedra.core.personas.utils.time import parse_time
-from numpy import einsum
-from .test import Test
+from hedra.test.stages.execute import Execute
+from hedra.test.config import Config
 
 
-def action(name, group=None, weight=1, order=1, timeout=None, wait_interval=None, metadata={}, checks=None):
-    '''
-    Action Hook
-
-    The @action(<name>, ...) decorator is required for any methods of a class
-    inheriting the ActionSet class to execute as actions. All functions wrapped in the
-    decorator must be asynchronous and return valid results.
-
-    You may pass the following to a setup hook:
-
-    - name (required:string - positional)
-    - group (optional:string - keyword)
-    - weight (optional:decimal - keyword)
-    - order (optional:integer - keyword)
-    - timeout (optional:integer - keyword - use in place of request_timeout)
-    - wait_interval (optional:integer - keyword - used in place of batch interval for Sequence based personas)
-    - metadata (optional:dict - keyword - may include env, user, type, tags [list:string], and url)
-    - success_condition (optional:function - keyword)
-
-    Note that the success condition function, if provided, will be executed when results are
-    assessed. The success condition function should accept a single positional argument 
-    representing the response returned by the action (for example, the HTTP response object
-    returned by a request made using AioHTTP and return a true/false value based on that argument.
-
-    For example:
-
-    @action('my_test_action', success_condition=lambda response: response.status > 200 and response.status < 400)
-    def my_test_action(self):
-        with self.session.get('https://www.google.com') as response:
-            return await response
-
-    '''
-    def wrapper(func):
-        func.action_name = name
-        func.is_setup = False
-        func.is_teardown = False
-        func.is_action = True
-        func.weight = weight
-        func.order = order
-        func.group = group
-        func.metadata = {
-            'group': group
-        }
-        func.timeout = timeout
-        func.wait_interval = wait_interval
-        func.env = metadata.get('env')
-        func.user = metadata.get('user')
-        func.type = metadata.get('type')
-        func.tags = metadata.get('tags')
-        func.url = metadata.get('url')
-        func.checks = checks
-
-        @functools.lru_cache(maxsize=128)
-        @functools.wraps(func)
-        def decorator(*args, **kwargs):
-            return func(*args, **kwargs)
-                
-        return decorator  
-    return wrapper
 
 
-def setup(name, group=None, metadata={}):
-    '''
-    Setup Hook
-
-    The @setup(<name>, ...) decorator is an optional means of specifying that
-    a method of a class inherting ActionSet should executor prior to testing as a means
-    of setting up/initializing test state. You may specify as many setup hooks
-    as needed, however all methods wrapped in the decorator must be asynchronous
-    and return valid results.
-
-    You may pass the following to a setup hook:
-
-    - name (required:string - positional)
-    - group (optional:string - keyword)
-    - metadata (optional:dict - keyword - may include env, user, type, tags [list], and url)
-    
-    '''
-    def wrapper(func):
- 
-        func.action_name = name
-        func.is_setup = True
-        func.is_teardown = False
-        func.is_action = True
-        func.weight = 0
-        func.order = 0
-        func.group = group
-        func.metadata = {
-            'group': group
-        }
-        func.timeout = None
-        func.wait_interval = None
-        func.env = metadata.get('env')
-        func.user = metadata.get('user')
-        func.type = metadata.get('type')
-        func.tags = metadata.get('tags')
-        func.url = metadata.get('url')
-        func.checks = None
-
-        @functools.wraps(func)
-        async def decorator(*args, **kwargs):
-            return await func(*args, **kwargs)
-
-        return decorator
-    return wrapper
-
-def teardown(name, group=None, metadata={}):
-    '''
-    Teardown Hook
-
-    The @teardown(<name>, ...) decorator is an optional means of specifying that
-    a method of a class inherting ActionSet should executor after testing as a means
-    of cleaning up/closing any session or state created during tests. You may specify as 
-    many teardown hooks as needed, however all methods wrapped in the decorator must be 
-    asynchronous and return valid results.
-
-    You may pass the following to a teardown hook:
-
-    - name (required:string - positional)
-    - group (optional:string - keyword)
-    - metadata (optional:dict - keyword - may include env, user, type, tags [list], and url)
-    
-    '''
-    def wrapper(func):
-
-        func.action_name = name
-        func.is_setup = False
-        func.is_teardown = True
-        func.is_action = True
-        func.weight = 0
-        func.order = float('inf')
-        func.group = group
-        func.timeout = None
-        func.wait_interval = None
-        func.metadata = {
-            'group': group
-        }
-        func.env = metadata.get('env')
-        func.user = metadata.get('user')
-        func.type = metadata.get('type')
-        func.tags = metadata.get('tags')
-        func.url = metadata.get('url')
-        func.checks = None
-
-        @functools.wraps(func)
-        async def decorator(*args, **kwargs):
-            return await func(*args, **kwargs)
-
-        return decorator
-    return wrapper
 
 
-def use(config: Test, fixtures={}, inject=None):
+
+
+
+
+def use(config: Config, fixtures={}, inject=None):
 
     '''
     Use
 
-    The @use(<Test>) hook offers pre-configured sessions for use with an Action Set test's built in engines.
-    You must supply a reference to a valid Test class to the hook. For example:
+    The @use(<Config>) hook offers pre-configured sessions for use with an Action Set test's built in engines.
+    You must supply a reference to a valid Config class to the hook. For example:
 
-    from hedra.testing import ActionSet, Test
-    from hedra.testing.hooks import action, use
+    from hedra.test import Execute, Config
+    from hedra.test.hooks import action, use
 
 
-        class Config(Test):
+        class MyConfig(Config):
                 engine='fast-http'
                 total_time='00:01:00'
                 batch_size=5000
                 bach_interval=0
 
 
-        @use(Config)
-        TestActionSet(ActionSet):
+        @use(MyConfig)
+        MyExecuteStage(Execute):
 
             @action('test_httpbin_get')
             async def test_httpbin_get(self):
@@ -211,10 +65,10 @@ def use(config: Test, fixtures={}, inject=None):
     keyword argument:
 
 
-    from hedra.testing import ActionSet, Test
-    from hedra.testing.hooks import action, use
+    from hedra.test import Execute, Config
+    from hedra.test.hooks import action, use
 
-        class Config(Test):
+        class MyConfig(Config):
                 engine='fast-http'
                 total_time='00:01:00'
                 batch_size=5000
@@ -222,7 +76,7 @@ def use(config: Test, fixtures={}, inject=None):
 
 
         @use(Config, inject=CustomSessionClass())
-        TestActionSet(ActionSet):
+        MyExecuteStage(Execute):
 
             @action('test_httpbin_get')
             async def test_httpbin_get(self):
@@ -239,7 +93,7 @@ def use(config: Test, fixtures={}, inject=None):
 
     def wrapper(cls):
 
-        async def decorator(selected_config: Test=config):
+        async def decorator(selected_config: Config=config):
 
 
             selected_engine = selected_config.engine_type
@@ -295,6 +149,8 @@ def use(config: Test, fixtures={}, inject=None):
                         reset_connections=selected_config.options.get('reset_connections')
                     )
 
+                    session.protocol.context = cls.context
+
                 elif selected_engine == 'websocekt':
                     session = MercuryWebsocketClient(
                         concurrency=pool_concurrency,
@@ -328,7 +184,9 @@ def use(config: Test, fixtures={}, inject=None):
 
                     await session.setup(context_config)
 
+                session.context = cls.context
                 cls.session = session
+                cls.config = selected_config
                 cls.engine_type = selected_engine
 
             except Exception as err:

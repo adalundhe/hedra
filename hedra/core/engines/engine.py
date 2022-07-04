@@ -69,7 +69,7 @@ class Engine:
 
     async def create_session(self, actions=[]) -> None:
         for action in actions:
-            await action.execute_setup_or_teardown()
+            await action()
 
     async def yield_session(self) -> None:
         pass
@@ -81,5 +81,5 @@ class Engine:
     @async_execute_or_catch()
     async def close(self):
         for teardown_action in self.teardown_actions:
-            await teardown_action.execute_setup_or_teardown()
+            await teardown_action()
         

@@ -2,8 +2,8 @@ import time
 import asyncio
 from types import FunctionType
 from typing import Awaitable, List, Optional, Union, Tuple, Set
-from async_tools.datatypes import AsyncList
 from hedra.core.engines.types.http.client import MercuryHTTPClient
+from hedra.core.engines.types.http.connection import Connection
 from hedra.core.engines.types.common.response import Response, Request
 from hedra.core.engines.types.common.timeouts import Timeouts
 from .utils import get_header_bits, get_message_buffer_size, websocket_headers_to_iterator
@@ -26,14 +26,14 @@ class MercuryWebsocketClient(MercuryHTTPClient):
         try:
             if request.url.is_ssl:
                 request.ssl_context = self.ssl_context
+            
+            if self._hosts.get(request.url.hostname) is None:
+                    self._hosts[request.url.hostname] = await request.url.lookup()
+            else:
+                request.url.ip_addr = self._hosts[request.url.hostname]
 
             if request.is_setup is False:
                 request.setup_websocket_request()
-
-                if self._hosts.get(request.url.hostname) is None:
-                    self._hosts[request.url.hostname] = await request.url.lookup()
-                else:
-                    request.url.ip_addr = self._hosts[request.url.hostname]
 
                 if request.checks is None:
                     request.checks = checks
@@ -43,15 +43,37 @@ class MercuryWebsocketClient(MercuryHTTPClient):
         except Exception as e:
             return Response(request, error=e, type='websocket')
 
-    async def execute_prepared_request(self, request_name: str) -> WebsocketResponseFuture:
+    async def update_from_context(self, request_name: str):
+        previous_request = self.requests.get(request_name)
+        context_request = self.context.update_request(previous_request)
+        await self.prepare_request(context_request, context_request.checks)
+
+    async def update_request(self, update_request: Request):
+        previous_request = self.requests.get(update_request.name)
+
+        previous_request.method = update_request.method
+        previous_request.headers.data = update_request.headers.data
+        previous_request.params.data = update_request.params.data
+        previous_request.payload.data = update_request.payload.data
+        previous_request.metadata.tags = update_request.metadata.tags
+        previous_request.checks = update_request.checks
+
+        self.requests[update_request.name] = previous_request
+
+    async def execute_prepared_request(self, request_name: str, idx: int, timeout: int) -> WebsocketResponseFuture:
 
         request = self.requests[request_name]
         response = Response(request, type='websocket')
 
-        await self.sem.acquire() 
+        stream_idx = idx%self.pool.size
+        connection = self.pool.connections[stream_idx]
+
+        if request.before:
+            request = await request.before(idx, request) 
 
         try:
-            connection = self.pool.connections.pop()
+            await connection.lock.acquire()
+
             start = time.time()
             stream = await asyncio.wait_for(connection.connect(
                 request_name,
@@ -91,35 +113,29 @@ class MercuryWebsocketClient(MercuryHTTPClient):
             elapsed = time.time() - start
 
             response.time = elapsed
-            
-            self.pool.connections.append(connection)
-            self.sem.release()
+
+            if request.after:
+                response = await request.after(response)
+
+            self.context.last = response
+            connection.lock.release()
 
             return response
 
         except Exception as e:
             response.error = e
-            self.sem.release()
+            self.pool.connections[stream_idx] = Connection(reset_connection=self.pool.reset_connections)
+            self.context.last = response
             return response
 
-    async def request(self, request: Request, checks: Optional[List[FunctionType]]=[]) -> WebsocketBatchResponseFuture:
-
-        if self.requests.get(request.name) is None:
-
-            await self.prepare_request(request, checks)
-
-        elif self.hard_cache is False:
-            self.requests[request.name].update(request)
-            self.requests[request.name].setup_websocket_request()
-
+    async def request(self, request: Request) -> WebsocketBatchResponseFuture:
         return await self.execute_prepared_request(request.name)
         
     async def batch_request(
         self, 
         request: Request,
         concurrency: Optional[int]=None, 
-        timeout: Optional[float]=None,
-        checks: Optional[List[FunctionType]]=[]
+        timeout: Optional[float]=None
     ) -> WebsocketBatchResponseFuture:
 
         if concurrency is None:
@@ -127,12 +143,5 @@ class MercuryWebsocketClient(MercuryHTTPClient):
 
         if timeout is None:
             timeout = self.timeouts.total_timeout
-
-        if self.requests.get(request.name) is None:
-            await self.prepare_request(request, checks)
-
-        elif self.hard_cache is False:
-            self.requests[request.name].update(request)
-            self.requests[request.name].setup_websocket_request()
         
         return await asyncio.wait([self.execute_prepared_request(request.name) for _ in range(concurrency)], timeout=timeout)

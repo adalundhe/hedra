@@ -23,7 +23,7 @@ class Connection:
 
     async def connect(self, request_name: str, dns_address: str, port: int, ssl: Optional[SSLContext]=None) -> Union[Tuple[StreamReader, StreamWriter], Exception]:
         try:
-            if self.connected is False or self.request_name != request_name or self.reset_connection:
+            if self.connected is False or self.dns_address != dns_address or self.reset_connection:
                 self._connection = await asyncio.open_connection(dns_address, port, ssl=ssl)
                 self.connected = True
 
