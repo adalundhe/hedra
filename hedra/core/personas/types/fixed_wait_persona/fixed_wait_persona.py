@@ -32,8 +32,6 @@ class FixedWaitPersona(DefaultPersona):
             ))
 
             await asyncio.sleep(self.batch.interval.period)
-            if action.session.hard_cache == False:
-                await action.session.update_from_context(action.data.name)
 
             elapsed = time.time() - self.start
 

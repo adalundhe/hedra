@@ -58,7 +58,7 @@ class MercuryPlaywrightClient:
             self.context.last = result
 
             if command.after:
-                response = await command.after(response)
+                response = await command.after(idx, response)
 
             self.sem.release()
 

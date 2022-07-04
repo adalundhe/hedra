@@ -184,6 +184,8 @@ def use(config: Config, fixtures={}, inject=None):
 
                     await session.setup(context_config)
 
+                cls.context.history.row_size = selected_config.batch_size
+
                 session.context = cls.context
                 cls.session = session
                 cls.config = selected_config

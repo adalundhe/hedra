@@ -115,7 +115,7 @@ class MercuryWebsocketClient(MercuryHTTPClient):
             response.time = elapsed
 
             if request.after:
-                response = await request.after(response)
+                response = await request.after(idx, response)
 
             self.context.last = response
             connection.lock.release()

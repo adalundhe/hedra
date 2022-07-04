@@ -248,7 +248,7 @@ pydantic==1.9.0
     # via fastapi
 pyee==8.1.0
     # via playwright
-pyjwt==2.3.0
+pyjwt==2.4.0
     # via snowflake-connector-python
 pymongo==3.12.3
     # via motor

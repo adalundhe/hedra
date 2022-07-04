@@ -98,7 +98,7 @@ class MercuryGRPCClient(MercuryHTTP2Client):
             self.context.last = response
 
             if request.after:
-                response = await request.after(response)
+                response = await request.after(idx, response)
             
             connection.lock.release()
 

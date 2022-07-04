@@ -2,11 +2,13 @@ from __future__ import annotations
 from urllib.parse import urlparse
 from .request import Request
 from .response import BaseResponse
+from .history import History
 
 
 class Context:
     values = {}
     last = BaseResponse()
+    history = History()
 
     def __getitem__(self, key: str):
         return self.values.get(key)

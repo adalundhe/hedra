@@ -51,6 +51,7 @@ def action(name, group=None, weight=1, order=1, timeout=None, wait_interval=None
         func.tags = metadata.get('tags')
         func.url = metadata.get('url')
         func.checks = checks
+        func.context = None
 
         @functools.lru_cache(maxsize=128)
         @functools.wraps(func)

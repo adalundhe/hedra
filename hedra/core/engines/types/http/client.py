@@ -104,7 +104,7 @@ class MercuryHTTPClient:
 
         try:
             await connection.lock.acquire()
-            
+
             start = time.time()
 
             stream = await asyncio.wait_for(connection.connect(
@@ -141,7 +141,7 @@ class MercuryHTTPClient:
             elapsed = time.time() - start
 
             if request.after:
-                response = await request.after(response)
+                response = await request.after(idx, response)
 
             response.time = elapsed
             self.context.last = response

@@ -1,6 +1,4 @@
-from email.policy import default
-from typing import Any, Union
-from urllib.parse import urlparse
+from .history import History
 from .command import Command
 from .result import Result
 
@@ -8,6 +6,7 @@ from .result import Result
 class Context:
     values = {}
     last: Result = None
+    history = History()
 
     def __getitem__(self, key: str):
         return self.values.get(key)

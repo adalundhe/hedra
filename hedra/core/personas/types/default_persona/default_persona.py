@@ -92,6 +92,10 @@ class DefaultPersona:
             parsed_action =  await action()
             await parsed_action.session.prepare_request(parsed_action.data, action.checks)
             self._parsed_actions.data.append(parsed_action)
+
+            parsed_action.session.context.history.add_row(
+                parsed_action.data.name
+            )
         
     async def execute(self):
 
@@ -117,9 +121,7 @@ class DefaultPersona:
             ))
             
             await asyncio.sleep(self.batch.interval.period)
-            if action.session.hard_cache == False:
-                await action.session.update_from_context(action.data.name)
-
+        
             elapsed = time.time() - start
 
             current_action_idx = (current_action_idx + 1) % self.actions_count
