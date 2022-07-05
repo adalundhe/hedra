@@ -6,6 +6,8 @@ from .metadata import Metadata
 from .url import URL
 from .payload import Payload
 from .headers import Headers
+from .types import RequestTypes, ProtocolMap
+
 
 class Request:
 
@@ -19,12 +21,15 @@ class Request:
         user: str=None, tags: List[Dict[str, str]] = [],  
         checks: List[FunctionType] = None, 
         before: Coroutine = None, 
-        after: Coroutine = None
+        after: Coroutine = None,
+        request_type: RequestTypes = RequestTypes.HTTP
     ) -> None:
 
+        self.protocols = ProtocolMap()
         self.name = name
         self.method = method
-        self.url = URL(url)
+        self.type = request_type
+        self.url = URL(url, socket_type=self.protocols[request_type])
         self.params = Params(params)
         self.headers = Headers(headers)
         self.payload = Payload(payload)

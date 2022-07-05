@@ -1,7 +1,6 @@
 import math
 from typing import List
 from hedra.core.engines.types.common.timeouts import Timeouts
-from .connection import HTTP2Connection
 from .stream import AsyncStream
 
 
@@ -9,7 +8,7 @@ class HTTP2Pool:
 
     def __init__(self, size: int, timeouts: Timeouts, reset_connections=False) -> None:
         self.size = size
-        self.connections: List[HTTP2Connection] = []
+        self.connections: List[AsyncStream] = []
         self.timeouts = timeouts
         self.pools_count = math.ceil(size/100)
         self.reset_connections = reset_connections

@@ -133,6 +133,7 @@ def use(config: Config, fixtures={}, inject=None):
                     session = MercuryHTTP2Client(
                         concurrency=pool_concurrency,
                         timeouts=Timeouts(
+                            connect_timeout=selected_config.connect_timeout,
                             total_timeout=selected_config.request_timeout
                         ),
                         hard_cache=selected_config.options.get('hard_cache', False),

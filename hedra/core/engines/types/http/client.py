@@ -111,6 +111,7 @@ class MercuryHTTPClient:
                 request_name,
                 request.url.ip_addr,
                 request.url.port,
+                request.url.socket_config,
                 ssl=request.ssl_context
             ), timeout=self.timeouts.connect_timeout)
             if isinstance(stream, Exception):

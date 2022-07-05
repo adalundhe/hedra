@@ -1,4 +1,6 @@
 import functools
+from .types import HookType
+
 
 def action(name, group=None, weight=1, order=1, timeout=None, wait_interval=None, metadata={}, checks=None):
     '''
@@ -35,10 +37,7 @@ def action(name, group=None, weight=1, order=1, timeout=None, wait_interval=None
     def wrapper(func):
         func.name = name
         func.is_action = True
-        func.is_before = False
-        func.is_after = False
-        func.is_setup = False
-        func.is_teardown = False
+        func.hook_type = HookType.ACTION
         func.weight = weight
         func.order = order
         func.group = group

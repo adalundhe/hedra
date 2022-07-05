@@ -1,6 +1,7 @@
 from types import FunctionType
 from typing import Any, Coroutine, Dict, List
 from hedra.core.engines.types.common import Request
+from hedra.core.engines.types.common.types import RequestTypes
 from .base import Action
 
 
@@ -31,5 +32,6 @@ class HTTPAction(Action):
             tags=tags,
             checks=checks,
             before=before,
-            after=after
+            after=after,
+            request_type=RequestTypes.HTTP
         )

@@ -2,12 +2,12 @@ import functools
 from .types import HookType
 
 
-def after(*names):
+def after_batch(*names):
     
     def wrapper(func):
         func.names = names
         func.is_action = True
-        func.hook_type = HookType.AFTER
+        func.hook_type = HookType.AFTER_BATCH
 
         @functools.wraps(func)
         def decorator(*args, **kwargs):

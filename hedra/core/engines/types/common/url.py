@@ -1,10 +1,13 @@
 import aiodns
+import socket
 from urllib.parse import urlparse
+from asyncio.events import get_running_loop
+from .types import SocketTypes
 
 
 class URL:
 
-    def __init__(self, url: str, port: int=80) -> None:
+    def __init__(self, url: str, port: int=80, socket_type: SocketTypes= SocketTypes.DEFAULT) -> None:
         self.resolver = aiodns.DNSResolver()
         self.ip_addr = None
         self.parsed = urlparse(url)
@@ -16,12 +19,30 @@ class URL:
         self.port = self.parsed.port if self.parsed.port else port
         self.full = url
         self.has_ip_addr = False 
+        self.socket_config = None
+        self.socket_type = socket_type
+        self.loop = None
 
     async def lookup(self):
+
+        if self.loop is None:
+            self.loop = get_running_loop()
+
         hosts = await self.resolver.query(self.parsed.hostname, 'A')
         resolved = hosts.pop()
         self.ip_addr = resolved.host
         self.has_ip_addr = True
+
+        info = await self.loop.getaddrinfo(
+            self.ip_addr, 
+            self.port, 
+            family=self.socket_type, 
+            type=socket.SOCK_STREAM, 
+            proto=0, 
+            flags=0
+        )
+
+        self.socket_config = info[0]
 
         return self.ip_addr
 

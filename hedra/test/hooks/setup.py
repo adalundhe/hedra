@@ -1,4 +1,6 @@
 import functools
+from .types import HookType
+
 
 def setup(name, group=None, metadata={}):
     '''
@@ -21,10 +23,7 @@ def setup(name, group=None, metadata={}):
  
         func.action_name = name
         func.is_action = True
-        func.is_before = False
-        func.is_after = False
-        func.is_setup = True
-        func.is_teardown = False
+        func.hook_type = HookType.SETUP
         func.weight = 0
         func.order = 0
         func.group = group

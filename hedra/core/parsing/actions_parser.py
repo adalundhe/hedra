@@ -1,8 +1,9 @@
 import inspect
-from types import FunctionType
 from typing import Coroutine
 from easy_logger import Logger
 from async_tools.datatypes import AsyncList
+from hedra.test.hooks.types import HookType
+
 
 class ActionsParser:
 
@@ -15,8 +16,12 @@ class ActionsParser:
         self._is_multi_user_sequence = config.executor_config.get('persona_type') == 'multi-user-sequence'
         self.actions = []
         self.sequences = {}
-        self.before = []
-        self.after = []
+        self.hooks = {
+            HookType.BEFORE: [],
+            HookType.AFTER: [],
+            HookType.BEFORE_BATCH: [],
+            HookType.AFTER_BATCH: []
+        }
         self.user_setup_actions = {}
         self.user_teardown_actions = {}
         self.setup_actions = []
@@ -101,17 +106,23 @@ class ActionsParser:
                             'teardown': []
                         }
 
-                    if method.is_setup:
+                    if method.hook_type == HookType.SETUP:
                         self.sequences[group]['setup'].append(method)
 
-                    elif method.is_teardown:
+                    elif method.hook_type == HookType.TEARDOWN:
                         self.sequences[group]['teardown'].append(method)
 
-                    elif method.is_before:
-                        self.before.append(method)
+                    elif method.hook_type == HookType.BEFORE:
+                        self.hooks[HookType.BEFORE].append(method)
 
-                    elif method.is_after:
-                        self.after.append(method)
+                    elif method.hook_type == HookType.AFTER:
+                        self.hooks[HookType.AFTER].append(method)
+
+                    elif method.hook_type == HookType.BEFORE_BATCH:
+                        self.hooks[HookType.BEFORE_BATCH].append(method)
+                    
+                    elif method.hook_type == HookType.AFTER_BATCH:
+                        self.hooks[HookType.AFTER_BATCH].append(method          )
 
                     else:
                         if self.sequences[group].get('execute') is None:
@@ -124,39 +135,41 @@ class ActionsParser:
             for _, method in methods:
                 if hasattr(method, 'is_action'):
                     
-                    if method.is_setup:
+                    if method.hook_type == HookType.SETUP:
                         self.setup_actions.append(method)
 
-                    elif method.is_teardown:
+                    elif method.hook_type == HookType.TEARDOWN:
                         self.teardown_actions.append(method)
 
-                    elif method.is_before:
-                        self.before.append(method)
+                    elif method.hook_type == HookType.BEFORE:
+                        self.hooks[HookType.BEFORE].append(method)
 
-                    elif method.is_after:
-                        self.after.append(method)
+                    elif method.hook_type == HookType.AFTER:
+                        self.hooks[HookType.AFTER].append(method)
+
+                    elif method.hook_type == HookType.BEFORE_BATCH:
+                        self.hooks[HookType.BEFORE_BATCH].append(method)
+
+                    elif method.hook_type == HookType.AFTER_BATCH:
+                        self.hooks[HookType.AFTER_BATCH].append(method)
 
                     else:
                         self.actions.append(method)
 
     async def setup(self, action: Coroutine):
         
-        before_hook = None
-        for hook in self.before:
-            if action.name in hook.names:
-                before_hook = hook
-
-        after_hook = None
-        for hook in self.after:
-
-            if action.name in hook.names:
-                after_hook = hook
-
         parsed_action = await action()
-        parsed_action.data.before = before_hook
-        parsed_action.data.after = after_hook
+        parsed_action.before_batch = self.get_hook(action, HookType.BEFORE_BATCH)
+        parsed_action.after_batch = self.get_hook(action, HookType.AFTER_BATCH)
+        parsed_action.data.before = self.get_hook(action, HookType.BEFORE)
+        parsed_action.data.after = self.get_hook(action, HookType.AFTER)
 
         return parsed_action
+
+    def get_hook(self, action, hook_type):
+        for hook in self.hooks[hook_type]:
+            if action.name in hook.names:
+                return hook
 
     async def weights(self):
         actions  = [action for action in self.actions if action.is_setup is False and action.is_teardown is False]

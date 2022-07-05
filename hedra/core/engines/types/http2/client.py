@@ -98,7 +98,13 @@ class MercuryHTTP2Client:
 
             start = time.time()
 
-            await asyncio.wait_for(stream.connect(request), self.timeouts.connect_timeout)
+            await asyncio.wait_for(stream.connect(
+                request.url.hostname,
+                request.url.ip_addr,
+                request.url.port,
+                request.url.socket_config,
+                ssl=request.ssl_context
+            ), self.timeouts.connect_timeout)
 
             connection.connect(stream)
 

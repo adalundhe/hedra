@@ -1,6 +1,7 @@
 from types import FunctionType
 from typing import Any, Dict, List
 from hedra.core.engines.types.common import Request
+from hedra.core.engines.types.common.types import RequestTypes
 from .base import Action
 
 
@@ -27,7 +28,8 @@ class WebsocketAction(Action):
             payload=data,
             user=user,
             tags=tags,
-            checks=checks
+            checks=checks,
+            request_type=RequestTypes.WEBSOCKET
         )
 
     @classmethod

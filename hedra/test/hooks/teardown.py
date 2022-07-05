@@ -1,4 +1,5 @@
 import functools
+from .types import HookType
 
 
 def teardown(name, group=None, metadata={}):
@@ -22,10 +23,7 @@ def teardown(name, group=None, metadata={}):
 
         func.action_name = name
         func.is_action = True
-        func.is_before = False
-        func.is_after = False
-        func.is_setup = False
-        func.is_teardown = True
+        func.hook_type = HookType.TEARDOWN
         func.weight = 0
         func.order = float('inf')
         func.group = group
