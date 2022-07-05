@@ -37,8 +37,13 @@ class WeightedSelectionPersona(DefaultPersona):
         self.engine.teardown_actions = parser.teardown_actions
 
         for action in self.actions:
-            parsed_action =  await action()
-            self._parsed_actions.data.append(parsed_action)
+            action = await parser.setup(action)
+            await action.session.prepare_request(action.data, action.data.checks)
+            self._parsed_actions.data.append(action)
+
+            action.session.context.history.add_row(
+                action.data.name
+            )
 
         self.sampled_actions = self._sample()
         self.duration = self.total_time
@@ -52,10 +57,12 @@ class WeightedSelectionPersona(DefaultPersona):
         self.start = time.time()
 
         while elapsed < self.total_time:
-            next_timeout = self.total_time - (time.time() - self.start)
 
-            action = self.sampled_actions.pop()
             next_timeout = self.total_time - elapsed
+            action = self.sampled_actions.pop()
+
+            if action.before_batch:
+                action = await action.before_batch(action)
             
             self.batch.deferred.append(asyncio.create_task(
                 action.session.batch_request(
@@ -66,6 +73,9 @@ class WeightedSelectionPersona(DefaultPersona):
             ))
             
             await asyncio.sleep(self.batch.interval.period)
+
+            if action.after_batch:
+                action = await action.after_batch(action)
 
             elapsed = time.time() - self.start
 

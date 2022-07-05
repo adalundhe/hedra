@@ -41,7 +41,7 @@ class MultiSequencePersona(DefaultPersona):
                 self.handler
             )
             
-            await sequence.setup(sequence_actions)
+            await sequence.setup(sequence_actions, parser)
 
             if sequence.no_execution_actions is False:
                 self.sequences.append(sequence)

@@ -11,7 +11,7 @@ with open(os.path.join(current_directory, 'README.md'), "r") as readme:
 
 setup(
     name="hedra",
-    version="0.4.3",
+    version="0.4.4",
     description="Powerful performance testing made easy.",
     long_description=package_description,
     long_description_content_type="text/markdown",

@@ -1,6 +1,7 @@
 import time
 import asyncio
 from async_tools.datatypes.async_list import AsyncList
+from hedra.core.parsing.actions_parser import ActionsParser
 from hedra.core.personas.batching.batch_interval import BatchInterval
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.engines import Engine
@@ -37,7 +38,7 @@ class SequencedPersonaCollection(DefaultPersona):
         self.elapsed = 0
         self.no_execution_actions = True
 
-    async def setup(self, actions):
+    async def setup(self, actions, parser: ActionsParser):
         self.session_logger.debug('Setting up persona...')
 
         setup_actions = actions.get('setup')
@@ -51,9 +52,13 @@ class SequencedPersonaCollection(DefaultPersona):
             self.no_execution_actions = False
 
             async for action in execution_actions:
-                parsed_action = await action()
-                self._parsed_actions.data.append(parsed_action)
+                action = await parser.setup(action)
+                await action.session.prepare_request(action.data, action.data.checks)
+                self._parsed_actions.data.append(action)
 
+                action.session.context.history.add_row(
+                    action.data.name
+                )
 
     async def execute(self):
         results = []
@@ -64,6 +69,9 @@ class SequencedPersonaCollection(DefaultPersona):
             next_timeout = self.total_time - (time.time() - self.start)
             action = self._parsed_actions[current_action_idx] 
 
+            if action.before_batch:
+                action = await action.before_batch(action)
+
             self.batch.deferred.append(asyncio.create_task(
                 action.session.batch_request(
                     action.data,
@@ -73,6 +81,9 @@ class SequencedPersonaCollection(DefaultPersona):
             ))
 
             await asyncio.sleep(self.batch.interval.period)
+
+            if action.after_batch:
+                action = await action.after_batch(action)
 
             self.elapsed = time.time() - self.start
 

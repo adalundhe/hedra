@@ -40,8 +40,13 @@ class SequencedPersonaCollection(DefaultPersona):
         self.engine.teardown_actions = parser.teardown_actions
 
         for action in self.actions:
-            parsed_action =  await action()
-            self._parsed_actions.data.append(parsed_action)
+            action = await parser.setup(action)
+            await action.session.prepare_request(action.data, action.data.checks)
+            self._parsed_actions.data.append(action)
+
+            action.session.context.history.add_row(
+                action.data.name
+            )
 
     async def execute(self):
         elapsed = 0
@@ -55,6 +60,9 @@ class SequencedPersonaCollection(DefaultPersona):
         while elapsed < self.total_time:
             next_timeout = self.total_time - elapsed
             action = self._parsed_actions[current_action_idx]
+
+            if action.before_batch:
+                action = await action.before_batch(action)
             
             self.batch.deferred.append(asyncio.create_task(
                 action.session.batch_request(
@@ -66,6 +74,9 @@ class SequencedPersonaCollection(DefaultPersona):
             
 
             await asyncio.sleep(self.batch.interval.period)
+
+            if action.after_batch:
+                action = await action.after_batch(action)
 
             elapsed = time.time() - self.start
 
