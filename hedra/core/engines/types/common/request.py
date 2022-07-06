@@ -1,12 +1,14 @@
 from __future__ import annotations
 from types import FunctionType
 from typing import Coroutine, Dict, Iterator, Union, List
+from hedra.test.hooks.types import HookType
 from .params import Params
 from .metadata import Metadata
 from .url import URL
 from .payload import Payload
 from .headers import Headers
 from .types import RequestTypes, ProtocolMap
+from .hooks import Hooks
 
 
 class Request:
@@ -20,8 +22,7 @@ class Request:
         payload: Union[str, dict, Iterator, bytes, None] = None, 
         user: str=None, tags: List[Dict[str, str]] = [],  
         checks: List[FunctionType] = None, 
-        before: Coroutine = None, 
-        after: Coroutine = None,
+        hooks: Dict[str, Coroutine] = {},
         request_type: RequestTypes = RequestTypes.HTTP
     ) -> None:
 
@@ -37,8 +38,7 @@ class Request:
         self.ssl_context = None
         self.is_setup = False
         self.checks = checks
-        self.before = before
-        self.after = after
+        self.hooks = Hooks(**hooks)
 
     def __aiter__(self):
         return self.payload.__aiter__()

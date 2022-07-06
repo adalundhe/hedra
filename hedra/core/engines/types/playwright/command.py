@@ -1,5 +1,6 @@
 from typing import Coroutine, Dict, List
 from hedra.core.engines.types.common.metadata import Metadata
+from .hooks import Hooks
 
 
 class Page:
@@ -48,8 +49,7 @@ class Command:
         user: str = None, 
         tags: List[Dict[str, str]] = [], 
         checks = None,
-        before: Coroutine = None,
-        after: Coroutine = None
+        hooks: Dict[str, Coroutine] = {}
     ) -> None:
         self.name = name
         self.command = command
@@ -59,5 +59,4 @@ class Command:
         self.options = options
         self.checks = checks
         self.metadata = Metadata(user, tags)
-        self.before = before
-        self.after = after
+        self.hooks = Hooks(**hooks)

@@ -79,13 +79,13 @@ class MercuryGraphQLClient:
         response: Response = await self.protocol.execute_prepared_request(request_name, idx, timeout)
         response.type = 'graphql'
 
-        self.context.last[request_name] = self.protocol.context.last
+        self.context.last[request_name] = self.protocol.context.last[request_name]
         return response
 
     async def request(self, request: Request) -> GraphQLResponseFuture:
         return await self.execute_prepared_request(request.name)
         
-    async def batch_request(
+    async def execute_batch(
         self, 
         request: Request,
         concurrency: Optional[int]=None, 

@@ -41,6 +41,7 @@ class Execute(Stage):
         self.actions = self.actions
         self.hooks = {}
         self.registry = Registry()
+        self.name = type(self).__name__
 
         for hook_type in HookType:
             self.hooks[hook_type] = []
@@ -125,18 +126,21 @@ class Execute(Stage):
                     self.hooks[method.hook_type].append(method)
                     if method.hook_type == HookType.ACTION:
                         action: Action = await method()
-                        action.session = self.session
                         action.to_type(method.name)
                         
                         action.order = method.order
                         action.weight = method.weight
 
-                        await self.session.prepare(action.parsed, action.checks)
+                        result = await self.session.prepare(action.parsed, action.checks)
+                        if result and result.error:
+                            raise result.error
 
                         self.session.context.history.add_row(
                             action.parsed.name,
                             batch_size=self.config.batch_size
                         )
+
+                        action.session = self.session
 
                         self.registry[method.name] = action
 

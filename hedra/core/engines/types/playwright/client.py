@@ -47,8 +47,8 @@ class MercuryPlaywrightClient:
         result = Result(command)
         await self.sem.acquire()
 
-        if command.before:
-            command = await command.before(idx, command)
+        if command.hooks.before:
+            command = await command.hooks.before(idx, command)
 
         try:
 
@@ -57,8 +57,8 @@ class MercuryPlaywrightClient:
 
             self.context.last[command_name] = result
 
-            if command.after:
-                response = await command.after(idx, response)
+            if command.hooks.after:
+                response = await command.hooks.after(idx, response)
 
             self.sem.release()
 
@@ -66,7 +66,7 @@ class MercuryPlaywrightClient:
 
         except Exception as e:
             result.error = e
-            self.context.last = result
+            self.context.last[command_name] = response
             self.sem.release()
             return result
 
@@ -82,7 +82,7 @@ class MercuryPlaywrightClient:
 
         return await self.execute_prepared_command(command.name)
 
-    async def batch_request(
+    async def execute_batch(
         self, 
         command: Command,
         concurrency: Optional[int]=None, 
@@ -96,10 +96,15 @@ class MercuryPlaywrightClient:
         if timeout is None:
             timeout = self.timeouts.total_timeout
 
-        if self.commands.get(command.name) is None:
-            await self.prepare_command(command, checks)
+        if command.hooks.before:
+            command = await command.hooks.before(command)
 
-        return await asyncio.wait([self.execute_prepared_command(command.name) for _ in range(concurrency)], timeout=timeout)
+        results = await asyncio.wait([self.execute_prepared_command(command.name) for _ in range(concurrency)], timeout=timeout)
+
+        if command.hooks.after:
+            command = await command.hooks.after(command)
+
+        return results
 
     async def close(self):
         for context_group in self.pool:

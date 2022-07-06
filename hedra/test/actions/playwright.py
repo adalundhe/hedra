@@ -1,6 +1,5 @@
 from types import FunctionType
 from typing import Any, Dict, List
-from hedra.core.engines.types.common.request import Request
 from hedra.core.engines.types.playwright import (
     Command,
     Page,
@@ -98,8 +97,7 @@ class PlaywrightAction(Action):
             user=self.user,
             tags=self.tags,
             checks=self.checks,
-            before=self.before,
-            after=self.after
+            hooks=self.hooks
         )
 
     @classmethod

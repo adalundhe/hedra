@@ -22,11 +22,8 @@ class FixedWaitPersona(DefaultPersona):
         while elapsed < self.total_time:
             action = self._parsed_actions[current_action_idx]
 
-            if action.before_batch:
-                action = await action.before_batch(action)
-
             self.batch.deferred.append(asyncio.create_task(
-                action.session.batch_request(
+                action.session.execute_batch(
                     action.parsed,
                     concurrency=self.batch.size,
                     timeout=self.batch.interval.period
@@ -34,9 +31,6 @@ class FixedWaitPersona(DefaultPersona):
             ))
 
             await asyncio.sleep(self.batch.interval.period)
-
-            if action.after_batch:
-                action = await action.after_batch(action)
 
             elapsed = time.time() - self.start
 

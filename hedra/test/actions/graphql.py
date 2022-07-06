@@ -42,6 +42,7 @@ class GraphQLAction(Action):
             user=self.user,
             tags=self.tags,
             checks=self.checks,
+            hooks=self.hooks,
             request_type=RequestTypes.GRAPHQL
         )
 

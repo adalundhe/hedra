@@ -71,8 +71,8 @@ class MercuryGRPCClient(MercuryHTTP2Client):
 
         stream_id = idx%self.pool.size
 
-        if request.before:
-            request = await request.before(request)
+        if request.hooks.before:
+            request = await request.hooks.before(request)
 
         try:
             connection = self.connection_pool.connections[stream_id]
@@ -97,8 +97,8 @@ class MercuryGRPCClient(MercuryHTTP2Client):
             response.time = elapsed
             self.context.last[request_name] = response
 
-            if request.after:
-                response = await request.after(idx, response)
+            if request.hooks.after:
+                response = await request.hooks.after(idx, response)
             
             connection.lock.release()
 
@@ -107,7 +107,7 @@ class MercuryGRPCClient(MercuryHTTP2Client):
         except Exception as e:
             response.response_code = 500
             response.error = e
-            self.context.last = response
+            self.context.last[request_name] = response
             self.pool.connections[stream_id] = AsyncStream(stream.stream_id, self.timeouts, self.concurrency, self.pool.reset_connections)
             self.connection_pool.connections[stream_id] = HTTP2Connection(stream_id)
 
@@ -116,7 +116,7 @@ class MercuryGRPCClient(MercuryHTTP2Client):
     async def request(self, request: Request) -> GRPCResponseFuture:
         return await self.execute_prepared_request(request.name)
 
-    async def batch_request(
+    async def execute_batch(
         self, 
         request: Request,
         concurrency: Optional[int]=None, 
@@ -128,8 +128,16 @@ class MercuryGRPCClient(MercuryHTTP2Client):
 
         if timeout is None:
             timeout = self.timeouts.total_timeout
+
+        if request.hooks.before_batch:
+            request = await request.hooks.before_batch(request)
         
-        return await asyncio.wait([self.execute_prepared_request(request.name, timeout) for _ in range(concurrency)], timeout=timeout)
+        responses = await asyncio.wait([self.execute_prepared_request(request.name, idx, timeout) for idx in range(concurrency)], timeout=timeout)
+        
+        if request.hooks.after_batch:
+            request = await request.hooks.after_batch(request)
+
+        return responses
 
     async def close(self) -> Awaitable[None]:
         await self.pool.close()

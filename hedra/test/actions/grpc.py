@@ -36,8 +36,7 @@ class GRPCAction(Action):
             user=self.user,
             tags=self.tags,
             checks=self.checks,
-            before=self.before,
-            after=self.after,
+            hooks=self.hooks,
             request_type=RequestTypes.GRPC
         )
 

@@ -68,8 +68,8 @@ class MercuryWebsocketClient(MercuryHTTPClient):
         stream_idx = idx%self.pool.size
         connection = self.pool.connections[stream_idx]
 
-        if request.before:
-            request = await request.before(idx, request) 
+        if request.hooks.before:
+            request = await request.hooks.before(idx, request) 
 
         try:
             await connection.lock.acquire()
@@ -108,14 +108,14 @@ class MercuryWebsocketClient(MercuryHTTPClient):
                 header_content_length = get_message_buffer_size(header_bits)
                 
             if request.method == 'GET':
-                response.body = await reader.read(min(16384, header_content_length))
+                response.body = await asyncio.wait_for(reader.read(min(16384, header_content_length)), timeout)
             
             elapsed = time.time() - start
 
             response.time = elapsed
 
-            if request.after:
-                response = await request.after(idx, response)
+            if request.hooks.after:
+                response = await request.hooks.after(idx, response)
 
             self.context.last[request_name] = response
             connection.lock.release()
@@ -124,14 +124,14 @@ class MercuryWebsocketClient(MercuryHTTPClient):
 
         except Exception as e:
             response.error = e
-            self.pool.connections[stream_idx] = Connection(reset_connection=self.pool.reset_connections)
-            self.context.last = response
+            self.pool.connections[stream_idx] = Connection(reset_connection=self.pool.reset_connections)  
+            self.context.last[request_name] = response
             return response
 
     async def request(self, request: Request) -> WebsocketBatchResponseFuture:
         return await self.execute_prepared_request(request.name)
         
-    async def batch_request(
+    async def execute_batch(
         self, 
         request: Request,
         concurrency: Optional[int]=None, 
@@ -143,5 +143,13 @@ class MercuryWebsocketClient(MercuryHTTPClient):
 
         if timeout is None:
             timeout = self.timeouts.total_timeout
+
+        if request.hooks.before_batch:
+            request = await request.hooks.before_batch(request)
         
-        return await asyncio.wait([self.execute_prepared_request(request.name) for _ in range(concurrency)], timeout=timeout)
+        responses = await asyncio.wait([self.execute_prepared_request(request.name, idx, timeout) for idx in range(concurrency)], timeout=timeout)
+        
+        if request.hooks.after_batch:
+            request = await request.hooks.after_batch(request)
+
+        return responses

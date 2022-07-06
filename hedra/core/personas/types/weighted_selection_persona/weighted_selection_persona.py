@@ -56,12 +56,9 @@ class WeightedSelectionPersona(DefaultPersona):
 
             next_timeout = self.total_time - elapsed
             action = self.sampled_actions.pop()
-
-            if action.before_batch:
-                action = await action.before_batch(action)
             
             self.batch.deferred.append(asyncio.create_task(
-                action.session.batch_request(
+                action.session.execute_batch(
                     action.parsed,
                     concurrency=self.batch.size,
                     timeout=next_timeout
@@ -69,9 +66,6 @@ class WeightedSelectionPersona(DefaultPersona):
             ))
             
             await asyncio.sleep(self.batch.interval.period)
-
-            if action.after_batch:
-                action = await action.after_batch(action)
 
             elapsed = time.time() - self.start
 

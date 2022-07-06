@@ -2,6 +2,7 @@ import inspect
 from typing import Coroutine, Dict, List
 from easy_logger import Logger
 from async_tools.datatypes import AsyncList
+from hedra.core.engines.types.common.hooks import Hooks
 from hedra.test.actions.base import Action
 from hedra.test.hooks.types import HookType
 from hedra.test.stages.execute import Execute
@@ -18,12 +19,7 @@ class ActionsParser:
         self._is_multi_user_sequence = config.executor_config.get('persona_type') == 'multi-user-sequence'
         self.actions: Dict[str, Execute] = {}
         self.sequences = {}
-        self.hooks = {
-            HookType.BEFORE: [],
-            HookType.AFTER: [],
-            HookType.BEFORE_BATCH: [],
-            HookType.AFTER_BATCH: []
-        }
+        self.hooks = {}
         self.setup_actions = []
         self.teardown_actions = []
         self.engine_type = config.executor_config.get('engine_type')
@@ -83,22 +79,22 @@ class ActionsParser:
             await class_instance.register_actions()
 
             for action in class_instance.registry:
-                class_instance.registry[action.parsed.name] = self.set_hooks(action)
+                self.hooks[class_instance.name] = class_instance.hooks
+                action.parsed.hooks = Hooks(
+                    before=self.get_hook(action, class_instance.name, HookType.BEFORE),
+                    after=self.get_hook(action, class_instance.name, HookType.AFTER),
+                    before_batch=self.get_hook(action, class_instance.name, HookType.BEFORE_BATCH),
+                    after_batch=self.get_hook(action, class_instance.name, HookType.AFTER_BATCH)
+                )
+
+
+                class_instance.registry[action.parsed.name] = action
 
             self.actions[type(class_instance).__name__] = class_instance
 
-    def set_hooks(self, action: Action):
-        
-        action.before_batch = self.get_hook(action, HookType.BEFORE_BATCH)
-        action.after_batch = self.get_hook(action, HookType.AFTER_BATCH)
-        action.before = self.get_hook(action, HookType.BEFORE)
-        action.after = self.get_hook(action, HookType.AFTER)
-
-        return action
-
-    def get_hook(self, action, hook_type):
-        for hook in self.hooks[hook_type]:
-            if action.name in hook.names:
+    def get_hook(self, action: Action, action_set_name: str, hook_type: str):
+        for hook in self.hooks[action_set_name][hook_type]:
+            if action.parsed.name in hook.names:
                 return hook
 
     async def weights(self):

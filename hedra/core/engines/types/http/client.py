@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from types import FunctionType
 import aiodns
 import time
@@ -99,8 +100,8 @@ class MercuryHTTPClient:
 
         connection = self.pool.connections[stream_idx]
 
-        if request.before:
-            request = await request.before(idx, request)
+        if request.hooks.before:
+            request = await request.hooks.before(idx, request)
 
         try:
             await connection.lock.acquire()
@@ -141,8 +142,8 @@ class MercuryHTTPClient:
             
             elapsed = time.time() - start
 
-            if request.after:
-                response = await request.after(idx, response)
+            if request.hooks.after:
+                response = await request.hooks.after(idx, response)
 
             response.time = elapsed
             self.context.last[request_name] = response
@@ -152,13 +153,13 @@ class MercuryHTTPClient:
         except Exception as e:
             response.error = e
             self.pool.connections[stream_idx] = Connection(reset_connection=self.pool.reset_connections)
-            self.context.last = response
+            self.context.last[request_name] = response
             return response
 
     async def request(self, request: Request) -> HTTPResponseFuture:
         return await self.execute_prepared_request(request.name)
         
-    async def batch_request(
+    async def execute_batch(
         self, 
         request: Request,
         concurrency: Optional[int]=None, 
@@ -171,4 +172,12 @@ class MercuryHTTPClient:
         if timeout is None:
             timeout = self.timeouts.total_timeout
 
-        return await asyncio.wait([self.execute_prepared_request(request.name, idx, timeout) for idx in range(concurrency)], timeout=timeout)
+        if request.hooks.before_batch:
+            request = await request.hooks.before_batch(request)
+        
+        responses = await asyncio.wait([self.execute_prepared_request(request.name, idx, timeout) for idx in range(concurrency)], timeout=timeout)
+        
+        if request.hooks.after_batch:
+            request = await request.hooks.after_batch(request)
+
+        return responses
