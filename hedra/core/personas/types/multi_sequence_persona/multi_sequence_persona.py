@@ -33,15 +33,15 @@ class MultiSequencePersona(DefaultPersona):
 
         self.session_logger.debug('Setting up persona...')
 
-        sorted_actions = await parser.sort_multi_sequence()
+        await parser.sort_multi_sequence()
 
-        for sequence_actions in sorted_actions.values():
+        for sequence in parser.actions.values():
             sequence = SequencedPersonaCollection(
                 self._sequence_config, 
                 self.handler
             )
             
-            await sequence.setup(sequence_actions, parser)
+            await sequence.setup(sequence, parser)
 
             if sequence.no_execution_actions is False:
                 self.sequences.append(sequence)

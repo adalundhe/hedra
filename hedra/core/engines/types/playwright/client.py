@@ -31,7 +31,7 @@ class MercuryPlaywrightClient:
         for context_group in self.pool:
             await context_group.create()
 
-    async def prepare_command(self, command: Command, checks: List[FunctionType]) -> Awaitable[None]:
+    async def prepare(self, command: Command, checks: List[FunctionType]) -> Awaitable[None]:
         if command.checks is None:
             command.checks = checks
         
@@ -55,7 +55,7 @@ class MercuryPlaywrightClient:
             context = random.choice(self.pool.contexts)
             result = await context.execute(command)
 
-            self.context.last = result
+            self.context.last[command_name] = result
 
             if command.after:
                 response = await command.after(idx, response)

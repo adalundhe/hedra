@@ -37,7 +37,7 @@ class MercuryGraphQLClient:
         self.context = Context()
         self.protocol.context = self.context
 
-    async def prepare_request(self, request: Request, checks: List[FunctionType]) -> Awaitable[None]:
+    async def prepare(self, request: Request, checks: List[FunctionType]) -> Awaitable[None]:
         try:
             if request.url.is_ssl:
                 request.ssl_context = self.protocol.ssl_context
@@ -79,7 +79,7 @@ class MercuryGraphQLClient:
         response: Response = await self.protocol.execute_prepared_request(request_name, idx, timeout)
         response.type = 'graphql'
 
-        self.context.last = self.protocol.context.last
+        self.context.last[request_name] = self.protocol.context.last
         return response
 
     async def request(self, request: Request) -> GraphQLResponseFuture:

@@ -1,8 +1,10 @@
 import inspect
-from typing import Coroutine
+from typing import Coroutine, Dict, List
 from easy_logger import Logger
 from async_tools.datatypes import AsyncList
+from hedra.test.actions.base import Action
 from hedra.test.hooks.types import HookType
+from hedra.test.stages.execute import Execute
 
 
 class ActionsParser:
@@ -14,7 +16,7 @@ class ActionsParser:
         self.sorted = config.executor_config.get('sorted')
         self._is_multi_sequence = config.executor_config.get('persona_type') == 'multi-sequence'
         self._is_multi_user_sequence = config.executor_config.get('persona_type') == 'multi-user-sequence'
-        self.actions = []
+        self.actions: Dict[str, Execute] = {}
         self.sequences = {}
         self.hooks = {
             HookType.BEFORE: [],
@@ -22,8 +24,6 @@ class ActionsParser:
             HookType.BEFORE_BATCH: [],
             HookType.AFTER_BATCH: []
         }
-        self.user_setup_actions = {}
-        self.user_teardown_actions = {}
         self.setup_actions = []
         self.teardown_actions = []
         self.engine_type = config.executor_config.get('engine_type')
@@ -79,92 +79,22 @@ class ActionsParser:
 
     async def parse(self):
         for python_class in self._raw_actions:
-            class_instance = python_class()
-            await self._parse(class_instance)
+            class_instance: Execute = python_class()
+            await class_instance.register_actions()
 
-        if self._is_multi_user_sequence or self._is_multi_sequence:
-            self.actions = self.sequences
+            for action in class_instance.registry:
+                class_instance.registry[action.parsed.name] = self.set_hooks(action)
 
-    async def _parse(self, class_instance):
-        methods = inspect.getmembers(class_instance, predicate=inspect.ismethod) 
+            self.actions[type(class_instance).__name__] = class_instance
 
-        user = type(class_instance).__name__
-            
-        if self._is_multi_sequence:
-
-            for _, method in methods:
-
-                if hasattr(method, 'is_action'):
-
-                    group = method.metadata.get('group')
-                    if group is None:
-                        group = user
-                    
-                    if self.sequences.get(group) is None:
-                        self.sequences[group] = {
-                            'setup': [],
-                            'teardown': []
-                        }
-
-                    if method.hook_type == HookType.SETUP:
-                        self.sequences[group]['setup'].append(method)
-
-                    elif method.hook_type == HookType.TEARDOWN:
-                        self.sequences[group]['teardown'].append(method)
-
-                    elif method.hook_type == HookType.BEFORE:
-                        self.hooks[HookType.BEFORE].append(method)
-
-                    elif method.hook_type == HookType.AFTER:
-                        self.hooks[HookType.AFTER].append(method)
-
-                    elif method.hook_type == HookType.BEFORE_BATCH:
-                        self.hooks[HookType.BEFORE_BATCH].append(method)
-                    
-                    elif method.hook_type == HookType.AFTER_BATCH:
-                        self.hooks[HookType.AFTER_BATCH].append(method          )
-
-                    else:
-                        if self.sequences[group].get('execute') is None:
-                            self.sequences[group]['execute'] = [method]
-
-                        else:
-                            self.sequences[group]['execute'].append(method)
+    def set_hooks(self, action: Action):
         
-        else:
-            for _, method in methods:
-                if hasattr(method, 'is_action'):
-                    
-                    if method.hook_type == HookType.SETUP:
-                        self.setup_actions.append(method)
+        action.before_batch = self.get_hook(action, HookType.BEFORE_BATCH)
+        action.after_batch = self.get_hook(action, HookType.AFTER_BATCH)
+        action.before = self.get_hook(action, HookType.BEFORE)
+        action.after = self.get_hook(action, HookType.AFTER)
 
-                    elif method.hook_type == HookType.TEARDOWN:
-                        self.teardown_actions.append(method)
-
-                    elif method.hook_type == HookType.BEFORE:
-                        self.hooks[HookType.BEFORE].append(method)
-
-                    elif method.hook_type == HookType.AFTER:
-                        self.hooks[HookType.AFTER].append(method)
-
-                    elif method.hook_type == HookType.BEFORE_BATCH:
-                        self.hooks[HookType.BEFORE_BATCH].append(method)
-
-                    elif method.hook_type == HookType.AFTER_BATCH:
-                        self.hooks[HookType.AFTER_BATCH].append(method)
-
-                    else:
-                        self.actions.append(method)
-
-    async def setup(self, action: Coroutine):
-        
-        parsed_action = await action()
-        parsed_action.before_batch = self.get_hook(action, HookType.BEFORE_BATCH)
-        parsed_action.after_batch = self.get_hook(action, HookType.AFTER_BATCH)
-        parsed_action.data.before = self.get_hook(action, HookType.BEFORE)
-        parsed_action.data.after = self.get_hook(action, HookType.AFTER)
-
-        return parsed_action
+        return action
 
     def get_hook(self, action, hook_type):
         for hook in self.hooks[hook_type]:
@@ -183,19 +113,19 @@ class ActionsParser:
             return await self.sort_sequence()
 
     async def sort_multi_sequence(self):
-        sorted_sequences = {}
-        for sequence_name, sequence in self.sequences.items():
-            sorted_sequences[sequence_name] = sequence
-            unsorted_sequence = self.sequences[sequence_name].get('execute')
 
-            if unsorted_sequence:
-                sorted_sequence = AsyncList(unsorted_sequence)
-                sorted_sequence = await sorted_sequence.sort(key=lambda action: action.order)
-
-                sorted_sequences[sequence_name]['execute'] = sorted_sequence
-
-        return sorted_sequences
+        for action_set_name, action_set in self.actions.items():
+            actions = action_set.registry.to_list()
+            sorted_actions = sorted(actions, key=lambda action: action.order)
+            action_set.registry.data = list(sorted_actions)
+            
+            self.actions[action_set_name] = actions
 
     async def sort_sequence(self):
-        actions = AsyncList(self.actions)
-        return await actions.sort(key=lambda action: action.order)
+        actions = []
+        for action_set in self.actions.values():
+            registry_actions = action_set.registry.to_list()
+            sorted_actions = sorted(registry_actions, key=lambda action: action.order)
+            actions.extend(list(sorted_actions))
+
+        return actions

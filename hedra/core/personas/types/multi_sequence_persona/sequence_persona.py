@@ -6,6 +6,8 @@ from hedra.core.personas.batching.batch_interval import BatchInterval
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.engines import Engine
 from hedra.core.personas.batching import SequenceStep
+from hedra.test.hooks.types import HookType
+from hedra.test.stages.execute import Execute
 
 
 class SequencedPersonaCollection(DefaultPersona):
@@ -38,27 +40,14 @@ class SequencedPersonaCollection(DefaultPersona):
         self.elapsed = 0
         self.no_execution_actions = True
 
-    async def setup(self, actions, parser: ActionsParser):
+    async def setup(self, sequence: Execute, parser: ActionsParser):
         self.session_logger.debug('Setting up persona...')
 
-        setup_actions = actions.get('setup')
-        teardown_actions = actions.get('teardown')
-        execution_actions = actions.get('execute')
-        await self.engine.create_session(setup_actions)
-        self.engine.teardown_actions = teardown_actions
+        await sequence.setup()
+        self.engine.teardown_actions = sequence.hooks.get(HookType.TEARDOWN)
 
-        if execution_actions and len(execution_actions.data) > 0:
-            self.actions_count = len(execution_actions.data)
-            self.no_execution_actions = False
-
-            async for action in execution_actions:
-                action = await parser.setup(action)
-                await action.session.prepare_request(action.data, action.data.checks)
-                self._parsed_actions.data.append(action)
-
-                action.session.context.history.add_row(
-                    action.data.name
-                )
+        self.actions_count = sequence.registry.count
+        self.actions = sequence.registry.to_list()
 
     async def execute(self):
         results = []
@@ -74,7 +63,7 @@ class SequencedPersonaCollection(DefaultPersona):
 
             self.batch.deferred.append(asyncio.create_task(
                 action.session.batch_request(
-                    action.data,
+                    action.parsed,
                     concurrency=self.batch.size,
                     timeout=next_timeout
                 )

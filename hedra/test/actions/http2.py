@@ -1,3 +1,4 @@
+from __future__ import annotations
 from types import FunctionType
 from typing import Any, Dict, List
 from hedra.core.engines.types.common import Request
@@ -9,7 +10,6 @@ class HTTP2Action(Action):
 
     def __init__(
         self, 
-        name: str, 
         url: str, 
         method: str = 'GET', 
         headers: Dict[str, str] = {}, 
@@ -18,15 +18,28 @@ class HTTP2Action(Action):
         tags: List[Dict[str, str]] = [], 
         checks: List[FunctionType]=[]
     ) -> None:
-        self.data = Request(
+        super().__init__()
+        self.url = url
+        self.method = method
+        self.headers = headers
+        self.data = data
+        self.user = user
+        self.tags = tags
+        self.checks = checks
+        self.parsed: Request = None
+
+    def to_type(self, name: str):
+        self.parsed = Request(
             name,
-            url,
-            method=method,
-            headers=headers,
-            payload=data,
-            user=user,
-            tags=tags,
-            checks=checks,
+            self.url,
+            method=self.method,
+            headers=self.headers,
+            payload=self.data,
+            user=self.user,
+            tags=self.tags,
+            checks=self.checks,
+            before=self.before,
+            after=self.after,
             request_type=RequestTypes.HTTP2
         )
 
@@ -52,8 +65,3 @@ class HTTP2Action(Action):
         - tags: <list_of_tags_for_aggregating_actions>
 
         '''
-
-    async def setup(self):
-        self.data.setup_http2_request()
-        await self.data.url.lookup()
-        self.is_setup = True

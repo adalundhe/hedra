@@ -1,5 +1,6 @@
 from types import FunctionType
 from typing import Any, Dict, List
+from hedra.core.engines.types.common.request import Request
 from hedra.core.engines.types.playwright import (
     Command,
     Page,
@@ -14,7 +15,6 @@ class PlaywrightAction(Action):
 
     def __init__(
         self,
-        name: str,
         command: str,
         selector: str=None,
         attribute: str=None,
@@ -39,39 +39,67 @@ class PlaywrightAction(Action):
         tags: List[Dict[str, str]]=[],
         checks: List[FunctionType] = []
     ) -> None:
-        self.data = Command(
+        super().__init__()
+        self.command = command
+        self.selector = selector
+        self.attribute = attribute
+        self.x_coordinate = x_coordinate
+        self.y_coordinate = y_coordinate
+        self.frame = frame
+        self.location = location
+        self.headers = headers
+        self.key = key
+        self.text = text
+        self.function = function
+        self.args = args
+        self.filepath = filepath
+        self.file = file
+        self.event = event
+        self.option = option
+        self.is_checked = is_checked
+        self.timeout = timeout
+        self.extra = extra
+        self.switch_by = switch_by
+        self.user = user
+        self.tags = tags
+        self.checks = checks
+
+    def to_type(self, name: str):
+        self.parsed = Command(
             name,
-            command,
+            self.command,
             page=Page(
-                selector=selector,
-                attribute=attribute,
-                x_coordinate=x_coordinate,
-                y_coordinate=y_coordinate,
-                frame=frame
+                selector=self.selector,
+                attribute=self.attribute,
+                x_coordinate=self.x_coordinate,
+                y_coordinate=self.y_coordinate,
+                frame=self.frame
             ),
             url=URL(
-                location=location,
-                headers=headers
+                location=self.location,
+                headers=self.headers
             ),
             input=Input(
-                key=key,
-                text=text,
-                function=function,
-                args=args,
-                filepath=filepath,
-                file=file
+                key=self.key,
+                text=self.text,
+                function=self.function,
+                args=self.args,
+                filepath=self.filepath,
+                file=self.file
             ),
             options=Options(
-                event=event,
-                option=option,
-                is_checked=is_checked,
-                timeout=timeout,
-                extra=extra,
-                switch_by=switch_by
+                event=self.event,
+                option=self.option,
+                is_checked=self.is_checked,
+                timeout=self.timeout,
+                extra=self.extra,
+                switch_by=self.switch_by
             ),
-            user=user,
-            tags=tags,
-            checks=checks
+            user=self.user,
+            tags=self.tags,
+            checks=self.checks,
+            before=self.before,
+            after=self.after
         )
 
     @classmethod
@@ -143,6 +171,3 @@ class PlaywrightAction(Action):
             hedra --about engine:playwright:<command>
 
         '''
-
-    async def setup(self):
-        self.is_setup = True

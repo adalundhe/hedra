@@ -43,15 +43,14 @@ class MercuryHTTP2Client:
         self._connected = False
         self.context = Context()
 
-    async def prepare_request(self, request: Request, checks: List[FunctionType]) -> Awaitable[None]:
+    async def prepare(self, request: Request, checks: List[FunctionType]) -> Awaitable[None]:
         try:
-            if request.url.is_ssl:
-                request.ssl_context = self.ssl_context
+            request.ssl_context = self.ssl_context
 
             if self._hosts.get(request.url.hostname) is None:
                     self._hosts[request.url.hostname] = await request.url.lookup()
             else:
-                request.url.ip_addr = self._hosts[request.url.hostname]
+                request.url.ip_addr = self._hosts[request.url.full]
 
             if request.is_setup is False:
                 request.setup_http2_request()
@@ -117,7 +116,7 @@ class MercuryHTTP2Client:
             elapsed = time.time() - start
 
             response.time = elapsed
-            self.context.last = response
+            self.context.last[request_name] = response
 
             if request.after:
                 response = await request.after(idx, response)

@@ -33,20 +33,14 @@ class SequencedPersonaCollection(DefaultPersona):
         self.session_logger.debug('Setting up persona...')
 
         self._parsed_actions = await parser.sort_sequence()
-        self.actions_count = await self._parsed_actions.size()
+        self.actions_count = len(self._parsed_actions)
         self.engine = Engine(self.config, self.handler)
 
         await self.engine.create_session(parser.setup_actions)
         self.engine.teardown_actions = parser.teardown_actions
 
-        for action in self.actions:
-            action = await parser.setup(action)
-            await action.session.prepare_request(action.data, action.data.checks)
-            self._parsed_actions.data.append(action)
-
-            action.session.context.history.add_row(
-                action.data.name
-            )
+        for action_set in parser.actions.values():
+            await action_set.setup()
 
     async def execute(self):
         elapsed = 0
@@ -66,7 +60,7 @@ class SequencedPersonaCollection(DefaultPersona):
             
             self.batch.deferred.append(asyncio.create_task(
                 action.session.batch_request(
-                    action.data,
+                    action.parsed,
                     concurrency=self.batch.size,
                     timeout=next_timeout
                 )

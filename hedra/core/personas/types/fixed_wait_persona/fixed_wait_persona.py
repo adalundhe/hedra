@@ -27,7 +27,7 @@ class FixedWaitPersona(DefaultPersona):
 
             self.batch.deferred.append(asyncio.create_task(
                 action.session.batch_request(
-                    action.data,
+                    action.parsed,
                     concurrency=self.batch.size,
                     timeout=self.batch.interval.period
                 )

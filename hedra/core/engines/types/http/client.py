@@ -44,7 +44,7 @@ class MercuryHTTPClient:
         self.requests[request.name] = request
         self._hosts[request.url.hostname] = request.url.hostname
     
-    async def prepare_request(self, request: Request, checks: List[FunctionType]) -> Awaitable[None]:
+    async def prepare(self, request: Request, checks: List[FunctionType]) -> Awaitable[None]:
         try:
             if request.url.is_ssl:
                 request.ssl_context = self.ssl_context
@@ -145,7 +145,7 @@ class MercuryHTTPClient:
                 response = await request.after(idx, response)
 
             response.time = elapsed
-            self.context.last = response
+            self.context.last[request_name] = response
             connection.lock.release()
             return response
 

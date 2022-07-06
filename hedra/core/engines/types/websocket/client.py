@@ -22,7 +22,7 @@ class MercuryWebsocketClient(MercuryHTTPClient):
             self
         ).__init__(concurrency, timeouts, hard_cache, reset_connections=reset_connection)
 
-    async def prepare_request(self, request: Request, checks: List[FunctionType]) -> Awaitable[None]:
+    async def prepare(self, request: Request, checks: List[FunctionType]) -> Awaitable[None]:
         try:
             if request.url.is_ssl:
                 request.ssl_context = self.ssl_context
@@ -117,7 +117,7 @@ class MercuryWebsocketClient(MercuryHTTPClient):
             if request.after:
                 response = await request.after(idx, response)
 
-            self.context.last = response
+            self.context.last[request_name] = response
             connection.lock.release()
 
             return response

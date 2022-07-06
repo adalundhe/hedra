@@ -42,7 +42,7 @@ class RampedIntervalPersona(DefaultPersona):
             
             self.batch.deferred.append(asyncio.create_task(
                 action.session.batch_request(
-                    action.data,
+                    action.parsed,
                     concurrency=self.batch.size,
                     timeout=batch_timeout
                 )

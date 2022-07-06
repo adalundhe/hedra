@@ -9,7 +9,6 @@ class WebsocketAction(Action):
     
     def __init__(
         self, 
-        name: str, 
         url: str, 
         method: str = 'GET', 
         headers: Dict[str, str] = {}, 
@@ -19,16 +18,29 @@ class WebsocketAction(Action):
         tags: List[Dict[str, str]] = [], 
         checks: List[FunctionType]=[]
     ) -> None:
+        super().__init__()
+        self.url = url
+        self.method = method
+        self.headers = headers
+        self.params = params
+        self.data = data
+        self.user = user
+        self.tags = tags
+        self.checks = checks
+
+    def to_type(self, name: str):
         self.data = Request(
             name,
-            url,
-            method=method,
-            headers=headers,
-            params=params,
-            payload=data,
-            user=user,
-            tags=tags,
-            checks=checks,
+            self.url,
+            method=self.method,
+            headers=self.headers,
+            params=self.params,
+            payload=self.data,
+            user=self.user,
+            tags=self.tags,
+            checks=self.checks,
+            before=self.before,
+            after=self.after,
             request_type=RequestTypes.WEBSOCKET
         )
 
@@ -54,8 +66,3 @@ class WebsocketAction(Action):
         - order: (optional) <action_order_for_sequence_personas>
 
         '''
-
-    async def setup(self):
-        self.data.setup_websocket_request()
-        await self.data.url.lookup()
-        self.is_setup = True

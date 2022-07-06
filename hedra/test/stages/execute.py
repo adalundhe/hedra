@@ -1,3 +1,7 @@
+import ast
+import inspect
+import importlib
+import gc
 from typing import Union
 from hedra.core.engines.types import (
     MercuryGraphQLClient,
@@ -9,9 +13,12 @@ from hedra.core.engines.types import (
 )
 
 from hedra.test.actions import Action
+from hedra.test.actions.http2 import HTTP2Action
 from hedra.test.hooks import teardown
 from hedra.core.engines.types.common.context import Context
 from hedra.test.config import Config
+from hedra.test.hooks.types import HookType
+from hedra.test.registry import registered, Registry
 from .stage import Stage
 
 
@@ -27,10 +34,16 @@ class Execute(Stage):
     setup_actions = []
     teardown_actions = []
     context = Context()
+    next_timeout = 0
 
     def __init__(self) -> None:
         self.session = self.session
         self.actions = self.actions
+        self.hooks = {}
+        self.registry = Registry()
+
+        for hook_type in HookType:
+            self.hooks[hook_type] = []
 
     @classmethod
     def about(cls):
@@ -103,19 +116,39 @@ class Execute(Stage):
 
             hedra --about hooks:<hook_type>        
         '''
-        
-    async def execute(self, action: Action):
-        if action.is_setup == False:
-            await action.setup()
+   
+    async def register_actions(self):
+        methods = inspect.getmembers(self, predicate=inspect.ismethod) 
 
-        action.session = self.session
-        
+        for _, method in methods:
+                if hasattr(method, 'is_action'):
+                    self.hooks[method.hook_type].append(method)
+                    if method.hook_type == HookType.ACTION:
+                        action: Action = await method()
+                        action.session = self.session
+                        action.to_type(method.name)
+                        
+                        action.order = method.order
+                        action.weight = method.weight
+
+                        await self.session.prepare(action.parsed, action.checks)
+
+                        self.session.context.history.add_row(
+                            action.parsed.name,
+                            batch_size=self.config.batch_size
+                        )
+
+                        self.registry[method.name] = action
+
+    async def setup(self):
+        for setup_hook in self.hooks.get(HookType.SETUP):
+            await setup_hook()
+
+    async def execute(self, action: Action):
         return action
 
-    @teardown('teardown_action_set')
-    async def close(self):
-        try:
-            await self.session.close()
-        except Exception:
-            pass
-    
+    async def teardown(self):
+        for teardown_hook in self.hooks.get(HookType.TEARDOWN):
+            await teardown_hook()
+
+        await self.session.close()

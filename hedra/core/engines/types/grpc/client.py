@@ -25,7 +25,7 @@ class MercuryGRPCClient(MercuryHTTP2Client):
             reset_connections=reset_connections
         )
 
-    async def prepare_request(self, request: Request, checks: List[FunctionType], timeout: int) -> Awaitable[None]:
+    async def prepare(self, request: Request, checks: List[FunctionType]) -> Awaitable[None]:
         try:
             if request.url.is_ssl:
                 request.ssl_context = self.ssl_context
@@ -37,7 +37,7 @@ class MercuryGRPCClient(MercuryHTTP2Client):
 
             if request.is_setup is False:
                 request.setup_grpc_request(
-                    grpc_request_timeout=timeout
+                    grpc_request_timeout=self.timeouts.total_timeout
                 )
 
                 if request.checks is None:
@@ -95,7 +95,7 @@ class MercuryGRPCClient(MercuryHTTP2Client):
             elapsed = time.time() - start
 
             response.time = elapsed
-            self.context.last = response
+            self.context.last[request_name] = response
 
             if request.after:
                 response = await request.after(idx, response)

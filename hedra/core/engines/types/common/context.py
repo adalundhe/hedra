@@ -1,13 +1,26 @@
 from __future__ import annotations
 from urllib.parse import urlparse
+from typing import Any, Dict
 from .request import Request
 from .response import BaseResponse
 from .history import History
 
 
+class LastDict:
+
+    def __init__(self) -> None:
+        self._data = {}
+
+    def __getitem__(self, name: str):
+        return self._data.get(name, BaseResponse())
+    
+    def __setitem__(self, name: str, response: BaseResponse):
+        self._data[name] = response
+
+
 class Context:
     values = {}
-    last = BaseResponse()
+    last: Dict[str, BaseResponse]  = LastDict()
     history = History()
 
     def __getitem__(self, key: str):

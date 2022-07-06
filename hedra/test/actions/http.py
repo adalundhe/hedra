@@ -8,8 +8,7 @@ from .base import Action
 class HTTPAction(Action):
 
     def __init__(
-        self, 
-        name: str, 
+        self,  
         url: str, 
         method: str = 'GET', 
         headers: Dict[str, str] = {}, 
@@ -17,21 +16,30 @@ class HTTPAction(Action):
         data: Any = None, 
         user: str = None, 
         tags: List[Dict[str, str]] = [], 
-        checks: List[FunctionType] = [],
-        before: Coroutine = None,
-        after: Coroutine = None,
+        checks: List[FunctionType] = []
     ) -> None:
-        self.data = Request(
+        super().__init__()
+        self.url = url
+        self.method = method
+        self.headers = headers
+        self.params = params
+        self.data = data
+        self.user = user
+        self.tags = tags
+        self.checks = checks
+
+    def to_type(self, name: str):
+        self.parsed = Request(
             name,
-            url,
-            method=method,
-            headers=headers,
-            params=params,
-            payload=data,
-            user=user,
-            tags=tags,
-            checks=checks,
-            before=before,
-            after=after,
+            self.url,
+            method=self.method,
+            headers=self.headers,
+            params=self.params,
+            payload=self.data,
+            user=self.user,
+            tags=self.tags,
+            checks=self.checks,
+            before=self.before,
+            after=self.after,
             request_type=RequestTypes.HTTP
         )

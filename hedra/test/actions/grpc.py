@@ -9,7 +9,6 @@ class GRPCAction(Action):
 
     def __init__(
         self, 
-        name: str, 
         url: str, 
         method: str = 'GET', 
         headers: Dict[str, str] = {}, 
@@ -18,15 +17,27 @@ class GRPCAction(Action):
         tags: List[Dict[str, str]] = [], 
         checks: List[FunctionType]=[]
     ) -> None:
-        self.data = Request(
+        super().__init__()
+        self.url = url
+        self.method = method
+        self.headers = headers
+        self.protobuf = protobuf
+        self.user = user
+        self.tags = tags
+        self.checks = checks
+
+    def to_type(self, name: str):
+        self.parsed = Request(
             name,
-            url,
-            method=method,
-            headers=headers,
-            payload=protobuf,
-            user=user,
-            tags=tags,
-            checks=checks,
+            self.url,
+            method=self.method,
+            headers=self.headers,
+            payload=self.protobuf,
+            user=self.user,
+            tags=self.tags,
+            checks=self.checks,
+            before=self.before,
+            after=self.after,
             request_type=RequestTypes.GRPC
         )
 
@@ -50,8 +61,3 @@ class GRPCAction(Action):
         - order: (optional) <action_order_for_sequence_personas>
 
         '''
-
-    async def setup(self):
-        self.data.setup_grpc_request()
-        await self.data.url.lookup()
-        self.is_setup = True

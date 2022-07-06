@@ -10,9 +10,10 @@ import uvloop
 from async_tools.functions.awaitable import awaitable
 
 from hedra.core.personas.batching.batch import Batch
+from hedra.test.actions.base import Action
+from hedra.test.hooks.types import HookType
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 uvloop.install()
-from async_tools.datatypes.async_list import AsyncList
 from easy_logger import Logger
 from hedra.core.personas.batching import Batch
 from hedra.core.personas.batching.batch_interval import BatchInterval
@@ -25,8 +26,8 @@ class DefaultPersona:
 
     def __init__(self, config, handler):
         self.config = config.executor_config
-        self.actions = AsyncList()
-        self._parsed_actions = AsyncList()
+        self.actions = []
+        self._parsed_actions: List[Action] = []
         self.handler = handler
         self.engine = Engine(self.config, self.handler)
         self.batch = Batch(self.config)
@@ -52,6 +53,7 @@ class DefaultPersona:
         self.completed_actions = 0
         self.completed_time = 0
         self.run_timer = False
+        self.actions_count = 0
 
         self.is_timed = True
         self.timer_thread = None
@@ -83,18 +85,13 @@ class DefaultPersona:
         self.session_logger.debug('Setting up persona...')
 
         self.actions = parser.actions
-        self.actions_count = len(self.actions)
 
-        await self.engine.create_session(parser.setup_actions)  
-        self.engine.teardown_actions = parser.teardown_actions
+        for action_set in self.actions.values():
+            self.actions_count += action_set.registry.count
+            await action_set.setup()
 
-        for action in self.actions:
-            action = await parser.setup(action)
-            await action.session.prepare_request(action.data, action.data.checks)
-            self._parsed_actions.data.append(action)
-
-            action.session.context.history.add_row(
-                action.data.name
+            self._parsed_actions.extend(
+                action_set.registry.to_list()
             )
         
     async def execute(self):
@@ -116,8 +113,8 @@ class DefaultPersona:
                 action = await action.before_batch(action)
             
             self.batch.deferred.append(asyncio.create_task(
-                action.session.batch_request(
-                    action.data,
+                action.session.batch(
+                    action.parsed,
                     concurrency=self.batch.size,
                     timeout=next_timeout
                 )

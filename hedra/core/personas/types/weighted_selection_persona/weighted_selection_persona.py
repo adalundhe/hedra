@@ -1,11 +1,13 @@
 import random
 import time
 import asyncio
+from typing import List
 from async_tools.datatypes.async_list import AsyncList
 from async_tools.functions import awaitable
 from hedra.core.engines import Engine
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.parsing import ActionsParser
+from hedra.test.actions.base import Action
 
 
 class WeightedSelectionPersona(DefaultPersona):
@@ -13,7 +15,7 @@ class WeightedSelectionPersona(DefaultPersona):
     def __init__(self, config=None, handler=None):
         super().__init__(config=config, handler=handler)
         self.weights = []
-        self.sampled_actions = AsyncList()
+        self.sampled_actions: List[Action] = []
         
     @classmethod
     def about(cls):
@@ -30,19 +32,13 @@ class WeightedSelectionPersona(DefaultPersona):
         self.session_logger.debug('Setting up persona...')
 
         self.actions = parser.actions
-        self.actions_count = len(self.actions)
-        self.weights = await parser.weights()
 
-        await self.engine.create_session(parser.setup_actions)  
-        self.engine.teardown_actions = parser.teardown_actions
+        for action_set in self.actions.values():
+            self.actions_count += action_set.registry.count
+            await action_set.setup()
 
-        for action in self.actions:
-            action = await parser.setup(action)
-            await action.session.prepare_request(action.data, action.data.checks)
-            self._parsed_actions.data.append(action)
-
-            action.session.context.history.add_row(
-                action.data.name
+            self._parsed_actions.extend(
+                action_set.registry.to_list()
             )
 
         self.sampled_actions = self._sample()
@@ -66,7 +62,7 @@ class WeightedSelectionPersona(DefaultPersona):
             
             self.batch.deferred.append(asyncio.create_task(
                 action.session.batch_request(
-                    action.data,
+                    action.parsed,
                     concurrency=self.batch.size,
                     timeout=next_timeout
                 )
@@ -102,7 +98,7 @@ class WeightedSelectionPersona(DefaultPersona):
 
         return results
 
-    def _sample(self):
+    def _sample(self) -> List[Action]:
         return random.choices(
             self._parsed_actions.data,
             self.weights,
