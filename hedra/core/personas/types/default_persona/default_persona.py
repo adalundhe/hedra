@@ -11,7 +11,6 @@ from async_tools.functions.awaitable import awaitable
 
 from hedra.core.personas.batching.batch import Batch
 from hedra.test.actions.base import Action
-from hedra.test.hooks.types import HookType
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 uvloop.install()
 from easy_logger import Logger
