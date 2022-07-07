@@ -36,6 +36,7 @@ class MercuryGraphQLClient:
         self._use_http2 = use_http2
         self.context = Context()
         self.protocol.context = self.context
+        self.registered = {}
 
     async def prepare(self, request: Request, checks: List[FunctionType]) -> Awaitable[None]:
         try:
@@ -53,27 +54,11 @@ class MercuryGraphQLClient:
                 if request.checks is None:
                     request.checks = checks
 
-            self.protocol.requests[request.name] = request
+            self.protocol.registered[request.name] = request
+            self.registered[request.name] = request
         
         except Exception as e:
             return Response(request, error=e, type='graphql')
-
-    async def update_from_context(self, request_name: str):
-        previous_request = self.protocol.requests.get(request_name)
-        context_request = self.context.update_request(previous_request)
-        await self.prepare_request(context_request, context_request.checks)
-
-    async def update_request(self, update_request: Request):
-        previous_request = self.protocol.requests.get(update_request.name)
-
-        previous_request.method = update_request.method
-        previous_request.headers.data = update_request.headers.data
-        previous_request.params.data = update_request.params.data
-        previous_request.payload.data = update_request.payload.data
-        previous_request.metadata.tags = update_request.metadata.tags
-        previous_request.checks = update_request.checks
-
-        self.protocol.requests[update_request.name] = previous_request
 
     async def execute_prepared_request(self, request_name: str, idx: int, timeout: int):
         response: Response = await self.protocol.execute_prepared_request(request_name, idx, timeout)

@@ -33,7 +33,10 @@ class ConnectionFactory:
         if self.loop is None:
             self.loop = get_running_loop()
 
-        reader = StreamReader(limit=limit, loop=self.loop)
+        if kwds.get('ssl') is None:
+            hostname = None
+
+        reader = StreamReader(limit=2**16, loop=self.loop)
         protocol = StreamReaderProtocol(reader, loop=self.loop)
 
         family, type_, proto, _, address = socket_config

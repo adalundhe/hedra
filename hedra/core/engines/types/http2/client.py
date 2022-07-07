@@ -28,8 +28,8 @@ class MercuryHTTP2Client:
         self.timeouts = timeouts
         self.hard_cache = hard_cache
         self._hosts = {}
-        self.requests = {}
-        self.requests: Dict[str, Request] = {}
+        self.registered = {}
+        self.registered: Dict[str, Request] = {}
         self.ssl_context = get_http2_ssl_context()
         self.results = []
         self.iters = 0
@@ -48,7 +48,27 @@ class MercuryHTTP2Client:
             request.ssl_context = self.ssl_context
 
             if self._hosts.get(request.url.hostname) is None:
-                    self._hosts[request.url.hostname] = await request.url.lookup()
+                socket_configs = await request.url.lookup()
+
+                for config in socket_configs:
+                    
+                    try:
+                        connection = HTTP2Connection()
+                        await connection.connect(
+                            request.url.hostname,
+                            request.url.ip_addr,
+                            request.url.port,
+                            config,
+                            ssl=request.ssl_context
+                        )
+
+                        request.url.socket_config = config
+                        break
+
+                    except Exception as e:
+                        pass
+            
+                self._hosts[request.url.hostname] = request.url.ip_addr
             else:
                 request.url.ip_addr = self._hosts[request.url.hostname]
 
@@ -58,18 +78,18 @@ class MercuryHTTP2Client:
                 if request.checks is None:
                     request.checks = checks
 
-            self.requests[request.name] = request
+            self.registered[request.name] = request
 
         except Exception as e:
             return Response(request, error=e, type='http2')
 
     async def update_from_context(self, request_name: str):
-        previous_request = self.requests.get(request_name)
+        previous_request = self.registered.get(request_name)
         context_request = self.context.update_request(previous_request)
         await self.prepare_request(context_request, context_request.checks)
 
     async def update_request(self, update_request: Request):
-        previous_request = self.requests.get(update_request.name)
+        previous_request = self.registered.get(update_request.name)
 
         previous_request.method = update_request.method
         previous_request.headers.data = update_request.headers.data
@@ -78,10 +98,10 @@ class MercuryHTTP2Client:
         previous_request.metadata.tags = update_request.metadata.tags
         previous_request.checks = update_request.checks
 
-        self.requests[update_request.name] = previous_request
+        self.registered[update_request.name] = previous_request
 
     async def execute_prepared_request(self, request_name: str, idx: int, timeout: int) -> HTTP2ResponseFuture:
-        request = self.requests[request_name]
+        request = self.registered[request_name]
         response = Response(request, type='http2')
 
         stream_id = idx%self.pool.size

@@ -1,8 +1,10 @@
 import functools
 from .types import HookType
+from hedra.test.registry.registrar import registar
 
 
-def teardown(name, group=None, metadata={}):
+@registar(HookType.TEARDOWN)
+def teardown(metadata={}):
     '''
     Teardown Hook
 
@@ -20,24 +22,6 @@ def teardown(name, group=None, metadata={}):
     
     '''
     def wrapper(func):
-
-        func.action_name = name
-        func.is_action = True
-        func.hook_type = HookType.TEARDOWN
-        func.weight = 0
-        func.order = float('inf')
-        func.group = group
-        func.timeout = None
-        func.wait_interval = None
-        func.metadata = {
-            'group': group
-        }
-        func.env = metadata.get('env')
-        func.user = metadata.get('user')
-        func.type = metadata.get('type')
-        func.tags = metadata.get('tags')
-        func.url = metadata.get('url')
-        func.checks = None
 
         @functools.wraps(func)
         async def decorator(*args, **kwargs):

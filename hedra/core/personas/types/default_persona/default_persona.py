@@ -1,16 +1,12 @@
-import threading
 import time
 import asyncio
-import traceback
-from turtle import st
-from typing import List, Tuple
-from urllib.request import Request
+from typing import List
 import psutil
 import uvloop
 from async_tools.functions.awaitable import awaitable
 
 from hedra.core.personas.batching.batch import Batch
-from hedra.test.actions.base import Action
+from hedra.test.hooks.hook import Hook
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 uvloop.install()
 from easy_logger import Logger
@@ -26,7 +22,7 @@ class DefaultPersona:
     def __init__(self, config, handler):
         self.config = config.executor_config
         self.actions = []
-        self._parsed_actions: List[Action] = []
+        self._parsed_actions: List[Hook] = []
         self.handler = handler
         self.engine = Engine(self.config, self.handler)
         self.batch = Batch(self.config)
@@ -86,12 +82,8 @@ class DefaultPersona:
         self.actions = parser.actions
 
         for action_set in self.actions.values():
-            self.actions_count += action_set.registry.count
-            await action_set.setup()
-
-            self._parsed_actions.extend(
-                action_set.registry.to_list()
-            )
+            self.actions_count += len(action_set.actions)
+            self._parsed_actions.extend(action_set.actions)
 
     async def execute(self):
 
@@ -106,11 +98,11 @@ class DefaultPersona:
         while elapsed < self.total_time:
             
             next_timeout = self.total_time - elapsed
-            action = self._parsed_actions[current_action_idx]
+            hook = self._parsed_actions[current_action_idx]
             
             self.batch.deferred.append(asyncio.create_task(
-                action.session.execute_batch(
-                    action.parsed,
+                hook.session.execute_batch(
+                    hook.action,
                     concurrency=self.batch.size,
                     timeout=next_timeout
                 )

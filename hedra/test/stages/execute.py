@@ -1,46 +1,34 @@
-import ast
+import functools
 import inspect
-import importlib
-import gc
-from typing import Union
-from hedra.core.engines.types import (
-    MercuryGraphQLClient,
-    MercuryGRPCClient,
-    MercuryHTTP2Client,
-    MercuryHTTPClient,
-    MercuryPlaywrightClient,
-    MercuryWebsocketClient
-)
+from hedra.core.engines.types.common.request import Request
+from hedra.core.engines.types.playwright.command import Command
+from hedra.test.hooks.hook import Hook
+from hedra.test.registry.registrar import registar
+from typing import Dict, List, Union
 
 from hedra.test.actions import Action
-from hedra.test.actions.http2 import HTTP2Action
-from hedra.test.hooks import teardown
 from hedra.core.engines.types.common.context import Context
 from hedra.test.config import Config
 from hedra.test.hooks.types import HookType
-from hedra.test.registry import registered, Registry
+from hedra.core.engines.types.common.hooks import Hooks
+from hedra.test.client import Client
 from .stage import Stage
 
-
-MercuryEngine = Union[MercuryGraphQLClient, MercuryGRPCClient, MercuryHTTP2Client, MercuryHTTPClient, MercuryPlaywrightClient, MercuryWebsocketClient]
 
 
 class Execute(Stage):
     name = None
     engine_type = 'http'
-    session: MercuryEngine = None
     config: Config = None
-    actions = []
     setup_actions = []
     teardown_actions = []
     context = Context()
     next_timeout = 0
+    client: Client = None
 
     def __init__(self) -> None:
-        self.session = self.session
-        self.actions = self.actions
-        self.hooks = {}
-        self.registry = Registry()
+        self.actions = []
+        self.hooks: Dict[str, List[Hook]] = {}
         self.name = type(self).__name__
 
         for hook_type in HookType:
@@ -122,27 +110,49 @@ class Execute(Stage):
         methods = inspect.getmembers(self, predicate=inspect.ismethod) 
 
         for _, method in methods:
-                if hasattr(method, 'is_action'):
-                    self.hooks[method.hook_type].append(method)
-                    if method.hook_type == HookType.ACTION:
-                        action: Action = await method()
-                        action.to_type(method.name)
-                        
-                        action.order = method.order
-                        action.weight = method.weight
 
-                        result = await self.session.prepare(action.parsed, action.checks)
-                        if result and result.error:
-                            raise result.error
+            method_name = method.__name__
 
-                        self.session.context.history.add_row(
-                            action.parsed.name,
-                            batch_size=self.config.batch_size
-                        )
+            hook: Hook = registar.all.get(method_name)
 
-                        action.session = self.session
+            if hook and self.hooks.get(hook.hook_type) is None:
+                self.hooks[hook.hook_type] = [hook]
+            
+            elif hook:
+                self.hooks[hook.hook_type].append(hook)
 
-                        self.registry[method.name] = action
+        for hook in self.hooks.get(HookType.ACTION):
+            
+            selected_client = self.client[self.config.engine_type]
+            selected_client.next_name = hook.name
+            self.client[self.config.engine_type] = selected_client
+            await hook.call(self)
+
+            self.client.session.context.history.add_row(
+                hook.name,
+                batch_size=self.config.batch_size
+            )
+
+            parsed_action = self.client.session.registered.get(hook.name)
+
+            parsed_action.hooks = Hooks(
+                before=self.get_hook(parsed_action, HookType.BEFORE),
+                after=self.get_hook(parsed_action, HookType.AFTER),
+                before_batch=self.get_hook(parsed_action, HookType.BEFORE_BATCH),
+                after_batch=self.get_hook(parsed_action, HookType.AFTER_BATCH)
+            )
+
+            hook.session = self.client.session
+            hook.action = parsed_action
+            
+
+            self.actions.append(hook)
+
+    def get_hook(self, action: Union[Request,Command], hook_type: str):
+        for hook in self.hooks[hook_type]:
+            if action.name in hook.names:
+                return functools.partial(hook.call, self)
+
 
     async def setup(self):
         for setup_hook in self.hooks.get(HookType.SETUP):

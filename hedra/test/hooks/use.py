@@ -13,7 +13,7 @@ from easy_logger import Logger
 from hedra.core.personas.utils.time import parse_time
 from hedra.test.stages.execute import Execute
 from hedra.test.config import Config
-
+from hedra.test.client import Client
 
 
 
@@ -188,7 +188,7 @@ def use(config: Config, fixtures={}, inject=None):
                 cls.context.history.row_size = selected_config.batch_size
 
                 session.context = cls.context
-                cls.session = session
+                cls.client = Client(session)
                 cls.config = selected_config
                 cls.engine_type = selected_engine
 

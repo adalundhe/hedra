@@ -1,8 +1,10 @@
 import functools
 from .types import HookType
+from hedra.test.registry.registrar import registar
 
 
-def setup(name, group=None, metadata={}):
+@registar(HookType.SETUP)
+def setup(metadata={}):
     '''
     Setup Hook
 
@@ -21,24 +23,6 @@ def setup(name, group=None, metadata={}):
     '''
     def wrapper(func):
  
-        func.action_name = name
-        func.is_action = True
-        func.hook_type = HookType.SETUP
-        func.weight = 0
-        func.order = 0
-        func.group = group
-        func.metadata = {
-            'group': group
-        }
-        func.timeout = None
-        func.wait_interval = None
-        func.env = metadata.get('env')
-        func.user = metadata.get('user')
-        func.type = metadata.get('type')
-        func.tags = metadata.get('tags')
-        func.url = metadata.get('url')
-        func.checks = None
-
         @functools.wraps(func)
         async def decorator(*args, **kwargs):
             return await func(*args, **kwargs)

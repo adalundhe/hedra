@@ -1,13 +1,12 @@
 import functools
 from .types import HookType
+from hedra.test.registry.registrar import registar
 
 
+@registar(HookType.BEFORE_BATCH)
 def before_batch(*names):
     
     def wrapper(func):
-        func.names = names
-        func.is_action = True
-        func.hook_type = HookType.BEFORE_BATCH
 
         @functools.wraps(func)
         def decorator(*args, **kwargs):

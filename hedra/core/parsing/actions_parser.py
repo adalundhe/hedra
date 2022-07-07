@@ -1,7 +1,5 @@
-import inspect
-from typing import Coroutine, Dict, List
+from typing import Dict
 from easy_logger import Logger
-from async_tools.datatypes import AsyncList
 from hedra.core.engines.types.common.hooks import Hooks
 from hedra.test.actions.base import Action
 from hedra.test.hooks.types import HookType
@@ -78,17 +76,7 @@ class ActionsParser:
             class_instance: Execute = python_class()
             await class_instance.register_actions()
 
-            for action in class_instance.registry:
-                self.hooks[class_instance.name] = class_instance.hooks
-                action.parsed.hooks = Hooks(
-                    before=self.get_hook(action, class_instance.name, HookType.BEFORE),
-                    after=self.get_hook(action, class_instance.name, HookType.AFTER),
-                    before_batch=self.get_hook(action, class_instance.name, HookType.BEFORE_BATCH),
-                    after_batch=self.get_hook(action, class_instance.name, HookType.AFTER_BATCH)
-                )
-
-
-                class_instance.registry[action.parsed.name] = action
+            self.hooks[class_instance.name] = class_instance.hooks
 
             self.actions[type(class_instance).__name__] = class_instance
 
@@ -111,9 +99,9 @@ class ActionsParser:
     async def sort_multi_sequence(self):
 
         for action_set_name, action_set in self.actions.items():
-            actions = action_set.registry.to_list()
+            actions = action_set.actions
             sorted_actions = sorted(actions, key=lambda action: action.order)
-            action_set.registry.data = list(sorted_actions)
+            action_set.actions = list(sorted_actions)
             
             self.actions[action_set_name] = actions
 

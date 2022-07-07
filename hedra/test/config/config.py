@@ -21,7 +21,7 @@ class Config:
     pool_size=psutil.cpu_count(logical=False)
     no_run_visuals=False
     session_url=None
-    connect_timeout=60
+    connect_timeout=15
     request_timeout=60
     reporter_type='statstream'
     reporter_config={

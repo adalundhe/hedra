@@ -1,4 +1,5 @@
 import asyncio
+from ipaddress import ip_address
 import traceback
 from types import FunctionType
 import aiodns
@@ -26,7 +27,7 @@ class MercuryHTTPClient:
     def __init__(self, concurrency: int = 10**3, timeouts: Timeouts = Timeouts(), hard_cache=False, reset_connections: bool=False) -> None:
         self.concurrency = concurrency
         self.pool = Pool(concurrency, reset_connections=reset_connections)
-        self.requests: Dict[str, Request] = {}
+        self.registered: Dict[str, Request] = {}
         self._hosts = {}
         self._parsed_urls = {}
         self.timeouts = timeouts
@@ -42,7 +43,7 @@ class MercuryHTTPClient:
         self.pool.create_pool()
 
     def add_request(self, request: Request):
-        self.requests[request.name] = request
+        self.registered[request.name] = request
         self._hosts[request.url.hostname] = request.url.hostname
     
     async def prepare(self, request: Request, checks: List[FunctionType]) -> Awaitable[None]:
@@ -51,7 +52,28 @@ class MercuryHTTPClient:
                 request.ssl_context = self.ssl_context
 
             if self._hosts.get(request.url.hostname) is None:
-                    self._hosts[request.url.hostname] = await request.url.lookup()
+
+                    socket_configs = await request.url.lookup()
+
+                    for config in socket_configs:
+                        try:
+                            connection = Connection()
+                            await connection.connect(
+                                request.url.hostname,
+                                request.url.ip_addr,
+                                request.url.port,
+                                config,
+                                ssl=request.ssl_context
+                            )
+
+                            request.url.socket_config = config
+                            break
+
+                        except Exception as e:
+                            pass
+                
+                    self._hosts[request.url.hostname] = request.url.ip_addr
+
             else:
                 request.url.ip_addr = self._hosts[request.url.hostname]
 
@@ -61,39 +83,13 @@ class MercuryHTTPClient:
                 if request.checks is None:
                     request.checks = checks
 
-            self.requests[request.name] = request
+            self.registered[request.name] = request
         
         except Exception as e:
             return Response(request, error=e)
 
+    async def execute_prepared_request(self, request: Request, idx: int, timeout: int) -> HTTPResponseFuture:
 
-
-    async def update_from_context(self, request_name: str):
-
-        if self.hard_cache == False:
-            
-            previous_request = self.requests.get(request_name)
-            context_request = self.context.update_request(
-                previous_request, 
-                self.context
-            )
-            await self.prepare_request(context_request, context_request.checks)
-
-    async def update_request(self, update_request: Request):
-        previous_request = self.requests.get(update_request.name)
-
-        previous_request.method = update_request.method
-        previous_request.headers.data = update_request.headers.data
-        previous_request.params.data = update_request.params.data
-        previous_request.payload.data = update_request.payload.data
-        previous_request.metadata.tags = update_request.metadata.tags
-        previous_request.checks = update_request.checks
-
-        self.requests[update_request.name] = previous_request
-
-    async def execute_prepared_request(self, request_name: str, idx: int, timeout: int) -> HTTPResponseFuture:
-
-        request = self.requests[request_name]
         response = Response(request, channel_id=idx)
 
         stream_idx = idx%self.pool.size
@@ -109,7 +105,7 @@ class MercuryHTTPClient:
             start = time.time()
 
             stream = await asyncio.wait_for(connection.connect(
-                request_name,
+                request.url.hostname,
                 request.url.ip_addr,
                 request.url.port,
                 request.url.socket_config,
@@ -146,14 +142,14 @@ class MercuryHTTPClient:
                 response = await request.hooks.after(idx, response)
 
             response.time = elapsed
-            self.context.last[request_name] = response
+            self.context.last[request.name] = response
             connection.lock.release()
             return response
 
         except Exception as e:
             response.error = e
             self.pool.connections[stream_idx] = Connection(reset_connection=self.pool.reset_connections)
-            self.context.last[request_name] = response
+            self.context.last[request.name] = response
             return response
 
     async def request(self, request: Request) -> HTTPResponseFuture:
@@ -175,7 +171,7 @@ class MercuryHTTPClient:
         if request.hooks.before_batch:
             request = await request.hooks.before_batch(request)
         
-        responses = await asyncio.wait([self.execute_prepared_request(request.name, idx, timeout) for idx in range(concurrency)], timeout=timeout)
+        responses = await asyncio.wait([self.execute_prepared_request(request, idx, timeout) for idx in range(concurrency)], timeout=timeout)
         
         if request.hooks.after_batch:
             request = await request.hooks.after_batch(request)

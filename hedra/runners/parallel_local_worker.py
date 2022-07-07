@@ -81,11 +81,6 @@ class ParallelLocalWorker:
             b'results': False,
             b'serializing': False
         }
-        actions_parser = ActionsParser(config)
-        
-        loop = asyncio.get_event_loop()
-        parsed_actions = loop.run_until_complete(actions_parser.parse())
-        self.reporter_fields = [action.name for action in parsed_actions]
 
     def _partition_actions(self, action=None):
 

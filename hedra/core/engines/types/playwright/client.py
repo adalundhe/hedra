@@ -21,7 +21,7 @@ class MercuryPlaywrightClient:
         self.concurrency = concurrency
         self.pool = ContextPool(concurrency, group_size)
         self.timeouts = timeouts
-        self.commands: Dict[str, Command] = {}
+        self.registered: Dict[str, Command] = {}
         self.sem = asyncio.Semaphore(self.concurrency)
         self.loop = asyncio.get_event_loop()
         self.context = Context()
@@ -40,10 +40,10 @@ class MercuryPlaywrightClient:
             'timeout': self.timeouts.total_timeout * 1000
         }
 
-        self.commands[command.name] = command
+        self.registered[command.name] = command
 
     async def execute_prepared_command(self, command_name: str, idx: int) -> PlaywrightResponseFuture:
-        command = self.commands[command_name]
+        command = self.registered[command_name]
         result = Result(command)
         await self.sem.acquire()
 
@@ -71,14 +71,14 @@ class MercuryPlaywrightClient:
             return result
 
     async def update_from_context(self, command_name: str):
-        previous_command = self.commands.get(command_name)
+        previous_command = self.registered.get(command_name)
         context_command = self.context.update_command(previous_command)
-        await self.prepare_command(context_command, context_command.checks)
+        await self.prepare(context_command, context_command.checks)
 
     async def request(self, command: Command, checks: Optional[List[FunctionType]]=[]) -> PlaywrightResponseFuture:
 
-        if self.commands.get(command.name) is None:
-            await self.prepare_command(command, checks)
+        if self.registered.get(command.name) is None:
+            await self.prepare(command, checks)
 
         return await self.execute_prepared_command(command.name)
 

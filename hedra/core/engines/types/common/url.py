@@ -42,6 +42,8 @@ class URL:
             flags=0
         )
 
+        return info
+
         self.socket_config = info[0]
 
         return self.ip_addr

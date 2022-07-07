@@ -1,8 +1,13 @@
 import functools
+from typing import Coroutine, Dict, List, Union
 from .types import HookType
+from .hook import Hook
+from hedra.test.registry.registrar import registar
 
 
-def action(name, group=None, weight=1, order=1, timeout=None, wait_interval=None, metadata={}, checks=None):
+@registar(HookType.ACTION)
+def action(weight: int=1, order: int=1, metadata: Dict[str, Union[str, int]]={}, checks: List[Coroutine]=[]):
+
     '''
     Action Hook
 
@@ -34,29 +39,13 @@ def action(name, group=None, weight=1, order=1, timeout=None, wait_interval=None
             return await response
 
     '''
-    def wrapper(func):
-        func.name = name
-        func.is_action = True
-        func.hook_type = HookType.ACTION
-        func.weight = weight
-        func.order = order
-        func.group = group
-        func.metadata = {
-            'group': group
-        }
-        func.timeout = timeout
-        func.wait_interval = wait_interval
-        func.env = metadata.get('env')
-        func.user = metadata.get('user')
-        func.type = metadata.get('type')
-        func.tags = metadata.get('tags')
-        func.url = metadata.get('url')
-        func.checks = checks
-        func.context = None
+    def wrapper(func) -> Hook:
 
         @functools.wraps(func)
         def decorator(*args, **kwargs):
+
             return func(*args, **kwargs)
                 
-        return decorator  
+        return decorator
+
     return wrapper

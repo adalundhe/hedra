@@ -36,7 +36,8 @@ class AsyncStream:
         if self.connected is False or self.dns_address != dns_address or self.reset_connection:
             stream = await self._connection_factory.create_tls(
                 hostname,
-                socket_config,
+                dns_address=dns_address,
+                port=port,
                 ssl=ssl
             )
             self.reader, self.writer = stream
