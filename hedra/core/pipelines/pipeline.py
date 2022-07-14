@@ -1,9 +1,5 @@
 import psutil
 import asyncio
-import uvloop
-import math
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-uvloop.install()
 from async_tools.functions import check_event_loop
 from async_tools.datatypes.async_list import AsyncList
 from easy_logger import Logger

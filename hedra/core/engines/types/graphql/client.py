@@ -83,4 +83,6 @@ class MercuryGraphQLClient:
         if timeout is None:
             timeout = self.protocol.timeouts.total_timeout
 
-        return await asyncio.wait([self.execute_prepared_request(request.name, idx, timeout) for idx in range(concurrency)], timeout=timeout)
+        return [ asyncio.create_task(
+            self.execute_prepared_request(request.name, idx, timeout)
+        ) for idx in range(concurrency)]

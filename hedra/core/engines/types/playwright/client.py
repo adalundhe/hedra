@@ -82,7 +82,7 @@ class MercuryPlaywrightClient:
 
         return await self.execute_prepared_command(command.name)
 
-    async def execute_batch(
+    def execute_batch(
         self, 
         command: Command,
         concurrency: Optional[int]=None, 
@@ -96,15 +96,9 @@ class MercuryPlaywrightClient:
         if timeout is None:
             timeout = self.timeouts.total_timeout
 
-        if command.hooks.before:
-            command = await command.hooks.before(command)
-
-        results = await asyncio.wait([self.execute_prepared_command(command.name) for _ in range(concurrency)], timeout=timeout)
-
-        if command.hooks.after:
-            command = await command.hooks.after(command)
-
-        return results
+        return [ asyncio.create_task(
+            self.execute_prepared_command(command.name)
+        ) for _ in range(concurrency)]
 
     async def close(self):
         for context_group in self.pool:

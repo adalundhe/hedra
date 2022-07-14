@@ -6,6 +6,11 @@ class SocketTypes:
     HTTP2=socket.AF_INET
     NONE=None
 
+class SocketProtocols:
+    DEFAULT=socket.SOCK_STREAM
+    HTTP2=socket.SOCK_STREAM
+    NONE=None
+
 
 class RequestTypes:
     HTTP='HTTP'
@@ -19,7 +24,7 @@ class RequestTypes:
 class ProtocolMap:
 
     def __init__(self) -> None:
-        self.types = {
+        self.address_families = {
             RequestTypes.HTTP: SocketTypes.DEFAULT,
             RequestTypes.HTTP2: SocketTypes.HTTP2,
             RequestTypes.WEBSOCKET: SocketTypes.DEFAULT,
@@ -28,5 +33,14 @@ class ProtocolMap:
             RequestTypes.PLAYWRIGHT: SocketTypes.NONE
         }
 
+        self.protocols = {
+            RequestTypes.HTTP: SocketProtocols.DEFAULT,
+            RequestTypes.HTTP2: SocketProtocols.HTTP2,
+            RequestTypes.WEBSOCKET: SocketProtocols.DEFAULT,
+            RequestTypes.GRAPHQL: SocketProtocols.DEFAULT,
+            RequestTypes.GRPC: SocketProtocols.HTTP2,
+            RequestTypes.PLAYWRIGHT: SocketProtocols.NONE
+        }
+
     def __getitem__(self, key: RequestTypes) -> SocketTypes:
-        return self.types.get(key)
+        return self.address_families.get(key), self.protocols.get(key)

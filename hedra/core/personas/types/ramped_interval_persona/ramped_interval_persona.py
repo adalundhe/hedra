@@ -21,65 +21,58 @@ class RampedIntervalPersona(DefaultPersona):
         until the total time is up. You may also specify a wait between batches for an integere number of seconds
         via the --batch-interval argument.
         '''
-            
+
     async def execute(self):
-        results = []
-        elapsed = 0
+        actions = self._parsed_actions
+        actions_count = self.actions_count
+        total_time = self.total_time
+        task_idx = 0
 
         await self.start_updates()
-        current_action_idx = 0
-
-        self.start = time.time()
-
-        batch_timeout = self.batch.time
         
-        while elapsed < self.total_time: 
+        start = time.time()
 
-            action = self._parsed_actions[current_action_idx]
-            
-            self.batch.deferred.append(asyncio.create_task(
-                action.session.execute_batch(
-                    action.parsed,
-                    concurrency=self.batch.size,
-                    timeout=batch_timeout
+        completed, pending = await asyncio.wait([
+            asyncio.create_task(
+                actions[idx%actions_count].session.execute_prepared_request(
+                    actions[idx%actions_count].action,
+                    idx,
+                    timeout=total_time,
                 )
-            ))
-
-            await asyncio.sleep(self.batch.interval.period)
-
-            elapsed = time.time() - self.start
-
-            batch_timeout = batch_timeout + (1 * self.batch.gradient)
-            current_action_idx = (current_action_idx + 1) % self.actions_count
-
-        self.end = elapsed + self.start
-        await self.stop_updates()
-
-        for deferred_batch in self.batch.deferred:
-            batch, pending = await deferred_batch
-            completed = await asyncio.gather(*batch)
-            results.extend(completed)
-            
+            ) async for idx in self.generator(total_time, self.batch.time)
+        ], timeout=1)
+        self.end = time.time()
+        self.start = start
+        for pend in pending:
             try:
-                for pend in pending:
-                    pend.cancel()
+                pend.cancel()
             except Exception:
                 pass
 
-        self.total_actions = len(results)
-        self.total_elapsed = elapsed
+        completed = await asyncio.gather(*completed)
+            
+        self.total_actions = len(set(completed))
+        self.total_elapsed = self.end - self.start
+        self.optimized_params = None
 
-        return results
+        return completed
+            
+    async def generator(self, total_time, batch_time):
+        elapsed = 0
+        idx = 0
+        generation_batch_interval = batch_time
 
-    async def _execute_batch(self):  
-        return await asyncio.wait(
-            [ action async for action in self.engine.defer_all(self.actions)], 
-            timeout=self.batch.time
-        )
+        start = time.time()
+        batch_start = time.time()
+        while elapsed < total_time:
+            yield idx
+            
+            await asyncio.sleep(0)
+            elapsed = time.time() - start
+            batch_elapsed = time.time() - batch_start
+            idx += 1
 
-    async def _next_batch_time_limit(self):
-        return await awaitable(
-            round,
-            (self.batch.gradient + 1) * self.batch.time,
-            2
-        )
+            if batch_elapsed >= generation_batch_interval:
+                generation_batch_interval = generation_batch_interval *(self.batch.gradient + 1)
+                await asyncio.sleep(self.batch.interval.period)
+                batch_start = time.time()

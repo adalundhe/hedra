@@ -20,8 +20,6 @@ class Execute(Stage):
     name = None
     engine_type = 'http'
     config: Config = None
-    setup_actions = []
-    teardown_actions = []
     context = Context()
     next_timeout = 0
     client: Client = None
@@ -163,6 +161,16 @@ class Execute(Stage):
 
     async def teardown(self):
         for teardown_hook in self.hooks.get(HookType.TEARDOWN):
-            await teardown_hook()
 
-        await self.session.close()
+            try:
+                
+                await teardown_hook()
+
+            except Exception:
+                pass
+
+        try:
+            await self.client.session.close()
+        
+        except Exception:
+            pass

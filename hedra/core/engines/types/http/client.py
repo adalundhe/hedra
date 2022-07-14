@@ -1,5 +1,5 @@
 import asyncio
-from ipaddress import ip_address
+import chunk
 import traceback
 from types import FunctionType
 import aiodns
@@ -12,10 +12,6 @@ from hedra.core.engines.types.common.ssl import get_default_ssl_context
 from hedra.core.engines.types.common.timeouts import Timeouts
 from .connection import Connection
 from .pool import Pool
-from .utils import (
-    http_headers_to_iterator, 
-    read_body
-)
 
 
 HTTPResponseFuture = Awaitable[Union[Response, Exception]]
@@ -24,29 +20,26 @@ HTTPBatchResponseFuture = Awaitable[Tuple[Set[HTTPResponseFuture], Set[HTTPRespo
 
 class MercuryHTTPClient:
 
-    def __init__(self, concurrency: int = 10**3, timeouts: Timeouts = Timeouts(), hard_cache=False, reset_connections: bool=False) -> None:
+    def __init__(self, concurrency: int=10**3, timeouts: Timeouts = Timeouts(), hard_cache=False, reset_connections: bool=False) -> None:
+        
+        self.loop = asyncio.get_event_loop()
         self.concurrency = concurrency
         self.pool = Pool(concurrency, reset_connections=reset_connections)
         self.registered: Dict[str, Request] = {}
         self._hosts = {}
         self._parsed_urls = {}
         self.timeouts = timeouts
-        self.loop = asyncio.get_event_loop()
+        self.sem = asyncio.Semaphore(self.concurrency)
         self.resolver = aiodns.DNSResolver(loop=self.loop)
         self.hard_cache = hard_cache
         self.running = False
         self.responses = []
-        self.ssl_context = get_default_ssl_context()
         self.context = Context()
-        self._current_connection = 0
+        self.ssl_context = get_default_ssl_context()
 
         self.pool.create_pool()
-
-    def add_request(self, request: Request):
-        self.registered[request.name] = request
-        self._hosts[request.url.hostname] = request.url.hostname
     
-    async def prepare(self, request: Request, checks: List[FunctionType]) -> Awaitable[None]:
+    async def prepare(self, request: Request, checks: List[FunctionType]) -> Awaitable[Union[Request, Exception]]:
         try:
             if request.url.is_ssl:
                 request.ssl_context = self.ssl_context
@@ -54,25 +47,34 @@ class MercuryHTTPClient:
             if self._hosts.get(request.url.hostname) is None:
 
                     socket_configs = await request.url.lookup()
+                    
+                    for ip_addr, configs in socket_configs.items():
+                        for config in configs:
+                            try:
+                                connection = Connection()
+                                await connection.make_connection(
+                                    request.url.hostname,
+                                    ip_addr,
+                                    request.url.port,
+                                    config,
+                                    ssl=request.ssl_context
+                                )
 
-                    for config in socket_configs:
-                        try:
-                            connection = Connection()
-                            await connection.connect(
-                                request.url.hostname,
-                                request.url.ip_addr,
-                                request.url.port,
-                                config,
-                                ssl=request.ssl_context
-                            )
+                                request.url.socket_config = config
+                                request.url.ip_addr = ip_addr
+                                request.url.has_ip_addr = True
+                                break
 
-                            request.url.socket_config = config
+                            except Exception as e:
+                                pass
+
+                        if request.url.socket_config:
                             break
-
-                        except Exception as e:
-                            pass
                 
                     self._hosts[request.url.hostname] = request.url.ip_addr
+
+                    if request.url.socket_config is None:
+                        raise Exception('Err. - No socket found.')
 
             else:
                 request.url.ip_addr = self._hosts[request.url.hostname]
@@ -84,78 +86,70 @@ class MercuryHTTPClient:
                     request.checks = checks
 
             self.registered[request.name] = request
+
+            return request
         
         except Exception as e:
-            return Response(request, error=e)
+            return e
 
     async def execute_prepared_request(self, request: Request, idx: int, timeout: int) -> HTTPResponseFuture:
+        response = Response(request)
+        
+        async with self.sem:
+            connection: Connection = self.pool.connections.pop()
+            try:
 
-        response = Response(request, channel_id=idx)
+                if request.hooks.before:
+                    request = await request.hooks.before(idx, request)
 
-        stream_idx = idx%self.pool.size
+                start = time.time()
 
-        connection = self.pool.connections[stream_idx]
+                await connection.make_connection(
+                    request.url.hostname,
+                    request.url.ip_addr,
+                    request.url.port,
+                    request.url.socket_config,
+                    timeout=self.timeouts.connect_timeout,
+                    ssl=request.ssl_context
+                )
 
-        if request.hooks.before:
-            request = await request.hooks.before(idx, request)
+                connection.write(request.headers.encoded_headers)
+                
+                if request.payload.has_data:
+                    if request.payload.is_stream:
+                        await request.payload.write_chunks(connection)
 
-        try:
-            await connection.lock.acquire()
+                    else:
+                        connection.write(request.payload.encoded_data)
 
-            start = time.time()
 
-            stream = await asyncio.wait_for(connection.connect(
-                request.url.hostname,
-                request.url.ip_addr,
-                request.url.port,
-                request.url.socket_config,
-                ssl=request.ssl_context
-            ), timeout=self.timeouts.connect_timeout)
-            if isinstance(stream, Exception):
-                response.error = stream
+                chunk: bytes = await connection.readline()
+                response.body += chunk
+                while True:
+                    if chunk.endswith(b'0\r\n') or chunk is None:
+                        break
+                    chunk = await connection.readline()
+                    response.body += chunk
+                    
+                response.time = time.time() - start
+                self.pool.connections.append(connection)
+
+                if request.hooks.after:
+                    response = await request.hooks.after(idx, response)
+
+                self.context.last[request.name] = response
+                
                 return response
 
-            reader, writer = stream
-            writer.write(request.headers.encoded_headers)
-            
-            if request.payload.has_data:
-                if request.payload.is_stream:
-                    await request.payload.write_chunks(writer)
-
-                else:
-                    writer.write(request.payload.encoded_data)
-
-            line = await asyncio.wait_for(reader.readuntil(), self.timeouts.socket_read_timeout)
-            response.response_code = line
-
-            async for key, value in http_headers_to_iterator(reader):
-                response.headers[key] = value
-            
-            if response.size:
-                response.body = await asyncio.wait_for(reader.readexactly(response.size), timeout)
-            else:
-                response = await asyncio.wait_for(read_body(reader, response), timeout)    
-            
-            elapsed = time.time() - start
-
-            if request.hooks.after:
-                response = await request.hooks.after(idx, response)
-
-            response.time = elapsed
-            self.context.last[request.name] = response
-            connection.lock.release()
-            return response
-
-        except Exception as e:
-            response.error = e
-            self.pool.connections[stream_idx] = Connection(reset_connection=self.pool.reset_connections)
-            self.context.last[request.name] = response
-            return response
+            except Exception as e:
+                response.error = f'{traceback.format_exc()}\n{str(e)}'
+                self.pool.connections.append(Connection(reset_connection=self.pool.reset_connections))
+                return response
 
     async def request(self, request: Request) -> HTTPResponseFuture:
         return await self.execute_prepared_request(request.name)
         
-    async def execute_batch(
+    def execute_batch(
         self, 
         request: Request,
         concurrency: Optional[int]=None, 
@@ -167,13 +161,5 @@ class MercuryHTTPClient:
 
         if timeout is None:
             timeout = self.timeouts.total_timeout
-
-        if request.hooks.before_batch:
-            request = await request.hooks.before_batch(request)
         
-        responses = await asyncio.wait([self.execute_prepared_request(request, idx, timeout) for idx in range(concurrency)], timeout=timeout)
-        
-        if request.hooks.after_batch:
-            request = await request.hooks.after_batch(request)
-
-        return responses
+        return [asyncio.create_task(self.execute_prepared_request(request, idx, timeout)) for idx in range(concurrency)]

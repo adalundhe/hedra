@@ -1,0 +1,22 @@
+from enum import Enum
+
+class StreamStateMap(Enum):
+    SEND_HEADERS = 0
+    SEND_PUSH_PROMISE = 1
+    SEND_RST_STREAM = 2
+    SEND_DATA = 3
+    SEND_WINDOW_UPDATE = 4
+    SEND_END_STREAM = 5
+    RECV_HEADERS = 6
+    RECV_PUSH_PROMISE = 7
+    RECV_RST_STREAM = 8
+    RECV_DATA = 9
+    RECV_WINDOW_UPDATE = 10
+    RECV_END_STREAM = 11
+    RECV_CONTINUATION = 12  # Added in 2.0.0
+    SEND_INFORMATIONAL_HEADERS = 13  # Added in 2.2.0
+    RECV_INFORMATIONAL_HEADERS = 14  # Added in 2.2.0
+    SEND_ALTERNATIVE_SERVICE = 15  # Added in 2.3.0
+    RECV_ALTERNATIVE_SERVICE = 16  # Added in 2.3.0
+    UPGRADE_CLIENT = 17  # Added 2.3.0
+    UPGRADE_SERVER = 18  # Added 2.3.0

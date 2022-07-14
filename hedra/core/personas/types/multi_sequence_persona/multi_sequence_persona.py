@@ -80,7 +80,7 @@ class MultiSequencePersona(DefaultPersona):
         elapsed_times = []
 
         async for sequence in self.sequences:
-            elapsed_times.append(sequence.elapsed)
+            elapsed_times.append(sequence.total_elapsed)
 
         self.total_elapsed = sum(elapsed_times)/len(elapsed_times)
         self.total_actions = len(results)

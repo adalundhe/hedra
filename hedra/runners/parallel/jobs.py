@@ -10,18 +10,16 @@ from hedra.test import (
 
 
 def run_job(config):
-
     logger = Logger()
     session_logger = logger.generate_logger()
 
     try:
         
-        import uvloop
-        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-        uvloop.install()
+        import asyncio
         
+        policy = asyncio.get_event_loop_policy()
+        policy.set_event_loop(policy.new_event_loop())
         loop = asyncio.get_event_loop()
-        asyncio.set_event_loop(loop)
 
         config = dill.loads(config)
 
@@ -57,16 +55,13 @@ def run_job(config):
 
 async def _run_job(worker):
     await worker.setup()
-    process_barrier.wait()
 
     for pipeline_stage in worker.pipeline:
         stage.value = pipeline_stage.name
         await worker.pipeline.execute_stage(pipeline_stage)
-        process_barrier.wait()
 
     stage.value = b'serializing'
     parsed_results = await worker.calculate_results()
-    process_barrier.wait()
 
     return parsed_results
 

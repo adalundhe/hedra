@@ -1,4 +1,4 @@
-from mercury_http.common import Response
+from hedra.core.engines.types.common import Response
 from .event_tags import EventTagCollection
 
 

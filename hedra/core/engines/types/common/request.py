@@ -30,7 +30,9 @@ class Request:
         self.name = name
         self.method = method
         self.type = request_type
-        self.url = URL(url, socket_type=self.protocols[request_type])
+
+        address_family, protocol = self.protocols[request_type]
+        self.url = URL(url, family=address_family, protocol=protocol)
         self.params = Params(params)
         self.headers = Headers(headers)
         self.payload = Payload(payload)

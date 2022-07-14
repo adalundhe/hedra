@@ -37,7 +37,7 @@ class Execution(BaseStage):
 
             else:
                 self.results = await self.selected_persona.execute()
-
+       
             completed_actions = self.selected_persona.total_actions
             total_time = self.selected_persona.total_elapsed
             actions_per_second = completed_actions / total_time
@@ -57,7 +57,6 @@ class Execution(BaseStage):
             }
 
         except Exception as e:
-            print(traceback.format_exc())
             pass
 
         return self.selected_persona

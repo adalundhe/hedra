@@ -72,7 +72,7 @@ class WeightedSelectionPersona(DefaultPersona):
             if len(self.sampled_actions) < 1:
                 self.sampled_actions = self._sample()
 
-        self.end = elapsed + self.start
+        self.end = time.time()
 
         await self.stop_updates()
 
@@ -88,7 +88,7 @@ class WeightedSelectionPersona(DefaultPersona):
                 pass
 
         self.total_actions = len(results)
-        self.total_elapsed = elapsed
+        self.total_elapsed = self.end - self.start
 
         return results
 

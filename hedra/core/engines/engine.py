@@ -1,7 +1,4 @@
 import asyncio
-import uvloop
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-uvloop.install()
 from easy_logger import Logger
 from async_tools.functions import check_event_loop
 

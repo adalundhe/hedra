@@ -8,5 +8,5 @@ class ConnectionPool:
         self.connections = []
 
     def create_pool(self):
-        self.connections = [HTTP2Connection(idx) for idx in range(self.size)]
+        self.connections = [HTTP2Connection(self.size) for _ in range(self.size)]
     

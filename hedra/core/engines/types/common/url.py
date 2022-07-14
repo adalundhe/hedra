@@ -1,13 +1,14 @@
+from pydoc import resolve
 import aiodns
 import socket
 from urllib.parse import urlparse
 from asyncio.events import get_running_loop
-from .types import SocketTypes
+from .types import SocketProtocols, SocketTypes
 
 
 class URL:
 
-    def __init__(self, url: str, port: int=80, socket_type: SocketTypes= SocketTypes.DEFAULT) -> None:
+    def __init__(self, url: str, port: int=80, family: SocketTypes=SocketTypes.DEFAULT, protocol: SocketProtocols=SocketProtocols.DEFAULT) -> None:
         self.resolver = aiodns.DNSResolver()
         self.ip_addr = None
         self.parsed = urlparse(url)
@@ -20,7 +21,8 @@ class URL:
         self.full = url
         self.has_ip_addr = False 
         self.socket_config = None
-        self.socket_type = socket_type
+        self.family = family
+        self.protocol = protocol
         self.loop = None
 
     async def lookup(self):
@@ -28,25 +30,27 @@ class URL:
         if self.loop is None:
             self.loop = get_running_loop()
 
-        hosts = await self.resolver.query(self.parsed.hostname, 'A')
-        resolved = hosts.pop()
-        self.ip_addr = resolved.host
-        self.has_ip_addr = True
+        infos = {}
+        resolved = await self.resolver.gethostbyname(self.parsed.hostname, self.family)
+   
+        for address in resolved.addresses:
 
-        info = await self.loop.getaddrinfo(
-            self.ip_addr, 
-            self.port, 
-            family=self.socket_type, 
-            type=socket.SOCK_STREAM, 
-            proto=0, 
-            flags=0
-        )
+            info = await self.loop.getaddrinfo(
+                address, 
+                self.port, 
+                family=self.family, 
+                type=self.protocol, 
+                proto=0, 
+                flags=0
+            )
 
-        return info
+            if infos.get(address) is None:
+                infos[address] = [*info]
 
-        self.socket_config = info[0]
+            else:
+                infos[address].extend(info)
 
-        return self.ip_addr
+        return infos
 
     def set_ip_addr_and_port(self, ip_addr):
         self.ip_addr = ip_addr

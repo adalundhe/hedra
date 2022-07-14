@@ -2,13 +2,10 @@ import time
 import asyncio
 from typing import List
 import psutil
-import uvloop
 from async_tools.functions.awaitable import awaitable
 
 from hedra.core.personas.batching.batch import Batch
 from hedra.test.hooks.hook import Hook
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-uvloop.install()
 from easy_logger import Logger
 from hedra.core.personas.batching import Batch
 from hedra.core.personas.batching.batch_interval import BatchInterval
@@ -86,54 +83,62 @@ class DefaultPersona:
             self._parsed_actions.extend(action_set.actions)
 
     async def execute(self):
-
-        elapsed = 0
-        results = []
+        actions = self._parsed_actions
+        actions_count = self.actions_count
+        total_time = self.total_time
 
         await self.start_updates()
-        current_action_idx = 0
         
         start = time.time()
 
-        while elapsed < self.total_time:
-            
-            next_timeout = self.total_time - elapsed
-            hook = self._parsed_actions[current_action_idx]
-            
-            self.batch.deferred.append(asyncio.create_task(
-                hook.session.execute_batch(
-                    hook.action,
-                    concurrency=self.batch.size,
-                    timeout=next_timeout
+        completed, pending = await asyncio.wait([
+            asyncio.create_task(
+                actions[action_idx].session.execute_prepared_request(
+                    actions[action_idx].action,
+                    idx,
+                    timeout=total_time,
                 )
-            ))
-            
-            await asyncio.sleep(self.batch.interval.period)
-        
-            elapsed = time.time() - start
+            ) async for idx, action_idx in self.generator(
+                total_time, 
+                actions_count,
+                self.batch.size
+            )
+        ], timeout=1)
 
-            current_action_idx = (current_action_idx + 1) % self.actions_count
-        
-        self.start = start
-        self.end = elapsed + self.start
+        results = await asyncio.gather(*completed)
+
+        self.end = time.time()
+
         await self.stop_updates()
 
-        for deferred_batch in self.batch.deferred:
-            batch, pending = await deferred_batch
-            collected = await asyncio.gather(*batch)
-            results.extend(collected)
-            
+        self.start = start
+        for pend in pending:
             try:
-                for pend in pending:
-                    pend.cancel()
-            except Exception as e:
+                pend.cancel()
+            except Exception:
                 pass
-            
-        self.total_actions = len(results)
-        self.total_elapsed = elapsed
+
+        self.total_actions = len(set(results))
+        self.total_elapsed = self.end - self.start
         self.optimized_params = None
 
         return results
+
+    async def generator(self, total_time, actions_count, batch_size):
+        elapsed = 0
+        idx = 0
+        action_idx = 0
+
+        start = time.time()
+        while elapsed < total_time:
+            yield idx, action_idx
+            
+            await asyncio.sleep(0)
+            elapsed = time.time() - start
+            idx += 1
+
+            if idx%batch_size == 0:
+                action_idx = (action_idx + 1)%actions_count
 
     async def close(self):
         await self.engine.close()

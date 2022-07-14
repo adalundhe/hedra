@@ -42,8 +42,8 @@ class HTTPClient:
                 checks=[]
             )
 
-            if result and result.error:
-                raise result.error
+            if isinstance(result, Exception):
+                raise result
 
 
     async def post(

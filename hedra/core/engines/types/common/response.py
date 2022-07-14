@@ -28,6 +28,7 @@ class BaseResponse:
         self.extentions = {}
         self.response_code = None
         self.type = None
+        self.deferred_headers = None
         self.channel_id = 0
 
     def _set_response_headers(self, response_headers: dict = {}):

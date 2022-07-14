@@ -1,6 +1,5 @@
 import asyncio
 import time
-import traceback
 from types import FunctionType
 from typing import Awaitable, Dict, List, Optional, Set, Tuple
 from hedra.core.engines.types.common.timeouts import Timeouts
@@ -20,7 +19,7 @@ HTTP2BatchResponseFuture = Awaitable[Tuple[Set[HTTP2ResponseFuture], Set[HTTP2Re
 class MercuryHTTP2Client:
 
     def __init__(self, concurrency: int = 10**3, timeouts: Timeouts = None, hard_cache: bool=False, reset_connections: bool=False) -> None:
-        
+
         if timeouts is None:
             timeouts = Timeouts(connect_timeout=10)
 
@@ -50,25 +49,38 @@ class MercuryHTTP2Client:
             if self._hosts.get(request.url.hostname) is None:
                 socket_configs = await request.url.lookup()
 
-                for config in socket_configs:
-                    
-                    try:
-                        connection = HTTP2Connection()
-                        await connection.connect(
-                            request.url.hostname,
-                            request.url.ip_addr,
-                            request.url.port,
-                            config,
-                            ssl=request.ssl_context
-                        )
+                for ip_addr, configs in socket_configs.items():
+                        for config in configs:
+                            try:
+                                stream = AsyncStream(
+                                    0, 
+                                    self.timeouts, 
+                                    self.concurrency,
+                                    self.pool.reset_connections,
+                                    self.pool.pool_type
+                                )
+                                await stream.connect(
+                                    request.url.hostname,
+                                    ip_addr,
+                                    request.url.port,
+                                    config,
+                                    ssl=self.ssl_context
+                                )
 
-                        request.url.socket_config = config
-                        break
+                                request.url.socket_config = config
+                                break
 
-                    except Exception as e:
-                        pass
-            
+                            except Exception as e:
+                                pass
+
+                        if request.url.socket_config:
+                            break
+
                 self._hosts[request.url.hostname] = request.url.ip_addr
+
+                if request.url.socket_config is None:
+                        raise Exception('Err. - No socket found.')
+                        
             else:
                 request.url.ip_addr = self._hosts[request.url.hostname]
 
@@ -81,43 +93,25 @@ class MercuryHTTP2Client:
             self.registered[request.name] = request
 
         except Exception as e:
-            return Response(request, error=e, type='http2')
+            return e
 
-    async def update_from_context(self, request_name: str):
-        previous_request = self.registered.get(request_name)
-        context_request = self.context.update_request(previous_request)
-        await self.prepare_request(context_request, context_request.checks)
-
-    async def update_request(self, update_request: Request):
-        previous_request = self.registered.get(update_request.name)
-
-        previous_request.method = update_request.method
-        previous_request.headers.data = update_request.headers.data
-        previous_request.params.data = update_request.params.data
-        previous_request.payload.data = update_request.payload.data
-        previous_request.metadata.tags = update_request.metadata.tags
-        previous_request.checks = update_request.checks
-
-        self.registered[update_request.name] = previous_request
-
-    async def execute_prepared_request(self, request_name: str, idx: int, timeout: int) -> HTTP2ResponseFuture:
-        request = self.registered[request_name]
+    async def execute_prepared_request(self, request: Request, idx: int, timeout: int) -> HTTP2ResponseFuture:
+        
         response = Response(request, type='http2')
-
         stream_id = idx%self.pool.size
-
-        if request.hooks.before:
-            request = await request.hooks.before(idx, request)
+        stream = self.pool.connections[stream_id]
 
         try:
+            
+            if request.hooks.before:
+                request = await request.hooks.before(idx, request)
+
+            await stream.lock.acquire()
             connection = self.connection_pool.connections[stream_id]
-            await connection.lock.acquire()
-
-            stream = self.pool.connections[stream_id]
-
+            
             start = time.time()
 
-            await asyncio.wait_for(stream.connect(
+            reader_writer = await asyncio.wait_for(stream.connect(
                 request.url.hostname,
                 request.url.ip_addr,
                 request.url.port,
@@ -125,38 +119,43 @@ class MercuryHTTP2Client:
                 ssl=request.ssl_context
             ), self.timeouts.connect_timeout)
 
-            connection.connect(stream)
-
-            connection.send_request_headers(request, stream)
-
-            await connection.submit_request_body(request, stream)
-                
-            await asyncio.wait_for(connection.receive_response(response, stream), timeout)
+            connection.connect(reader_writer)
+            connection.send_request_headers(request, reader_writer)
+            await connection.submit_request_body(request, reader_writer)
+            await connection.receive_response(response, reader_writer)
 
             elapsed = time.time() - start
 
             response.time = elapsed
-            self.context.last[request_name] = response
 
             if request.hooks.after:
                 response = await request.hooks.after(idx, response)
             
-            connection.lock.release()
+            self.context.last[request.name] = response
+            
+            stream.lock.release()
 
             return response
             
         except Exception as e:
             response.response_code = 500
             response.error = e
-            self.context.last[request_name] = response
-            self.pool.connections[stream_id] = AsyncStream(stream.stream_id, self.timeouts, self.concurrency, self.pool.reset_connections)
+            self.context.last[request.name] = response
+
+            self.pool.connections[stream_id] = AsyncStream(
+                stream.stream_id, self.timeouts, 
+                self.concurrency, 
+                self.pool.reset_connections,
+                self.pool.pool_type
+            )
+
             self.connection_pool.connections[stream_id] = HTTP2Connection(stream_id)
             return response
 
     async def request(self, request: Request) -> HTTP2ResponseFuture:
-        return await self.execute_prepared_request(request.name, 0)
+        return await self.execute_prepared_request(request, 0)
 
-    async def execute_batch(self, request: Request, concurrency: Optional[int]=None, timeout: Optional[float]=None) -> HTTP2BatchResponseFuture:
+    def execute_batch(self, request: Request, concurrency: Optional[int]=None, timeout: Optional[float]=None) -> HTTP2BatchResponseFuture:
 
         if concurrency is None:
             concurrency = self.concurrency
@@ -164,15 +163,9 @@ class MercuryHTTP2Client:
         if timeout is None:
             timeout = self.timeouts.total_timeout
 
-        if request.hooks.before_batch:
-            request = await request.hooks.before_batch(request)
+        return [ asyncio.create_task(
+            self.execute_prepared_request(request.name, idx, timeout)
+        ) for idx in range(concurrency)]
 
-        responses = await asyncio.wait([self.execute_prepared_request(request.name, idx, timeout) for idx in range(concurrency)], timeout=timeout)
-        
-        if request.hooks.after_batch:
-            request = await request.hooks.after_batch(request)
-
-        return responses
-        
     async def close(self) -> Awaitable[None]:
         await self.pool.close()

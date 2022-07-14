@@ -18,7 +18,6 @@ dill
 scipy
 art
 scikit-learn
-uvloop
 asyncio-pool
 aiopg
 prometheus-client

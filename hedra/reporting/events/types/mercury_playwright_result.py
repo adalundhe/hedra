@@ -1,4 +1,4 @@
-from mercury_http.playwright import Result
+from hedra.core.engines.types.playwright import Result
 from .event_tags import EventTagCollection
 
 

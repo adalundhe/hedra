@@ -1,92 +1,148 @@
 import asyncio
+from asyncio.constants import SSL_HANDSHAKE_TIMEOUT
 import socket
-import weakref
+from weakref import ref
 from ssl import SSLContext
 from typing import Optional
-from asyncio.events import get_running_loop
-from asyncio.streams import (
-    StreamReader,
-    StreamReaderProtocol,
-    StreamWriter
+from .fast_streams import (
+    FastReader,
+    FastWriter,
+    FastReaderProtocol
 )
+from asyncio.events import get_running_loop
+from asyncio.sslproto import SSLProtocol
+from .types import RequestTypes
 
-
+_SSL_CONNECT_TIMEOUT = 30
 _DEFAULT_LIMIT= 65536
+_HTTP2_LIMIT = _DEFAULT_LIMIT * 1024
+
 
 class TLSStreamReaderProtocol(asyncio.StreamReaderProtocol):
 
-    def upgrade_reader(self, reader: StreamReader):
-        if self._stream_reader is not None:
+    def upgrade_reader(self, reader: FastReader):
+
+        if self._stream_reader:
             self._stream_reader.set_exception(Exception('upgraded connection to TLS, this reader is obsolete now.'))
-        self._stream_reader_wr = weakref.ref(reader)
+
+        self._stream_reader_wr = ref(reader)
         self._source_traceback = reader._source_traceback
 
 
+class Connection:
+
+    def __init__(self, reader: FastReader, writer: FastWriter) -> None:
+        self._reader = reader
+        self._writer = writer
+
+    def send(self, data: bytes):
+        return self._writer.write(data)
+
+    async def read(self, size: int=_DEFAULT_LIMIT):
+        return await self._reader.read(size)
+
 class ConnectionFactory:
 
-    def __init__(self) -> None:
-      self.loop = None
-      self.transport = None
+    def __init__(self, factory_type: RequestTypes = RequestTypes.HTTP) -> None:
+        self.loop: asyncio.AbstractEventLoop = get_running_loop()
+        self.transport = None
+        self.factory_type = factory_type
+        self._connection = None
 
-    async def create(self, hostname=None, socket_config=None, *, limit=_DEFAULT_LIMIT, **kwds):
-
-        if self.loop is None:
-            self.loop = get_running_loop()
-
-        if kwds.get('ssl') is None:
-            hostname = None
-
-        reader = StreamReader(limit=2**16, loop=self.loop)
-        protocol = StreamReaderProtocol(reader, loop=self.loop)
-
+    async def create(self, hostname=None, socket_config=None, *, limit=_DEFAULT_LIMIT, ssl=None):
         family, type_, proto, _, address = socket_config
+
         sock = socket.socket(family=family, type=type_, proto=proto)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        await self.loop.run_in_executor(None, sock.connect, address)
+
         sock.setblocking(False)
-        await self.loop.sock_connect(sock, address)
 
-        transport, _ = await self.loop.create_connection(lambda: protocol, sock=sock, server_hostname=hostname, **kwds)
-        writer = StreamWriter(transport, protocol, reader, self.loop)
+        reader = FastReader(limit=limit, loop=self.loop)
+        reader_protocol = FastReaderProtocol(reader, loop=self.loop)
 
-        return reader, writer
+        if ssl is None:
+            hostname = None
 
-    async def create_tls(self, hostname=None, socket_config=None, ssl: Optional[SSLContext] = None):
+        self.transport, _ = await self.loop.create_connection(
+            lambda: reader_protocol, 
+            sock=sock,
+            server_hostname=hostname,
+            ssl=ssl
+        )
+
+        writer = FastWriter(self.transport, reader_protocol, reader, self.loop)
+
+        self._connection = Connection(reader, writer)
+        
+        return self._connection
+
+    async def create_http2(self, hostname=None, socket_config=None, ssl: Optional[SSLContext] = None, ssl_timeout: int = SSL_HANDSHAKE_TIMEOUT):
         # this does the same as loop.open_connection(), but TLS upgrade is done
         # manually after connection be established.
         if self.loop is None:
             self.loop = get_running_loop()
 
-        reader = StreamReader(limit=2**64, loop=self.loop)
-        protocol = TLSStreamReaderProtocol(reader, loop=self.loop)
-
         family, type_, proto, _, address = socket_config
         sock = socket.socket(family=family, type=type_, proto=proto)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        await self.loop.run_in_executor(None, sock.connect, address)
         sock.setblocking(False)
-        await self.loop.sock_connect(sock, address)
 
-        transport, _ = await self.loop.create_connection(
-            lambda: protocol, 
-            sock=sock,
-            family=socket.AF_INET
-        )
+        reader = FastReader(limit=_HTTP2_LIMIT, loop=self.loop)
 
-        writer = asyncio.StreamWriter(transport, protocol, reader, self.loop)
-        # here you can use reader and writer for whatever you want, for example
-        # start a proxy connection and start TLS to target host later...
-        # now perform TLS upgrade
-        if ssl:
-            transport = await self.loop.start_tls(
-                transport,
-                protocol,
-                sslcontext=ssl,
-                server_side=False,
-                server_hostname=hostname
+        if self.factory_type == RequestTypes.GRPC:
+            protocol = TLSStreamReaderProtocol(reader, loop=self.loop)
+
+            self.transport, _ = await self.loop.create_connection(
+                lambda: protocol, 
+                sock=sock,
+                happy_eyeballs_delay=0.1,
+                family=socket.AF_INET
+            )
+            
+            ssl_protocol = SSLProtocol(
+                self.loop, 
+                protocol, 
+                ssl, 
+                None,
+                False, 
+                hostname,
+                ssl_handshake_timeout=ssl_timeout,
+                call_connection_made=False
             )
 
-            reader = asyncio.StreamReader(limit=2**64, loop=self.loop)
-            protocol.upgrade_reader(reader) # update reader
-            protocol.connection_made(transport) # update transport
-            writer = asyncio.StreamWriter(transport, protocol, reader, self.loop) # update writer
+            # Pause early so that "ssl_protocol.data_received()" doesn't
+            # have a chance to get called before "ssl_protocol.connection_made()".
+            self.transport.pause_reading()
 
-        return reader, writer
+            self.transport.set_protocol(ssl_protocol)
+            await self.loop.run_in_executor(None, ssl_protocol.connection_made, self.transport)
+            self.transport.resume_reading()
+
+            self.transport = ssl_protocol._app_transport
+
+            reader = FastReader(limit=_HTTP2_LIMIT, loop=self.loop)
+            protocol.upgrade_reader(reader) # update reader
+            protocol.connection_made(self.transport) # update transport
+            writer = FastWriter(self.transport, ssl_protocol, reader, self.loop) # update writer
+
+
+            return reader, writer
+
+        else:
+            reader_protocol = FastReaderProtocol(reader, loop=self.loop)
+
+            if ssl is None:
+                hostname = None
+
+            self.transport, _ = await self.loop.create_connection(
+                lambda: reader_protocol, 
+                sock=sock,
+                server_hostname=hostname,
+                ssl=ssl
+            )
+
+            writer = FastWriter(self.transport, reader_protocol, reader, self.loop)
+
+            return reader, writer

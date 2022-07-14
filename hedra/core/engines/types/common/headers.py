@@ -1,10 +1,8 @@
-from ctypes import c_char_p
 import os
-import enum
 from base64 import encodebytes as base64encode
 from typing import Dict
-from urllib.parse import urlencode
 from typing import Union
+from .encoder import Encoder
 from hedra.core.engines.types.common.params import Params
 from .constants import NEW_LINE, WEBSOCKETS_VERSION
 from .url import URL
@@ -29,6 +27,7 @@ class Headers:
     def __init__(self, headers: Dict[str, str]) -> None:
         self.data = headers
         self.encoded_headers = None
+        self.hpack_encoder = Encoder()
 
     @property
     def as_dict(self):
@@ -74,19 +73,32 @@ class Headers:
     def setup_http2_headers(self, method: str, url: URL) -> None:
         
         self.encoded_headers = [
-                (b":method", method),
-                (b":authority", url.authority),
-                (b":scheme", url.scheme),
-                (b":path", url.path),
-            ] + [
-                (k.lower(), v)
-                for k, v in self.data.items()
-                if k.lower()
-                not in (
-                    b"host",
-                    b"transfer-encoding",
-                )
-            ]
+            (b":method", method),
+            (b":authority", url.authority),
+            (b":scheme", url.scheme),
+            (b":path", url.path),
+        ]
+
+        self.encoded_headers.extend([
+            (
+                k.lower(), 
+                v
+            )
+            for k, v in self.data.items()
+            if k.lower()
+            not in (
+                b"host",
+                b"transfer-encoding",
+            )
+        ])
+        
+        self.encoded_headers = self.hpack_encoder.encode(self.encoded_headers)
+        self.data.update({
+            "authority": url.authority,
+            "scheme": url.scheme,
+            "path": url.path,
+            "method": method
+        })
 
     def setup_websocket_headders(self, method: str, url: URL):
 

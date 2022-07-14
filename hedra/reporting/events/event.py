@@ -2,7 +2,7 @@ import json
 import datetime
 import time
 import tzlocal
-from mercury_http.common import Response
+from hedra.core.engines.types.common import Response
 from .types import (
     MercuryPlaywrightResult,
     CustomEvent,

@@ -1,9 +1,6 @@
 import asyncio
-import uvloop
 import time
 from hedra.runners.leader_services.proto.leader_pb2 import PollLeaderJobRequest
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-uvloop.install()
 from operator import countOf
 from hedra.core import Executor
 from hedra.reporting import Handler

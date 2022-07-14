@@ -13,7 +13,6 @@ from queue import Queue
 from easy_logger import Logger
 from hedra.command_line import CommandLine
 from hedra.reporting import Handler
-from hedra.core.parsing import ActionsParser
 from .parallel.jobs import (
     create_job,
     run_job
@@ -38,7 +37,7 @@ class ParallelLocalWorker:
         self._stages_completed = 0
         self._monitor_thread = None
 
-        cpu_count = psutil.cpu_count(logical=False)
+        cpu_count = psutil.cpu_count()
         self._size = self.executor_config.get(
             'pool_size',
             cpu_count
@@ -69,6 +68,7 @@ class ParallelLocalWorker:
         self._current_stage.value = b'initializing'
 
         self._results = []
+        self._jobs = []
         self._jobs_configs = []
         self._total_actions = 0
         self._progress_bar = None
@@ -106,6 +106,7 @@ class ParallelLocalWorker:
                 else:
                     command_line.actions = dict(self.config.actions)
                 
+                # command_line.executor_config['batch_size'] = batch_size
                 if idx == last_batch_idx:
                     command_line.executor_config['batch_size'] = last_batch_size
                 else:
@@ -148,31 +149,37 @@ class ParallelLocalWorker:
             self.session_logger.error(f'\nErr - encountered exception while running parallel job - {str(err)}')
             exit(1)
 
+
     def _run(self, configs):
-        pool = multiprocessing.Pool(
-            self._workers, 
-            initializer=create_job, 
-            initargs=(
-                self._barrier,
-                self.stages,
-                self._current_stage,
-                self.optimized_aps,
-                self.optimized_batch_size,
-                self.optimized_batch_time,
-            )
+        shared = (
+            self._barrier,
+            self.stages,
+            self._current_stage,
+            self.optimized_aps,
+            self.optimized_batch_size,
+            self.optimized_batch_time,
         )
 
-        self._results = pool.map_async(run_job, configs, )
+        pool = multiprocessing.Pool(
+            processes=self._workers,
+            initializer=create_job,
+            initargs=shared
+        )
+        
+        self._jobs = pool.map_async(run_job, configs)
 
         if self._no_run_visuals:
-            self._results = self._results.get()
+            
+            self._results = self._jobs.get()
 
         else:
             self._stages_completed += 1
             self._progress_bar()
             self._progress_bar.text(f'- {self._current_stage.value.decode()}')
             self._monitor()
-            self._results = self._results.get()
+
+            self._results = self._jobs.get()
+
             self._monitor_thread.join()
 
     def _monitor(self):
