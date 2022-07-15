@@ -8,7 +8,6 @@ from hedra.core.engines.types.http2.stream import AsyncStream
 from hedra.core.engines.types.common import Request, Response
 from hedra.core.engines.types.common.context import Context
 from hedra.core.engines.types.common.ssl import get_http2_ssl_context
-from .connection_pool import ConnectionPool
 from .pool import HTTP2Pool
 
 
@@ -36,8 +35,6 @@ class MercuryHTTP2Client:
         self.pool: HTTP2Pool = HTTP2Pool(self.concurrency, self.timeouts, reset_connections=reset_connections)
         self.pool.create_pool()
 
-        self.connection_pool = ConnectionPool(self.concurrency)
-        self.connection_pool.create_pool()
         self.responses = []
         self._connected = False
         self.context = Context()
@@ -98,8 +95,9 @@ class MercuryHTTP2Client:
     async def execute_prepared_request(self, request: Request, idx: int, timeout: int) -> HTTP2ResponseFuture:
         
         response = Response(request, type='http2')
+
         stream_id = idx%self.pool.size
-        stream = self.pool.connections[stream_id]
+        stream = self.pool.streams[stream_id]
 
         try:
             
@@ -107,7 +105,7 @@ class MercuryHTTP2Client:
                 request = await request.hooks.before(idx, request)
 
             await stream.lock.acquire()
-            connection = self.connection_pool.connections[stream_id]
+            connection = self.pool.connections[stream_id]
             
             start = time.time()
 
@@ -142,14 +140,15 @@ class MercuryHTTP2Client:
             response.error = e
             self.context.last[request.name] = response
 
-            self.pool.connections[stream_id] = AsyncStream(
+            self.pool.streams[stream_id] = AsyncStream(
                 stream.stream_id, self.timeouts, 
                 self.concurrency, 
                 self.pool.reset_connections,
                 self.pool.pool_type
             )
 
-            self.connection_pool.connections[stream_id] = HTTP2Connection(stream_id)
+            self.pool.connections[stream_id] = HTTP2Connection(stream_id)
+
             return response
 
     async def request(self, request: Request) -> HTTP2ResponseFuture:

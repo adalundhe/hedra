@@ -12,13 +12,19 @@ class HTTP2Pool:
     def __init__(self, size: int, timeouts: Timeouts, reset_connections: bool=False) -> None:
         self.size = size
         self.connections: List[HTTP2Connection] = []
+        self.streams: List[AsyncStream] = []
         self.timeouts = timeouts
         self.pools_count = math.ceil(size/100)
         self.reset_connections = reset_connections
         self.pool_type: RequestTypes = RequestTypes.HTTP2
 
     def create_pool(self) -> None:
+
         self.connections = [
+            HTTP2Connection(self.size) for _ in range(self.size)
+        ]
+        
+        self.streams = [
             AsyncStream(
                 randrange(1, 2**20 + 2, 2), 
                 self.timeouts, 
