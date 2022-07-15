@@ -56,12 +56,3 @@ class PushPromiseFrame(Padding, Frame):
 
         self.data = data[padding_data_length + 4:len(data)-self.pad_length]
         self.body_len = len(data)
-
-        if self.promised_stream_id == 0 or self.promised_stream_id % 2 != 0:
-            raise Exception(
-                "Invalid PUSH_PROMISE promised stream id: %s" %
-                self.promised_stream_id
-            )
-
-        if self.pad_length and self.pad_length >= self.body_len:
-            raise Exception("Padding is too long.")

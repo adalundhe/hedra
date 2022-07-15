@@ -142,4 +142,5 @@ class Frame:
         """
         raise NotImplementedError()
 
-
+    def get_events_and_frames(self, stream, connection):
+        return None, None

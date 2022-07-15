@@ -1,4 +1,10 @@
 from typing import List, Any
+from hedra.core.engines.types.http2.errors.exceptions import StreamError
+from hedra.core.engines.types.http2.errors.types import ErrorCodes
+from hedra.core.engines.types.http2.events.stream_reset import StreamReset
+from hedra.core.engines.types.http2.events.window_updated_event import WindowUpdated
+from hedra.core.engines.types.http2.frames.types.reset_stream_frame import RstStreamFrame
+from hedra.core.engines.types.http2.reader_writer import ReaderWriter
 from .base_frame import Frame
 from .attributes import (
     Flag,
@@ -44,17 +50,59 @@ class WindowUpdateFrame(Frame):
         return _STRUCT_L.pack(self.window_increment & 0x7FFFFFFF)
 
     def parse_body(self, data: bytearray) -> None:
-        if len(data) > 4:
-            raise Exception(
-                "WINDOW_UPDATE frame must have 4 byte length: got %s" %
-                len(data)
-            )
-
         self.window_increment = _STRUCT_L.unpack(data)[0]
-
-        if not 1 <= self.window_increment <= 2**31-1:
-            raise Exception(
-                "WINDOW_UPDATE increment must be between 1 to 2^31-1"
-            )
-
         self.body_len = 4
+
+    def get_events_and_frames(self, stream: ReaderWriter, connection):
+        stream_events = []
+        frames = []
+        increment = self.window_increment
+        if self.stream_id:
+            try:
+
+                
+                event = WindowUpdated()
+                event.stream_id = stream.stream_id
+
+                # If we encounter a problem with incrementing the flow control window,
+                # this should be treated as a *stream* error, not a *connection* error.
+                # That means we need to catch the error and forcibly close the stream.
+                event.delta = increment
+
+                try:
+                    connection.outbound_flow_control_window = connection._guard_increment_window(
+                        connection.outbound_flow_control_window,
+                        increment
+                    )
+                except StreamError:
+                    # Ok, this is bad. We're going to need to perform a local
+                    # reset.
+
+                    event = StreamReset()
+                    event.stream_id = stream.stream_id
+                    event.error_code = ErrorCodes.FLOW_CONTROL_ERROR
+                    event.remote_reset = False
+
+                    stream.closed_by = ErrorCodes.FLOW_CONTROL_ERROR    
+                    
+                    rsf = RstStreamFrame(stream.stream_id)
+                    rsf.error_code = ErrorCodes.FLOW_CONTROL_ERROR
+
+                    frames = [rsf]
+
+                stream_events.append(event)
+            except Exception as e:
+                return [], stream_events
+        else:
+            connection.outbound_flow_control_window = connection._guard_increment_window(
+                connection.outbound_flow_control_window,
+                increment
+            )
+            # FIXME: Should we split this into one event per active stream?
+            window_updated_event = WindowUpdated()
+            window_updated_event.stream_id = 0
+            window_updated_event.delta = increment
+            stream_events.append(window_updated_event)
+            frames = []
+
+        return frames, stream_events

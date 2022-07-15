@@ -33,22 +33,11 @@ class PingFrame(Frame):
         )
 
     def serialize_body(self) -> bytes:
-        if len(self.opaque_data) > 8:
-            raise Exception(
-                "PING frame may not have more than 8 bytes of data, got %r" %
-                self.opaque_data
-            )
-
         data = self.opaque_data
         data += b'\x00' * (8 - len(self.opaque_data))
         return data
 
     def parse_body(self, data: bytearray) -> None:
-        if len(data) != 8:
-            raise Exception(
-                "PING frame must have 8 byte length: got %s" % len(data)
-            )
-
         self.opaque_data = data
         self.body_len = 8
 

@@ -1,5 +1,4 @@
 from typing import Dict, List, Tuple, Union
-from hedra.core.engines.types.http2.frames.types.headers_frame import HeadersFrame
 from hpack import Decoder
 from .base_event import BaseEvent
 
@@ -37,7 +36,7 @@ def is_informational_response(headers: Tuple[bytes, bytes]):
 class DeferredHeaders(BaseEvent):
     event_type='DEFERRED_HEADERS'
 
-    def __init__(self, table_size: int, frame: HeadersFrame, encoding: Union[str, None]) -> None:
+    def __init__(self, table_size: int, frame, encoding: Union[str, None]) -> None:
         super().__init__()
         self.stream_id = frame.stream_id
         self.hpack_table_size = table_size

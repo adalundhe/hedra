@@ -1,4 +1,7 @@
 from typing import Any
+from hedra.core.engines.types.http2.events.deferred_headers_event import DeferredHeaders
+from hedra.core.engines.types.http2.events.stream_ended_event import StreamEnded
+from hedra.core.engines.types.http2.reader_writer import ReaderWriter
 from .base_frame import Frame
 from .attributes import (
     Padding,
@@ -7,7 +10,6 @@ from .attributes import (
     _STREAM_ASSOC_HAS_STREAM
 )
 from .utils import raw_data_repr
-
 
 
 class HeadersFrame(Padding, Priority, Frame):
@@ -51,9 +53,6 @@ class HeadersFrame(Padding, Priority, Frame):
         )
 
     def serialize_body(self) -> bytes:
-        # Hyper themselves states that they don't use
-        # padding data or priority on header frames
-        # so why are we doing this?
         padding_data = self.serialize_padding_data()
         padding = b'\0' * self.pad_length
 
@@ -74,9 +73,31 @@ class HeadersFrame(Padding, Priority, Frame):
             priority_data_length = 0
 
         self.body_len = len(data)
-        self.data = (
-            data[priority_data_length:len(data)-self.pad_length]
+        self.data = data[priority_data_length:len(data)-self.pad_length]
+
+    def get_events_and_frames(self, stream: ReaderWriter, connection):
+        
+        # Hyper H2 would have you immediate unpack the headers,
+        # but as with the Encoder, the Decoder blocks the event loop.
+        # Instead, since we know the HeadersFrame is valid, we'll defer
+        # parsing the headers until explicitly needed (during results
+        # analysis/accumulation).
+
+        stream_events = []
+
+        deferred_headers = DeferredHeaders(
+            connection._decoder.header_table.maxsize,
+            self,
+            connection._h2_state.config.header_encoding
         )
 
-        if self.pad_length and self.pad_length >= self.body_len:
-            raise Exception("Padding is too long.")
+        stream_events.append(deferred_headers)
+
+        if deferred_headers.end_stream:
+            event = StreamEnded()
+            event.stream_id = stream.stream_id
+            
+            stream_events[0].stream_ended = event
+            stream_events.append(event)
+
+        return [], stream_events

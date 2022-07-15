@@ -22,6 +22,7 @@ class ReaderWriter:
         self.outbound: WindowManager = None
         self.closed_by = None
         self._authority = None
+        self.frame_buffer = None
 
     def write(self, data: bytes):
         self.writer._transport.write(data)

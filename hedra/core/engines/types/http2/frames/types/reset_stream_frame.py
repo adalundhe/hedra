@@ -1,5 +1,9 @@
 import struct
+import h2.errors
 from typing import List, Any
+from hedra.core.engines.types.http2.events.stream_reset import StreamReset
+from hedra.core.engines.types.http2.reader_writer import ReaderWriter
+from hedra.core.engines.types.http2.streams.stream_closed_by import StreamClosedBy
 from .base_frame import Frame
 from .attributes import (
     Flag,
@@ -41,15 +45,14 @@ class RstStreamFrame(Frame):
         return _STRUCT_L.pack(self.error_code)
 
     def parse_body(self, data: bytearray) -> None:
-        if len(data) != 4:
-            raise Exception(
-                "RST_STREAM must have 4 byte body: actual length %s." %
-                len(data)
-            )
-
-        try:
-            self.error_code = _STRUCT_L.unpack(data)[0]
-        except struct.error:  # pragma: no cover
-            raise Exception("Invalid RST_STREAM body")
-
+        self.error_code = _STRUCT_L.unpack(data)[0]
         self.body_len = 4
+    
+    def get_events_and_frames(self, stream: ReaderWriter, connection):
+
+        stream.closed_by = StreamClosedBy.RECV_RST_STREAM
+        reset_event = StreamReset()
+        reset_event.stream_id = stream.stream_id
+        reset_event[0].error_code = h2.errors._error_code_from_int(self.error_code)
+
+        return [], [reset_event]

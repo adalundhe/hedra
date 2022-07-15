@@ -2,9 +2,10 @@ import asyncio
 from ssl import SSLContext
 from typing import Tuple, Optional, Union
 from hedra.core.engines.types.common.timeouts import Timeouts
-from hedra.core.engines.types.common.connection_factory import ConnectionFactory
 from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core.engines.types.common.connection_factory import ConnectionFactory
 from .reader_writer import ReaderWriter
+from .frames import FrameBuffer
 
 
 class AsyncStream:
@@ -12,10 +13,9 @@ class AsyncStream:
     def __init__(self, stream_id: int, timeouts: Timeouts, concurrency: int, reset_connection: bool, stream_type: RequestTypes) -> None:
         self.timeouts = timeouts
         self.connected = False
+        self.init_id = stream_id
         self.reset_connection = reset_connection
         self.stream_type = stream_type
-        
-        self.init_id = stream_id
 
         if self.init_id%2 == 0:
             self.init_id += 1
@@ -26,7 +26,7 @@ class AsyncStream:
         self.port = None
         self._connection_factory = ConnectionFactory(stream_type)
         self.lock = asyncio.Lock()
-        self.reader_writer: ReaderWriter = None
+        self.reader_writer = None
 
     async def connect(self, 
         hostname: str, 
@@ -59,8 +59,8 @@ class AsyncStream:
 
                 self.reader_writer.stream_id = self.stream_id
 
+            self.reader_writer.frame_buffer = FrameBuffer()
             return self.reader_writer
 
         except Exception as e:
             raise e
-

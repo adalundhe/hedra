@@ -1,4 +1,10 @@
 from typing import Any
+from hedra.core.engines.types.http2.errors.exceptions import StreamClosedError
+from hedra.core.engines.types.http2.events.data_received_event import DataReceived
+from hedra.core.engines.types.http2.events.stream_ended_event import StreamEnded
+from hedra.core.engines.types.http2.frames.types.reset_stream_frame import RstStreamFrame
+from hedra.core.engines.types.http2.frames.types.window_update_frame import WindowUpdateFrame
+from hedra.core.engines.types.http2.reader_writer import ReaderWriter
 from .attributes import (
     Flag,
     _STREAM_ASSOC_HAS_STREAM,
@@ -43,9 +49,6 @@ class DataFrame(Padding, Frame):
         )
         self.body_len = len(data)
 
-        if self.pad_length and self.pad_length >= self.body_len:
-            raise Exception("Padding is too long.")
-
     @property
     def flow_controlled_length(self) -> int:
         """
@@ -58,3 +61,53 @@ class DataFrame(Padding, Frame):
             # present if possibly zero-valued.
             padding_len = self.pad_length + 1
         return len(self.data) + padding_len
+
+    def get_events_and_frames(self, stream: ReaderWriter, connection):
+        end_stream = 'END_STREAM' in self.flags
+        flow_controlled_length = self.flow_controlled_length
+        frame_data = self.data
+
+        frames = []
+        data_events = []
+        connection._inbound_flow_control_window_manager.window_consumed(
+            flow_controlled_length
+        )
+
+        try:
+            
+            stream.inbound.window_consumed(flow_controlled_length)
+      
+            event = DataReceived()
+            event.stream_id = stream.stream_id
+
+            data_events.append(event)
+
+            if end_stream:
+                event = StreamEnded()
+                event.stream_id = stream.stream_id
+                data_events[0].stream_ended = event
+                data_events.append(event)
+
+            data_events[0].data = frame_data
+            data_events[0].flow_controlled_length = flow_controlled_length
+            return frames, data_events
+
+        except StreamClosedError as e:
+            # This stream is either marked as CLOSED or already gone from our
+            # internal state.
+            
+            conn_manager = connection._inbound_flow_control_window_manager
+            conn_increment = conn_manager.process_bytes(
+                flow_controlled_length
+            )
+
+            if conn_increment:
+                f = WindowUpdateFrame(0)
+                f.window_increment = conn_increment
+                frames.append(f)
+
+            f = RstStreamFrame(e.stream_id)
+            f.error_code = e.error_code
+            frames.append(f)
+    
+            return frames, data_events + e._events

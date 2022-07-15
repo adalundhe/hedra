@@ -1,4 +1,8 @@
 from typing import Optional, Dict, Any
+from hedra.core.engines.types.http2.events.remote_settings_changed_event import RemoteSettingsChanged
+from hedra.core.engines.types.http2.events.settings_acknowledged_event import SettingsAcknowledged
+from hedra.core.engines.types.http2.reader_writer import ReaderWriter
+from hedra.core.engines.types.http2.streams.stream_settings import SettingCodes
 from .base_frame import Frame
 from .attributes import (
     Flag,
@@ -30,20 +34,6 @@ class SettingsFrame(Frame):
 
     # We need to define the known settings, they may as well be class
     # attributes.
-    #: The byte that signals the SETTINGS_HEADER_TABLE_SIZE setting.
-    HEADER_TABLE_SIZE = 0x01
-    #: The byte that signals the SETTINGS_ENABLE_PUSH setting.
-    ENABLE_PUSH = 0x02
-    #: The byte that signals the SETTINGS_MAX_CONCURRENT_STREAMS setting.
-    MAX_CONCURRENT_STREAMS = 0x03
-    #: The byte that signals the SETTINGS_INITIAL_WINDOW_SIZE setting.
-    INITIAL_WINDOW_SIZE = 0x04
-    #: The byte that signals the SETTINGS_MAX_FRAME_SIZE setting.
-    MAX_FRAME_SIZE = 0x05
-    #: The byte that signals the SETTINGS_MAX_HEADER_LIST_SIZE setting.
-    MAX_HEADER_LIST_SIZE = 0x06
-    #: The byte that signals SETTINGS_ENABLE_CONNECT_PROTOCOL setting.
-    ENABLE_CONNECT_PROTOCOL = 0x08
 
     def __init__(self, stream_id: int = 0, settings: Optional[Dict[int, int]] = None, **kwargs: Any) -> None:
         super().__init__(stream_id, **kwargs)
@@ -66,12 +56,6 @@ class SettingsFrame(Frame):
         return body
 
     def parse_body(self, data: bytearray) -> None:
-        if 'ACK' in self.flags and len(data) > 0:
-            raise Exception(
-                "SETTINGS ack frame must not have payload: got %s bytes" %
-                len(data)
-            )
-
         body_len = 0
         for i in range(0, len(data), 6):
 
@@ -81,3 +65,70 @@ class SettingsFrame(Frame):
             body_len += 6
 
         self.body_len = body_len
+
+    def get_events_and_frames(self, stream: ReaderWriter, connection):
+        events = []
+        if 'ACK' in self.flags:
+
+            changes = connection.local_settings.acknowledge()
+    
+            initial_window_size_change = changes.get(SettingCodes.INITIAL_WINDOW_SIZE)
+            max_header_list_size_change = changes.get(SettingCodes.MAX_HEADER_LIST_SIZE)
+            max_frame_size_change = changes.get(SettingCodes.MAX_FRAME_SIZE)
+            header_table_size_change =changes.get(SettingCodes.HEADER_TABLE_SIZE)
+
+            if initial_window_size_change is not None:
+
+                window_delta = initial_window_size_change.new_value - initial_window_size_change.original_value
+                
+                new_max_window_size = stream.inbound.max_window_size + window_delta
+                stream.inbound.window_opened(window_delta)
+                stream.inbound.max_window_size = new_max_window_size
+
+            if max_header_list_size_change is not None:
+                connection._decoder.max_header_list_size = max_header_list_size_change.new_value
+
+            if max_frame_size_change is not None:
+                stream.max_outbound_frame_size =  max_frame_size_change.new_value
+
+            if header_table_size_change:
+                # This is safe across all hpack versions: some versions just won't
+                # respect it.
+                connection._decoder.max_allowed_table_size = header_table_size_change.new_value
+
+            ack_event = SettingsAcknowledged()
+            ack_event.changed_settings = changes
+            events.append(ack_event)
+            return [], events
+
+        # Add the new settings.
+        connection.remote_settings.update(self.settings)
+        events.append(
+            RemoteSettingsChanged.from_settings(
+                connection.remote_settings, self.settings
+            )
+        )
+
+        changes = connection.remote_settings.acknowledge()
+        initial_window_size_change = changes.get(SettingCodes.INITIAL_WINDOW_SIZE)
+        header_table_size_change = changes.get(SettingCodes.HEADER_TABLE_SIZE)
+        max_frame_size_change = changes.get(SettingCodes.MAX_FRAME_SIZE)
+     
+        if initial_window_size_change:
+            stream.current_outbound_window_size = connection._guard_increment_window(
+                stream.current_outbound_window_size,
+                initial_window_size_change.new_value - initial_window_size_change.original_value
+            )
+
+        # HEADER_TABLE_SIZE changes by the remote part affect our encoder: cf.
+        # RFC 7540 Section 6.5.2.
+        if  header_table_size_change:
+            connection._encoder.header_table_size = header_table_size_change.new_value
+
+        if max_frame_size_change:
+            stream.max_outbound_frame_size = max_frame_size_change.new_value
+
+        frames = SettingsFrame(0)
+        frames.flags.add('ACK')
+
+        return [frames], events
