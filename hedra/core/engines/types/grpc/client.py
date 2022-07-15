@@ -82,7 +82,7 @@ class MercuryGRPCClient(MercuryHTTP2Client):
         
         response = Response(request, type='http2')
         stream_id = idx%self.pool.size
-        stream = self.pool.connections[stream_id]
+        stream = self.pool.streams[stream_id]
 
         try:
             
@@ -90,7 +90,7 @@ class MercuryGRPCClient(MercuryHTTP2Client):
                 request = await request.hooks.before(idx, request)
 
             await stream.lock.acquire()
-            connection = self.connection_pool.connections[stream_id]
+            connection = self.pool.connections[stream_id]
             
             start = time.time()
 
@@ -125,14 +125,15 @@ class MercuryGRPCClient(MercuryHTTP2Client):
             response.error = e
             self.context.last[request.name] = response
 
-            self.pool.connections[stream_id] = AsyncStream(
+            self.pool.streams[stream_id] = AsyncStream(
                 stream.stream_id, self.timeouts, 
                 self.concurrency, 
                 self.pool.reset_connections,
                 self.pool.pool_type
             )
             
-            self.connection_pool.connections[stream_id] = HTTP2Connection(stream_id)
+            self.pool.connections[stream_id] = HTTP2Connection(stream_id)
+            
             return response
 
     async def request(self, request: Request) -> GRPCResponseFuture:
