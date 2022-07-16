@@ -22,7 +22,7 @@ class MercuryWebsocketClient(MercuryHTTPClient):
             self
         ).__init__(concurrency, timeouts, hard_cache, reset_connections=reset_connection)
 
-    async def prepare(self, request: Request, checks: List[FunctionType]) -> Awaitable[None]:
+    async def prepare(self, request: Request) -> Awaitable[None]:
         try:
             if request.url.is_ssl:
                 request.ssl_context = self.ssl_context
@@ -63,78 +63,76 @@ class MercuryWebsocketClient(MercuryHTTPClient):
             if request.is_setup is False:
                 request.setup_websocket_request()
 
-                if request.checks is None:
-                    request.checks = checks
-
             self.registered[request.name] = request
 
         except Exception as e:
             return e
 
-    async def execute_prepared_request(self, request_name: str, idx: int, timeout: int) -> WebsocketResponseFuture:
+    async def execute_prepared_request(self, request: Request) -> WebsocketResponseFuture:
 
-        request = self.registered[request_name]
         response = Response(request, type='websocket')
 
-        stream_idx = idx%self.pool.size
-        connection = self.pool.connections[stream_idx]
+        async with self.sem:
 
-        try:
-            await connection.lock.acquire()
+            connection = self.pool.connections.pop()
 
-            if request.hooks.before:
-                request = await request.hooks.before(idx, request) 
+            try:
 
-            start = time.time()
-            await connection.make_connection(
-                request_name,
-                request.url.ip_addr,
-                request.url.port,
-                ssl=request.ssl_context
-            )
+                if request.hooks.before:
+                    request = await request.hooks.before(request) 
 
-            connection.write(request.headers.encoded_headers)
-            
-            if request.payload.has_data:
-                if request.payload.is_stream:
-                    await request.payload.write_chunks(connection)
+                start = time.time()
+                await connection.make_connection(
+                    request.name,
+                    request.url.ip_addr,
+                    request.url.port,
+                    ssl=request.ssl_context
+                )
 
-                else:
-                    connection.write(request.payload.encoded_data)
-
-            reader = connection._connection._reader
-            line = await asyncio.wait_for(reader.readuntil(), self.timeouts.socket_read_timeout)
-
-            response.response_code = line
-            raw_headers = b''
-            async for key, value, header_line in websocket_headers_to_iterator(reader):
-                response.headers[key] = value
-                raw_headers += header_line
-
-            if request.payload.has_data:
-                header_bits = get_header_bits(raw_headers)
-                header_content_length = get_message_buffer_size(header_bits)
+                connection.write(request.headers.encoded_headers)
                 
-            if request.method == 'GET':
-                response.body = await asyncio.wait_for(reader.read(min(16384, header_content_length)), timeout)
-            
-            elapsed = time.time() - start
+                if request.payload.has_data:
+                    if request.payload.is_stream:
+                        await request.payload.write_chunks(connection)
 
-            response.time = elapsed
+                    else:
+                        connection.write(request.payload.encoded_data)
 
-            if request.hooks.after:
-                response = await request.hooks.after(idx, response)
+                reader = connection._connection._reader
+                line = await asyncio.wait_for(reader.readuntil(), self.timeouts.socket_read_timeout)
 
-            self.context.last[request_name] = response
-            connection.lock.release()
+                response.response_code = line
+                raw_headers = b''
+                async for key, value, header_line in websocket_headers_to_iterator(reader):
+                    response.headers[key] = value
+                    raw_headers += header_line
 
-            return response
+                if request.payload.has_data:
+                    header_bits = get_header_bits(raw_headers)
+                    header_content_length = get_message_buffer_size(header_bits)
+                    
+                if request.method == 'GET':
+                    response.body = await asyncio.wait_for(reader.read(min(16384, header_content_length)), self.timeouts.total_timeout)
+                
+                elapsed = time.time() - start
 
-        except Exception as e:
-            response.error = e
-            self.pool.connections[stream_idx] = Connection(reset_connection=self.pool.reset_connections)  
-            self.context.last[request_name] = response
-            return response
+                response.time = elapsed
+
+                if request.hooks.after:
+                    response = await request.hooks.after(response)
+
+                self.context.last[request.name] = response
+                self.pool.connections.append(connection)
+
+                return response
+
+            except Exception as e:
+                response.error = e
+                self.pool.connections.append(
+                    Connection(reset_connection=self.pool.reset_connections) 
+                ) 
+                self.context.last[request.name] = response
+                return response
 
     async def request(self, request: Request) -> WebsocketBatchResponseFuture:
         return await self.execute_prepared_request(request.name)

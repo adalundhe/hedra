@@ -36,7 +36,7 @@ class Registrar:
                 
                 return wrapped_method
 
-        elif hook_type in [HookType.BEFORE, HookType.AFTER, HookType.BEFORE_BATCH, HookType.AFTER_BATCH]:
+        elif hook_type in [HookType.BEFORE, HookType.AFTER]:
             
             def wrap_hook(*names):
                 def wrapped_method(func):

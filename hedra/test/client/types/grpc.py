@@ -11,6 +11,7 @@ class GRPCClient:
     def __init__(self, session: MercuryGRPCClient) -> None:
         self.session = session
         self.request_type = RequestTypes.GRPC
+        self.next_name = None
 
     def __getitem__(self, key: str):
         return self.session.registered.get(key)
@@ -39,5 +40,5 @@ class GRPCClient:
                 )
             )
 
-            if result and result.error:
-                raise result.error
+            if isinstance(result, Exception):
+                raise result

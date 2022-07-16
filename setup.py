@@ -58,7 +58,7 @@ setup(
     ],
     entry_points = {
         'console_scripts': [
-            'hedra=hedra.hedra:run',
+            'hedra=hedra.cli:run',
             'hedra-server=hedra.run_uwsgi:run_uwsgi'
         ],
     },

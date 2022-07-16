@@ -2,21 +2,17 @@ from .hooks import (
     action,
     setup,
     teardown,
-    use,
+    configure,
     before,
     after,
-    before_batch,
-    after_batch
+    depends
 )
 from .stages import (
-    Execute
+    Analyze,
+    Checkpoint,
+    Execute,
+    Optimize,
+    Setup,
+    Teardown
 )
 from .config import Config
-from .actions import (
-    HTTPAction,
-    HTTP2Action,
-    GraphQLAction,
-    GRPCAction,
-    WebsocketAction,
-    PlaywrightAction
-)

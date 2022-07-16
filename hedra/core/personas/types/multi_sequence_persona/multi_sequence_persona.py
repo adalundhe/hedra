@@ -33,20 +33,18 @@ class MultiSequencePersona(DefaultPersona):
 
         self.session_logger.debug('Setting up persona...')
 
-        await parser.sort_multi_sequence()
+        parser.sort_multisequence()
 
-        for sequence in parser.actions.values():
+        for sequence_class in parser.action_sets.values():
+       
             sequence = SequencedPersonaCollection(
                 self._sequence_config, 
                 self.handler
             )
             
-            await sequence.setup(sequence, parser)
+            self.sequences.append(sequence)
 
-            if sequence.no_execution_actions is False:
-                self.sequences.append(sequence)
-            else:
-                self._utility_sequences.append(sequence)
+        await asyncio.gather(*[sequence.setup(sequence_class) for sequence in self.sequences])
 
         sequences_count = len(self.sequences)
         batch_sizes = [int(self.batch.size/sequences_count) for _ in range(sequences_count)]

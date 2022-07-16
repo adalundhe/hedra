@@ -2,20 +2,18 @@ import random
 import time
 import asyncio
 from typing import List
-from async_tools.datatypes.async_list import AsyncList
-from async_tools.functions import awaitable
-from hedra.core.engines import Engine
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.parsing import ActionsParser
-from hedra.test.actions.base import Action
+from hedra.test.hooks.types import HookType
 
 
 class WeightedSelectionPersona(DefaultPersona):
 
     def __init__(self, config=None, handler=None):
         super().__init__(config=config, handler=handler)
-        self.weights = []
-        self.sampled_actions: List[Action] = []
+        self.weights: List[int] = []
+        self.indexes: List[int] = []
+        self.sample: List[int] = []
         
     @classmethod
     def about(cls):
@@ -28,73 +26,55 @@ class WeightedSelectionPersona(DefaultPersona):
         '''
 
     async def setup(self, parser: ActionsParser):
-
         self.session_logger.debug('Setting up persona...')
+        
+        parser.weights()
 
-        self.actions = parser.actions
+        self.indexes = []
+        self.actions = []
+        self.weights = []
 
-        for action_set in self.actions.values():
-            self.actions_count += action_set.registry.count
-            await action_set.setup()
+        for idx, action, weight in parser.actions:
+            self.indexes.append(idx)
+            self.actions.append(action)
+            self.weights.append(weight)
 
-            self._parsed_actions.extend(
-                action_set.registry.to_list()
-            )
-
-        self.sampled_actions = self._sample()
-        self.duration = self.total_time
-
-    async def execute(self):
-        elapsed = 0
-        results = []
-
-        await self.start_updates()
-
-        self.start = time.time()
-
-        while elapsed < self.total_time:
-
-            next_timeout = self.total_time - elapsed
-            action = self.sampled_actions.pop()
-            
-            self.batch.deferred.append(asyncio.create_task(
-                action.session.execute_batch(
-                    action.parsed,
-                    concurrency=self.batch.size,
-                    timeout=next_timeout
-                )
-            ))
-            
-            await asyncio.sleep(self.batch.interval.period)
-
-            elapsed = time.time() - self.start
-
-            if len(self.sampled_actions) < 1:
-                self.sampled_actions = self._sample()
-
-        self.end = time.time()
-
-        await self.stop_updates()
-
-        for deferred_batch in self.batch.deferred:
-            batch, pending = await deferred_batch
-            completed = await asyncio.gather(*batch, return_exceptions=True)
-            results.extend(completed)
-
-            try:
-                for pend in pending:
-                    pend.cancel()
-            except Exception:
-                pass
-
-        self.total_actions = len(results)
-        self.total_elapsed = self.end - self.start
-
-        return results
-
-    def _sample(self) -> List[Action]:
-        return random.choices(
-            self._parsed_actions.data,
-            self.weights,
-            k=self.actions_count
+        self.sample = random.choices(
+            self.indexes,
+            weights=self.weights,
+            k=self.batch.size
         )
+
+        self.actions_count = len(self.actions)
+        self._hooks = self.actions
+
+        self.engine.teardown_actions = []
+
+        for action_set in parser.action_sets.values():
+
+            setup_hooks = action_set.hooks.get(HookType.SETUP)
+
+            for setup_hook in setup_hooks:
+                await setup_hook.call(action_set)
+
+            teardown_hooks = action_set.hooks.get(HookType.TEARDOWN)
+            if teardown_hooks:
+                self.engine.teardown_actions.extend(teardown_hooks)
+
+    async def generator(self, total_time):
+        elapsed = 0
+
+        start = time.time()
+        while elapsed < total_time:
+            for action_idx in self.sample:
+                yield action_idx
+                
+                await asyncio.sleep(0)
+                elapsed = time.time() - start
+
+            self.sample = random.choices(
+                self.indexes,
+                weights=self.weights,
+                k=self.batch.size
+            )
+            

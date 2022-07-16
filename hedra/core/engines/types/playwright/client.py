@@ -31,10 +31,8 @@ class MercuryPlaywrightClient:
         for context_group in self.pool:
             await context_group.create()
 
-    async def prepare(self, command: Command, checks: List[FunctionType]) -> Awaitable[None]:
-        if command.checks is None:
-            command.checks = checks
-        
+    async def prepare(self, command: Command) -> Awaitable[None]:
+
         command.options.extra = {
             **command.options.extra,
             'timeout': self.timeouts.total_timeout * 1000
@@ -42,33 +40,33 @@ class MercuryPlaywrightClient:
 
         self.registered[command.name] = command
 
-    async def execute_prepared_command(self, command_name: str, idx: int) -> PlaywrightResponseFuture:
-        command = self.registered[command_name]
+    async def execute_prepared_command(self, command: Command) -> PlaywrightResponseFuture:
+
         result = Result(command)
-        await self.sem.acquire()
+        
+        async with self.sem:
+            context = self.pool.contexts.pop()
+            try:
+                if command.hooks.before:
+                    command = await command.hooks.before(command)
 
-        if command.hooks.before:
-            command = await command.hooks.before(idx, command)
+                result = await context.execute(command)
 
-        try:
+                self.context.last[command.name] = result
 
-            context = random.choice(self.pool.contexts)
-            result = await context.execute(command)
+                if command.hooks.after:
+                    response = await command.hooks.after(response)
 
-            self.context.last[command_name] = result
+                self.pool.contexts.append(context)
 
-            if command.hooks.after:
-                response = await command.hooks.after(idx, response)
+                return result
 
-            self.sem.release()
+            except Exception as e:
+                result.error = e
+                self.context.last[command.name] = response
+                self.pool.contexts.append(context)
 
-            return result
-
-        except Exception as e:
-            result.error = e
-            self.context.last[command_name] = response
-            self.sem.release()
-            return result
+                return result
 
     async def update_from_context(self, command_name: str):
         previous_command = self.registered.get(command_name)
@@ -80,7 +78,7 @@ class MercuryPlaywrightClient:
         if self.registered.get(command.name) is None:
             await self.prepare(command, checks)
 
-        return await self.execute_prepared_command(command.name)
+        return await self.execute_prepared_command(command)
 
     def execute_batch(
         self, 
@@ -97,7 +95,7 @@ class MercuryPlaywrightClient:
             timeout = self.timeouts.total_timeout
 
         return [ asyncio.create_task(
-            self.execute_prepared_command(command.name)
+            self.execute_prepared_command(command)
         ) for _ in range(concurrency)]
 
     async def close(self):

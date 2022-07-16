@@ -4,10 +4,10 @@ from pycli_tools import BaseConfig
 from pycli_tools.arguments.bundler import Bundler
 from importlib.metadata import version
 
-from hedra.test import Config
+from hedra.test.config import Config
 
 from .config.cli.hedra import hedra_cli
-from .docs import DocsManager
+
 
 
 class CommandLine(BaseConfig):
@@ -36,7 +36,7 @@ class CommandLine(BaseConfig):
 
     def copy(self, cli):
         copy_result = super().copy(cli)
-        copy_result.executor_config['actions_code_filepath'] = self.executor_config.get('actions_code_filepath')
+        copy_result.executor_config['import_filepath'] = self.executor_config.get('import_filepath')
         
         return copy_result
 
@@ -45,9 +45,9 @@ class CommandLine(BaseConfig):
         docs_arg = self.config_helper["about"]
 
         config_help_string = self.config_helper.generate_help_string()
-        docs_manager = DocsManager(docs_arg, config_help_string=config_help_string)
+        # docs_manager = DocsManager(docs_arg, config_help_string=config_help_string)
 
-        docs_manager.print_docs()
+        # docs_manager.print_docs()
         
         exit(0)
 
@@ -86,30 +86,29 @@ class CommandLine(BaseConfig):
             self.actions = self.config_helper['actions']
 
             code_actions = self.config_helper['code_actions']
-            if code_actions and len(code_actions) > 0:
 
-                config_map = self.config_helper._assembler.mapped.get('code_actions')
-    
-                if config_map.argument:
-                    bundler = Bundler(options={
-                        'class_type': Config,
-                        'package_name': config_map.argument.original_arg
-                    })
+            config_map = self.config_helper._assembler.mapped.get('code_actions')
 
-                    discovered = bundler.discover()
+            if config_map.argument:
+                bundler = Bundler(options={
+                    'class_type': Config,
+                    'package_name': config_map.argument.original_arg
+                })
 
-                    if len(discovered) > 0:
-                        test_config = discovered.pop()()
-                        self.executor_config.update(test_config.executor_config)
-                        self.reporter_config.update(test_config.reporter_config)
-                        self.embedded_stats = test_config.embedded_stats
-                        self.log_level = test_config.log_level
-                        self.runner_mode = test_config.runner_mode
+                discovered = bundler.discover()
 
-                    self.executor_config['actions_code_filepath'] = config_map.argument.original_arg
+                if len(discovered) > 0:
+                    test_config = discovered.pop()()
+                    self.executor_config.update(test_config.executor_config)
+                    self.reporter_config.update(test_config.reporter_config)
+                    self.embedded_stats = test_config.embedded_stats
+                    self.log_level = test_config.log_level
+                    self.runner_mode = test_config.runner_mode
 
-                self.actions = code_actions
-                self.executor_config['engine_type'] = 'action-set'
+                self.executor_config['import_filepath'] = config_map.argument.original_arg
+
+            self.actions = code_actions
+            self.executor_config['engine_type'] = 'action-set'
 
             logger = Logger()
             session_logger = logger.generate_logger('hedra')

@@ -23,7 +23,7 @@ from hedra.test.client import Client
 
 
 
-def use(config: Config, fixtures={}, inject=None):
+def configure(config: Config):
 
     '''
     Use
@@ -112,9 +112,6 @@ def use(config: Config, fixtures={}, inject=None):
                 selected_config.request_timeout = total_time         
 
             try:
-                if inject:
-                    selected_engine = 'custom'
-                    session = inject
                 
                 session = None
 
@@ -185,12 +182,11 @@ def use(config: Config, fixtures={}, inject=None):
 
                     await session.setup(context_config)
 
-                cls.context.history.row_size = selected_config.batch_size
+                # cls.context.history.row_size = selected_config.batch_size
 
-                session.context = cls.context
+                # session.context = cls.context
                 cls.client = Client(session)
                 cls.config = selected_config
-                cls.engine_type = selected_engine
 
             except Exception as err:
 

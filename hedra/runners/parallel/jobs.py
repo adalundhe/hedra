@@ -7,6 +7,7 @@ from hedra.core import Executor
 from hedra.test import (
     Execute
 )
+from hedra.test.stages.stage import Stage
 
 
 def run_job(config):
@@ -27,8 +28,8 @@ def run_job(config):
 
         if job_config.executor_config.get('engine_type') == 'action-set':
             bundler = Bundler(options={
-                'class_type': Execute,
-                'package_name': job_config.executor_config.get('actions_code_filepath')
+                'class_type': Stage,
+                'package_name': job_config.executor_config.get('import_filepath')
             })
 
 
@@ -43,7 +44,7 @@ def run_job(config):
 
         worker = Executor(job_config)
         results = loop.run_until_complete(_run_job(worker))
-
+        
         return {
             'stats': worker.pipeline.stats,
             'events': results

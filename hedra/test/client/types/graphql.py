@@ -1,4 +1,3 @@
-import inspect
 from types import FunctionType
 from typing import Any, Dict, List
 from hedra.core.engines.types.common import Request
@@ -11,6 +10,7 @@ class GraphQLClient:
     def __init__(self, session: MercuryGraphQLClient) -> None:
         self.session = session
         self.request_type = RequestTypes.GRAPHQL
+        self.next_name = None
 
     def __getitem__(self, key: str):
         return self.session.registered.get(key)
@@ -29,7 +29,7 @@ class GraphQLClient:
         if self.session.protocol.registered.get(self.next_name) is None:
             result = await self.session.prepare(
                 Request(
-                    callable,
+                    self.next_name,
                     url,
                     method='POST',
                     headers=headers,
@@ -45,5 +45,5 @@ class GraphQLClient:
                 )
             )
 
-            if result and result.error:
-                raise result.error
+            if isinstance(result, Exception):
+                raise result

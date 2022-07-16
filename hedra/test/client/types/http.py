@@ -38,8 +38,7 @@ class HTTPClient:
                     tags=tags,
                     checks=checks,
                     request_type=self.request_type
-                ), 
-                checks=[]
+                )
             )
 
             if isinstance(result, Exception):
@@ -53,11 +52,13 @@ class HTTPClient:
         params: Dict[str, str] = {},
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
-        tags: List[Dict[str, str]] = []
+        tags: List[Dict[str, str]] = [],
+        checks: List[FunctionType]=[]
     ):
         if self.session.registered.get(self.next_name) is None:
             result = await self.session.prepare(
                 Request(
+                    self.next_name,
                     url,
                     method='POST',
                     headers=headers,
@@ -65,12 +66,13 @@ class HTTPClient:
                     payload=data,
                     user=user,
                     tags=tags,
+                    checks=checks,
                     request_type=self.request_type
                 )
             )
 
-            if result and result.error:
-                raise result.error
+            if isinstance(result, Exception):
+                raise result
 
     async def put(
         self,
@@ -79,13 +81,14 @@ class HTTPClient:
         params: Dict[str, str] = {},
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
-        tags: List[Dict[str, str]] = []
+        tags: List[Dict[str, str]] = [],
+        checks: List[FunctionType]=[]
     ):
 
-        self.next_name = inspect.stack()[1][3]
         if self.session.registered.get(self.next_name) is None:
             result = await self.session.prepare(
                 Request(
+                    self.next_name,
                     url,
                     method='PUT',
                     headers=headers,
@@ -93,12 +96,13 @@ class HTTPClient:
                     payload=data,
                     user=user,
                     tags=tags,
+                    checks=checks,
                     request_type=self.request_type
                 )
             )
 
-            if result and result.error:
-                raise result.error
+            if isinstance(result, Exception):
+                raise result
 
     async def patch(
         self,
@@ -107,10 +111,10 @@ class HTTPClient:
         params: Dict[str, str] = {},
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
-        tags: List[Dict[str, str]] = []
+        tags: List[Dict[str, str]] = [],
+        checks: List[FunctionType]=[]
     ):
 
-        self.next_name = inspect.stack()[1][3]
         if self.session.registered.get(self.next_name) is None:
             result = await self.session.prepare(
                 Request(
@@ -122,12 +126,13 @@ class HTTPClient:
                     payload=data,
                     user=user,
                     tags=tags,
+                    checks=checks,
                     request_type=self.request_type
                 )
             )
 
-            if result and result.error:
-                raise result.error
+            if isinstance(result, Exception):
+                raise result
 
     async def delete(
         self, 
@@ -135,9 +140,10 @@ class HTTPClient:
         headers: Dict[str, str] = {}, 
         params: Dict[str, str] = {},
         user: str = None,
-        tags: List[Dict[str, str]] = []
+        tags: List[Dict[str, str]] = [],
+        checks: List[FunctionType]=[]
     ):
-        self.next_name = inspect.stack()[1][3]
+
         if self.session.registered.get(self.next_name) is None:
             result = await self.session.prepare(
                 Request(
@@ -149,9 +155,10 @@ class HTTPClient:
                     payload=None,
                     user=user,
                     tags=tags,
+                    checks=checks,
                     request_type=self.request_type
                 )
             )
 
-            if result and result.error:
-                raise result.error
+            if isinstance(result, Exception):
+                raise result

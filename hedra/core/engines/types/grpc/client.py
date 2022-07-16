@@ -25,7 +25,7 @@ class MercuryGRPCClient(MercuryHTTP2Client):
             reset_connections=reset_connections
         )
 
-    async def prepare(self, request: Request, checks: List[FunctionType]) -> Awaitable[None]:
+    async def prepare(self, request: Request) -> Awaitable[None]:
         try:
             request.ssl_context = self.ssl_context
 
@@ -70,71 +70,61 @@ class MercuryGRPCClient(MercuryHTTP2Client):
             if request.is_setup is False:
                 request.setup_grpc_request()
 
-                if request.checks is None:
-                    request.checks = checks
-
             self.registered[request.name] = request
 
         except Exception as e:
             return e
 
-    async def execute_prepared_request(self, request: Request, idx: int, timeout: int) -> GRPCResponseFuture:
+    async def execute_prepared_request(self, request: Request) -> GRPCResponseFuture:
         
         response = Response(request, type='http2')
-        stream_id = idx%self.pool.size
-        stream = self.pool.streams[stream_id]
 
-        try:
-            
-            if request.hooks.before:
-                request = await request.hooks.before(idx, request)
+        async with self.sem:
+            stream = self.pool.streams.pop()
+            connection = self.pool.connections.pop()
 
-            await stream.lock.acquire()
-            connection = self.pool.connections[stream_id]
-            
-            start = time.time()
+            try:
+                
+                if request.hooks.before:
+                    request = await request.hooks.before(request)
+                
+                start = time.time()
 
-            reader_writer = await asyncio.wait_for(stream.connect(
-                request.url.hostname,
-                request.url.ip_addr,
-                request.url.port,
-                request.url.socket_config,
-                ssl=request.ssl_context
-            ), self.timeouts.connect_timeout)
+                reader_writer = await asyncio.wait_for(stream.connect(
+                    request.url.hostname,
+                    request.url.ip_addr,
+                    request.url.port,
+                    request.url.socket_config,
+                    ssl=request.ssl_context
+                ), self.timeouts.connect_timeout)
 
-            connection.connect(reader_writer)
-            connection.send_request_headers(request, reader_writer)
-            await connection.submit_request_body(request, reader_writer)
-            await connection.receive_response(response, reader_writer)
+                connection.connect(reader_writer)
+                connection.send_request_headers(request, reader_writer)
+                await connection.submit_request_body(request, reader_writer)
+                await connection.receive_response(response, reader_writer)
 
-            elapsed = time.time() - start
+                elapsed = time.time() - start
 
-            response.time = elapsed
+                response.time = elapsed
 
-            if request.hooks.after:
-                response = await request.hooks.after(idx, response)
-            
-            self.context.last[request.name] = response
-            
-            stream.lock.release()
+                if request.hooks.after:
+                    response = await request.hooks.after(response)
+                
+                self.context.last[request.name] = response
+                
+                self.pool.streams.append(stream)
+                self.pool.connections.append(connection)
 
-            return response
-            
-        except Exception as e:
-            response.response_code = 500
-            response.error = e
-            self.context.last[request.name] = response
+                return response
+                
+            except Exception as e:
+                response.response_code = 500
+                response.error = e
+                self.context.last[request.name] = response
 
-            self.pool.streams[stream_id] = AsyncStream(
-                stream.stream_id, self.timeouts, 
-                self.concurrency, 
-                self.pool.reset_connections,
-                self.pool.pool_type
-            )
-            
-            self.pool.connections[stream_id] = HTTP2Connection(stream_id)
-            
-            return response
+                self.pool.reset()
+
+                return response
 
     async def request(self, request: Request) -> GRPCResponseFuture:
         return await self.execute_prepared_request(request.name)

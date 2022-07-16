@@ -9,16 +9,8 @@ class History:
         self.row_size = 0
         self._history = {}
 
-    def add_row(self, request_name: str, batch_size: int = None):
-
-        if batch_size is None:
-            batch_size = self.row_size
-        else:
-            self.row_size = batch_size
-
-        self._history[request_name] = [
-            None for _ in range(self.row_size)
-        ]
+    def add_row(self, request_name: str):
+        self._history[request_name] = []
 
     def update(self, channel_id: int, response: Response):
         self._history[response.name][channel_id] = response

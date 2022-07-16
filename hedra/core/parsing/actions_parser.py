@@ -1,7 +1,7 @@
-from typing import Dict
+from typing import Dict, List, Union
 from easy_logger import Logger
 from hedra.core.engines.types.common.hooks import Hooks
-from hedra.test.actions.base import Action
+from hedra.test.hooks.hook import Hook
 from hedra.test.hooks.types import HookType
 from hedra.test.stages.execute import Execute
 
@@ -15,8 +15,8 @@ class ActionsParser:
         self.sorted = config.executor_config.get('sorted')
         self._is_multi_sequence = config.executor_config.get('persona_type') == 'multi-sequence'
         self._is_multi_user_sequence = config.executor_config.get('persona_type') == 'multi-user-sequence'
-        self.actions: Dict[str, Execute] = {}
-        self.sequences = {}
+        self.action_sets: Dict[str, Execute] = {}
+        self.actions: Union[List, Dict] = []
         self.hooks = {}
         self.setup_actions = []
         self.teardown_actions = []
@@ -78,38 +78,42 @@ class ActionsParser:
 
             self.hooks[class_instance.name] = class_instance.hooks
 
-            self.actions[type(class_instance).__name__] = class_instance
+            self.action_sets[type(class_instance).__name__] = class_instance
 
-    def get_hook(self, action: Action, action_set_name: str, hook_type: str):
-        for hook in self.hooks[action_set_name][hook_type]:
-            if action.parsed.name in hook.names:
-                return hook
+    def weights(self):
+        weighted_actions = []
 
-    async def weights(self):
-        actions  = [action for action in self.actions if action.is_setup is False and action.is_teardown is False]
-        return [action.weight if action.weight else 1 for action in actions]
+        for action_set in self.action_sets.values():
+            actions: List[Hook] = action_set.actions
+            weighted_actions.extend(actions)
 
-    async def sort(self):
-        if self._is_multi_sequence:
-            return await self.sort_multi_sequence()
+        self.actions = [
+            (
+                idx, 
+                action, 
+                action.config.weight
+            ) for idx, action in enumerate(actions)
+        ]
 
-        else:
-            return await self.sort_sequence()
-
-    async def sort_multi_sequence(self):
-
-        for action_set_name, action_set in self.actions.items():
-            actions = action_set.actions
-            sorted_actions = sorted(actions, key=lambda action: action.order)
-            action_set.actions = list(sorted_actions)
+    def sort_multisequence(self):
+        self.actions = {}
+        for action_set_name, action_set in self.action_sets.items():
+            actions: List[Hook] = action_set.actions
+            sorted_set = sorted(actions, key=lambda action: action.config.order)
+            action_set.actions = list(sorted_set)
             
-            self.actions[action_set_name] = actions
+            self.actions[action_set_name].hooks[HookType.ACTION] = actions
 
-    async def sort_sequence(self):
-        actions = []
-        for action_set in self.actions.values():
-            registry_actions = action_set.registry.to_list()
-            sorted_actions = sorted(registry_actions, key=lambda action: action.order)
-            actions.extend(list(sorted_actions))
+    def sort_sequence(self):
 
-        return actions
+        sorted_actions = []
+
+        for action_set in self.action_sets.values():
+            actions: List[Hook] = action_set.actions
+            sorted_set = sorted(actions, key= lambda action: action.config.order)
+
+            sorted_actions.extend(
+                list(sorted_set)
+            )
+
+        self.actions = sorted_actions

@@ -2,10 +2,13 @@ from typing import Union
 from easy_logger import Logger
 from alive_progress import alive_bar
 from hedra.reporting import Handler, ParallelHandler
+from hedra.test.stages.types.stage_types import StageTypes
 from .stage import Stage
 
 
-class Gather(Stage):
+class Analyze(Stage):
+    stage_order=5
+    stage_type=StageTypes.ANALYIZE
     results = None
     stats = {}
     is_parallel = False

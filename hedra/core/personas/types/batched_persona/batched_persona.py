@@ -15,7 +15,7 @@ class BatchedPersona(DefaultPersona):
 
         start = time.time()
         while elapsed < total_time:
-            yield idx, action_idx
+            yield action_idx
             
             await asyncio.sleep(0)
             elapsed = time.time() - start

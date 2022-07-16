@@ -1,11 +1,14 @@
 import time
 import asyncio
 from async_tools.datatypes.async_list import AsyncList
+from yaml import parse
 from hedra.core.personas.batching.batch_interval import BatchInterval
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.engines import Engine
 from hedra.core.personas.batching import SequenceStep
 from hedra.core.parsing import ActionsParser
+from hedra.test.hooks.hook import Hook
+from hedra.test.hooks.types import HookType
 
 
 class SequencedPersonaCollection(DefaultPersona):
@@ -32,12 +35,21 @@ class SequencedPersonaCollection(DefaultPersona):
 
         self.session_logger.debug('Setting up persona...')
 
-        self._parsed_actions = await parser.sort_sequence()
-        self.actions_count = len(self._parsed_actions)
-        self.engine = Engine(self.config, self.handler)
+        parser.sort_sequence()
 
-        await self.engine.create_session(parser.setup_actions)
-        self.engine.teardown_actions = parser.teardown_actions
+        self.actions = parser.actions
+        self.actions_count = len(self.actions)
+        self._hooks = self.actions
 
-        for action_set in parser.actions.values():
-            await action_set.setup()
+        self.engine.teardown_actions = []
+
+        for action_set in parser.action_sets.values():
+
+            setup_hooks = action_set.hooks.get(HookType.SETUP)
+
+            for setup_hook in setup_hooks:
+                await setup_hook.call(action_set)
+
+            teardown_hooks = action_set.hooks.get(HookType.TEARDOWN)
+            if teardown_hooks:
+                self.engine.teardown_actions.extend(teardown_hooks)

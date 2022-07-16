@@ -1,5 +1,6 @@
 import asyncio
 import time
+import traceback
 from types import FunctionType
 from typing import Awaitable, Dict, List, Optional, Set, Tuple
 from hedra.core.engines.types.common.timeouts import Timeouts
@@ -32,6 +33,8 @@ class MercuryHTTP2Client:
         self.results = []
         self.iters = 0
         self.running = False
+        
+        self.sem = asyncio.Semaphore(self.concurrency)
         self.pool: HTTP2Pool = HTTP2Pool(self.concurrency, self.timeouts, reset_connections=reset_connections)
         self.pool.create_pool()
 
@@ -39,7 +42,7 @@ class MercuryHTTP2Client:
         self._connected = False
         self.context = Context()
 
-    async def prepare(self, request: Request, checks: List[FunctionType]) -> Awaitable[None]:
+    async def prepare(self, request: Request) -> Awaitable[None]:
         try:
             request.ssl_context = self.ssl_context
 
@@ -84,72 +87,62 @@ class MercuryHTTP2Client:
             if request.is_setup is False:
                 request.setup_http2_request()
 
-                if request.checks is None:
-                    request.checks = checks
-
             self.registered[request.name] = request
 
         except Exception as e:
             return e
 
-    async def execute_prepared_request(self, request: Request, idx: int, timeout: int) -> HTTP2ResponseFuture:
+    async def execute_prepared_request(self, request: Request) -> HTTP2ResponseFuture:
         
         response = Response(request, type='http2')
 
-        stream_id = idx%self.pool.size
-        stream = self.pool.streams[stream_id]
+        async with self.sem:
+        
+            try:
 
-        try:
-            
-            if request.hooks.before:
-                request = await request.hooks.before(idx, request)
+                stream = self.pool.streams.pop()
+                connection = self.pool.connections.pop()
+                
+                if request.hooks.before:
+                    request = await request.hooks.before(request)
 
-            await stream.lock.acquire()
-            connection = self.pool.connections[stream_id]
-            
-            start = time.time()
+                start = time.time()
 
-            reader_writer = await asyncio.wait_for(stream.connect(
-                request.url.hostname,
-                request.url.ip_addr,
-                request.url.port,
-                request.url.socket_config,
-                ssl=request.ssl_context
-            ), self.timeouts.connect_timeout)
+                reader_writer = await asyncio.wait_for(stream.connect(
+                    request.url.hostname,
+                    request.url.ip_addr,
+                    request.url.port,
+                    request.url.socket_config,
+                    ssl=request.ssl_context
+                ), self.timeouts.connect_timeout)
 
-            connection.connect(reader_writer)
-            connection.send_request_headers(request, reader_writer)
-            await connection.submit_request_body(request, reader_writer)
-            await connection.receive_response(response, reader_writer)
+                connection.connect(reader_writer)
+                connection.send_request_headers(request, reader_writer)
+                await connection.submit_request_body(request, reader_writer)
+                await connection.receive_response(response, reader_writer)
 
-            elapsed = time.time() - start
+                elapsed = time.time() - start
 
-            response.time = elapsed
+                response.time = elapsed
 
-            if request.hooks.after:
-                response = await request.hooks.after(idx, response)
-            
-            self.context.last[request.name] = response
-            
-            stream.lock.release()
+                if request.hooks.after:
+                    response = await request.hooks.after(response)
+                
+                self.context.last[request.name] = response
 
-            return response
-            
-        except Exception as e:
-            response.response_code = 500
-            response.error = e
-            self.context.last[request.name] = response
+                self.pool.streams.append(stream)
+                self.pool.connections.append(connection)
+                
+                return response
+                
+            except Exception as e:
+                response.response_code = 500
+                response.error = f'{traceback.format_exc()}\n{str(e)}'
+                self.context.last[request.name] = response
 
-            self.pool.streams[stream_id] = AsyncStream(
-                stream.stream_id, self.timeouts, 
-                self.concurrency, 
-                self.pool.reset_connections,
-                self.pool.pool_type
-            )
+                self.pool.reset()
 
-            self.pool.connections[stream_id] = HTTP2Connection(stream_id)
-
-            return response
+                return response
 
     async def request(self, request: Request) -> HTTP2ResponseFuture:
         return await self.execute_prepared_request(request, 0)

@@ -1,4 +1,4 @@
-from hedra.test import Execute
+from hedra.test.stages.stage import Stage
 
 
 hedra_cli = {
@@ -32,7 +32,7 @@ hedra_cli = {
             "arg_name": "--code-filepath",
             "var_name": "code_filepath",
             "arg_type": "python-file",
-            'class_type': Execute,
+            'class_type': Stage,
             "envar_default": "CODE_FILEPATH",
             "required": False,
             "help": "The path to the actions Python file for Hedra to load."

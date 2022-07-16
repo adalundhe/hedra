@@ -18,6 +18,7 @@ class PlaywrightClient:
     def __init__(self, session: MercuryPlaywrightClient) -> None:
         self.session = session
         self.request_type = RequestTypes.PLAYWRIGHT
+        self.next_name = None
 
     def __getitem__(self, key: str):
         return self.session.registered.get(key)
@@ -83,9 +84,8 @@ class PlaywrightClient:
                     user=user,
                     tags=tags,
                     checks=checks
-                ), 
-                checks=[]
+                )
             )
 
-            if result and result.error:
-                raise result.error
+            if isinstance(result, Exception):
+                raise result

@@ -12,6 +12,7 @@ from hedra.core.personas.batching.batch_interval import BatchInterval
 from hedra.core.engines import Engine
 from hedra.core.personas.utils import parse_time
 from hedra.core.parsing import ActionsParser
+from hedra.test.hooks.types import HookType
 
 
 class DefaultPersona:
@@ -19,7 +20,7 @@ class DefaultPersona:
     def __init__(self, config, handler):
         self.config = config.executor_config
         self.actions = []
-        self._parsed_actions: List[Hook] = []
+        self._hooks: List[Hook] = []
         self.handler = handler
         self.engine = Engine(self.config, self.handler)
         self.batch = Batch(self.config)
@@ -75,16 +76,19 @@ class DefaultPersona:
 
     async def setup(self, parser: ActionsParser):
         self.session_logger.debug('Setting up persona...')
-
+        
         self.actions = parser.actions
 
-        for action_set in self.actions.values():
+        for action_set in parser.action_sets.values():
             self.actions_count += len(action_set.actions)
-            self._parsed_actions.extend(action_set.actions)
+            self._hooks.extend(action_set.actions)
+            
+            setup_hooks = action_set.hooks.get(HookType.SETUP)
+            for setup_hook in setup_hooks:
+                await setup_hook.call(action_set)
 
     async def execute(self):
-        actions = self._parsed_actions
-        actions_count = self.actions_count
+        hooks = self._hooks
         total_time = self.total_time
 
         await self.start_updates()
@@ -93,21 +97,16 @@ class DefaultPersona:
 
         completed, pending = await asyncio.wait([
             asyncio.create_task(
-                actions[action_idx].session.execute_prepared_request(
-                    actions[action_idx].action,
-                    idx,
-                    timeout=total_time,
+                hooks[action_idx].session.execute_prepared_request(
+                    hooks[action_idx].action
                 )
-            ) async for idx, action_idx in self.generator(
-                total_time, 
-                actions_count,
-                self.batch.size
-            )
+            ) async for action_idx in self.generator(total_time)
         ], timeout=1)
 
-        results = await asyncio.gather(*completed)
-
         self.end = time.time()
+        
+        results = await asyncio.gather(*completed, return_exceptions=True)
+        
 
         await self.stop_updates()
 
@@ -124,21 +123,21 @@ class DefaultPersona:
 
         return results
 
-    async def generator(self, total_time, actions_count, batch_size):
+    async def generator(self, total_time):
         elapsed = 0
         idx = 0
         action_idx = 0
 
         start = time.time()
         while elapsed < total_time:
-            yield idx, action_idx
+            yield action_idx
             
             await asyncio.sleep(0)
             elapsed = time.time() - start
             idx += 1
 
-            if idx%batch_size == 0:
-                action_idx = (action_idx + 1)%actions_count
+            if idx%self.batch.size == 0:
+                action_idx = (action_idx + 1)%self.actions_count
 
     async def close(self):
         await self.engine.close()

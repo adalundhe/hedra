@@ -48,9 +48,6 @@ class Executor:
             self.session_logger.info('Reporter successfully connected!')
 
         await self.actions.parse()
-        if len(self.actions) == 0:
-            self.session_logger.error('Error: Requests file empty or not found.')
-            exit(0)
 
         persona = PersonaManager(
             self.config,

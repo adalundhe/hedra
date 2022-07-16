@@ -1,10 +1,13 @@
 from easy_logger import Logger
 from hedra.core.optimizers import Optimizer
 from hedra.test.config import Config
+from hedra.test.stages.types.stage_types import StageTypes
 from .stage import Stage
 
 
 class Optimize(Stage):
+    stage_type=StageTypes.OPTIMIZE
+    stage_order=2
     config: Config = None
     is_parallel = False
     

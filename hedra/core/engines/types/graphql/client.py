@@ -38,7 +38,7 @@ class MercuryGraphQLClient:
         self.protocol.context = self.context
         self.registered = {}
 
-    async def prepare(self, request: Request, checks: List[FunctionType]) -> Awaitable[None]:
+    async def prepare(self, request: Request) -> Awaitable[None]:
         try:
             if request.url.is_ssl:
                 request.ssl_context = self.protocol.ssl_context
@@ -51,20 +51,17 @@ class MercuryGraphQLClient:
             if request.is_setup is False:
                 request.setup_graphql_request(use_http2=self._use_http2)
 
-                if request.checks is None:
-                    request.checks = checks
-
             self.protocol.registered[request.name] = request
             self.registered[request.name] = request
         
         except Exception as e:
             return Response(request, error=e, type='graphql')
 
-    async def execute_prepared_request(self, request_name: str, idx: int, timeout: int):
-        response: Response = await self.protocol.execute_prepared_request(request_name, idx, timeout)
+    async def execute_prepared_request(self, request: Request):
+        response: Response = await self.protocol.execute_prepared_request(request)
         response.type = 'graphql'
 
-        self.context.last[request_name] = self.protocol.context.last[request_name]
+        self.context.last[request.name] = self.protocol.context.last[request.name]
         return response
 
     async def request(self, request: Request) -> GraphQLResponseFuture:

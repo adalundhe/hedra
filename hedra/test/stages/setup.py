@@ -1,4 +1,5 @@
 import inspect
+import psutil
 import functools
 from typing import Dict, List, Union
 from hedra.test.hooks.hook import Hook
@@ -9,10 +10,29 @@ from hedra.test.client import Client
 from hedra.core.engines.types.common.request import Request
 from hedra.core.engines.types.playwright.command import Command
 from hedra.test.registry.registrar import registar
+from hedra.test.stages.types.stage_types import StageTypes
 from .stage import Stage
 
 
 class Setup(Stage):
+    stage_type=StageTypes.SETUP
+    log_level='info'
+    persona_type='simple'
+    total_time='00:01:00'
+    batch_size=1000
+    batch_interval=1
+    batch_interval_range=None
+    optimize=0
+    optimize_iter_duration=10
+    optimizer_type='shg'
+    gradient=0.1
+    pool_size=psutil.cpu_count(logical=False)
+    no_run_visuals=False
+    connect_timeout=5
+    request_timeout=60
+    options={
+        
+    }
     config: Config = None
     client: Client = None
     
@@ -55,9 +75,7 @@ class Setup(Stage):
 
             parsed_action.hooks = Hooks(
                 before=self.get_hook(parsed_action, HookType.BEFORE),
-                after=self.get_hook(parsed_action, HookType.AFTER),
-                before_batch=self.get_hook(parsed_action, HookType.BEFORE_BATCH),
-                after_batch=self.get_hook(parsed_action, HookType.AFTER_BATCH)
+                after=self.get_hook(parsed_action, HookType.AFTER)
             )
 
             hook.session = self.client.session

@@ -1,121 +1,143 @@
-import psutil
 import asyncio
-from async_tools.functions import check_event_loop
-from async_tools.datatypes.async_list import AsyncList
-from easy_logger import Logger
-from async_tools.functions import awaitable
-from hedra.core.personas.utils import parse_time
-from hedra.core.pipelines.stages import setup
-from .stages import (
-    Execution,
-    Optimize,
-    Warmup,
-    Setup,
-    Results
+import inspect
+import networkx
+from typing import Dict, List
+from hedra.test.stages.stage import Stage
+from hedra.test.stages.types import StageTypes
+from .validation import (
+    validate_analyze_stage,
+    validate_checkpoint_stage,
+    validate_execute_stage,
+    validate_optimize_stage,
+    validate_setup_stage,
+    validate_teardown_stage
 )
 
 
 class Pipeline:
 
-    stages = {
-        'execute': Execution,
-        'optimize': Optimize,
-        'warmup': Warmup,
-        'setup': Setup,
-        'results': Results
-    }
-
-    def __init__(self, config) -> None:
-
-        logger = Logger()
-        self.session_logger = logger.generate_logger()
+    def __init__(self, stages: List[Stage]) -> None:
         
-        self._is_parallel = config.runner_mode.find('parallel') > -1
-        self._no_run_visuals = config.executor_config.get('no_run_visuals', False)
-        self.pool_size = config.executor_config.get('pool_size')
+        self.stages = networkx.DiGraph()
+        
+        self.stage_types = {
+            subclass.stage_type: subclass for subclass in Stage.__subclasses__()
+        }
 
-        if self._is_parallel and self.pool_size is None:
-            self.pool_size = psutil.cpu_count(logical=False)
+        self.stages_by_name = {stage.__name__: stage for stage in stages}
+        
+        self.instances: Dict[StageTypes, List[Stage]] = {}
 
-        self.config = config
-        self.selected_persona = None
-        self._selected_stages = AsyncList()
-        self.results = []
-        self.stats = {}
+        for stage in self.stage_types.values():
+            stage_instances = stage.__subclasses__()
+            self.instances[stage.stage_type] = stage_instances
 
-        check_event_loop(self.session_logger)
+        self.stages.add_nodes_from([
+            (
+                stage_name, 
+                {"stage": stage}
+            ) for stage_name, stage in self.stages_by_name.items()
+        ])
 
-        try:
-            self._event_loop = asyncio.get_running_loop()
+        for stage in stages:
+            for dependency in stage.dependencies:
+                if self.stages.nodes.get(dependency.__name__):
+                    self.stages.add_edge(dependency.__name__, stage.__name__)
 
-        except Exception:          
-            self._event_loop = asyncio.get_event_loop()
+  
+        self.execution_order = [
+            generation for generation in networkx.topological_generations(self.stages)
+        ]
 
-    @classmethod
-    def about(cls):
+    def validate(self):
+        if len(self.instances.get(StageTypes.SETUP)) < 1:
+            raise Exception('Error: - Your graph must contain at least one Setup stage.')
 
-        pipeline_stages = '\n\t'.join([f'- {stage_name}' for stage_name in cls.stages.keys()])
+        if len(self.instances.get(StageTypes.ANALYIZE)) < 1:
+           self._append_stage(StageTypes.ANALYIZE)
 
-        return f'''
-        Pipelines
+        if len(self.instances.get(StageTypes.CHECKPOINT)) < 1:
+            self._append_stage(StageTypes.CHECKPOINT)
 
-        key-arguments:
+        for instance in self.instances.get(StageTypes.SETUP):
+            validate_setup_stage(instance)
 
-        --warmup <warmup_duration_seconds>
+        for instance in self.instances.get(StageTypes.OPTIMIZE):
+            validate_optimize_stage(instance)
+            
+        for instance in self.instances.get(StageTypes.EXECUTE):
+            validate_execute_stage(instance)
 
-        --optimize <optimization_iterations>
+        for instance in self.instances.get(StageTypes.TEARDOWN):
+            validate_teardown_stage(instance)
 
-        Pipelines organize execution of performance tests into discrete, recognizable stages. This allows personas
-        to focus on action execution organization as opposed to overall test session managment. The following stages
-        are currently supported:
+        for instance in self.instances.get(StageTypes.ANALYIZE):
+            validate_analyze_stage(instance)
 
-        {pipeline_stages}
+        for instance in self.instances.get(StageTypes.CHECKPOINT):
+            validate_checkpoint_stage(instance)
 
-        For more information on each stage, run the command:
+    async def run(self):
 
-            hedra --about pipeline:<stage_name>
+        for stage_group in self.execution_order:
+            stages = [
+                self.stages_by_name.get(
+                    stage_name
+                )() for stage_name in stage_group 
+            ]
+
+            if len(stages) < 2:
+                stage = stages.pop()
+                
+                await stage.configure()
+                await stage.run()
+                await stage.close()
+
+            else:
+
+                await asyncio.gather(*[
+                    asyncio.create_task(
+                        stage.configure()
+                    ) for stage in stages
+                ])
+
+                await asyncio.gather(*[
+                    asyncio.create_task(
+                        stage.run()
+                    ) for stage in stages
+                ])
+
+                await asyncio.gather(*[
+                    asyncio.create_task(
+                        stage.close()
+                    ) for stage in stages
+                ])
 
 
-        Related Topics
+    def _append_stage(self, stage_type: StageTypes):
 
-        - personas
-        - runners
+        appended_stage = self.stage_types.get(stage_type)
+        last_cut = self.execution_order[-1]
 
-        '''
+        for stage_name in last_cut:
+            stage = self.stages_by_name.get(stage_name)
 
-    def  __iter__(self):
-        for stage in self._selected_stages.data:
-            yield stage
+            appended_stage.dependencies.append(stage)
+            appended_stage.all_dependencies.append(stage)
 
-    async def initialize(self, persona, actions):
-        self.selected_persona = persona.selected_persona
-        for stage in self.stages:
-            initialized_stage = self.stages[stage](self.config, self.selected_persona)
-            if initialized_stage.execute_stage:
-                initialized_stage.actions = actions
-                await self._selected_stages.append(initialized_stage)
-
-        self._selected_stages = await self._selected_stages.sort(key=lambda stage: stage.order)
-
-    async def execute(self):
-        async for stage in self._selected_stages:
-            self.selected_persona = await stage.execute(
-                self.selected_persona
+            appended_stage.all_dependencies.extend(
+                self.stages_by_name.get(stage_name).all_dependencies
             )
 
-    async def execute_stage(self, stage):
-        self.selected_persona = await stage.execute(self.selected_persona)
+        appended_stage.all_dependencies = list(set(appended_stage.all_dependencies))
+        self.stages.add_node(appended_stage.__name__, stage=appended_stage)
 
-    async def get_results(self):
-        results_stage = self._selected_stages.data[len(self._selected_stages.data)-1]
-        self.results = results_stage.results
-        self.stats = results_stage.stats
-        return self.results, self.stats
+        for stage in last_cut:
+            self.stages.add_edge(stage, appended_stage.__name__)
 
-    async def get_completed_count(self):
-        if self.selected_persona:
-            return self.selected_persona.completed_actions, int(self.selected_persona.completed_time)
+        self.execution_order = [
+            generation for generation in networkx.topological_generations(self.stages)
+        ]
 
-        else:
-            return 0, 0
-        
+        self.stages_by_name[appended_stage.__name__] = appended_stage
+        self.instances[appended_stage.stage_type].append(appended_stage)

@@ -11,6 +11,7 @@ class WebsocketClient:
     def __init__(self, session: MercuryWebsocketClient) -> None:
         self.session = session
         self.request_type = RequestTypes.WEBSOCKET
+        self.next_name = None
 
     def __getitem__(self, key: str):
         return self.session.registered.get(key)
@@ -38,12 +39,11 @@ class WebsocketClient:
                     tags=tags,
                     checks=checks,
                     request_type=self.request_type
-                ), 
-                checks=[]
+                )
             )
 
-            if result and result.error:
-                raise result.error
+            if isinstance(result, Exception):
+                raise result
 
     async def send(
         self, 
@@ -56,7 +56,7 @@ class WebsocketClient:
         checks: List[FunctionType]=[]
         
     ):
-        self.next_name = inspect.stack()[1][3]
+
         if self.session.registered.get(self.next_name) is None:
             result = await self.session.prepare(
                 Request(
@@ -70,9 +70,8 @@ class WebsocketClient:
                     tags=tags,
                     checks=checks,
                     request_type=self.request_type
-                ), 
-                checks=[]
+                )
             )
 
-            if result and result.error:
-                raise result.error
+            if isinstance(result, Exception):
+                raise result

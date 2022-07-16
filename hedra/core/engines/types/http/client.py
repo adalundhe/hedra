@@ -39,7 +39,7 @@ class MercuryHTTPClient:
 
         self.pool.create_pool()
     
-    async def prepare(self, request: Request, checks: List[FunctionType]) -> Awaitable[Union[Request, Exception]]:
+    async def prepare(self, request: Request) -> Awaitable[Union[Request, Exception]]:
         try:
             if request.url.is_ssl:
                 request.ssl_context = self.ssl_context
@@ -82,9 +82,6 @@ class MercuryHTTPClient:
             if request.is_setup is False:
                 request.setup_http_request()
 
-                if request.checks is None:
-                    request.checks = checks
-
             self.registered[request.name] = request
 
             return request
@@ -92,7 +89,7 @@ class MercuryHTTPClient:
         except Exception as e:
             return e
 
-    async def execute_prepared_request(self, request: Request, idx: int, timeout: int) -> HTTPResponseFuture:
+    async def execute_prepared_request(self, request: Request) -> HTTPResponseFuture:
         response = Response(request)
         
         async with self.sem:
@@ -100,7 +97,7 @@ class MercuryHTTPClient:
             try:
 
                 if request.hooks.before:
-                    request = await request.hooks.before(idx, request)
+                    request = await request.hooks.before(request)
 
                 start = time.time()
 
@@ -135,7 +132,7 @@ class MercuryHTTPClient:
                 self.pool.connections.append(connection)
 
                 if request.hooks.after:
-                    response = await request.hooks.after(idx, response)
+                    response = await request.hooks.after(response)
 
                 self.context.last[request.name] = response
                 

@@ -3,9 +3,6 @@ import psutil
 
 class Config:
     log_level='info'
-    runner_mode='local'
-    embedded_stats=False
-    engine_type='http'
     persona_type='simple'
     total_time='00:01:00'
     batch_size=1000
@@ -13,20 +10,14 @@ class Config:
     batch_count=0
     batch_interval=1
     batch_interval_range=None
-    warmup=0
     optimize=0
     optimize_iter_duration=10
     optimizer_type='shg'
     gradient=0.1
     pool_size=psutil.cpu_count(logical=False)
     no_run_visuals=False
-    session_url=None
     connect_timeout=5
     request_timeout=60
-    reporter_type='statstream'
-    reporter_config={
-        "save_to_file": True
-    }
     options={
         
     }

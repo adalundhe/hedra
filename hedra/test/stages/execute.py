@@ -6,17 +6,19 @@ from hedra.test.hooks.hook import Hook
 from hedra.test.registry.registrar import registar
 from typing import Dict, List, Union
 
-from hedra.test.actions import Action
 from hedra.core.engines.types.common.context import Context
 from hedra.test.config import Config
 from hedra.test.hooks.types import HookType
 from hedra.core.engines.types.common.hooks import Hooks
 from hedra.test.client import Client
+from hedra.test.stages.types.stage_types import StageTypes
 from .stage import Stage
 
 
 
 class Execute(Stage):
+    stage_type=StageTypes.EXECUTE
+    stage_order=3
     name = None
     engine_type = 'http'
     config: Config = None
@@ -126,18 +128,13 @@ class Execute(Stage):
             self.client[self.config.engine_type] = selected_client
             await hook.call(self)
 
-            self.client.session.context.history.add_row(
-                hook.name,
-                batch_size=self.config.batch_size
-            )
-
+            self.client.session.context.history.add_row(hook.name)
+            
             parsed_action = self.client.session.registered.get(hook.name)
 
             parsed_action.hooks = Hooks(
                 before=self.get_hook(parsed_action, HookType.BEFORE),
-                after=self.get_hook(parsed_action, HookType.AFTER),
-                before_batch=self.get_hook(parsed_action, HookType.BEFORE_BATCH),
-                after_batch=self.get_hook(parsed_action, HookType.AFTER_BATCH)
+                after=self.get_hook(parsed_action, HookType.AFTER)
             )
 
             hook.session = self.client.session
@@ -155,9 +152,6 @@ class Execute(Stage):
     async def setup(self):
         for setup_hook in self.hooks.get(HookType.SETUP):
             await setup_hook()
-
-    async def execute(self, action: Action):
-        return action
 
     async def teardown(self):
         for teardown_hook in self.hooks.get(HookType.TEARDOWN):
