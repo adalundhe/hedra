@@ -7,7 +7,7 @@ from hedra.core import Executor
 from hedra.test import (
     Execute
 )
-from hedra.test.stages.stage import Stage
+from hedra.core.pipelines.stages.stage import Stage
 
 
 def run_job(config):

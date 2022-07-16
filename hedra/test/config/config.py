@@ -6,8 +6,6 @@ class Config:
     persona_type='simple'
     total_time='00:01:00'
     batch_size=1000
-    batch_time=1
-    batch_count=0
     batch_interval=1
     batch_interval_range=None
     optimize=0

@@ -1,4 +1,4 @@
-from hedra.test.stages import Execute
+from hedra.core.pipelines.stages import Execute
 from hedra.test.config import Config
 from hedra.test.hooks import (
     setup,

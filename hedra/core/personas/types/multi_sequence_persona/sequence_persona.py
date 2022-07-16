@@ -7,7 +7,7 @@ from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.engines import Engine
 from hedra.core.personas.batching import SequenceStep
 from hedra.test.hooks.types import HookType
-from hedra.test.stages.execute import Execute
+from hedra.core.pipelines.stages.stage import Stage
 
 
 class SequencedPersonaCollection(DefaultPersona):
@@ -40,7 +40,7 @@ class SequencedPersonaCollection(DefaultPersona):
         self.elapsed = 0
         self.no_execution_actions = True
 
-    async def setup(self, sequence: Execute):
+    async def setup(self, sequence: Stage):
 
         self.session_logger.debug('Setting up persona...')
 

@@ -1,18 +1,15 @@
 from typing import Union
 from easy_logger import Logger
 from alive_progress import alive_bar
-from hedra.reporting import Handler, ParallelHandler
-from hedra.test.stages.types.stage_types import StageTypes
+# from hedra.reporting import Handler, ParallelHandler
+from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from .stage import Stage
 
 
 class Analyze(Stage):
-    stage_order=5
-    stage_type=StageTypes.ANALYIZE
-    results = None
-    stats = {}
+    stage_type=StageTypes.ANALYZE
     is_parallel = False
-    handler: Union[Handler, ParallelHandler] = None
+    handler = None
 
     def __init__(self) -> None:
         super().__init__()

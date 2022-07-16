@@ -1,10 +1,11 @@
+import asyncio
 import click
 import inspect
 import sys
 import importlib
 import ntpath
 from pathlib import Path
-from hedra.test.stages.stage import Stage
+from hedra.core.pipelines.stages.stage import Stage
 
 from hedra.core.pipelines import Pipeline
 
@@ -35,10 +36,15 @@ def run(path: str):
         if inspect.isclass(obj) and issubclass(obj, Stage) and obj not in direct_decendants:
             discovered[name] = obj
 
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
     pipeline = Pipeline(
         list(discovered.values())
     )
 
     pipeline.validate()
+    
+    loop.run_until_complete(pipeline.run())
 
     

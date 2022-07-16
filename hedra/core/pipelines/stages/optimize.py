@@ -1,39 +1,31 @@
-from .base_stage import BaseStage
+from easy_logger import Logger
 from hedra.core.optimizers import Optimizer
-from .calibrate import Calibrate
+from hedra.core.pipelines.stages.types.stage_types import StageTypes
+from .stage import Stage
 
 
-class Optimize(BaseStage):
+class Optimize(Stage):
+    stage_type=StageTypes.OPTIMIZE
+    is_parallel = False
     
-    def __init__(self, config, persona) -> None:
-        super(Optimize, self).__init__(config, persona)
-
-        self.calibration = Calibrate(config, persona)
+    def __init__(self) -> None:
+        super().__init__()
         self.order = 3
         self.name = b'optimize'
-        self.iters = config.executor_config.get('optimize', 0)
+        self.iters = self.config.optimize
         self.execute_stage = self.iters > 0
         self.optmizer = None
+        self.selected_persona = None
 
-        if self.execute_stage:
-            self.optmizer = Optimizer(self.selected_persona)
-
+        self.optmizer = Optimizer(self.selected_persona)
         self.optimized_params = None
+        
+        logger = Logger()
+        self.session_logger = logger.generate_logger('hedra')
 
-    @classmethod
-    def about(cls):
-        return '''
-        Optimize Stage
+    async def optimize(self, persona):
 
-        The optimize stage is an (optional) stage that occurs if the --optimize argument is provided. It 
-        occurs after warmup but pre-execution, passing the optimized batch size and batch time to the subsequent
-        execution stage for use.
-
-        '''
-
-    async def execute(self, persona):
-
-        if self._is_parallel is False:
+        if self.is_parallel is False:
             self.session_logger.info('Estimating batch size and batch time...')
             
         self.selected_persona = persona
@@ -45,7 +37,7 @@ class Optimize(BaseStage):
         optimization_total_time = self.selected_persona.optimized_params['optimization_total_time']
         optimization_max_aps = self.selected_persona.optimized_params['optimization_max_aps']
 
-        if self._is_parallel is False:
+        if self.is_parallel is False:
             self.session_logger.info('\nOptimization complete...')
             self.session_logger.info(f'Executed - {optimization_iters} - iterations over - {optimization_total_time} - seconds.')
             self.session_logger.info(f'Best batch size - {optimized_batch_size}')
@@ -55,5 +47,3 @@ class Optimize(BaseStage):
     
         self.selected_persona.batch.size = optimized_batch_size
         self.selected_persona.batch.interval.wait_period = optimized_batch_interval
-
-        return await self.calibration.execute(self.selected_persona)

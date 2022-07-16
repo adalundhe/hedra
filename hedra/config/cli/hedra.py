@@ -1,4 +1,4 @@
-from hedra.test.stages.stage import Stage
+from hedra.core.pipelines.stages.stage import Stage
 
 
 hedra_cli = {

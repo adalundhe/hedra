@@ -1,9 +1,9 @@
 from typing import Dict, List, Union
 from easy_logger import Logger
-from hedra.core.engines.types.common.hooks import Hooks
-from hedra.test.hooks.hook import Hook
-from hedra.test.hooks.types import HookType
-from hedra.test.stages.execute import Execute
+# from hedra.core.engines.types.common.hooks import Hooks
+# from hedra.test.hooks.hook import Hook
+# from hedra.test.hooks.types import HookType
+# from hedra.core.pipelines.stages.execute import Execute
 
 
 class ActionsParser:
@@ -15,12 +15,12 @@ class ActionsParser:
         self.sorted = config.executor_config.get('sorted')
         self._is_multi_sequence = config.executor_config.get('persona_type') == 'multi-sequence'
         self._is_multi_user_sequence = config.executor_config.get('persona_type') == 'multi-user-sequence'
-        self.action_sets: Dict[str, Execute] = {}
-        self.actions: Union[List, Dict] = []
-        self.hooks = {}
-        self.setup_actions = []
-        self.teardown_actions = []
-        self.engine_type = config.executor_config.get('engine_type')
+        # self.action_sets: Dict[str, Execute] = {}
+        # self.actions: Union[List, Dict] = []
+        # self.hooks = {}
+        # self.setup_actions = []
+        # self.teardown_actions = []
+        # self.engine_type = config.executor_config.get('engine_type')
 
     @classmethod
     def about(cls):
@@ -71,49 +71,49 @@ class ActionsParser:
     def __getitem__(self, index):
         return self.actions[index]
 
-    async def parse(self):
-        for python_class in self._raw_actions:
-            class_instance: Execute = python_class()
-            await class_instance.register_actions()
+    # async def parse(self):
+    #     for python_class in self._raw_actions:
+    #         class_instance: Execute = python_class()
+    #         await class_instance.register_actions()
 
-            self.hooks[class_instance.name] = class_instance.hooks
+    #         self.hooks[class_instance.name] = class_instance.hooks
 
-            self.action_sets[type(class_instance).__name__] = class_instance
+    #         self.action_sets[type(class_instance).__name__] = class_instance
 
-    def weights(self):
-        weighted_actions = []
+    # def weights(self):
+    #     weighted_actions = []
 
-        for action_set in self.action_sets.values():
-            actions: List[Hook] = action_set.actions
-            weighted_actions.extend(actions)
+    #     for action_set in self.action_sets.values():
+    #         actions: List[Hook] = action_set.actions
+    #         weighted_actions.extend(actions)
 
-        self.actions = [
-            (
-                idx, 
-                action, 
-                action.config.weight
-            ) for idx, action in enumerate(actions)
-        ]
+    #     self.actions = [
+    #         (
+    #             idx, 
+    #             action, 
+    #             action.config.weight
+    #         ) for idx, action in enumerate(actions)
+    #     ]
 
-    def sort_multisequence(self):
-        self.actions = {}
-        for action_set_name, action_set in self.action_sets.items():
-            actions: List[Hook] = action_set.actions
-            sorted_set = sorted(actions, key=lambda action: action.config.order)
-            action_set.actions = list(sorted_set)
+    # def sort_multisequence(self):
+    #     self.actions = {}
+    #     for action_set_name, action_set in self.action_sets.items():
+    #         actions: List[Hook] = action_set.actions
+    #         sorted_set = sorted(actions, key=lambda action: action.config.order)
+    #         action_set.actions = list(sorted_set)
             
-            self.actions[action_set_name].hooks[HookType.ACTION] = actions
+    #         self.actions[action_set_name].hooks[HookType.ACTION] = actions
 
-    def sort_sequence(self):
+    # def sort_sequence(self):
 
-        sorted_actions = []
+    #     sorted_actions = []
 
-        for action_set in self.action_sets.values():
-            actions: List[Hook] = action_set.actions
-            sorted_set = sorted(actions, key= lambda action: action.config.order)
+    #     for action_set in self.action_sets.values():
+    #         actions: List[Hook] = action_set.actions
+    #         sorted_set = sorted(actions, key= lambda action: action.config.order)
 
-            sorted_actions.extend(
-                list(sorted_set)
-            )
+    #         sorted_actions.extend(
+    #             list(sorted_set)
+    #         )
 
-        self.actions = sorted_actions
+    #     self.actions = sorted_actions
