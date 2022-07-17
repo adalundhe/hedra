@@ -1,6 +1,6 @@
 import functools
 from .types import HookType
-from hedra.test.registry.registrar import registar
+from hedra.core.hooks.registry.registrar import registar
 
 
 @registar(HookType.SETUP)

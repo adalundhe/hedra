@@ -1,15 +1,26 @@
-import inspect
 from types import FunctionType
 from typing import Any, Dict, List
+from hedra.core.hooks.client.config import Config
+from hedra.core.engines.types.common.hooks import Hooks
+from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.types.websocket.client import MercuryWebsocketClient
 from hedra.core.engines.types.common.request import Request
 from hedra.core.engines.types.common.types import RequestTypes
+from .base_client import BaseClient
 
 
-class WebsocketClient:
+class WebsocketClient(BaseClient):
 
-    def __init__(self, session: MercuryWebsocketClient) -> None:
-        self.session = session
+    def __init__(self, config: Config) -> None:
+        super().__init__()
+
+        self.session = MercuryWebsocketClient(
+            concurrency=config.batch_size,
+            timeouts=Timeouts(
+                total_timeout=config.request_timeout
+            ),
+            reset_connections=config.options.get('reset_connections')
+        )
         self.request_type = RequestTypes.WEBSOCKET
         self.next_name = None
 
@@ -45,6 +56,8 @@ class WebsocketClient:
             if isinstance(result, Exception):
                 raise result
 
+        return self.session
+
     async def send(
         self, 
         url: str, 
@@ -75,3 +88,5 @@ class WebsocketClient:
 
             if isinstance(result, Exception):
                 raise result
+
+        return self.session

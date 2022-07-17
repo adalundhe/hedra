@@ -4,7 +4,7 @@ import traceback
 from easy_logger import Logger
 from pycli_tools.arguments.bundler import Bundler
 from hedra.core import Executor
-from hedra.test import (
+from hedra.core.hooks import (
     Execute
 )
 from hedra.core.pipelines.stages.stage import Stage

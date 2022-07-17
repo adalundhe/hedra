@@ -1,13 +1,6 @@
-import time
-import asyncio
-from async_tools.datatypes.async_list import AsyncList
-from hedra.core.parsing.actions_parser import ActionsParser
-from hedra.core.personas.batching.batch_interval import BatchInterval
 from hedra.core.personas.types.default_persona import DefaultPersona
-from hedra.core.engines import Engine
-from hedra.core.personas.batching import SequenceStep
-from hedra.test.hooks.types import HookType
-from hedra.core.pipelines.stages.stage import Stage
+from hedra.core.hooks.types.types import HookType
+from hedra.core.hooks.client.config import Config
 
 
 class SequencedPersonaCollection(DefaultPersona):
@@ -31,20 +24,15 @@ class SequencedPersonaCollection(DefaultPersona):
     the sequence.
     '''
 
-    def __init__(self, config, handler):
-        super(SequencedPersonaCollection, self).__init__(
-            config,
-            handler
-        )
+    def __init__(self, config: Config):
+        super(SequencedPersonaCollection, self).__init__(config)
 
         self.elapsed = 0
         self.no_execution_actions = True
 
-    async def setup(self, sequence: Stage):
+    async def setup(self, sequence):
 
         self.session_logger.debug('Setting up persona...')
-
-        self.engine.teardown_actions = sequence.hooks.get(HookType.TEARDOWN, [])
 
         actions = sequence.hooks[HookType.ACTION]
 

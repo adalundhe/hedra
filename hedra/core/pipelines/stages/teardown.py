@@ -1,7 +1,7 @@
 from typing import Dict, List
-from hedra.test.client import Client
-from hedra.test.hooks.hook import Hook
-from hedra.test.hooks.types import HookType
+from hedra.core.hooks.client import Client
+from hedra.core.hooks.types.hook import Hook
+from hedra.core.hooks.types.types import HookType
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from .stage import Stage
 

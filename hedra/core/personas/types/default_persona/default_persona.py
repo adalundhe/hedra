@@ -1,43 +1,25 @@
 import time
 import asyncio
-from typing import List
-import psutil
-from async_tools.functions.awaitable import awaitable
-
-from hedra.core.personas.batching.batch import Batch
-from hedra.test.hooks.hook import Hook
+from typing import Dict, List
 from easy_logger import Logger
+from async_tools.functions.awaitable import awaitable
+from hedra.core.hooks.types.types import HookType
+from hedra.core.personas.batching.batch import Batch
+from hedra.core.hooks.types.hook import Hook
 from hedra.core.personas.batching import Batch
 from hedra.core.personas.batching.batch_interval import BatchInterval
-from hedra.core.engines import Engine
-from hedra.core.personas.utils import parse_time
-from hedra.core.parsing import ActionsParser
-from hedra.test.hooks.types import HookType
+from hedra.core.hooks.client.config import Config
 
 
 class DefaultPersona:
 
-    def __init__(self, config, handler):
-        self.config = config.executor_config
+    def __init__(self, config: Config):
         self.actions = []
         self._hooks: List[Hook] = []
-        self.handler = handler
-        self.engine = Engine(self.config, self.handler)
-        self.batch = Batch(self.config)
-        self._live_updates = config.distributed_config.get('live_progress_updates', False)
+        self.batch = Batch(config)
 
-        self.is_parallel = config.runner_mode.find('parallel') > -1
-        self.pool_size = self.config.get('pool_size')
-        self.results = []
-        self.stats = {}
-
-        if self.is_parallel and self.pool_size is None:
-            self.pool_size = psutil.cpu_count(logical=False)
-
-        self.total_time = parse_time(
-            self.config.get('total_time', 60)
-        )
-
+        self._live_updates = False
+        self.total_time = config.total_time
         self.duration = 0
         self.total_actions = 0
         self.total_elapsed = 0
@@ -56,37 +38,11 @@ class DefaultPersona:
         self.loop = None
         self.current_action_idx = 0
 
-    @classmethod
-    def about(cls):
-        return '''
-        Default Persona - (default)
-
-        Executes as many actions as possible of the specified batch size (can be set either using optimization or via the --batch-size argument) for the
-        specified amount of time-per-batch (specified either via optimization or the --batch-time argument) for the total amount of time specified by 
-        the --total-time argument.
-        '''
-
-    @classmethod
-    def about_batches(cls):
-        return Batch.about()
-
-    @classmethod
-    def about_batch_intervals(cls):
-        return BatchInterval.about()
-
-    async def setup(self, parser: ActionsParser):
-        self.session_logger.debug('Setting up persona...')
+    def setup(self, actions: Dict[str, List[Hook]]):
+        self._hooks = list(actions.get(HookType.ACTION))
+        self.actions_count = len(self._hooks)
         
-        self.actions = parser.actions
-
-        for action_set in parser.action_sets.values():
-            self.actions_count += len(action_set.actions)
-            self._hooks.extend(action_set.actions)
             
-            setup_hooks = action_set.hooks.get(HookType.SETUP)
-            for setup_hook in setup_hooks:
-                await setup_hook.call(action_set)
-
     async def execute(self):
         hooks = self._hooks
         total_time = self.total_time

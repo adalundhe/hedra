@@ -1,17 +1,15 @@
 from .batch_interval import BatchInterval
+from hedra.core.hooks.client.config import Config
 
 
 class Batch:
 
-    def __init__(self, config) -> None:
-        self.config = config
-        self.gradient = self.config.get('gradient', 0.1)
-        self.time = self.config.get('batch_time', 1)
+    def __init__(self, config: Config) -> None:
+        self.gradient = config.batch_gradient
 
-        self.size = self.config.get('batch_size', 1000)
-        self.count = self.config.get('batch_count', 10)
+        self.size = config.batch_size
 
-        self.interval = BatchInterval(self.config)
+        self.interval = BatchInterval(config)
 
         self.deferred = []
 

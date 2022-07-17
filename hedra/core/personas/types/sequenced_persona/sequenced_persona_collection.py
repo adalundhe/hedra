@@ -1,23 +1,12 @@
-import time
-import asyncio
-from async_tools.datatypes.async_list import AsyncList
-from yaml import parse
-from hedra.core.personas.batching.batch_interval import BatchInterval
 from hedra.core.personas.types.default_persona import DefaultPersona
-from hedra.core.engines import Engine
-from hedra.core.personas.batching import SequenceStep
-from hedra.core.parsing import ActionsParser
-from hedra.test.hooks.hook import Hook
-from hedra.test.hooks.types import HookType
+from hedra.core.hooks.types.types import HookType
+from hedra.core.hooks.client.config import Config
 
 
 class SequencedPersonaCollection(DefaultPersona):
 
-    def __init__(self, config, handler):
-        super(SequencedPersonaCollection, self).__init__(
-            config,
-            handler
-        )
+    def __init__(self, config: Config):
+        super(SequencedPersonaCollection, self).__init__(config)
 
     @classmethod
     def about(cls):
@@ -31,19 +20,18 @@ class SequencedPersonaCollection(DefaultPersona):
         argument. You may specify a wait between batches (between each step) by specifying an integer number of seconds via the --batch-interval argument.
         '''
 
-    async def setup(self, parser: ActionsParser):
+    async def setup(self, actions):
 
         self.session_logger.debug('Setting up persona...')
 
-        parser.sort_sequence()
 
-        self.actions = parser.actions
+        self.actions = actions
         self.actions_count = len(self.actions)
         self._hooks = self.actions
 
         self.engine.teardown_actions = []
 
-        for action_set in parser.action_sets.values():
+        for action_set in actions:
 
             setup_hooks = action_set.hooks.get(HookType.SETUP)
 

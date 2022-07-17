@@ -1,12 +1,13 @@
 
 import asyncio
 import enum
+from types import SimpleNamespace
 import networkx
 from typing import Dict, List
 from hedra.core.pipelines.transitions.exceptions.exceptions import IsolatedStageError
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
-from .transitions import TransitionAssembler
+from .transitions import TransitionAssembler, local_transitions
 
 
 
@@ -45,7 +46,7 @@ class Pipeline:
             generation for generation in networkx.topological_generations(self.graph)
         ]
 
-        self.runner = TransitionAssembler()
+        self.runner = TransitionAssembler(local_transitions)
 
     def validate(self):
 
@@ -59,10 +60,9 @@ class Pipeline:
 
         self._append_stage(StageTypes.COMPLETE)
 
-        self.transitions_graph = self.runner.build_transitions_graph(
-            self.execution_order,
-            self.stages
-        )
+        self.runner.generate_stages(self.stages)
+        self.transitions_graph = self.runner.build_transitions_graph(self.execution_order)
+        self.runner.map_to_setup_stages(self.graph)
 
         for isolate_stage_name in networkx.isolates(self.graph):
             raise IsolatedStageError(
@@ -90,10 +90,10 @@ class Pipeline:
 
             else:
                 await asyncio.gather(*[
-                    transition.transition(
+                    asyncio.create_task(transition.transition(
                         transition.from_stage, 
                         transition.to_stage
-                    ) for transition in transition_group
+                    )) for transition in transition_group
                 ])
 
     def _append_stage(self, stage_type: StageTypes):

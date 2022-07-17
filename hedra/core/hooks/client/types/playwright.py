@@ -1,8 +1,9 @@
-
-import inspect
 from types import FunctionType
 from typing import Any, Dict, List
+from hedra.core.hooks.client.config import Config
+from hedra.core.engines.types.common.hooks import Hooks
 from hedra.core.engines.types.playwright.client import MercuryPlaywrightClient
+from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.types.playwright import (
     Command,
     Page,
@@ -11,12 +12,22 @@ from hedra.core.engines.types.playwright import (
     Options
 )
 from hedra.core.engines.types.common.types import RequestTypes
+from .base_client import BaseClient
 
 
-class PlaywrightClient:
+class PlaywrightClient(BaseClient):
 
-    def __init__(self, session: MercuryPlaywrightClient) -> None:
-        self.session = session
+    def __init__(self, config: Config) -> None:
+        super().__init__()
+        
+        self.session = MercuryPlaywrightClient(
+            concurrency=config.batch_size,
+            group_size=config.options.get('session_group_size', 25),
+            timeouts=Timeouts(
+                total_timeout=config.request_timeout
+            )
+        )
+
         self.request_type = RequestTypes.PLAYWRIGHT
         self.next_name = None
 
@@ -89,3 +100,5 @@ class PlaywrightClient:
 
             if isinstance(result, Exception):
                 raise result
+
+        return self.session

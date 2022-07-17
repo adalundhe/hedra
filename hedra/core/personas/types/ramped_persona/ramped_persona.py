@@ -4,12 +4,13 @@ import math
 from async_tools.functions import awaitable
 from async_tools.datatypes.async_list import AsyncList
 from hedra.core.personas.types.default_persona import DefaultPersona
+from hedra.core.hooks.client.config import Config
 
 
 class RampedPersona(DefaultPersona):
 
-    def __init__(self, config, handler):
-        super(RampedPersona, self).__init__(config, handler)
+    def __init__(self, config: Config):
+        super(RampedPersona, self).__init__(config)
         self._initial_actions = AsyncList()
         self._current_batch = 1
 

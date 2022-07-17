@@ -1,12 +1,13 @@
 import functools
 from .types import HookType
-from hedra.test.registry.registrar import registar
+from .hook import Hook
+from hedra.core.hooks.registry.registrar import registar
 
 
 @registar(HookType.AFTER)
 def after(*names):
     
-    def wrapper(func):
+    def wrapper(func) -> Hook:
 
         @functools.wraps(func)
         def decorator(*args, **kwargs):

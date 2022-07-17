@@ -1,13 +1,13 @@
 import time
 import asyncio
-from async_tools.functions import awaitable
 from hedra.core.personas.types.default_persona import DefaultPersona
+from hedra.core.hooks.client.config import Config
 
 
 class RampedIntervalPersona(DefaultPersona):
 
-    def __init__(self, config, handler):
-        super(RampedIntervalPersona, self).__init__(config, handler)
+    def __init__(self, config: Config):
+        super(RampedIntervalPersona, self).__init__(config)
         self._current_batch = 1
 
     @classmethod

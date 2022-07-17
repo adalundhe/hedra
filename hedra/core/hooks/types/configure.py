@@ -11,8 +11,8 @@ from hedra.core.engines.types import (
 from hedra.core.engines.types.common import Timeouts
 from easy_logger import Logger
 from hedra.core.personas.utils.time import parse_time
-from hedra.test.config import Config
-from hedra.test.client import Client
+from hedra.core.hooks.config import Config
+from hedra.core.hooks.client import Client
 
 
 
@@ -121,7 +121,6 @@ def configure(config: Config):
                         timeouts=Timeouts(
                             total_timeout=selected_config.request_timeout
                         ),
-                        hard_cache=selected_config.options.get('hard_cache', False),
                         reset_connections=selected_config.options.get('reset_connections')
                     )
 
@@ -132,7 +131,6 @@ def configure(config: Config):
                             connect_timeout=selected_config.connect_timeout,
                             total_timeout=selected_config.request_timeout
                         ),
-                        hard_cache=selected_config.options.get('hard_cache', False),
                         reset_connections=selected_config.options.get('reset_connections')
                     )
 
@@ -142,7 +140,6 @@ def configure(config: Config):
                         timeouts=Timeouts(
                             total_timeout=selected_config.request_timeout
                         ),
-                        hard_cache=selected_config.options.get('hard_cache', False),
                         reset_connections=selected_config.options.get('reset_connections')
                     )
 
@@ -154,7 +151,6 @@ def configure(config: Config):
                         timeouts=Timeouts(
                             total_timeout=selected_config.request_timeout
                         ),
-                        hard_cache=selected_config.options.get('hard_cache', False),
                         reset_connections=selected_config.options.get('reset_connections')
                     )
 
@@ -164,7 +160,6 @@ def configure(config: Config):
                         timeouts=Timeouts(
                             total_timeout=selected_config.request_timeout
                         ),
-                        hard_cache=selected_config.options.get('hard_cache', False),
                         reset_connections=selected_config.options.get('reset_connections')
                     )
 

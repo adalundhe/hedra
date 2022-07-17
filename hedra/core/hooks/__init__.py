@@ -1,4 +1,4 @@
-from .hooks import (
+from .types import (
     action,
     setup,
     teardown,

@@ -1,18 +1,15 @@
-import math
-from re import S
-import time
 import asyncio
 from typing import List
 from hedra.core.personas.types.default_persona import DefaultPersona
 from .sequence_persona import SequencedPersonaCollection
 from async_tools.datatypes import AsyncList
-from hedra.core.parsing import ActionsParser
+from hedra.core.hooks.client.config import Config
 
 
 class MultiSequencePersona(DefaultPersona):
 
-    def __init__(self, config=None, handler=None, user=None):
-        super(MultiSequencePersona, self).__init__(config, handler)
+    def __init__(self, config: Config):
+        super(MultiSequencePersona, self).__init__(config)
         self._sequence_config = config
         self.sequences: List[SequencedPersonaCollection] = []
         self._utility_sequences: List[SequencedPersonaCollection] = []
@@ -29,18 +26,13 @@ class MultiSequencePersona(DefaultPersona):
         argument. You may specify a wait between batches (between each step) by specifying an integer number of seconds via the --batch-interval argument.
         '''
 
-    async def setup(self, parser: ActionsParser):
+    async def setup(self, actions):
 
         self.session_logger.debug('Setting up persona...')
 
-        parser.sort_multisequence()
-
-        for sequence_class in parser.action_sets.values():
+        for sequence_class in actions:
        
-            sequence = SequencedPersonaCollection(
-                self._sequence_config, 
-                self.handler
-            )
+            sequence = SequencedPersonaCollection(self._sequence_config)
             
             self.sequences.append(sequence)
 

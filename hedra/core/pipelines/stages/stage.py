@@ -7,5 +7,8 @@ class Stage:
     stage_type=StageTypes
     dependencies: List[Stage]=[]
     all_dependencies: List[Stage]=[]
-    results: Any = None
+    next_context: Any = None
     context: Any = None
+
+    def __init__(self) -> None:
+        self.name = self.__class__.__name__

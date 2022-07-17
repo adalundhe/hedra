@@ -4,7 +4,7 @@ from pycli_tools import BaseConfig
 from pycli_tools.arguments.bundler import Bundler
 from importlib.metadata import version
 
-from hedra.test.config import Config
+from hedra.core.hooks.config import Config
 
 from .config.cli.hedra import hedra_cli
 

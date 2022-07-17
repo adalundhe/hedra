@@ -1,14 +1,26 @@
 import inspect
 from types import FunctionType
 from typing import Dict, Iterator, List, Union
+from hedra.core.hooks.client.config import Config
 from hedra.core.engines.types.http.client import MercuryHTTPClient
+from hedra.core.engines.types.common.hooks import Hooks
 from hedra.core.engines.types.common.request import Request
 from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core.engines.types.common import Timeouts
+from .base_client import BaseClient
 
-class HTTPClient:
 
-    def __init__(self, session: MercuryHTTPClient) -> None:
-        self.session = session
+class HTTPClient(BaseClient):
+
+    def __init__(self, config: Config) -> None:
+        super().__init__()
+        self.session = MercuryHTTPClient(
+            concurrency=config.batch_size,
+            timeouts=Timeouts(
+                total_timeout=config.request_timeout
+            ),
+            reset_connections=config.options.get('reset_connections')
+        )
         self.request_type = RequestTypes.HTTP
         self.next_name = None
 
@@ -44,6 +56,7 @@ class HTTPClient:
             if isinstance(result, Exception):
                 raise result
 
+        return self.session
 
     async def post(
         self,
@@ -73,6 +86,8 @@ class HTTPClient:
 
             if isinstance(result, Exception):
                 raise result
+        
+        return self.session
 
     async def put(
         self,
@@ -104,6 +119,8 @@ class HTTPClient:
             if isinstance(result, Exception):
                 raise result
 
+        return self.session
+
     async def patch(
         self,
         url: str, 
@@ -134,6 +151,8 @@ class HTTPClient:
             if isinstance(result, Exception):
                 raise result
 
+        return self.session
+
     async def delete(
         self, 
         url: str, 
@@ -162,3 +181,5 @@ class HTTPClient:
 
             if isinstance(result, Exception):
                 raise result
+
+        return self.session

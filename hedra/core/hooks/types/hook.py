@@ -1,5 +1,5 @@
 from typing import Any, Coroutine, Dict, List, Union
-from hedra.test.hooks.types import HookType
+from hedra.core.hooks.types.types import HookType
 
 
 

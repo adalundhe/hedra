@@ -1,6 +1,6 @@
 from hedra.core.pipelines.stages import Execute
-from hedra.test.config import Config
-from hedra.test.hooks import (
+from hedra.core.hooks.config import Config
+from hedra.core.hooks.types import (
     setup,
     action,
     teardown,

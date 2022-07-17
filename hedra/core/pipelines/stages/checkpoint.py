@@ -3,3 +3,6 @@ from .stage import Stage
 
 class Checkpoint(Stage):
     stage_type=StageTypes.CHECKPOINT
+
+    def __init__(self) -> None:
+        super().__init__()

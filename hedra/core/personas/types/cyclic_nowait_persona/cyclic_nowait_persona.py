@@ -1,12 +1,13 @@
 import asyncio
 import time
 from hedra.core.personas.types.default_persona import DefaultPersona
+from hedra.core.hooks.client.config import Config
 
 
 class CyclicNoWaitPersona(DefaultPersona):
 
-    def __init__(self, config, handler):
-        super().__init__(config, handler)
+    def __init__(self, config: Config):
+        super().__init__(config)
 
     async def generator(self, total_time):
         elapsed = 0

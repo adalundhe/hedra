@@ -1,7 +1,7 @@
 from types import FunctionType
 from typing import Any, Dict, List, Union, Coroutine
-from hedra.test.hooks.hook import Hook, Metadata
-from hedra.test.hooks.types import HookType
+from hedra.core.hooks.types.hook import Hook, Metadata
+from hedra.core.hooks.types.types import HookType
 
 
 class Registrar:
@@ -21,7 +21,7 @@ class Registrar:
             def wrap_hook(metadata: Dict[str, Union[str, int]]={}):
                 def wrapped_method(func):
 
-                    hook_name = func.__name__
+                    hook_name = func.__qualname__
 
                     self.all[hook_name] = Hook(
                         hook_name, 
@@ -40,8 +40,7 @@ class Registrar:
             
             def wrap_hook(*names):
                 def wrapped_method(func):
-
-                    hook_name = func.__name__
+                    hook_name = func.__qualname__
 
                     self.all[hook_name] = Hook(
                         hook_name, 
@@ -59,8 +58,8 @@ class Registrar:
             def wrap_hook(weight: int=1, order: int=1, metadata: Dict[str, Union[str, int]]={}, checks: List[Coroutine]=[]):
                 def wrapped_method(func):
 
-                    hook_name = func.__name__
-                    
+                    hook_name = func.__qualname__
+
                     self.all[hook_name] = Hook(
                         hook_name, 
                         func, 

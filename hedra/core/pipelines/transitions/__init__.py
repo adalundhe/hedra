@@ -1,1 +1,2 @@
 from .transition_assembler import TransitionAssembler
+from .local_transitions import local_transitions

@@ -1,20 +1,20 @@
-from typing import Dict, List, Union
-from easy_logger import Logger
+# from typing import Dict, List, Union
+# from easy_logger import Logger
 # from hedra.core.engines.types.common.hooks import Hooks
 # from hedra.test.hooks.hook import Hook
 # from hedra.test.hooks.types import HookType
 # from hedra.core.pipelines.stages.execute import Execute
 
 
-class ActionsParser:
+# class ActionsParser:
 
-    def __init__(self, config):
-        logger = Logger()
-        self.session_logger = logger.generate_logger('hedra')
-        self._raw_actions = config.actions
-        self.sorted = config.executor_config.get('sorted')
-        self._is_multi_sequence = config.executor_config.get('persona_type') == 'multi-sequence'
-        self._is_multi_user_sequence = config.executor_config.get('persona_type') == 'multi-user-sequence'
+#     def __init__(self, config):
+#         logger = Logger()
+#         self.session_logger = logger.generate_logger('hedra')
+#         self._raw_actions = config.actions
+#         self.sorted = config.executor_config.get('sorted')
+#         self._is_multi_sequence = config.executor_config.get('persona_type') == 'multi-sequence'
+#         self._is_multi_user_sequence = config.executor_config.get('persona_type') == 'multi-user-sequence'
         # self.action_sets: Dict[str, Execute] = {}
         # self.actions: Union[List, Dict] = []
         # self.hooks = {}
@@ -22,54 +22,15 @@ class ActionsParser:
         # self.teardown_actions = []
         # self.engine_type = config.executor_config.get('engine_type')
 
-    @classmethod
-    def about(cls):
+    # def __len__(self):
+    #     return len(self.actions)
 
-        registered_parsers = '\n\t'.join([ f'- {parser_type}' for parser_type in cls.parsers ])
+    # def __iter__(self):
+    #     for action in self.actions:
+    #         yield action
 
-        return f'''
-        Action Parsers
-
-        key-arguments:
-
-        --engine (The engine type to use - determines the action type the parser will use)
-        --persona (The parser type to use - determines the parser used)
-
-        Actions, whether written Python or read-in as JSON file data, need to be parsed prior to
-        execution so Personas can easily organize and Engines easily execute them. Action parsers 
-        are responsible for handling this task, allowing Hedra to implement a consistent interface
-        both for declaring/describing actions and for processing/consuming actions internally.
-
-        All parsers share the following methods:
-
-        - parse (maps raw action data to the required format for Hedra to consume during execution)
-
-        Currently registered parsers include:
-
-        {registered_parsers}
-        
-        For more information on parsers, run the command:
-
-            hedra --about actions:parsers:<parser_type>
-
-
-        Related Topics:
-
-        -personas
-        -engines
-        -actions
-
-        '''
-
-    def __len__(self):
-        return len(self.actions)
-
-    def __iter__(self):
-        for action in self.actions:
-            yield action
-
-    def __getitem__(self, index):
-        return self.actions[index]
+    # def __getitem__(self, index):
+    #     return self.actions[index]
 
     # async def parse(self):
     #     for python_class in self._raw_actions:

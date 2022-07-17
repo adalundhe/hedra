@@ -1,7 +1,7 @@
 from __future__ import annotations
 from types import FunctionType
 from typing import Coroutine, Dict, Iterator, Union, List
-from hedra.test.hooks.types import HookType
+from hedra.core.hooks.types.types import HookType
 from .params import Params
 from .metadata import Metadata
 from .url import URL
