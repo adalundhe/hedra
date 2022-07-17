@@ -14,6 +14,15 @@ class InvalidTransitionError(Exception):
             f'Error - {from_stage_type} stage {from_stage_name} cannot preceed {to_stage_type} stage {to_stage_name}.'
         )
 
+class IdleTranstionError(Exception):
+    def __init__(self, stage: Stage) -> None:
+
+        stage_name = stage.__class__.__name__
+        stage_type = stage.stage_type.name.capitalize()
+
+        super().__init__(
+            f"Error - {stage_type} stage {stage_name} cannot be the initial stage. Make sure you have a Setup class and set it as {stage_name}'s dependency!"
+        )
 
 class IsolatedStageError(Exception):
 

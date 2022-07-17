@@ -1,1 +1,5 @@
-from .exceptions import InvalidTransitionError, IsolatedStageError
+from .exceptions import (
+    InvalidTransitionError, 
+    IsolatedStageError,
+    IdleTranstionError
+)

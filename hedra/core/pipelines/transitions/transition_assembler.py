@@ -9,6 +9,7 @@ from .common import (
     exit_transition
 )
 from .idle import (
+    invalid_idle_transition,
     idle_to_setup_transition,
 )
 
@@ -56,17 +57,17 @@ class TransitionAssembler:
         # State: Idle
         (StageTypes.IDLE, StageTypes.IDLE): idle_transition,
         (StageTypes.IDLE, StageTypes.SETUP): idle_to_setup_transition,
-        (StageTypes.IDLE, StageTypes.OPTIMIZE): invalid_transition,
-        (StageTypes.IDLE, StageTypes.EXECUTE):  invalid_transition,
-        (StageTypes.IDLE, StageTypes.TEARDOWN): invalid_transition,
-        (StageTypes.IDLE, StageTypes.ANALYZE): invalid_transition,
-        (StageTypes.IDLE, StageTypes.CHECKPOINT): invalid_transition,
-        (StageTypes.IDLE, StageTypes.COMPLETE): invalid_transition,
-        (StageTypes.IDLE, StageTypes.ERROR): invalid_transition,
+        (StageTypes.IDLE, StageTypes.OPTIMIZE): invalid_idle_transition,
+        (StageTypes.IDLE, StageTypes.EXECUTE):  invalid_idle_transition,
+        (StageTypes.IDLE, StageTypes.TEARDOWN): invalid_idle_transition,
+        (StageTypes.IDLE, StageTypes.ANALYZE): invalid_idle_transition,
+        (StageTypes.IDLE, StageTypes.CHECKPOINT): invalid_idle_transition,
+        (StageTypes.IDLE, StageTypes.COMPLETE): invalid_idle_transition,
+        (StageTypes.IDLE, StageTypes.ERROR): invalid_idle_transition,
 
         # State: Setup
         (StageTypes.SETUP, StageTypes.SETUP): invalid_transition,
-        (StageTypes.SETUP, StageTypes.IDLE): idle_transition,
+        (StageTypes.SETUP, StageTypes.IDLE): invalid_transition,
         (StageTypes.SETUP, StageTypes.OPTIMIZE): setup_to_optimize_transition,
         (StageTypes.SETUP, StageTypes.EXECUTE): setup_to_execute_transition,
         (StageTypes.SETUP, StageTypes.TEARDOWN): invalid_transition,
@@ -77,7 +78,7 @@ class TransitionAssembler:
 
         # State: Optimize
         (StageTypes.OPTIMIZE, StageTypes.OPTIMIZE): invalid_transition,
-        (StageTypes.OPTIMIZE, StageTypes.IDLE): idle_transition,
+        (StageTypes.OPTIMIZE, StageTypes.IDLE): invalid_transition,
         (StageTypes.OPTIMIZE, StageTypes.SETUP): invalid_transition,
         (StageTypes.OPTIMIZE, StageTypes.EXECUTE): optimize_to_execute_transition,
         (StageTypes.OPTIMIZE, StageTypes.TEARDOWN): invalid_transition,
@@ -88,7 +89,7 @@ class TransitionAssembler:
 
         # State: Execute
         (StageTypes.EXECUTE, StageTypes.EXECUTE): execute_to_execute_transition,
-        (StageTypes.EXECUTE, StageTypes.IDLE): idle_transition,
+        (StageTypes.EXECUTE, StageTypes.IDLE): invalid_transition,
         (StageTypes.EXECUTE, StageTypes.SETUP): invalid_transition,
         (StageTypes.EXECUTE, StageTypes.OPTIMIZE): execute_to_optimize_transition,
         (StageTypes.EXECUTE, StageTypes.TEARDOWN): execute_to_teardown_transition,
@@ -99,7 +100,7 @@ class TransitionAssembler:
 
         # State: Teardown
         (StageTypes.TEARDOWN, StageTypes.TEARDOWN): invalid_transition,
-        (StageTypes.TEARDOWN, StageTypes.IDLE): idle_transition,
+        (StageTypes.TEARDOWN, StageTypes.IDLE): invalid_transition,
         (StageTypes.TEARDOWN, StageTypes.SETUP): invalid_transition,
         (StageTypes.TEARDOWN, StageTypes.OPTIMIZE): invalid_transition,
         (StageTypes.TEARDOWN, StageTypes.EXECUTE): invalid_transition,
@@ -110,7 +111,7 @@ class TransitionAssembler:
 
         # State: Analyze
         (StageTypes.ANALYZE, StageTypes.ANALYZE): invalid_transition,
-        (StageTypes.ANALYZE, StageTypes.IDLE): idle_transition,
+        (StageTypes.ANALYZE, StageTypes.IDLE): invalid_transition,
         (StageTypes.ANALYZE, StageTypes.SETUP): invalid_transition,
         (StageTypes.ANALYZE, StageTypes.OPTIMIZE): invalid_transition,
         (StageTypes.ANALYZE, StageTypes.EXECUTE): invalid_transition,
@@ -121,7 +122,7 @@ class TransitionAssembler:
 
         # State: Checkpoint
         (StageTypes.CHECKPOINT, StageTypes.CHECKPOINT): invalid_transition,
-        (StageTypes.CHECKPOINT, StageTypes.IDLE): idle_transition,
+        (StageTypes.CHECKPOINT, StageTypes.IDLE): invalid_transition,
         (StageTypes.CHECKPOINT, StageTypes.SETUP): checkpoint_to_setup_transition,
         (StageTypes.CHECKPOINT, StageTypes.OPTIMIZE): checkpoint_to_optimize_transition,
         (StageTypes.CHECKPOINT, StageTypes.EXECUTE): checkpoint_to_execute_transition,
@@ -183,7 +184,7 @@ class TransitionAssembler:
                         stage_instance.stage_type
                     ))
 
-                    if transition == invalid_transition:
+                    if transition == invalid_transition or transition == invalid_idle_transition:
                         invalid_transition_error, _ = self.loop.run_until_complete(transition(dependency, stage_instance))
                         raise invalid_transition_error
 
