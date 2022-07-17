@@ -15,4 +15,4 @@ from .stage import Stage
 
 class Execute(Stage):
     stage_type=StageTypes.EXECUTE
-    pass
+    client: Client = None
