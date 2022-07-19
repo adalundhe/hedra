@@ -1,8 +1,8 @@
-from typing import Union
+import statistics
 from easy_logger import Logger
-from alive_progress import alive_bar
-# from hedra.reporting import Handler, ParallelHandler
+from hedra.core.pipelines.stages.types.stage_states import StageStates
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
+from hedra.results import results_types
 from .stage import Stage
 
 
@@ -15,28 +15,63 @@ class Analyze(Stage):
         super().__init__()
         logger = Logger()
         self.session_logger = logger.generate_logger('hedra')
+        self.raw_results = {}
         
-    async def gather(self):
-        actions_per_second = self.stats.get('actions_per_second')
-        completed_actions = self.stats.get('completed_actions')
-        total_time = self.stats.get('total_time')
+    async def run(self):
+        self.state.ANALYZING
+        summaries = {}
+
+        for stage_name, stage_results in self.raw_results.items():
+
+            # stage = stages.get(stage_name)
+            # if stage.state == StageStates.EXECUTED:
+            #     stage.state = StageStates.ANALYZING
+            
+    
+            results =  {}
+            stage_total = 0
+            for stage_result in stage_results:
+                result = results_types.get(stage_result.type)(stage_result)
+
+                if results.get(result.name) is None:
+                    results[result.name] = [result]
+                
+                else:
+                    results[result.name].append(result)
+            
+            grouped_stats = {}
+            
+            for results_group_name, results_group in results.items():
+
+                timings = [result.time for result in results_group]
         
-        if self.is_parallel is False:
+                quantiles = {
+                    (idx + 1)*10: quantile for idx, quantile in enumerate(
+                        statistics.quantiles(timings, n=10)
+                    )
+                }
 
-            self.session_logger.info('\n')
-            self.session_logger.info(f'Calculated APS of - {actions_per_second} - actions per second.')
-            self.session_logger.info(f'Total action completed - {completed_actions} over actual runtime of - {total_time} - seconds.')
-            self.session_logger.info('\n')
+                group_total = len(results_group)
+                grouped_stats[results_group_name] = {
+                    'total': group_total,
+                    'success': len([result for result in results_group if result.error is None]),
+                    'failure': len([result for result in results_group if result.error]),
+                    'median': statistics.median(timings),
+                    'mean': statistics.mean(timings),
+                    'variance': statistics.variance(timings),
+                    'stdev': statistics.stdev(timings),
+                    'minimum': min(timings),
+                    'maximum': max(timings),
+                    'quantiles': quantiles
+                }
 
-            self.session_logger.info(f'Processing - {completed_actions} - action results.')
+                stage_total += group_total
 
-            with alive_bar(
-                total=self.stats.get('completed_actions'),
-                title='Processing results...',
-                bar=None, 
-                spinner='dots_waves2'
-            ) as bar:
-                self.results = await self.handler.aggregate(self.results, bar=bar)
-
-        else:
-            self.results = await self.handler.aggregate(self.results)
+            summaries[stage_name] = {
+                'total': stage_total,
+                **grouped_stats
+            }
+        
+        self.state = StageStates.ANALYZED
+        return summaries
+            

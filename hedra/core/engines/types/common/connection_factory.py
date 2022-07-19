@@ -41,6 +41,9 @@ class Connection:
     async def read(self, size: int=_DEFAULT_LIMIT):
         return await self._reader.read(size)
 
+    async def readuntil(self, sep=b'\n'):
+        return await self._reader.readuntil(separator=sep)
+
 class ConnectionFactory:
 
     def __init__(self, factory_type: RequestTypes = RequestTypes.HTTP) -> None:

@@ -3,7 +3,7 @@ from .command import Command
 
 class Result:
 
-    def __init__(self, command: Command, error: Exception=None) -> None:
+    def __init__(self, command: Command, error: Exception=None, type=None) -> None:
         self.type = 'playwright'
         self.name = command.name
         self.error = error
@@ -20,6 +20,7 @@ class Result:
         self._frame = command.page.frame
         self.data = None
         self.hostname = None
+        self.type = type
 
     @property
     def path(self):

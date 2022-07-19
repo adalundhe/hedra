@@ -24,5 +24,7 @@ async def checkpoint_to_analyze_transition(current_stage: Stage, next_stage: Sta
     return None, StageTypes.ANALYZE
 
 async def checkpoint_to_complete_transition(current_stage: Stage, next_stage: Stage):
+    print('CHECKPOINTING!')
+    await current_stage.run()
     next_stage.context = current_stage.context
     return None, StageTypes.COMPLETE

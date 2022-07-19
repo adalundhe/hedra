@@ -1,3 +1,4 @@
+import asyncio
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from .stage import Stage
 
@@ -7,3 +8,13 @@ class Complete(Stage):
 
     def __init__(self) -> None:
         super().__init__()
+
+    async def run(self):
+        pending = asyncio.all_tasks()
+
+        for pend in pending:
+            try:
+                pend.set_result(None)
+
+            except Exception:
+                print('OOPS')

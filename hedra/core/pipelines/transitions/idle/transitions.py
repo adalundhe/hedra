@@ -7,6 +7,5 @@ async def invalid_idle_transition(current_stage: Stage, next_stage: Stage):
     return IdleTranstionError(next_stage), StageTypes.ERROR
 
 async def idle_to_setup_transition(current_stage: Stage, next_stage: Stage):
-    await next_stage.run()
-    
+    next_stage.context = current_stage.context
     return None, StageTypes.SETUP

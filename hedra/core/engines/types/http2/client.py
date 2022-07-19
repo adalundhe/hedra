@@ -4,7 +4,7 @@ import traceback
 from types import FunctionType
 from typing import Awaitable, Dict, List, Optional, Set, Tuple
 from hedra.core.engines.types.common.timeouts import Timeouts
-from hedra.core.engines.types.http2.connection import HTTP2Connection
+from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.http2.stream import AsyncStream
 from hedra.core.engines.types.common import Request, Response
 from hedra.core.engines.types.common.context import Context
@@ -94,7 +94,7 @@ class MercuryHTTP2Client:
 
     async def execute_prepared_request(self, request: Request) -> HTTP2ResponseFuture:
         
-        response = Response(request, type='http2')
+        response = Response(request, type=RequestTypes.HTTP2)
 
         async with self.sem:
         
@@ -115,6 +115,8 @@ class MercuryHTTP2Client:
                     request.url.socket_config,
                     ssl=request.ssl_context
                 ), self.timeouts.connect_timeout)
+
+                reader_writer.encoder = request.headers.hpack_encoder
 
                 connection.connect(reader_writer)
                 connection.send_request_headers(request, reader_writer)

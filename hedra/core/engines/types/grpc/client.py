@@ -1,6 +1,7 @@
 import time 
 import asyncio
 from types import FunctionType
+from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.http2 import MercuryHTTP2Client
 from hedra.core.engines.types.http2.connection import HTTP2Connection
 from hedra.core.engines.types.common import Timeouts, Request, Response
@@ -77,7 +78,7 @@ class MercuryGRPCClient(MercuryHTTP2Client):
 
     async def execute_prepared_request(self, request: Request) -> GRPCResponseFuture:
         
-        response = Response(request, type='http2')
+        response = Response(request, type=RequestTypes.GRPC)
 
         async with self.sem:
             stream = self.pool.streams.pop()

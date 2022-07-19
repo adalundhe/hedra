@@ -3,12 +3,20 @@ import asyncio
 from typing import Dict, List
 from easy_logger import Logger
 from async_tools.functions.awaitable import awaitable
+from asyncio import Task
 from hedra.core.hooks.types.types import HookType
 from hedra.core.personas.batching.batch import Batch
 from hedra.core.hooks.types.hook import Hook
 from hedra.core.personas.batching import Batch
 from hedra.core.personas.batching.batch_interval import BatchInterval
 from hedra.core.hooks.client.config import Config
+
+async def cancel_pending(pend: Task):
+    try:
+        pend.cancel()
+        await pend
+    except asyncio.CancelledError:
+        pass
 
 
 class DefaultPersona:
@@ -60,19 +68,14 @@ class DefaultPersona:
         ], timeout=1)
 
         self.end = time.time()
-        
-        results = await asyncio.gather(*completed, return_exceptions=True)
-        
-
-        await self.stop_updates()
-
         self.start = start
-        for pend in pending:
-            try:
-                pend.cancel()
-            except Exception:
-                pass
-
+        
+        results = await asyncio.gather(*completed)
+        
+        await self.stop_updates()
+        
+        await asyncio.gather(*[cancel_pending(pend) for pend in pending])
+        
         self.total_actions = len(set(results))
         self.total_elapsed = self.end - self.start
         self.optimized_params = None
@@ -87,16 +90,12 @@ class DefaultPersona:
         start = time.time()
         while elapsed < total_time:
             yield action_idx
-            
             await asyncio.sleep(0)
             elapsed = time.time() - start
             idx += 1
 
             if idx%self.batch.size == 0:
                 action_idx = (action_idx + 1)%self.actions_count
-
-    async def close(self):
-        await self.engine.close()
 
     async def start_updates(self):
         if self._live_updates:

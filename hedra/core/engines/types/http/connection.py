@@ -45,17 +45,24 @@ class Connection:
             self.ssl = ssl
             self.dns_address = dns_address
 
+    @property
+    def empty(self):
+        return not self._connection._reader._buffer
+
     async def read(self):
-        return await self._connection._reader.read()
+        return await self._connection.read()
 
-    async def readline(self):
-        return await self._connection._reader.readuntil()
+    async def readexactly(self, n_bytes: int):
+        return await self._connection._reader.read(n_bytes)
 
-    async def readexactly(self, num_bytes: int):
-        return await self._connection._reader.readexactly(num_bytes)
+    async def readuntil(self, sep=b'\n'):
+        return await self._connection._reader.readuntil(separator=sep)
 
     def write(self, data):
         self._connection.send(data)
+
+    def reset_buffer(self):
+        self._connection._reader._buffer = bytearray()
 
     async def close(self):
         try:

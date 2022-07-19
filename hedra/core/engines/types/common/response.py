@@ -5,6 +5,7 @@ from urllib.parse import ParseResult
 from zlib import decompress as zlib_decompress
 from typing import List, Union
 from hedra.core.engines.types.common import Request
+from hedra.core.engines.types.common.types import RequestTypes
 
 
 class BaseResponse:
@@ -58,12 +59,12 @@ class BaseResponse:
         pass
 
 
-class Response(BaseResponse):
+class Response:
 
     def __init__(self, 
         request: Request, 
         error: Exception = None, 
-        type: str = 'http', 
+        type: str = RequestTypes.HTTP, 
         channel_id: int = 0
     ) -> None:
         self.name = request.name
@@ -74,6 +75,7 @@ class Response(BaseResponse):
         self.params = request.params.data
         self.hostname = request.url.hostname
         self.checks = request.checks
+        self.type = request.type
         self.headers = {}
         self._size = None
         self.content_type = None
@@ -85,6 +87,7 @@ class Response(BaseResponse):
         self.tags = request.metadata.tags
         self.extentions = {}
         self.response_code = None
+        self.deferred_headers = None
         self.type = type
         self.channel_id = channel_id
 

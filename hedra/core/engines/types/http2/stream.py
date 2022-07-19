@@ -35,32 +35,28 @@ class AsyncStream:
         socket_config: Tuple[int, int, int, int, Tuple[int, int]], 
         ssl: Optional[SSLContext]=None
     ) -> Union[ReaderWriter, Exception]:
-        try:
-            if self.connected is False or self.dns_address != dns_address or self.reset_connection:
-                stream = await self._connection_factory.create_http2(
-                    hostname,
-                    socket_config=socket_config,
-                    ssl=ssl
-                )
-                self.connected = True
-                self.stream_id = self.init_id
-                self.dns_address = dns_address
-                self.port = port
+        if self.connected is False or self.dns_address != dns_address or self.reset_connection:
+            stream = await self._connection_factory.create_http2(
+                hostname,
+                socket_config=socket_config,
+                ssl=ssl
+            )
+            self.connected = True
+            self.stream_id = self.init_id
+            self.dns_address = dns_address
+            self.port = port
 
-                reader, writer = stream
+            reader, writer = stream
 
-                self.reader_writer = ReaderWriter(self.stream_id, reader, writer, self.timeouts)
+            self.reader_writer = ReaderWriter(self.stream_id, reader, writer, self.timeouts)
 
-            else:
+        else:
 
-                self.stream_id += 2# self.concurrency
-                if self.stream_id%2 == 0:
-                    self.stream_id += 1
+            self.stream_id += 2# self.concurrency
+            if self.stream_id%2 == 0:
+                self.stream_id += 1
 
-                self.reader_writer.stream_id = self.stream_id
+            self.reader_writer.stream_id = self.stream_id
 
-            self.reader_writer.frame_buffer = FrameBuffer()
-            return self.reader_writer
-
-        except Exception as e:
-            raise e
+        self.reader_writer.frame_buffer = FrameBuffer()
+        return self.reader_writer

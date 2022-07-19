@@ -59,7 +59,6 @@ class Headers:
 
             self.data = {
                 "HOST": hostname,
-                "Connection": "keep-alive",
                 "User-Agent": "mercury-http",
                 **self.data
             }

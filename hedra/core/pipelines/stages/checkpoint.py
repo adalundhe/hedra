@@ -6,3 +6,10 @@ class Checkpoint(Stage):
 
     def __init__(self) -> None:
         super().__init__()
+
+    async def run(self):
+        summaries = self.context.summaries
+        reporting_config = self.context.reporting_config
+
+        #TODO: Checkpointing done here.
+        print(summaries)

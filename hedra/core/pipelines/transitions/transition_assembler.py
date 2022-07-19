@@ -1,9 +1,9 @@
 import asyncio
 import networkx
-from types import SimpleNamespace
 from typing import Dict, List
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
+from hedra.core.pipelines.simple_context import SimpleContext
 from .transition import Transition
 from .common import (
     invalid_transition
@@ -88,26 +88,38 @@ class TransitionAssembler:
         return transitions_groups
 
     def map_to_setup_stages(self, graph: networkx.DiGraph):
+        
+        idle_stages = self.instances_by_type.get(StageTypes.IDLE)
+        for idle_stage in idle_stages:
+            idle_stage.context = SimpleContext()
+            idle_stage.context.stages = {}
+            idle_stage.context.visited = []
+            idle_stage.context.results = {}
+            idle_stage.context.results_stages = []
+            idle_stage.context.summaries = {}
+            idle_stage.context.paths = {}
 
-        for setup_stage in self.instances_by_type.get(StageTypes.SETUP):
-            setup_stage.context = SimpleNamespace()
-            setup_stage.context.stages = {}
-            setup_stage.context.setup = []
-            setup_stage_name = setup_stage.__class__.__name__
 
-            for stage_type in StageTypes:
+            
+        idle_stage_name = idle_stage.__class__.__name__
 
-                setup_stage.context.stages[stage_type] = {}
+        complete_stage = self.instances_by_type.get(StageTypes.COMPLETE)[0]
 
-                for stage in self.instances_by_type.get(stage_type, []):
+        for stage_type in StageTypes:
 
-                    stage_name = stage.__class__.__name__
+            idle_stage.context.stages[stage_type] = {}
 
-                    has_path = networkx.has_path(
-                        graph, 
-                        setup_stage_name,
-                        stage_name
-                    )
+            for stage in self.instances_by_type.get(stage_type, []):
 
-                    if has_path:
-                        setup_stage.context.stages[stage_type][stage_name] = stage
+                stage_name = stage.__class__.__name__
+
+                has_path = networkx.has_path(
+                    graph, 
+                    idle_stage_name,
+                    stage_name
+                )
+
+                if has_path:
+                    idle_stage.context.stages[stage_type][stage_name] = stage
+                    stage_path = networkx.shortest_path(graph, stage_name, complete_stage.name)
+                    idle_stage.context.paths[stage_name] = stage_path

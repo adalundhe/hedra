@@ -2,12 +2,14 @@ import psutil
 import functools
 import inspect
 from typing import Dict, List, Union
+from hedra.core.hooks.client.client import Client
 from hedra.core.hooks.types.hook import Hook
 from hedra.core.hooks.types.types import HookType
 from hedra.core.hooks.client.config import Config
 from hedra.core.engines.types.common.request import Request
 from hedra.core.engines.types.playwright.command import Command
 from hedra.core.hooks.registry.registrar import registar
+from hedra.core.pipelines.stages.types.stage_states import StageStates
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.personas import get_persona
 from .execute import Execute
@@ -28,12 +30,12 @@ class Setup(Stage):
     no_run_visuals=False
     connect_timeout=5
     request_timeout=60
-    options={
-        
-    }
+    reporting_config={}
+    options={}
     
     def __init__(self) -> None:
         super().__init__()
+        self.stages = {}
         self.actions = []
         self.hooks: Dict[str, List[Hook]] = {}
 
@@ -41,11 +43,6 @@ class Setup(Stage):
             self.hooks[hook_type] = []
 
     async def run(self):
-        execute_stages: Dict[str, Execute] = self.context.stages.get(StageTypes.EXECUTE)
-        visited = self.context.setup
-        setup_stages = {
-            stage_name: stage for stage_name, stage in execute_stages.items() if stage_name not in visited
-        }
 
         config = Config(
             log_level=self.log_level,
@@ -64,64 +61,67 @@ class Setup(Stage):
 
         )
 
-        persona = get_persona(config)
         
-        for execute_stage_name, execute_stage in setup_stages.items():
+        for execute_stage_name, execute_stage in self.stages.items():
             
+            if execute_stage.state == StageStates.INITIALIZED:
+                execute_stage.state = StageStates.SETTING_UP
 
-            execute_stage.hooks = {
-                hook_type: [] for hook_type in  HookType
-            }
+                persona = get_persona(config)
+                execute_stage.hooks = {
+                    hook_type: [] for hook_type in  HookType
+                }
 
-            execute_stage.client._config = config
+                client = Client()
+                execute_stage.client = client
 
-            methods = inspect.getmembers(execute_stage, predicate=inspect.ismethod) 
+                execute_stage.client._config = config
 
-            for _, method in methods:
+                methods = inspect.getmembers(execute_stage, predicate=inspect.ismethod) 
 
-                method_name = method.__qualname__
-                hook: Hook = registar.all.get(method_name)
+                for _, method in methods:
+
+                    method_name = method.__qualname__
+                    hook: Hook = registar.all.get(method_name)
+                    
+                    if hook and execute_stage.hooks.get(hook.hook_type) is None:
+                        execute_stage.hooks[hook.hook_type] = [hook]
+                    
+                    elif hook:
+                        execute_stage.hooks[hook.hook_type].append(hook)
                 
-                if hook and execute_stage.hooks.get(hook.hook_type) is None:
-                    execute_stage.hooks[hook.hook_type] = [hook]
-                
-                elif hook:
-                    execute_stage.hooks[hook.hook_type].append(hook)
-          
-            for hook in execute_stage.hooks.get(HookType.ACTION):
-                hook.name = hook.call.__name__
-                execute_stage.client.next_name = hook.name
-                session = await hook.call(execute_stage)
-    
-                session.context.history.add_row(
-                    hook.name
-                )
+                for hook in execute_stage.hooks.get(HookType.ACTION):
+                    execute_stage.client.next_name = hook.name
+                    session = await hook.call(execute_stage)
 
-                parsed_action = session.registered.get(hook.name)
+                    session.context.history.add_row(
+                        hook.name
+                    )
 
-                parsed_action.hooks.before = self.get_hook(execute_stage, parsed_action, HookType.BEFORE)
-                parsed_action.hooks.after = self.get_hook(execute_stage, parsed_action, HookType.AFTER)
+                    parsed_action = session.registered.get(hook.name)
 
-                hook.session = session
-                hook.action = parsed_action          
+                    parsed_action.hooks.before = self.get_hook(execute_stage, hook.shortname, HookType.BEFORE)
+                    parsed_action.hooks.after = self.get_hook(execute_stage, hook.shortname, HookType.AFTER)
+
+                    hook.session = session
+                    hook.action = parsed_action          
 
 
-            for setup_hook in execute_stage.hooks.get(HookType.SETUP):
-                await setup_hook.call(execute_stage)
+                for setup_hook in execute_stage.hooks.get(HookType.SETUP):
+                    await setup_hook.call(execute_stage)
 
-            persona.setup(execute_stage.hooks)
-            execute_stage.persona = persona    
+                persona.setup(execute_stage.hooks)
+                execute_stage.persona = persona    
 
-            execute_stages[execute_stage_name] = execute_stage
-        
-        self.context.stages[StageTypes.EXECUTE] = execute_stages
-        self.context.setup.extend(
-            list(setup_stages.keys())
-        )
+                execute_stage.state = StageStates.SETUP
 
-    def get_hook(self, execute_stage: Execute, action: Union[Request,Command], hook_type: str):
+                self.stages[execute_stage_name] = execute_stage
+
+        return self.stages
+
+    def get_hook(self, execute_stage: Execute, shortname: str, hook_type: str):
         for hook in execute_stage.hooks[hook_type]:
-            if action.name in hook.names:
+            if shortname in hook.names:
                 return functools.partial(hook.call, execute_stage)
 
 

@@ -22,9 +22,12 @@ class Registrar:
                 def wrapped_method(func):
 
                     hook_name = func.__qualname__
+                    hook_shortname = func.__name__
+
 
                     self.all[hook_name] = Hook(
                         hook_name, 
+                        hook_shortname,
                         func, 
                         hook_type=hook_type,
                         metadata=Metadata(
@@ -41,9 +44,11 @@ class Registrar:
             def wrap_hook(*names):
                 def wrapped_method(func):
                     hook_name = func.__qualname__
+                    hook_shortname = func.__name__
 
                     self.all[hook_name] = Hook(
                         hook_name, 
+                        hook_shortname,
                         func, 
                         hook_type=hook_type,
                         names=names
@@ -59,9 +64,12 @@ class Registrar:
                 def wrapped_method(func):
 
                     hook_name = func.__qualname__
+                    hook_shortname = func.__name__
+
 
                     self.all[hook_name] = Hook(
                         hook_name, 
+                        hook_shortname,
                         func, 
                         hook_type=hook_type,
                         metadata=Metadata(

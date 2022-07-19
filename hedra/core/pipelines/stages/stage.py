@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Any, List
+from hedra.core.pipelines.stages.types.stage_states import StageStates
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 
 
@@ -12,3 +13,5 @@ class Stage:
 
     def __init__(self) -> None:
         self.name = self.__class__.__name__
+        self.state = StageStates.INITIALIZED
+        self.next_stage: str = None

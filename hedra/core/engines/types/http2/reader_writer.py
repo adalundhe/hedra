@@ -1,4 +1,5 @@
 import asyncio
+from hedra.core.engines.types.common.encoder import Encoder
 from hedra.core.engines.types.common.fast_streams import FastReader, FastWriter
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.http2.windows.window_manager import WindowManager
@@ -23,6 +24,7 @@ class ReaderWriter:
         self.closed_by = None
         self._authority = None
         self.frame_buffer = None
+        self.encoder: Encoder = None
 
     def write(self, data: bytes):
         self.writer._transport.write(data)

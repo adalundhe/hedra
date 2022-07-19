@@ -4,6 +4,7 @@ from async_tools.datatypes import AsyncList
 from types import FunctionType
 from typing import Awaitable, Dict, List, Optional, Set, Tuple, Union
 from hedra.core.engines.types.common import Timeouts
+from hedra.core.engines.types.common.types import RequestTypes
 from .context_config import ContextConfig
 from .context import Context
 from .pool import ContextPool
@@ -42,7 +43,7 @@ class MercuryPlaywrightClient:
 
     async def execute_prepared_command(self, command: Command) -> PlaywrightResponseFuture:
 
-        result = Result(command)
+        result = Result(command, type=RequestTypes.PLAYWRIGHT)
         
         async with self.sem:
             context = self.pool.contexts.pop()

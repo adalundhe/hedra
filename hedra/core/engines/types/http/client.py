@@ -10,6 +10,7 @@ from hedra.core.engines.types.common import Response
 from hedra.core.engines.types.common.context import Context
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
 from hedra.core.engines.types.common.timeouts import Timeouts
+from hedra.core.engines.types.common.types import RequestTypes
 from .connection import Connection
 from .pool import Pool
 
@@ -93,9 +94,10 @@ class MercuryHTTPClient:
         response = Response(request)
         
         async with self.sem:
-            connection: Connection = self.pool.connections.pop()
+            connection = self.pool.connections.pop()
+            
             try:
-
+                
                 if request.hooks.before:
                     request = await request.hooks.before(request)
 
@@ -119,22 +121,58 @@ class MercuryHTTPClient:
                     else:
                         connection.write(request.payload.encoded_data)
 
+                chunk = await connection.readuntil()
 
-                chunk: bytes = await connection.readline()
-                response.body += chunk
+                response.response_code = chunk
+
+           
                 while True:
-                    if chunk.endswith(b'0\r\n') or chunk is None:
+                    res_data = await connection.readuntil()
+                    if b": " not in res_data and b":" not in res_data:
                         break
-                    chunk = await connection.readline()
-                    response.body += chunk
+
+                    decoded = res_data.rstrip().decode()
+                    pair = decoded.split(": ", 1)
+                    if pair and len(pair) < 2:
+                        pair = decoded.split(":")
+
+                    key, value = pair
+
+                    response.headers[key.lower()] = value
+
+                content_length = response.headers.get('content-length')
+                transfer_encoding = response.headers.get('transfer-encoding')
+
+                # We require Content-Length or Transfer-Encoding headers to read a
+                # request body, otherwise it's anyone's guess as to how big the body
+                # is, and we ain't playing that game.
+
+                if content_length:
+                    response.body = await connection.readexactly(int(content_length))
+
+                elif transfer_encoding:
                     
+                    all_chunks_read = False
+
+                    while True and not all_chunks_read:
+
+                        chunk_size = int((await connection.readuntil()).rstrip(), 16)
+                        if not chunk_size:
+                            # read last CRLF
+                            response.body += await connection.readuntil()
+                            break
+                        
+                        chunk = await connection.readexactly(chunk_size + 2)
+                        response.body += chunk[:-2]
+
+                    all_chunks_read = True
+   
                 response.time = time.time() - start
+                
                 self.pool.connections.append(connection)
 
                 if request.hooks.after:
                     response = await request.hooks.after(response)
-
-                self.context.last[request.name] = response
                 
                 return response
 

@@ -6,10 +6,11 @@ import h2.events
 import h2.exceptions
 import h2.settings
 import h2.errors
-from hpack import Encoder, Decoder
 from hyperframe.frame import SettingsFrame
-from mercury_http.http2.reader_writer import ReaderWriter
-from mercury_http.common import Response, Request
+from hedra.core.engines.types.http2.reader_writer import ReaderWriter
+from hedra.core.engines.types.common import Response, Request
+from hedra.core.engines.types.common.encoder import Encoder
+from hedra.core.engines.types.common.decoder import Decoder
 from .windows import WindowManager
 from .frames.types import *
 

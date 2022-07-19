@@ -84,9 +84,8 @@ class HeadersFrame(Padding, Priority, Frame):
         # analysis/accumulation).
 
         stream_events = []
-
         deferred_headers = DeferredHeaders(
-            connection._decoder.header_table.maxsize,
+            stream.encoder,
             self,
             connection._h2_state.config.header_encoding
         )

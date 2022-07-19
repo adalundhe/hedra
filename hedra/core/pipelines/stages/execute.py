@@ -1,4 +1,6 @@
 from hedra.core.hooks.client import Client
+from hedra.core.hooks.types.types import HookType
+from hedra.core.pipelines.stages.types.stage_states import StageStates
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from .stage import Stage
 
@@ -14,5 +16,14 @@ class Execute(Stage):
         self.client = Client()
 
     async def run(self):
-        persona = self.context.persona
-        return await persona.execute()
+
+        results = []
+
+        if self.state == StageStates.SETUP:
+
+            self.state = StageStates.EXECUTING
+            results = await self.persona.execute()
+
+            self.state = StageStates.EXECUTED
+
+        return results

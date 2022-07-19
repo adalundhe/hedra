@@ -1,3 +1,4 @@
+from distutils.command.config import config
 from .types.default_persona import DefaultPersona
 from .types.batched_persona import BatchedPersona
 from .types.sequenced_persona import SequencedPersonaCollection
@@ -10,14 +11,14 @@ from hedra.core.hooks.client.config import Config
 
 
 registered_personas = {
-    'default': DefaultPersona,
-    'batched': BatchedPersona,
-    'multi-sequence': MultiSequencePersona,
-    'ramped': RampedPersona,
-    'ramped-interval': RampedIntervalPersona,
-    'sequence': SequencedPersonaCollection,
-    'weighted': WeightedSelectionPersona,
-    'no-wait': CyclicNoWaitPersona
+    'default': lambda config: DefaultPersona(config),
+    'batched': lambda config: BatchedPersona(config),
+    'multi-sequence': lambda config: MultiSequencePersona(config),
+    'ramped': lambda config: RampedPersona(config),
+    'ramped-interval': lambda config: RampedIntervalPersona(config),
+    'sequence': lambda config: SequencedPersonaCollection(config),
+    'weighted': lambda config: WeightedSelectionPersona(config),
+    'no-wait': lambda config: CyclicNoWaitPersona(config)
 }
 
 def get_persona(config: Config):

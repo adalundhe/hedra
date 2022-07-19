@@ -2,6 +2,7 @@ import time
 import asyncio
 from types import FunctionType
 from typing import Awaitable, List, Optional, Union, Tuple, Set
+from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.http.client import MercuryHTTPClient
 from hedra.core.engines.types.http.connection import Connection
 from hedra.core.engines.types.common.response import Response, Request
@@ -70,7 +71,7 @@ class MercuryWebsocketClient(MercuryHTTPClient):
 
     async def execute_prepared_request(self, request: Request) -> WebsocketResponseFuture:
 
-        response = Response(request, type='websocket')
+        response = Response(request, type=RequestTypes.WEBSOCKET)
 
         async with self.sem:
 

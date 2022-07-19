@@ -1,5 +1,6 @@
 import asyncio
 from types import FunctionType
+from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.http2 import MercuryHTTP2Client
 from hedra.core.engines.types.http import MercuryHTTPClient
 from hedra.core.engines.types.common import Timeouts
@@ -55,11 +56,11 @@ class MercuryGraphQLClient:
             self.registered[request.name] = request
         
         except Exception as e:
-            return Response(request, error=e, type='graphql')
+            return e
 
     async def execute_prepared_request(self, request: Request):
         response: Response = await self.protocol.execute_prepared_request(request)
-        response.type = 'graphql'
+        response.type = RequestTypes.GRAPHQL
 
         self.context.last[request.name] = self.protocol.context.last[request.name]
         return response

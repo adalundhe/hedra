@@ -21,6 +21,7 @@ from .optimize import (
 )
 
 from .execute import (
+    execute_to_setup_transition,
     execute_to_execute_transition,
     execute_to_optimize_transition,
     execute_to_teardown_transition,
@@ -85,7 +86,7 @@ local_transitions = {
         # State: Execute
         (StageTypes.EXECUTE, StageTypes.EXECUTE): execute_to_execute_transition,
         (StageTypes.EXECUTE, StageTypes.IDLE): invalid_transition,
-        (StageTypes.EXECUTE, StageTypes.SETUP): invalid_transition,
+        (StageTypes.EXECUTE, StageTypes.SETUP): execute_to_setup_transition,
         (StageTypes.EXECUTE, StageTypes.OPTIMIZE): execute_to_optimize_transition,
         (StageTypes.EXECUTE, StageTypes.TEARDOWN): execute_to_teardown_transition,
         (StageTypes.EXECUTE, StageTypes.ANALYZE): execute_to_analyze_transition,

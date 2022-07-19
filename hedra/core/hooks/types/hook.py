@@ -24,7 +24,9 @@ class Metadata:
 class Hook:
 
     def __init__(
-        self, name: str, 
+        self, 
+        name: str, 
+        shortname: str,
         call: Coroutine, 
         hook_type=HookType.ACTION,
         names: List[str] = [], 
@@ -32,6 +34,7 @@ class Hook:
         checks: List[Coroutine]=[]
     ) -> None:
         self.name = name
+        self.shortname = shortname
         self.call = call
         self.names = list(set(names))
         self.hook_type = hook_type
