@@ -36,7 +36,7 @@ class HTTPClient(BaseClient):
         tags: List[Dict[str, str]] = [],
         checks: List[FunctionType]=[]
     ):
-
+    
         if self.session.registered.get(self.next_name) is None:
             result = await self.session.prepare(
                 Request(

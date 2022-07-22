@@ -56,7 +56,7 @@ class WeightedSelectionPersona(DefaultPersona):
             setup_hooks = action_set.hooks.get(HookType.SETUP)
 
             for setup_hook in setup_hooks:
-                await setup_hook.call(action_set)
+                await setup_hook.call()
 
             teardown_hooks = action_set.hooks.get(HookType.TEARDOWN)
             if teardown_hooks:

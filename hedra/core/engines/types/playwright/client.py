@@ -68,12 +68,7 @@ class MercuryPlaywrightClient:
                 self.pool.contexts.append(context)
 
                 return result
-
-    async def update_from_context(self, command_name: str):
-        previous_command = self.registered.get(command_name)
-        context_command = self.context.update_command(previous_command)
-        await self.prepare(context_command, context_command.checks)
-
+                
     async def request(self, command: Command, checks: Optional[List[FunctionType]]=[]) -> PlaywrightResponseFuture:
 
         if self.registered.get(command.name) is None:

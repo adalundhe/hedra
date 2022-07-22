@@ -1,9 +1,12 @@
 import asyncio
 import networkx
+import inspect
 from typing import Dict, List
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.pipelines.simple_context import SimpleContext
+from hedra.core.hooks.registry.registrar import registar
+from hedra.core.hooks.types.hook import Hook
 from .transition import Transition
 from .common import (
     invalid_transition
@@ -31,6 +34,18 @@ class TransitionAssembler:
         self.generated_stages = {stage_name: stage() for stage_name, stage in stages.items()}
 
         for stage in self.generated_stages.values():
+
+            methods = inspect.getmembers(stage, predicate=inspect.ismethod) 
+
+            for _, method in methods:
+
+                method_name = method.__qualname__
+                hook: Hook = registar.all.get(method_name)
+                
+                if hook:
+                    hook.call = hook.call.__get__(stage, stage.__class__)
+                    setattr(stage, hook.shortname, hook.call)
+
             self.instances_by_type[stage.stage_type].append(stage)
 
     def build_transitions_graph(self, topological_generations: List[List[str]]):
@@ -61,7 +76,6 @@ class TransitionAssembler:
                         invalid_transition_error, _ = self.loop.run_until_complete(transition(dependency, stage_instance))
                         raise invalid_transition_error
 
-                                        
                     if transition_group.get(dependency_name) is None:
                         transition_group[dependency_name] = [
                             Transition(
@@ -98,8 +112,6 @@ class TransitionAssembler:
             idle_stage.context.results_stages = []
             idle_stage.context.summaries = {}
             idle_stage.context.paths = {}
-
-
             
         idle_stage_name = idle_stage.__class__.__name__
 
@@ -121,5 +133,11 @@ class TransitionAssembler:
 
                 if has_path:
                     idle_stage.context.stages[stage_type][stage_name] = stage
-                    stage_path = networkx.shortest_path(graph, stage_name, complete_stage.name)
-                    idle_stage.context.paths[stage_name] = stage_path
+                    paths = networkx.all_shortest_paths(graph, stage_name, complete_stage.name)
+
+                    stage_paths = []
+                    for path in paths:
+                        stage_paths.extend(path)
+                    
+                    idle_stage.context.paths[stage_name] = stage_paths
+                    

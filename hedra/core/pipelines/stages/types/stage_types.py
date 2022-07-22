@@ -8,7 +8,9 @@ class StageTypes(Enum):
     EXECUTE='Execute'
     OPTIMIZE='Optimize'
     SETUP='Setup'
+    VALIDATE='Validate'
     TEARDOWN='Teardown'
     COMPLETE='Complete'
+    SUBMIT='Submit'
     ERROR='Error'
 

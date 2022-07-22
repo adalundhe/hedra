@@ -15,15 +15,8 @@ class Execute(Stage):
         self.persona = None
         self.client = Client()
 
+        for hook_type in HookType:
+            self.hooks[hook_type] = []
+
     async def run(self):
-
-        results = []
-
-        if self.state == StageStates.SETUP:
-
-            self.state = StageStates.EXECUTING
-            results = await self.persona.execute()
-
-            self.state = StageStates.EXECUTED
-
-        return results
+        return await self.persona.execute()

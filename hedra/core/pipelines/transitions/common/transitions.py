@@ -8,8 +8,10 @@ async def idle_transition(current_stage: Stage, next_stage: Stage):
     next_stage.context = current_stage.context
     return None, StageTypes.IDLE
 
+
 async def invalid_transition(current_stage: Stage, next_stage: Stage):
     return InvalidTransitionError(current_stage, next_stage), StageTypes.ERROR
+
 
 async def exit_transition(current_stage: Stage, next_stage: Stage):
     await current_stage.run()

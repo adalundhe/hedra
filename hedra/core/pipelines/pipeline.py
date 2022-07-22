@@ -48,14 +48,25 @@ class Pipeline:
 
     def validate(self):
 
+        # A user will never specify an Idle stage. Instead, we prepend one to 
+        # serve as the source node for a graphs, ensuring graphs have a 
+        # valid starting point and preventing the user from forgetting things
+        # like a Setup stage.
         self._prepend_stage(StageTypes.IDLE)
 
+        # If we haven't specified an Analyze stage for results aggregation,
+        # append one.
         if len(self.instances.get(StageTypes.ANALYZE)) < 1:
            self._append_stage(StageTypes.ANALYZE)
 
-        if len(self.instances.get(StageTypes.CHECKPOINT)) < 1:
-            self._append_stage(StageTypes.CHECKPOINT)
+        # If we havent specified a Submit stage for save aggregated results,
+        # append one.
+        if len(self.instances.get(StageTypes.SUBMIT)) < 1:
+            self._append_stage(StageTypes.SUBMIT)
 
+        # Like Idle, a user will never specify a Complete stage. We append
+        # one to serve as the sink node, ensuring all Graphs executed can
+        # reach a single exit point.
         self._append_stage(StageTypes.COMPLETE)
 
         self.runner.generate_stages(self.stages)
@@ -81,12 +92,16 @@ class Pipeline:
         for transition_group in self._transitions:
             
             if len(transition_group) == 1:
+                print(f'Executing - {transition_group[0].from_stage}')
                 await transition_group[0].transition(
                     transition_group[0].from_stage,
                     transition_group[0].to_stage
                 )
 
             else:
+                for transtition in transition_group:
+                    print(f'Executing {transtition.from_stage}')
+                    
                 await asyncio.gather(*[
                     asyncio.create_task(transition.transition(
                         transition.from_stage, 

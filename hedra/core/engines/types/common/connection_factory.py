@@ -9,7 +9,6 @@ from .fast_streams import (
     FastWriter,
     FastReaderProtocol
 )
-from asyncio.events import get_running_loop
 from asyncio.sslproto import SSLProtocol
 from .types import RequestTypes
 
@@ -47,12 +46,13 @@ class Connection:
 class ConnectionFactory:
 
     def __init__(self, factory_type: RequestTypes = RequestTypes.HTTP) -> None:
-        self.loop: asyncio.AbstractEventLoop = get_running_loop()
+        self.loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
         self.transport = None
         self.factory_type = factory_type
         self._connection = None
 
     async def create(self, hostname=None, socket_config=None, *, limit=_DEFAULT_LIMIT, ssl=None):
+        
         family, type_, proto, _, address = socket_config
 
         sock = socket.socket(family=family, type=type_, proto=proto)
@@ -84,7 +84,7 @@ class ConnectionFactory:
         # this does the same as loop.open_connection(), but TLS upgrade is done
         # manually after connection be established.
         if self.loop is None:
-            self.loop = get_running_loop()
+            self.loop = asyncio.get_event_loop()
 
         family, type_, proto, _, address = socket_config
         sock = socket.socket(family=family, type=type_, proto=proto)

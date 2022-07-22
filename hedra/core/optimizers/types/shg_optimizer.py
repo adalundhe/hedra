@@ -33,6 +33,5 @@ class SHGOptimizer:
                 'maxfev': self.max_iter,
                 'maxiter': self.max_iter,
                 'local_iter': 1
-            },
-            callback=self.callback
+            }
         )

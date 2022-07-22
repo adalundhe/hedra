@@ -17,6 +17,7 @@ class Payload:
         self.size = 0
         self.has_data = payload is not None
         self.encoded_data = b''
+        self.payload_setup = False
 
     async def __aiter__(self):
         yield self.data
@@ -26,6 +27,7 @@ class Payload:
             yield chunk
     
     def setup_payload(self, no_chunking=False) -> None:
+
         if self.data and no_chunking is False:
             if isinstance(self.data, Iterator):
                 chunks = []
@@ -40,13 +42,22 @@ class Payload:
 
             else:
 
-                if isinstance(self.data, (Dict, tuple)):
-                    self.encoded_data = urlencode(self.data)
+                if isinstance(self.data, dict):
+                    self.encoded_data = json.dumps(
+                        self.data
+                    ).encode()
 
-                if isinstance(self.data, str):
+                elif isinstance(self.data, tuple):
+                    self.encoded_data = urlencode(
+                        self.data
+                    ).encode()
+
+                elif isinstance(self.data, str):
                     self.encoded_data = self.data.encode()
 
-                self.size = len(self.data)
+                self.size = len(self.encoded_data)
+
+        self.payload_setup = True
 
     def setup_graphql_query(self) -> None:
         source = Source(self.data.get("query"))
@@ -70,12 +81,15 @@ class Payload:
 
         self.encoded_data = json.dumps(query).encode()
 
+        self.payload_setup = True
+
     def setup_grpc_protobuf(self) -> None:
         encoded_protobuf = str(binascii.b2a_hex(self.data.SerializeToString()), encoding='raw_unicode_escape')
         encoded_message_length = hex(int(len(encoded_protobuf)/2)).lstrip("0x").zfill(8)
         encoded_protobuf = f'00{encoded_message_length}{encoded_protobuf}'
 
         self.encoded_data = binascii.a2b_hex(encoded_protobuf)
+        self.payload_setup = True
 
     async def write_chunks(self, writer: StreamWriter):
         async for chunk in self.data:

@@ -3,11 +3,10 @@ from asyncio import (
     Transport,
     Future,
     Protocol,
-    get_running_loop,
     sleep
 )
 from asyncio.exceptions import IncompleteReadError, LimitOverrunError
-from asyncio.events import get_running_loop
+from asyncio.events import get_event_loop
 from weakref import ref
 from asyncio.coroutines import iscoroutine
 from asyncio.streams import FlowControlMixin
@@ -29,7 +28,7 @@ class FlowControlMixin(Protocol):
         if loop:
             self._loop = loop
         else:
-            self._loop = get_running_loop()
+            self._loop = get_event_loop()
 
         self._paused = False
         self._drain_waiter: Future = None
@@ -303,7 +302,7 @@ class FastReader:
 
         self._limit = limit
         if loop is None:
-            self._loop = get_running_loop()
+            self._loop = get_event_loop()
         else:
             self._loop = loop
         self._buffer = bytearray()
@@ -482,7 +481,7 @@ class FastReader:
             if self._eof:
                 chunk = bytes(self._buffer)
                 self._buffer.clear()
-                raise IncompleteReadError(chunk, None)
+                raise Exception('Connection closed.')
 
             # _wait_for_data() will resume reading if stream was paused.
             await self._wait_for_data('readuntil')

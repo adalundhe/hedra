@@ -1,3 +1,4 @@
+from ast import arg
 from types import FunctionType
 from typing import Any, Dict, List, Union, Coroutine
 from hedra.core.hooks.types.hook import Hook, Metadata
@@ -39,7 +40,7 @@ class Registrar:
                 
                 return wrapped_method
 
-        elif hook_type in [HookType.BEFORE, HookType.AFTER]:
+        elif hook_type in [HookType.BEFORE, HookType.AFTER, HookType.CHECK]:
             
             def wrap_hook(*names):
                 def wrapped_method(func):
@@ -65,7 +66,6 @@ class Registrar:
 
                     hook_name = func.__qualname__
                     hook_shortname = func.__name__
-
 
                     self.all[hook_name] = Hook(
                         hook_name, 

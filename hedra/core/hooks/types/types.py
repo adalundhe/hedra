@@ -7,3 +7,4 @@ class HookType(Enum):
     TEARDOWN='TEARDOWN'
     BEFORE='BEFORE'
     AFTER='AFTER'
+    CHECK='CHECK'

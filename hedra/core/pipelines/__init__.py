@@ -5,5 +5,7 @@ from .stages import (
     Execute,
     Optimize,
     Setup,
-    Teardown
+    Teardown,
+    Submit,
+    Validate
 )

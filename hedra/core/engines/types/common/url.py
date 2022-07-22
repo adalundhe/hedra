@@ -2,7 +2,7 @@ from pydoc import resolve
 import aiodns
 import socket
 from urllib.parse import urlparse
-from asyncio.events import get_running_loop
+from asyncio.events import get_event_loop
 from .types import SocketProtocols, SocketTypes
 
 
@@ -28,7 +28,7 @@ class URL:
     async def lookup(self):
 
         if self.loop is None:
-            self.loop = get_running_loop()
+            self.loop = get_event_loop()
 
         infos = {}
         resolved = await self.resolver.gethostbyname(self.parsed.hostname, self.family)
@@ -52,23 +52,30 @@ class URL:
 
         return infos
 
-    def set_ip_addr_and_port(self, ip_addr):
-        self.ip_addr = ip_addr
-        
-        if self.is_ssl:
-            self.port = 443
-
     @property
     def params(self):
         return self.parsed.params
+
+    @params.setter
+    def params(self, value):
+        self.parsed.params = value
 
     @property
     def scheme(self):
         return self.parsed.scheme
 
+    @scheme.setter
+    def scheme(self, value):
+        self.parsed.scheme = value
+
     @property
     def hostname(self):
         return self.parsed.hostname
+
+    @hostname.setter
+    def hostname(self, value):
+        self.parsed.hostname = value
+
 
     @property
     def path(self):
@@ -81,10 +88,23 @@ class URL:
             url_path += f'?{self.parsed.query}'
 
         return url_path
+
+    @path.setter
+    def path(self, value):
+        self.parsed.path = value
+        
     @property
     def query(self):
         return self.parsed.query
 
+    @query.setter
+    def query(self, value):
+        self.parsed.query = value
+
     @property
     def authority(self):
         return self.parsed.hostname
+
+    @authority.setter
+    def authority(self, value):
+        self.parsed.hostname = value

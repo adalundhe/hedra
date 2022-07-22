@@ -14,7 +14,7 @@ class Complete(Stage):
 
         for pend in pending:
             try:
-                pend.set_result(None)
-
+                pend.cancel()
+                await pend
             except Exception:
-                print('OOPS')
+                pass

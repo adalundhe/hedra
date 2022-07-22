@@ -1,5 +1,6 @@
 import asyncio
 import chunk
+from inspect import trace
 import traceback
 from types import FunctionType
 import aiodns
@@ -48,7 +49,6 @@ class MercuryHTTPClient:
             if self._hosts.get(request.url.hostname) is None:
 
                     socket_configs = await request.url.lookup()
-                    
                     for ip_addr, configs in socket_configs.items():
                         for config in configs:
                             try:
@@ -72,13 +72,18 @@ class MercuryHTTPClient:
                         if request.url.socket_config:
                             break
                 
-                    self._hosts[request.url.hostname] = request.url.ip_addr
+                    self._hosts[request.url.hostname] = {
+                        'ip_addr': request.url.ip_addr,
+                        'socket_config': request.url.socket_config
+                    }
 
                     if request.url.socket_config is None:
                         raise Exception('Err. - No socket found.')
 
             else:
-                request.url.ip_addr = self._hosts[request.url.hostname]
+                host_config = self._hosts[request.url.hostname]
+                request.url.ip_addr = host_config.get('ip_addr')
+                request.url.socket_config = host_config.get('socket_config')
 
             if request.is_setup is False:
                 request.setup_http_request()
@@ -88,18 +93,20 @@ class MercuryHTTPClient:
             return request
         
         except Exception as e:
-            return e
+            raise e
 
     async def execute_prepared_request(self, request: Request) -> HTTPResponseFuture:
+   
         response = Response(request)
-        
+
+
         async with self.sem:
             connection = self.pool.connections.pop()
             
             try:
-                
                 if request.hooks.before:
                     request = await request.hooks.before(request)
+                    request.setup_http_request()
 
                 start = time.time()
 
@@ -125,30 +132,28 @@ class MercuryHTTPClient:
 
                 response.response_code = chunk
 
-           
+                headers = {}
                 while True:
                     res_data = await connection.readuntil()
-                    if b": " not in res_data and b":" not in res_data:
+                    if b":" not in res_data:
                         break
 
-                    decoded = res_data.rstrip().decode()
-                    pair = decoded.split(": ", 1)
-                    if pair and len(pair) < 2:
-                        pair = decoded.split(":")
-
+                    decoded = res_data.strip()
+                    pair = decoded.split(b":", 1)
+        
                     key, value = pair
 
-                    response.headers[key.lower()] = value
+                    headers[key.lower()] = value.strip()
 
-                content_length = response.headers.get('content-length')
-                transfer_encoding = response.headers.get('transfer-encoding')
-
+                content_length = headers.get(b'content-length')
+                transfer_encoding = headers.get(b'transfer-encoding')
+    
                 # We require Content-Length or Transfer-Encoding headers to read a
                 # request body, otherwise it's anyone's guess as to how big the body
                 # is, and we ain't playing that game.
-
+                body = bytearray()
                 if content_length:
-                    response.body = await connection.readexactly(int(content_length))
+                    body = await connection.readexactly(int(content_length))
 
                 elif transfer_encoding:
                     
@@ -159,14 +164,20 @@ class MercuryHTTPClient:
                         chunk_size = int((await connection.readuntil()).rstrip(), 16)
                         if not chunk_size:
                             # read last CRLF
-                            response.body += await connection.readuntil()
+                            body.extend(
+                                await connection.readuntil()
+                            )
                             break
                         
                         chunk = await connection.readexactly(chunk_size + 2)
-                        response.body += chunk[:-2]
+                        body.extend(
+                            chunk[:-2]
+                        )
 
                     all_chunks_read = True
-   
+
+                response.headers = headers
+                response.body = body
                 response.time = time.time() - start
                 
                 self.pool.connections.append(connection)
@@ -177,7 +188,7 @@ class MercuryHTTPClient:
                 return response
 
             except Exception as e:
-                response.error = f'{traceback.format_exc()}\n{str(e)}'
+                response.error = str(e)
                 self.pool.connections.append(Connection(reset_connection=self.pool.reset_connections))
                 return response
 

@@ -19,16 +19,16 @@ class _ContextManagerMixin:
     async def __aexit__(self, exc_type, exc, tb):
         self.release()
 
-class Semaphore(_ContextManagerMixin, mixins._LoopBoundMixin):
-    """A Semaphore implementation.
-    A semaphore manages an internal counter which is decremented by each
-    acquire() call and incremented by each release() call. The counter
-    can never go below zero; when acquire() finds that it is zero, it blocks,
-    waiting until some other thread calls release().
-    Semaphores also support the context management protocol.
-    The optional argument gives the initial value for the internal
-    counter; it defaults to 1. If the value given is less than 0,
-    ValueError is raised.
+class MultiQueueSemaphore(_ContextManagerMixin, mixins._LoopBoundMixin):
+    """
+    The MultiQueueSemaphore functions akin to a normal Semaphore, except
+    that it "bins" waiting coroutines, sending pending coroutines to
+    the bin with the least number of coroutines waiting, then (when a 
+    coroutine is complete) releasing from the bin that has the most
+    pending coroutines. 
+    
+    The goal is any even distribution of work, such that no one
+    coroutine waits excessively longer than another.
     """
 
     def __init__(self, value=1):

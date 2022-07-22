@@ -1,4 +1,7 @@
+import asyncio
+import inspect
 from typing import Dict, List
+from hedra.core.hooks.registry.registrar import registar
 from hedra.core.hooks.client import Client
 from hedra.core.hooks.types.hook import Hook
 from hedra.core.hooks.types.types import HookType
@@ -12,17 +15,24 @@ class Teardown(Stage):
     def __init__(self) -> None:
         super().__init__()
         self.actions = []
-        self.hooks: Dict[str, List[Hook]] = {}
+        self.hooks: Dict[HookType, List[Hook]] = {}
 
         for hook_type in HookType:
             self.hooks[hook_type] = []
 
-    async def teardown(self):
-        for teardown_hook in self.hooks.get(HookType.TEARDOWN):
+    async def run(self):
 
-            try:
-                
-                await teardown_hook()
+        methods = inspect.getmembers(self, predicate=inspect.ismethod) 
+        for _, method in methods:
 
-            except Exception:
-                pass
+            method_name = method.__qualname__
+            hook: Hook = registar.all.get(method_name)
+
+            if hook:
+                self.hooks[hook.hook_type].append(hook)
+        
+        await asyncio.gather(*[
+            hook.call() for hook in self.hooks.get(
+                HookType.ACTION
+            )
+        ])

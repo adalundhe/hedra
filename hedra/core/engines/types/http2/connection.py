@@ -21,7 +21,7 @@ class HTTP2Connection:
     )
 
     def __init__(self, concurrency):
-        self.loop = asyncio.get_running_loop()
+        self.loop = asyncio.get_event_loop()
         self._h2_state = h2.connection.H2Connection(config=self.CONFIG)
         self.connected = False
         self.concurrency = concurrency

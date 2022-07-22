@@ -5,7 +5,8 @@ from .core.hooks import (
     configure,
     before,
     after,
-    depends
+    depends,
+    check
 )
 
 from .core.pipelines import (

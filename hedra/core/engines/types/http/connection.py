@@ -22,11 +22,6 @@ class Connection:
         self.pending = 0
         self._connection_factory = ConnectionFactory()
 
-    def setup(self, dns_address: str, port: int, ssl: Union[SSLContext, None]) -> None:
-        self.dns_address = dns_address
-        self.port = port
-        self.ssl = ssl
-
     async def make_connection(
         self, 
         hostname: str, 
@@ -37,13 +32,19 @@ class Connection:
         ssl: Optional[SSLContext]=None
     ) -> Connection:
         if self.connected is False or self.dns_address != dns_address or self.reset_connection:
-            self._connection = await asyncio.wait_for(self._connection_factory.create(hostname, socket_config, ssl=ssl), timeout)
-            self.connected = True
+            try:
+                self._connection = await asyncio.wait_for(self._connection_factory.create(hostname, socket_config, ssl=ssl), timeout)
+                self.connected = True
 
-            self.dns_address = dns_address
-            self.port = port
-            self.ssl = ssl
-            self.dns_address = dns_address
+                self.dns_address = dns_address
+                self.port = port
+                self.ssl = ssl
+
+            except asyncio.TimeoutError:
+                raise Exception('Connection timed out.')
+
+            except Exception as e:
+                raise e
 
     @property
     def empty(self):

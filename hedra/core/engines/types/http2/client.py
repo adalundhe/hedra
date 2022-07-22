@@ -105,6 +105,7 @@ class MercuryHTTP2Client:
                 
                 if request.hooks.before:
                     request = await request.hooks.before(request)
+                    request.setup_http2_request()
 
                 start = time.time()
 
@@ -139,7 +140,7 @@ class MercuryHTTP2Client:
                 
             except Exception as e:
                 response.response_code = 500
-                response.error = f'{traceback.format_exc()}\n{str(e)}'
+                response.error = str(e)
                 self.context.last[request.name] = response
 
                 self.pool.reset()

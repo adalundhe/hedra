@@ -5,7 +5,8 @@ from .types import (
     configure,
     before,
     after,
-    depends
+    depends,
+    check
 )
 
 from .config import Config

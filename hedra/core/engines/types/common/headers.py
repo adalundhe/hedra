@@ -28,17 +28,19 @@ class Headers:
         self.data = headers
         self.encoded_headers = None
         self.hpack_encoder = Encoder()
+        self.headers_setup = False
 
     @property
     def as_dict(self):
         return self.data
 
     def __getitem__(self, header_name: str) -> Union[str, str]:
-        return self.data.get(header_name, "")
+        return self.data.get(header_name, "").lower()
 
     def __setitem__(self, header_name: str, header_value: str) -> None:
         header_name = header_name.lower()
         self.data[header_name] = header_value
+        self.headers_setup = False
 
     def setup_http_headers(self, method: str, url: URL,  params: Params) -> Union[bytes, Dict[str, str]]:
             path = url.path
@@ -67,6 +69,7 @@ class Headers:
                 get_base += f"{key}: {value}{NEW_LINE}"
 
             self.encoded_headers = (get_base + NEW_LINE).encode()
+            self.headers_setup = True
 
 
     def setup_http2_headers(self, method: str, url: URL) -> None:
@@ -98,6 +101,8 @@ class Headers:
             "path": url.path,
             "method": method
         })
+
+        self.headers_setup = True
 
     def setup_websocket_headders(self, method: str, url: URL):
 
@@ -168,6 +173,7 @@ class Headers:
         headers.append("")
 
         self.encoded_headers = '\r\n'.join(headers).encode()
+        self.headers_setup = True
 
     def setup_graphql_headers(self, url: URL, params: Params, use_http2=False):
         self.data['Content-Type'] = "application/json"

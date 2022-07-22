@@ -1,6 +1,7 @@
 from __future__ import annotations
+import json
 from types import FunctionType
-from typing import Coroutine, Dict, Iterator, Union, List
+from typing import Any, Coroutine, Dict, Iterator, Union, List
 from hedra.core.hooks.types.types import HookType
 from .params import Params
 from .metadata import Metadata
@@ -45,46 +46,71 @@ class Request:
     def __aiter__(self):
         return self.payload.__aiter__()
 
+    @property
+    def data(self):
+        return self.payload.data
+
+    @data.setter
+    def data(self, value):
+        self.payload.data = value
+        self.payload.payload_setup = False
+
     def setup_http_request(self):
-        self.payload.setup_payload()
 
-        if self.payload.has_data:
-            self.headers['Content-Length'] = str(self.payload.size)
+        if self.headers.headers_setup is False:
+            self.headers.setup_http_headers(self.method, self.url, self.params)
+        
+        if self.payload.payload_setup is False:
+            self.payload.setup_payload()
 
-        self.headers.setup_http_headers(self.method, self.url, self.params)
+            if self.payload.has_data:
+                self.headers['Content-Length'] = str(self.payload.size)
+
         self.is_setup = True
 
-
     def setup_http2_request(self):
-        self.payload.setup_payload()
 
-        if self.payload.has_data:
-            self.headers['Content-Length'] = str(self.payload.size)
+        if self.headers.headers_setup is False:
+            self.headers.setup_http2_headers(self.method, self.url)
+
+        if self.payload.payload_setup is False:
+            self.payload.setup_payload()
+
+            if self.payload.has_data:
+                self.headers['Content-Length'] = str(self.payload.size)
  
-        self.headers.setup_http2_headers(self.method, self.url)
         self.is_setup = True
 
     def setup_websocket_request(self):
-        self.payload.setup_payload()
+        if self.headers.headers_setup is False:
+            self.headers.setup_websocket_headders(self.method, self.url)
 
-        if self.payload.has_data:
-            self.headers['Content-Length'] = str(self.payload.size)
+        if self.payload.payload_setup is False:
+            self.payload.setup_payload()
 
-        self.headers.setup_websocket_headders(self.method, self.url)
+            if self.payload.has_data:
+                self.headers['Content-Length'] = str(self.payload.size)
+
         self.is_setup = True
 
     def setup_graphql_request(self, use_http2=False):
         self.method = 'POST'
-        self.payload.setup_graphql_query()
-        self.headers.setup_graphql_headers(self.url, self.params, use_http2=use_http2)
+
+        if self.headers.headers_setup is False:
+            self.headers.setup_graphql_headers(self.url, self.params, use_http2=use_http2)
+
+        if self.payload.payload_setup is False:
+            self.payload.setup_graphql_query()
+
         self.is_setup = True
 
     def setup_grpc_request(self, grpc_request_timeout=60):
         self.method = 'POST'
-        self.payload.setup_grpc_protobuf()
-        self.headers.setup_grpc_headers(
-            self.url, 
-            timeout=grpc_request_timeout
-        )
+
+        if self.headers.headers_setup is False:
+            self.headers.setup_grpc_headers(self.url, timeout=grpc_request_timeout)
+
+        if self.payload.payload_setup is False:
+            self.payload.setup_grpc_protobuf()
 
         self.is_setup = True

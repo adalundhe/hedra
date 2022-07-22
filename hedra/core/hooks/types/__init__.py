@@ -5,3 +5,4 @@ from .configure import configure
 from .before import before
 from .after import after
 from .depends import depends
+from .check import check

@@ -1,7 +1,6 @@
 import binascii
 import json
 from gzip import decompress as gzip_decompress
-from urllib.parse import ParseResult
 from zlib import decompress as zlib_decompress
 from typing import List, Union
 from hedra.core.engines.types.common import Request
@@ -21,7 +20,7 @@ class BaseResponse:
         self._size = None
         self.content_type = None
         self.compressed = None
-        self.body = b''
+        self.body = bytearray()
         self.error = None
         self.time = 0
         self.user = None
@@ -31,9 +30,6 @@ class BaseResponse:
         self.type = None
         self.deferred_headers = None
         self.channel_id = 0
-
-    def _set_response_headers(self, response_headers: dict = {}):
-        pass
 
     @property
     def size(self):
@@ -74,13 +70,13 @@ class Response:
         self.path = request.url.path
         self.params = request.params.data
         self.hostname = request.url.hostname
-        self.checks = request.checks
+        self.checks = request.hooks.checks
         self.type = request.type
         self.headers = {}
         self._size = None
         self.content_type = None
         self.compressed = None
-        self.body = b''
+        self.body = bytearray()
         self.error = error
         self.time = 0
         self.user = request.metadata.user
@@ -91,30 +87,60 @@ class Response:
         self.type = type
         self.channel_id = channel_id
 
-    def _set_response_headers(self, response_headers: dict = {}):
-        self.content_type = response_headers.get("content-type", "")
-        self.compressed = response_headers.get("content-encoding", "")
+    def to_dict(self):
+
+        encoded_headers = {
+            header_name.decode(): header_value.decode() for header_name, header_value in self.headers.items()
+        }
+
+        data = self.data
+        if isinstance(data, bytes) or isinstance(data, bytearray):
+            data = data.decode()
+
+        return {
+            'name': self.name,
+            'url': self.url,
+            'method': self.method,
+            'path': self.path,
+            'params': self.params,
+            'type': self.type,
+            'headers': encoded_headers,
+            'data': data,
+            'tags': self.tags,
+            'user': self.user,
+            'error': str(self.error),
+            'status': self.status,
+            'reason': self.reason
+        }
 
     @property
     def size(self):
         if self._size is None:
-            self._size = int(self.headers.get("content-length", 0))
+            self._size = int(self.headers.get(b"content-length", 0))
 
         return self._size
         
     @property
     def data(self) -> Union[str, dict, None]:
-        data = self.body
-        if self.compressed == "gzip":
-            data = gzip_decompress(self.body)
-        elif self.compressed == "deflate":
-            data = zlib_decompress(self.body)
 
-        if self.content_type == "application/json":
-            data = json.loads(self.body)
+        self.content_type = self.headers.get(b"content-type")
+        self.compressed = self.headers.get(b"content-encoding")
         
-        elif isinstance(self.body, bytes):
-            data = data.decode()
+        data = self.body
+        try:
+            if self.compressed == b"gzip":
+                data = gzip_decompress(self.body)
+            elif self.compressed == b"deflate":
+                data = zlib_decompress(self.body)
+
+            if self.content_type == b"application/json":
+                data = json.loads(self.body)
+            
+            elif isinstance(self.body, bytes):
+                data = data.decode()
+
+        except Exception:
+            pass
 
         return data
 
@@ -149,12 +175,3 @@ class Response:
 
         except Exception:
             return None
-
-    def grpc_decode(self, protobuf):
-        wire_msg = binascii.b2a_hex(self.body)
-
-        message_length = wire_msg[4:10]
-        msg = wire_msg[10:10+int(message_length, 16)*2]
-        protobuf.ParseFromString(binascii.a2b_hex(msg))
-
-        return protobuf

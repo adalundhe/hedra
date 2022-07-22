@@ -88,6 +88,7 @@ class MercuryGRPCClient(MercuryHTTP2Client):
                 
                 if request.hooks.before:
                     request = await request.hooks.before(request)
+                    request.setup_grpc_request()
                 
                 start = time.time()
 

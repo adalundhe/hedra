@@ -81,6 +81,7 @@ class MercuryWebsocketClient(MercuryHTTPClient):
 
                 if request.hooks.before:
                     request = await request.hooks.before(request) 
+                    request.setup_websocket_request()
 
                 start = time.time()
                 await connection.make_connection(
