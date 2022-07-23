@@ -1,44 +1,21 @@
-from typing import Any, List
 import uuid
-
+from typing import Any, List
 
 
 try:
     import sqlalchemy
     from sqlalchemy.dialects.postgresql import UUID
-    from aiopg.sa import create_engine
-    has_connector = True
+    from hedra.reporting.types.postgres.postgres import Postgres
+    has_connector=True
 
 except ImportError:
     has_connector = False
 
 
-class Postgres:
+class TimescaleDB(Postgres):
 
     def __init__(self, config: Any) -> None:
-        self.host = config.host
-        self.database = config.database
-        self.username = config.username
-        self.password = config.password
-        self.events_table = config.events_table
-        self.metrics_table = config.metrics_table
-        self.custom_fields = config.custom_fields
-
-        self._engine = None
-        self._connection = None
-        self.metadata = sqlalchemy.MetaData()
-        self._events_table = None
-        self._metrics_table = None
-
-    async def connect(self):
-        self._engine = await create_engine(
-            user=self.username,
-            database=self.database,
-            host=self.host,
-            password=self.password
-        )
-
-        self._connection = await self._engine.acquire()
+        super().__init__(config)
 
     async def submit_events(self, events: List[Any]):
         for event in events:
@@ -50,11 +27,13 @@ class Postgres:
                     sqlalchemy.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
                     sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
                     sqlalchemy.Column('stage', sqlalchemy.VARCHAR(255)),
-                    sqlalchemy.Column('time', sqlalchemy.Float),
+                    sqlalchemy.Column('request_time', sqlalchemy.Float),
                     sqlalchemy.Column('succeeded', sqlalchemy.Boolean),
+                    sqlalchemy.Column('time', sqlalchemy.TIMESTAMP, nullable=False)
                 )
 
                 await events_table.create(self._connection, checkfirst=True)
+                await self._connection.execute(f'SELECT create_hypertable("{self.events_table}", "time")')
                 self._events_table = events_table
             
             await self._connection.execute(
@@ -80,7 +59,8 @@ class Postgres:
                     sqlalchemy.Column('variance', sqlalchemy.FLOAT),
                     sqlalchemy.Column('stdev', sqlalchemy.FLOAT),
                     sqlalchemy.Column('minimum', sqlalchemy.FLOAT),
-                    sqlalchemy.Column('maximum', sqlalchemy.FLOAT)
+                    sqlalchemy.Column('maximum', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('time', sqlalchemy.TIMESTAMP, nullable=False)
                 )
 
                 for quantile in metric.quantiles:
@@ -92,6 +72,7 @@ class Postgres:
                     metrics_table.append_column(custom_field_name, sql_alchemy_type)    
 
                 await metrics_table.create(self._connection, checkfirst=True)
+                await self._connection.execute(f'SELECT create_hypertable("{self.metrics_table}", "time")')
                 self._metrics_table = metrics_table
 
             await self._connection.execute(
@@ -102,6 +83,3 @@ class Postgres:
     async def close(self):
         await self._engine.close()
 
-
-
-    

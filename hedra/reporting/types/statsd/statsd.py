@@ -14,6 +14,8 @@ class StatsD:
     def __init__(self, config: Any) -> None:
         self.host = config.host
         self.port = config.port
+        self.custom_fields = config.custom_fields
+
         self.connection = StatsdClient(
             host=self.host,
             port=self.port
@@ -30,7 +32,7 @@ class StatsD:
             'minimum': 'gauge',
             'maximum': 'gauge',
             'quantiles': 'gauge',
-            **config.types_map
+            **self.custom_fields
         }
 
         self._update_map = {

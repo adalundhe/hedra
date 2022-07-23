@@ -25,6 +25,7 @@ class Prometheus:
         self.password = config.password
         self.namespace = config.namespace
         self.job_name = config.job_name
+        self.custom_fields = config.custom_fields
         self.registry = None
         self._auth_handler = None
         self._has_auth = False
@@ -41,7 +42,7 @@ class Prometheus:
             'minimum': 'gauge',
             'maximum': 'gauge',
             'quantiles': 'gauge',
-            **config.types_map
+            **self.custom_fields
         }
 
         self._events = {}

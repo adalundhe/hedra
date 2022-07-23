@@ -20,6 +20,7 @@ class Snowflake:
         self.schema = config.schema
         self.events_table = config.events_table
         self.metrics_table = config.metrics_table
+        self.custom_fields = config.custom_fields
 
         self.connection = None
         self.cursor = None
@@ -43,7 +44,7 @@ class Snowflake:
             'minimum': 'DECIMAL',
             'maximum': 'DECIMAL',
             'quantiles': 'DECIMAL',
-            **config.fields_map
+            **self.custom_fields
         }
 
     async def connect(self):

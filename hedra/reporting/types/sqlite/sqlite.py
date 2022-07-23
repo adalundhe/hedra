@@ -17,12 +17,19 @@ class SQLite:
         self.events_table = config.events_table
         self.metrics_table = config.metrics_table
         self.database = None
+        self._events_table = None
+        self._metrics_table = None
+        self.custom_fields = config.custom_fields
+
         self.events_fields= {
+            'name': 'TEXT',
+            'stage': 'TEXT',
             'time': 'REAL',
-            'succeeded': 'INTEGER',
-            'failed': 'INTEGER'
+            'succeeded': 'INTEGER'
         }
         self.metrics_fields = {
+            'name': 'TEXT',
+            'stage': 'TEXT',
             'total': 'INTEGER',
             'succeeded': 'INTEGER',
             'failed': 'INTEGER',
@@ -33,7 +40,7 @@ class SQLite:
             'minimum': 'REAL',
             'maximum': 'REAL',
             'quantiles': 'REAL',
-            **config.fields_map
+            **self.custom_fields
         }
 
     async def connect(self):
@@ -68,7 +75,10 @@ class SQLite:
             for field, value in event.record.items():
 
                 if isinstance(value, bool):
-                    value = bool(value)
+                    value = int(value)
+
+                elif isinstance(value, str):
+                    value = f'"{value}"'
 
                 event_fields.append(field)
                 event_values.append(value)
@@ -89,6 +99,13 @@ class SQLite:
             metric_values = []
             
             for field, value in metric.record.items():
+
+                if isinstance(value, bool):
+                    value = int(value)
+
+                elif isinstance(value, str):
+                    value = f'"{value}"'
+
                 metric_fields.append(field)
                 metric_values.append(value)
 

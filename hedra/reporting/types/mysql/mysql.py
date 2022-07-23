@@ -20,9 +20,12 @@ class MySQL:
         self.database = config.database
         self.username = config.username
         self.password = config.password
-        self.events_table: sqlalchemy.Table = config.events_table
-        self.metrics_table: sqlalchemy.Table = config.metrics_table
-
+        self.events_table: config.events_table
+        self.metrics_table: config.metrics_table
+        self.custom_fields = config.custom_fields
+        self._events_table = None
+        self._metrics_table = None
+        self.metadata = sqlalchemy.MetaData()
         self._engine = None
         self._connection = None
 
@@ -41,7 +44,18 @@ class MySQL:
         for event in events:
 
             if self._events_table is None:
-                self._events_table = event.to_table(self.events_table)
+                events_table = sqlalchemy.Table(
+                    self.events_table,
+                    self.metadata,
+                    sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
+                    sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
+                    sqlalchemy.Column('stage', sqlalchemy.VARCHAR(255)),
+                    sqlalchemy.Column('time', sqlalchemy.Float),
+                    sqlalchemy.Column('succeeded', sqlalchemy.Boolean),
+                )
+
+                await events_table.create(self._connection, checkfirst=True)
+                self._events_table = events_table
             
             await self._connection.execute(
                 self._events_table.insert(**event.record)
@@ -51,7 +65,34 @@ class MySQL:
         for metric in metrics:
 
             if self._metrics_table is None:
-                self._metrics_table = metric.to_table(self.metrics_table)
+
+                metrics_table = sqlalchemy.Table(
+                    self.metrics_table,
+                    self.metadata,
+                    sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
+                    sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
+                    sqlalchemy.Column('stage', sqlalchemy.VARCHAR(255)),
+                    sqlalchemy.Column('total', sqlalchemy.BIGINT),
+                    sqlalchemy.Column('succeeded', sqlalchemy.BIGINT),
+                    sqlalchemy.Column('failed', sqlalchemy.BIGINT),
+                    sqlalchemy.Column('median', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('mean', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('variance', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('stdev', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('minimum', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('maximum', sqlalchemy.FLOAT)
+                )
+
+                for quantile in metric.quantiles:
+                    metrics_table.append_column(
+                        sqlalchemy.Column(f'{quantile}', sqlalchemy.FLOAT)
+                    )
+
+                for custom_field_name, sql_alchemy_type in self.custom_fields:
+                    metrics_table.append_column(custom_field_name, sql_alchemy_type)    
+
+                await metrics_table.create(self._connection, checkfirst=True)
+                self._metrics_table = metrics_table
             
             await self._connection.execute(
                 self._metrics_table.insert(**metric.record)

@@ -19,6 +19,8 @@ class Datadog:
         self.event_alert_type = config.event_alert_type or 'info'
         self.device_name = config.device_name or 'hedra'
         self.priority = config.priority
+        self.custom_fields = config.custom_fields
+
         self.types_map = {
             'total': 'count',
             'succeeded': 'count',
@@ -30,7 +32,7 @@ class Datadog:
             'minimum': 'gauge',
             'maximum': 'gauge',
             'quantiles': 'gauge',
-            **config.types_map
+            **self.custom_fields
         }
 
         self._loop = asyncio.get_event_loop()
