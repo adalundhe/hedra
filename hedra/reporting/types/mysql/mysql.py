@@ -22,7 +22,7 @@ class MySQL:
         self.password = config.password
         self.events_table: config.events_table
         self.metrics_table: config.metrics_table
-        self.custom_fields = config.custom_fields
+        self.custom_fields = config.custom_fields or {}
         self._events_table = None
         self._metrics_table = None
         self.metadata = sqlalchemy.MetaData()
@@ -58,7 +58,7 @@ class MySQL:
                 self._events_table = events_table
             
             await self._connection.execute(
-                self._events_table.insert(**event.record)
+                self._events_table.insert().values(**event.record)
             )
 
     async def submit_metrics(self, metrics: List[Any]):
@@ -95,7 +95,7 @@ class MySQL:
                 self._metrics_table = metrics_table
             
             await self._connection.execute(
-                self._metrics_table.insert(**metric.record)
+                self._metrics_table.insert().values(**metric.record)
             )
 
     async def close(self):

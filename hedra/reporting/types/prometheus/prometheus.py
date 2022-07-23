@@ -1,4 +1,5 @@
 import asyncio
+import functools
 from typing import Any, List
 try:
     from prometheus_client.exposition import basic_auth_handler
@@ -25,7 +26,8 @@ class Prometheus:
         self.password = config.password
         self.namespace = config.namespace
         self.job_name = config.job_name
-        self.custom_fields = config.custom_fields
+        self.custom_fields = config.custom_fields or {}
+
         self.registry = None
         self._auth_handler = None
         self._has_auth = False
@@ -73,32 +75,37 @@ class Prometheus:
         if self._has_auth:
             await self._loop.run_in_executor(
                 None,
-                push_to_gateway,
-                self.pushgateway_address,
-                job=self.job_name,
-                registry=self.registry,
-                handler=self._generate_auth
+                functools.partial(
+                    push_to_gateway,
+                    self.pushgateway_address,
+                    job=self.job_name,
+                    registry=self.registry,
+                    handler=self._generate_auth
+                )
             )
 
         else:
             await self._loop.run_in_executor(
                 None,
-                push_to_gateway,
-                self.pushgateway_address,
-                job=self.job_name,
-                registry=self.registry
+                functools.partial(
+                    push_to_gateway,
+                    self.pushgateway_address,
+                    job=self.job_name,
+                    registry=self.registry
+                )
             )
 
     async def submit_events(self, events: List[Any]):
 
         for event in events:
             
-            record = event.record
+            record = event.stats
+
             if self._events.get(event.name) is None:
 
                 self._events[event.name] = {}
 
-                for event_field in event.fields:
+                for event_field in record.keys():
                     metric_type = self.types_map.get(event_field)
                 
                     metric = PrometheusMetric(

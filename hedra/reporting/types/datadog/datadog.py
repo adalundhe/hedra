@@ -19,7 +19,7 @@ class Datadog:
         self.event_alert_type = config.event_alert_type or 'info'
         self.device_name = config.device_name or 'hedra'
         self.priority = config.priority
-        self.custom_fields = config.custom_fields
+        self.custom_fields = config.custom_fields or {}
 
         self.types_map = {
             'total': 'count',

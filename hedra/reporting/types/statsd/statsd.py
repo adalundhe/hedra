@@ -14,7 +14,7 @@ class StatsD:
     def __init__(self, config: Any) -> None:
         self.host = config.host
         self.port = config.port
-        self.custom_fields = config.custom_fields
+        self.custom_fields = config.custom_fields or {}
 
         self.connection = StatsdClient(
             host=self.host,
@@ -53,7 +53,7 @@ class StatsD:
 
         for event in events:
             
-            record = event.record
+            record = event.stats
 
             for event_field, event_value in record.items():
                 if event_value and event_field in self.types_map:
@@ -66,7 +66,7 @@ class StatsD:
 
         for metric in metrics:
             
-            record = metric.record
+            record = metric.stats
 
             for metric_field, metric_value in record.items():
                 if metric_value and metric_field in self.types_map:

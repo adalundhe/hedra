@@ -25,7 +25,7 @@ class Telegraf(StatsD):
 
         for event in events:
             
-            record = event.record
+            record = event.stats
 
             for event_field, event_value in record.items():
                 if event_value and event_field in self.types_map:
@@ -36,7 +36,7 @@ class Telegraf(StatsD):
 
         for metric in metrics:
             
-            record = metric.record
+            record = metric.stats
 
             for metric_field, metric_value in record.items():
                 if metric_value and metric_field in self.types_map:

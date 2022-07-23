@@ -2,7 +2,8 @@ from typing import Any, List
 
 
 try:
-    import aiosqlite
+    from sqlalchemy_aio import ASYNCIO_STRATEGY
+    import sqlalchemy
     has_connector = True
 
 except ImportError:
@@ -14,107 +15,81 @@ class SQLite:
 
     def __init__(self, config) -> None:
         self.path = config.path
-        self.events_table = config.events_table
-        self.metrics_table = config.metrics_table
+        self.events_table_name = config.events_table
+        self.metrics_table_name = config.metrics_table
+        self.metadata = sqlalchemy.MetaData()
         self.database = None
+        self.custom_fields = config.custom_fields or {}
+        self._engine = None
+        self._connection = None
         self._events_table = None
         self._metrics_table = None
-        self.custom_fields = config.custom_fields
-
-        self.events_fields= {
-            'name': 'TEXT',
-            'stage': 'TEXT',
-            'time': 'REAL',
-            'succeeded': 'INTEGER'
-        }
-        self.metrics_fields = {
-            'name': 'TEXT',
-            'stage': 'TEXT',
-            'total': 'INTEGER',
-            'succeeded': 'INTEGER',
-            'failed': 'INTEGER',
-            'median': 'REAL',
-            'mean': 'REAL',
-            'variance': 'REAL',
-            'stdev': 'REAL',
-            'minimum': 'REAL',
-            'maximum': 'REAL',
-            'quantiles': 'REAL',
-            **self.custom_fields
-        }
 
     async def connect(self):
-        self.database = await aiosqlite.connect(self.path) 
-
-        fields = []
-
-        for field, field_type in self.events_fields.items():
-            fields.append(f'{field} {field_type}')
-
-        fields = ', '.join(fields)
-
-        await self.database.execute(f'CREATE TABLE IF NOT EXISTS {self.events_table} ({fields});')
-        
-        fields = []
-
-        for field, field_type in self.metrics_fields.items():
-            fields.append(f'{field} {field_type}')
-
-        fields = ', '.join(fields)
-
-        await self.database.execute(f'CREATE TABLE IF NOT EXISTS {self.metrics_table} ({fields});')
-
+        # self.database = await aiosqlite.connect(self.path) 
+        self._engine = sqlalchemy.create_engine(self.path, strategy=ASYNCIO_STRATEGY)
+        self._connection = await self._engine.connect()
     
     async def submit_events(self, events: List[Any]):
 
         for event in events:
 
-            event_fields = []
-            event_values = []
-            
-            for field, value in event.record.items():
+            if self._events_table is None:
 
-                if isinstance(value, bool):
-                    value = int(value)
+                events_table = sqlalchemy.Table(
+                    self.events_table_name,
+                    self.metadata,
+                    sqlalchemy.Column('id', sqlalchemy.INTEGER, primary_key=True,),
+                    sqlalchemy.Column('name', sqlalchemy.TEXT),
+                    sqlalchemy.Column('stage', sqlalchemy.TEXT),
+                    sqlalchemy.Column('time', sqlalchemy.REAL),
+                    sqlalchemy.Column('succeeded', sqlalchemy.INTEGER)
+                )
 
-                elif isinstance(value, str):
-                    value = f'"{value}"'
-
-                event_fields.append(field)
-                event_values.append(value)
-
-            event_fields = ', '.join(event_fields)
-            event_values = ', '.join(event_values)
-
-            await self.database.execute(f'INSERT INTO {event.fields} {self.events_table} VALUES ({event.values})')
-
-        await self.database.commit()
-
+                await events_table.create(self._connection, checkfirst=True)
+                self._events_table = events_table
+           
+            await self._connection.execute(
+                self._events_table.insert().values(**event.record)
+            )
 
     async def submit_metrics(self, metrics: List[Any]):
 
         for metric in metrics:
 
-            metric_fields = []
-            metric_values = []
-            
-            for field, value in metric.record.items():
+            if self._metrics_table is None:
 
-                if isinstance(value, bool):
-                    value = int(value)
+                metrics_table = sqlalchemy.Table(
+                    self.metrics_table_name,
+                    self.metadata,
+                    sqlalchemy.Column('id', sqlalchemy.INTEGER, primary_key=True),
+                    sqlalchemy.Column('name', sqlalchemy.TEXT),
+                    sqlalchemy.Column('stage', sqlalchemy.TEXT),
+                    sqlalchemy.Column('total', sqlalchemy.INTEGER),
+                    sqlalchemy.Column('succeeded', sqlalchemy.INTEGER),
+                    sqlalchemy.Column('failed', sqlalchemy.INTEGER),
+                    sqlalchemy.Column('median', sqlalchemy.REAL),
+                    sqlalchemy.Column('mean', sqlalchemy.REAL),
+                    sqlalchemy.Column('variance', sqlalchemy.REAL),
+                    sqlalchemy.Column('stdev', sqlalchemy.REAL),
+                    sqlalchemy.Column('minimum', sqlalchemy.REAL),
+                    sqlalchemy.Column('maximum', sqlalchemy.REAL)
+                )
 
-                elif isinstance(value, str):
-                    value = f'"{value}"'
+                for quantile in metric.quantiles:
+                    metrics_table.append_column(
+                        sqlalchemy.Column(f'{quantile}', sqlalchemy.REAL)
+                    )
 
-                metric_fields.append(field)
-                metric_values.append(value)
+                for custom_field_name, sql_alchemy_type in self.custom_fields:
+                    metrics_table.append_column(custom_field_name, sql_alchemy_type)    
 
-            metric_fields = ', '.join(metric_fields)
-            metric_values = ', '.join(metric_values)
+                await metrics_table.create(self._connection, checkfirst=True)
+                self._metrics_table = metrics_table
 
-            await self.database.execute(f'INSERT INTO {metric.fields} {self.metrics_table} VALUES ({metric.values})')
-
-        await self.database.commit()
+            await self._connection.execute(
+                self._metrics_table.insert().values(**metric.record)
+            )
 
     async def close(self):
         await self.database.close()

@@ -38,8 +38,7 @@ class InfluxDB:
         for event in events:
             point = Point(event.name)
 
-            record = event.record
-            del record['name']
+            record = event.stats
 
             for tag in event.tags:
                 point.tag(tag.name, tag.value)
@@ -60,9 +59,8 @@ class InfluxDB:
         for metric in metrics:
             point = Point(metric.name)
 
-            record = metric.record
-            del record['name']
-
+            record = metric.stats
+            
             for tag in metric.tags:
                 point.tag(tag.name, tag.value)
 

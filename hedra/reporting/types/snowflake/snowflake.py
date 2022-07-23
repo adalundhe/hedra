@@ -1,4 +1,5 @@
 import asyncio
+import functools
 from typing import Any, List
 
 try:
@@ -20,7 +21,7 @@ class Snowflake:
         self.schema = config.schema
         self.events_table = config.events_table
         self.metrics_table = config.metrics_table
-        self.custom_fields = config.custom_fields
+        self.custom_fields = config.custom_fields or {}
 
         self.connection = None
         self.cursor = None
@@ -50,14 +51,16 @@ class Snowflake:
     async def connect(self):
         self.connection = await self._loop.run_in_executor(
             None,
-            snowflake.connector.connect,
-            user=self.username,
-            password=self.password,
-            account=self.account_id,
-            private_key=self.private_key,
-            warehouse=self.warehouse,
-            database=self.database,
-            schema=self.schema
+            functools.partial(
+                snowflake.connector.connect,
+                user=self.username,
+                password=self.password,
+                account=self.account_id,
+                private_key=self.private_key,
+                warehouse=self.warehouse,
+                database=self.database,
+                schema=self.schema
+            )
         )
 
         self.cursor = await self._loop.run_in_executor(
