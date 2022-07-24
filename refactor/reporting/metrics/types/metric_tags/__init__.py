@@ -1,1 +1,0 @@
-from .metric_tag_collection import MetricTagCollection

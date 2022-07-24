@@ -1,1 +1,0 @@
-from .personas_docs import PersonasDocs
