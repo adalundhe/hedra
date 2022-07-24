@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from typing import Dict
 
 from hedra.reporting.types.common.types import ReporterTypes
+from pydantic import BaseModel
 
 try:
     import sqlalchemy
@@ -9,12 +10,15 @@ except ImportError:
     sqlalchemy = SimpleNamespace(Column=None)
 
 
-class PostgresConfig:
-    host: str=None
-    database: str=None
-    username: str=None
-    password: str=None
-    events_table: str=None
-    metrics_table: str=None
+class PostgresConfig(BaseModel):
+    host: str='localhost'
+    database: str
+    username: str
+    password: str
+    events_table: str='events'
+    metrics_table: str='metrics'
     custom_fields: Dict[str, sqlalchemy.Column]={}
     reporter_type: ReporterTypes=ReporterTypes.Postgres
+
+    class Config:
+        arbitrary_types_allowed = True

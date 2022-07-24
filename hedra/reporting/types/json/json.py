@@ -24,7 +24,7 @@ class JSON:
 
     async def submit_metrics(self, metrics: List[Metric]):
         metrics_records = [
-            metric.record for metric in metrics
+            metric.raw_data for metric in metrics
         ]
 
         with open(self.metrics_filepath, 'w') as metrics_file:

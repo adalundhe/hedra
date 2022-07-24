@@ -1,8 +1,8 @@
 import csv
-from typing import Any, List
-from .csv_config import CSVConfig
+from typing import List
 from hedra.reporting.events.types.base_event import BaseEvent
 from hedra.reporting.metric import Metric
+from .csv_config import CSVConfig
 has_connector = True
 
 
