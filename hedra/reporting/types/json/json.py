@@ -20,7 +20,7 @@ class JSON:
         ]
 
         with open(self.events_filepath, 'w') as events_file:
-            json.dumps(events_file, event_records, indent=4)
+            json.dump(events_file, event_records, indent=4)
 
     async def submit_metrics(self, metrics: List[Metric]):
         metrics_records = [
@@ -28,7 +28,7 @@ class JSON:
         ]
 
         with open(self.metrics_filepath, 'w') as metrics_file:
-            json.dumps(metrics_records, metrics_file, indent=4)
+            json.dump(metrics_records, metrics_file, indent=4)
 
     async def close(self):
         pass

@@ -125,12 +125,15 @@ class Reporter:
             ReporterTypes.TimescaleDB: lambda config: TimescaleDB(config)
         }
 
+        if reporter_config is None:
+            reporter_config = JSONConfig()
+
         self.reporter_type = reporter_config.reporter_type
         self.reporter_config = reporter_config
         
         selected_reporter = self._reporters.get(self.reporter_type)
         if selected_reporter is None:
-            self.selected_reporter = JSON(JSONConfig)
+            self.selected_reporter = JSON(reporter_config)
 
         else:
             self.selected_reporter = selected_reporter(reporter_config)

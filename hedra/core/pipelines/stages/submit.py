@@ -65,8 +65,12 @@ class Submit(Stage):
         metrics = []
 
         for stage in self.summaries.values():
-            for metric in stage.values():
-                metrics.append(metric)
+            for group_name, metric_set in stage.items():
+                if group_name == 'total':
+                    pass
+                
+                else:
+                    metrics.append(metric_set)
 
         await self.reporter.submit_metrics(metrics)
         await self.reporter.close()
