@@ -1,5 +1,4 @@
-from ctypes import Union
-from typing import Dict
+from typing import Dict, Union
 from hedra.reporting.tags import Tag
 
 
