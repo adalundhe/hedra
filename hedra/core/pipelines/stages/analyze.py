@@ -73,7 +73,7 @@ class Analyze(Stage):
 
                 quantile_ranges = [ .10, .20, .25, .30, .40, .50, .60, .70, .75, .80, .90, .95, .99 ]
                 quantiles = {
-                    quantile_range: quantile for quantile, quantile_range in zip(
+                    f'quantile_{int(quantile_range * 100)}th': quantile for quantile, quantile_range in zip(
                         numpy.quantile(timings, quantile_ranges),
                         quantile_ranges
                     )

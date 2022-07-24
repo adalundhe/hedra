@@ -1,11 +1,18 @@
 import asyncio
+import functools
+import os
 from typing import List
 from hedra.reporting.events.types.base_event import BaseEvent
 from hedra.reporting.metric import Metric
 
 
 try:
-
+    import uuid
+    from cassandra.cqlengine import columns
+    from cassandra.cqlengine import connection
+    from datetime import datetime
+    from cassandra.cqlengine.management import sync_table
+    from cassandra.cqlengine.models import Model
     from cassandra.cluster import Cluster
     from cassandra.auth import PlainTextAuthProvider
     from .cassandra_config import CassandraConfig
@@ -33,44 +40,12 @@ class Cassandra:
         self._events_table_name = config.events_table
         self._metrics_table_name = config.metrics_table
         self.replication_strategy = config.replication_strategy
-        self.replication = config.replication
-
-        self._events_table_types = {
-            'name': 'text',
-            'stage': 'text',
-            'time': 'float',
-            'succeeded': 'boolean'
-        }
-        
-        self._metrics_table_types = {
-            'name': 'text',
-            'stage': 'text',
-            'total': 'int',
-            'succeeded': 'int',
-            'failed': 'int',
-            'median': 'float',
-            'mean': 'float',
-            'variance': 'float',
-            'stdev': 'float',
-            'minimum': 'float',
-            'maximum': 'float',
-            '0.1': 'float',
-            '0.2': 'float',
-            '0.25': 'float',
-            '0.3': 'float',
-            '0.4': 'float',
-            '0.5': 'float',
-            '0.6': 'float',
-            '0.7': 'float',
-            '0.75': 'float',
-            '0.8': 'float',
-            '0.9': 'float',
-            '0.95': 'float',
-            '0.99': 'float',
-            **self.custom_fields
-        }
-       
+        self.replication = config.replication       
         self.ssl = config.ssl
+
+
+        self._metrics_table = None
+        self._events_table = None
         self._loop = asyncio.get_event_loop()
 
     async def connect(self):
@@ -109,71 +84,117 @@ class Cassandra:
             self.session.set_keyspace,
             self.keyspace
         )
+        if os.getenv('CQLENG_ALLOW_SCHEMA_MANAGEMENT') is None:
+            os.environ['CQLENG_ALLOW_SCHEMA_MANAGEMENT'] = '1'
+
+        await self._loop.run_in_executor(
+            None,
+            functools.partial(
+                connection.setup,
+                self.hosts, 
+                self.keyspace, 
+                protocol_version=3
+            )
+        )
 
     async def submit_events(self, events: List[BaseEvent]):
 
-        events_table_fields = ['id UUID PRIMARY KEY']
-        for field_name, field_type in self._events_table_types.items():
-            events_table_fields.append(f'{field_name} {field_type}')
+        self._events_table_types = {
+            'name': 'text',
+            'stage': 'text',
+            'time': 'float',
+            'succeeded': 'boolean'
+        }
 
-        field_types = ', '.join(events_table_fields)
-        create_events_table = f'CREATE TABLE IF NOT EXISTS {self.keyspace}.{self._events_table_name} ({field_types});'
-        await self._loop.run_in_executor(
-            None,
-            self.session.execute,
-            create_events_table
-        )
-        
-        event_fields = ', '.join(events[0].fields)
+        if self._events_table is None:
+
+            self._events_table = type(
+                self._events_table_name.capitalize(), 
+                (Model, ), 
+                {
+                    'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+                    'name': columns.Text(min_length=1, index=True),
+                    'stage': columns.Text(min_length=1),
+                    'time': columns.Float(),
+                    'succeeded': columns.Boolean(),
+                    'created_at': columns.DateTime(default=datetime.now)
+                }
+            )
+
+            await self._loop.run_in_executor(
+                None,
+                functools.partial(
+                    sync_table,
+                    self._events_table,
+                    keyspaces=[self.keyspace]
+                )
+            )
+
         for event in events:
-            event_values = []
-
-            for value in event.values:
-                if isinstance(value, str):
-                    value = f'"{value}"'
-
-                event_values.append(value)
-
-            insert_string = f'INSERT INTO {self.keyspace}.{self._events_table_name} (id, {event_fields}) VALUES (uuid(), {event_values});'
             
             await self._loop.run_in_executor(
                 None,
-                self.session.execute,
-                insert_string
+                functools.partial(
+                    self._metrics_table.create,
+                    **event.record
+                )
             )
 
     async def submit_metrics(self, metrics: List[Metric]):
+       
+        if self._metrics_table is None:
+            
+            fields = {
+                'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+                'name': columns.Text(min_length=1, index=True),
+                'stage': columns.Text(min_length=1),
+                'total': columns.Integer(),
+                'succeeded': columns.Integer(),
+                'failed': columns.Integer(),
+                'median': columns.Float(),
+                'mean': columns.Float(),
+                'variance': columns.Float(),
+                'stdev': columns.Float(),
+                'minimum': columns.Float(),
+                'maximum': columns.Float(),
+                'created_at': columns.DateTime(default=datetime.now)
+            }
 
-        metrics_table_fields = ['id UUID PRIMARY KEY']
-        for field_name, field_type in self._metrics_table_types.items():
-            metrics_table_fields.append(f'{field_name} {field_type}')
+            quantiles = metrics[0].quantiles
+            for quantile_name in quantiles.keys():
+                fields[quantile_name] = columns.Float()
+            
+            for custom_field_name, custom_field_type in self.custom_fields.items():
+                fields[custom_field_name] = custom_field_type
 
-        field_types = ', '.join(metrics_table_fields)
-        create_metrics_table = f'CREATE TABLE IF NOT EXISTS {self.keyspace}.{self._metrics_table_name} ({field_types});'
-        await self._loop.run_in_executor(
-            None,
-            self.session.execute,
-            create_metrics_table
-        )
 
-        metric_fields = ', '.join(metrics[0].fields)
-    
+            self._metrics_table = type(
+                self._metrics_table_name.capitalize(), 
+                (Model, ), 
+                fields
+            )
+
+            await self._loop.run_in_executor(
+                None,
+                functools.partial(
+                    sync_table,
+                    self._metrics_table,
+                    keyspaces=[self.keyspace]
+                )
+            )
+  
         for metric in metrics:
-            metric_values = []
-
-            for value in metric.values:
-                if isinstance(value, str):
-                    value = f'"{value}"'
-
-                metric_values.append(value)
-
-            insert_string = f'INSERT INTO {self.keyspace}.{self._metrics_table_name} (id, {metric_fields}) VALUES (uuid(), {metric_values});'
             
             await self._loop.run_in_executor(
                 None,
-                self.session.execute,
-                insert_string
+                functools.partial(
+                    self._metrics_table.create,
+                    **metric.record
+                )
             )
-
+ 
     async def close(self):
-        await self.cluster.shutdown()
+        await self._loop.run_in_executor(
+            None,
+            self.cluster.shutdown
+        )
