@@ -1,20 +1,26 @@
 import asyncio
-from typing import Any, List
+from typing import List
+from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.metric import Metric
 
 
 try:
 
     from cassandra.cluster import Cluster
     from cassandra.auth import PlainTextAuthProvider
+    from .cassandra_config import CassandraConfig
     has_connector = True
 
 except ImportError:
+    Cluster = None
+    PlainTextAuthProvider = None
+    CassandraConfig = None
     has_connector = False
 
 
 class Cassandra:
 
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: CassandraConfig) -> None:
         self.cluster = None
         self.session = None
 
@@ -26,7 +32,7 @@ class Cassandra:
         self.custom_fields = config.custom_fields
         self._events_table_name = config.events_table
         self._metrics_table_name = config.metrics_table
-        self.replication_strategy = config.replication_strategy or 'SimpleStrategy'
+        self.replication_strategy = config.replication_strategy
         self.replication = config.replication
 
         self._events_table_types = {
@@ -104,7 +110,7 @@ class Cassandra:
             self.keyspace
         )
 
-    async def submit_events(self, events: List[Any]):
+    async def submit_events(self, events: List[BaseEvent]):
 
         events_table_fields = ['id UUID PRIMARY KEY']
         for field_name, field_type in self._events_table_types.items():
@@ -118,8 +124,17 @@ class Cassandra:
             create_events_table
         )
         
+        event_fields = ', '.join(events[0].fields)
         for event in events:
-            insert_string = f'INSERT INTO {self.keyspace}.{self._events_table_name} (id, {event.fields}) VALUES (uuid(), {event.values});'
+            event_values = []
+
+            for value in event.values:
+                if isinstance(value, str):
+                    value = f'"{value}"'
+
+                event_values.append(value)
+
+            insert_string = f'INSERT INTO {self.keyspace}.{self._events_table_name} (id, {event_fields}) VALUES (uuid(), {event_values});'
             
             await self._loop.run_in_executor(
                 None,
@@ -127,7 +142,7 @@ class Cassandra:
                 insert_string
             )
 
-    async def submit_metrics(self, metrics: List[Any]):
+    async def submit_metrics(self, metrics: List[Metric]):
 
         metrics_table_fields = ['id UUID PRIMARY KEY']
         for field_name, field_type in self._metrics_table_types.items():
@@ -141,8 +156,18 @@ class Cassandra:
             create_metrics_table
         )
 
+        metric_fields = ', '.join(metrics[0].fields)
+    
         for metric in metrics:
-            insert_string = f'INSERT INTO {self.keyspace}.{self._metrics_table_name} (id, {metric.fields}) VALUES (uuid(), {metric.values});'
+            metric_values = []
+
+            for value in metric.values:
+                if isinstance(value, str):
+                    value = f'"{value}"'
+
+                metric_values.append(value)
+
+            insert_string = f'INSERT INTO {self.keyspace}.{self._metrics_table_name} (id, {metric_fields}) VALUES (uuid(), {metric_values});'
             
             await self._loop.run_in_executor(
                 None,

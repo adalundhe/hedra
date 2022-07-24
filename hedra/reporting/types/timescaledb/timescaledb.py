@@ -1,23 +1,30 @@
 import uuid
-from typing import Any, List
+from typing import List
+from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.metric import Metric
 
 
 try:
     import sqlalchemy
     from sqlalchemy.dialects.postgresql import UUID
     from hedra.reporting.types.postgres.postgres import Postgres
+    from .timescaledb_config import TimescaleDBConfig
     has_connector=True
 
 except ImportError:
+    sqlalchemy = None
+    UUID = None
+    Postgres = None
+    TimescaleDBConfig = None
     has_connector = False
 
 
 class TimescaleDB(Postgres):
 
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: TimescaleDBConfig) -> None:
         super().__init__(config)
 
-    async def submit_events(self, events: List[Any]):
+    async def submit_events(self, events: List[BaseEvent]):
         for event in events:
 
             if self._events_table is None:
@@ -40,7 +47,7 @@ class TimescaleDB(Postgres):
                 self._events_table.insert().values(**event.record)
             )
 
-    async def submit_metrics(self, metrics: List[Any]):
+    async def submit_metrics(self, metrics: List[Metric]):
         for metric in metrics:
 
             if self._metrics_table is None:

@@ -1,22 +1,27 @@
 import asyncio
 import functools
-from typing import Any, List
+from typing import List
+from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.metric import Metric
 
 
 try:
     import newrelic.agent
+    from .newrelic_config import NewRelicConfig
     has_connector=True
 
 except ImportError:
+    newrelic = None
+    NewRelicConfig = None
     has_connector=False
 
 
 class NewRelic:
 
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: NewRelicConfig) -> None:
         self.registration_timeout = config.registration_timeout
         self.shutdown_timeout = config.shutdown_timeout or 60
-        self.newrelic_application_name = config.newrelic_application_name or 'hedra'
+        self.newrelic_application_name = config.newrelic_application_name
         self.client = None
         self._loop = asyncio.get_event_loop()
 
@@ -30,7 +35,7 @@ class NewRelic:
             )
         )
 
-    async def submit_events(self, events: List[Any]):
+    async def submit_events(self, events: List[BaseEvent]):
         for event in events:
             await self._loop.run_in_executor(
                 None,
@@ -42,7 +47,7 @@ class NewRelic:
                 )
             )
 
-    async def submit_metrics(self, metrics: List[Any]):
+    async def submit_metrics(self, metrics: List[Metric]):
 
         for metric in metrics:
             record = metric.record

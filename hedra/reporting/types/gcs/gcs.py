@@ -1,19 +1,25 @@
 import asyncio
 import json
-from typing import Any, List
+from typing import List
+from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.metric import Metric
 
 try:
 
     from google.cloud import storage
     from google.auth.credentials import Credentials
+    from .gcs_config import GCSConfig
     has_connector = True
 
 except ImportError:
+    storage = None
+    Credentials = None
+    GCSConfig = None
     has_connector = False
 
 class GCS:
 
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: GCSConfig) -> None:
         self.token = config.token
         self.events_bucket_name = config.events_bucket
         self.metrics_bucket_name = config.metrics_bucket
@@ -27,7 +33,7 @@ class GCS:
 
         self.client = storage.Client(credentials=self.credentials)
 
-    async def submit_events(self, events: List[Any]):
+    async def submit_events(self, events: List[BaseEvent]):
 
         events_bucket = None
 
@@ -60,7 +66,7 @@ class GCS:
                 json.dumps(event.record)
             )
 
-    async def submit_metrics(self, metrics: List[Any]):
+    async def submit_metrics(self, metrics: List[Metric]):
 
         metrics_bucket = None
 

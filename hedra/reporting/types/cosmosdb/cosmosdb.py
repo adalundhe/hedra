@@ -1,24 +1,30 @@
 import uuid
 from typing import Any, List
+from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.metric import Metric
 
 
 try:
     from azure.cosmos.aio import CosmosClient
     from azure.cosmos import PartitionKey
+    from .cosmosdb_config import CosmosDBConfig
     has_connector = True
 except ImportError:
+    CosmosClient = None
+    PartitionKey = None
+    CosmosDBConfig = None
     has_connector = False
 
 
 class CosmosDB:
 
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: CosmosDBConfig) -> None:
         self.account_uri = config.account_uri
         self.account_key = config.account_key
         self.database_name = config.database
         self.events_container_name = config.events_container
         self.metrics_container_name = config.metrics_container
-        self.analytics_ttl = config.analytics_ttl or 0
+        self.analytics_ttl = config.analytics_ttl
         self.events_partition = config.events_partition or f'/{self.events_container_name}'
         self.metrics_partition = config.metrics_partition or f'/{self.metrics_container_name}'
 
@@ -35,7 +41,7 @@ class CosmosDB:
 
         self.database = self.client.get_database_client(self.database_name)
 
-    async def submit_events(self, events: List[Any]):
+    async def submit_events(self, events: List[BaseEvent]):
 
         self.events_container = await self.database.create_container_if_not_exists(
             id=self.events_container_name,
@@ -49,7 +55,7 @@ class CosmosDB:
                 **event.record
             })
         
-    async def submit_metrics(self, metrics: List[Any]):
+    async def submit_metrics(self, metrics: List[Metric]):
 
         self.metrics_container = await self.database.create_container_if_not_exists(
             id=self.metrics_container_name,

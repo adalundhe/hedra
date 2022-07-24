@@ -1,15 +1,15 @@
-from typing import Any
-
-
 try:
     from hedra.reporting.types.statsd.statsd import StatsD
+    from .netdata_config import NetdataConfig
     has_connector = True
 
 except ImportError:
+    from hedra.reporting.types.empty import Empty as StatsD
+    NetdataConfig = None
     has_connector = False
 
 
 class Netdata(StatsD):
 
-    def __init__(self, config: Any) -> None:
-        super().__init__(config)
+    def __init__(self, config: NetdataConfig) -> None:
+        super(Netdata, self).__init__(config)

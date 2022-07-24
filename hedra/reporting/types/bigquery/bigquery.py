@@ -1,19 +1,24 @@
 import asyncio
-from typing import Any, List
+from typing import List
+from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.metric import Metric
 
 try:
-
     from google.cloud import bigquery
     from google.auth.credentials import Credentials
+    from .bigquery_config import BigQueryConfig
     has_connector = True
 
 except ImportError:
+    bigquery = None
+    BigQueryConfig = None
+    Credentials = None
     has_connector = False
 
 
 class BigQuery:
 
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: BigQueryConfig) -> None:
         self.token = config.token
         self.events_table_name = config.events_table
         self.metrics_table_name = config.metrics_table
@@ -51,7 +56,7 @@ class BigQuery:
                 self._metrics_table
             )
 
-    async def submit_events(self, events: List[Any]):
+    async def submit_events(self, events: List[BaseEvent]):
         
         if self._events_table is None:
 
@@ -84,7 +89,7 @@ class BigQuery:
             [event.record for event in events]
         )
 
-    async def submit_metrics(self, metrics: List[Any]):
+    async def submit_metrics(self, metrics: List[Metric]):
         metric = metrics[0]
         if self._metrics_table is None:
             table_schema = [

@@ -1,7 +1,7 @@
 from hedra.core.engines.types.common.response import Response
 
 
-class GraphQLResult:
+class WebsocketEvent:
 
     def __init__(self, response: Response) -> None:
         pass

@@ -1,10 +1,15 @@
 import asyncio
+from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.metric import Metric
 
 try:
     import datadog
+    from .datadog_config import DatadogConfig
     has_connector = True
 
 except ImportError:
+    datadog = None
+    DatadogConfig = None
     has_connector = False
 
 from datetime import datetime
@@ -13,7 +18,7 @@ from typing import Any, List
 
 class Datadog:
 
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: DatadogConfig) -> None:
         self.datadog_api_key = config.api_key
         self.datadog_app_key = config.app_key
         self.event_alert_type = config.event_alert_type or 'info'
@@ -46,7 +51,7 @@ class Datadog:
 
         datadog.initialize(**config)
 
-    async def submit_events(self, events: List[Any]):
+    async def submit_events(self, events: List[BaseEvent]):
 
         for event in events:
 
@@ -68,7 +73,7 @@ class Datadog:
                 host=event.hostname
             )
 
-    async def submit_metics(self, metrics: List[Any]):
+    async def submit_metics(self, metrics: List[Metric]):
 
         for metric in metrics:
 
@@ -85,9 +90,9 @@ class Datadog:
                     None,
                     datadog.api.Metric.send,
                     metrics=[{
-                        'metric': field,
+                        'metric': f'{metric.name}_{field}',
                         'points': [value],
-                        'host': metric.hostname,
+                        'host': metric.source,
                         'tags': tags,
                         'type': self.types_map.get(field)
                     }]

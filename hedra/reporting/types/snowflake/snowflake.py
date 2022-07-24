@@ -1,27 +1,33 @@
 import asyncio
 import functools
 from typing import Any, List
+from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.metric import Metric
+
 
 try:
     import snowflake.connector
+    from .snowflake_config import SnowflakeConfig
     has_connector = True
 
 except ImportError:
+    snowflake = None
+    SnowflakeConfig = None
     has_connector = False
 
 class Snowflake:
 
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: SnowflakeConfig) -> None:
         self.username = config.username
-        self.account_id = config.account_id
         self.password = config.password
+        self.account_id = config.account_id
         self.private_key = config.private_key
         self.warehouse = config.warehouse
         self.database = config.database
         self.schema = config.schema
         self.events_table = config.events_table
         self.metrics_table = config.metrics_table
-        self.custom_fields = config.custom_fields or {}
+        self.custom_fields = config.custom_fields
 
         self.connection = None
         self.cursor = None
@@ -93,7 +99,7 @@ class Snowflake:
             f'CREATE TABLE IF NOT EXISTS {self.metrics_table} ({fields});'
         )
 
-    async def submit_events(self, events: List[Any]):
+    async def submit_events(self, events: List[BaseEvent]):
 
         for event in events:
     
@@ -114,7 +120,7 @@ class Snowflake:
                 insert_string
             )
 
-    async def submit_metrics(self, metrics: List[Any]):
+    async def submit_metrics(self, metrics: List[Metric]):
 
         for metric in metrics:
     

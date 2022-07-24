@@ -1,6 +1,9 @@
 import asyncio
 import functools
-from typing import Any, List
+from typing import List
+from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.metric import Metric
+
 try:
     from prometheus_client.exposition import basic_auth_handler
     from prometheus_client import (
@@ -9,24 +12,26 @@ try:
     )
     from .prometheus_metric import PrometheusMetric
     from prometheus_client.core import REGISTRY
+    from .prometheus_config import PrometheusConfig
     has_connector = True
 
 except ImportError:
+    PrometheusConfig = None
     has_connector = False
 
 
 class Prometheus:
 
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: PrometheusConfig) -> None:
         self.pushgateway_address = config.pushgateway_address
-        self.auth_request_method = config.auth_request_method or 'GET'
-        self.auth_request_timeout = config.auth_request_timeout or 60000
+        self.auth_request_method = config.auth_request_method
+        self.auth_request_timeout = config.auth_request_timeout
         self.auth_request_data = config.auth_request_data
         self.username = config.username
         self.password = config.password
         self.namespace = config.namespace
         self.job_name = config.job_name
-        self.custom_fields = config.custom_fields or {}
+        self.custom_fields = config.custom_fields
 
         self.registry = None
         self._auth_handler = None
@@ -95,11 +100,15 @@ class Prometheus:
                 )
             )
 
-    async def submit_events(self, events: List[Any]):
+    async def submit_events(self, events: List[BaseEvent]):
 
         for event in events:
             
-            record = event.stats
+            record = {
+                f'{event.name}_time': event.time,
+                f'{event.name}_success': 1 if event.success else 0,
+                f'{event.name}_failed': 1 if event.success is False else 0
+            }
 
             if self._events.get(event.name) is None:
 
@@ -123,7 +132,7 @@ class Prometheus:
                 if event_value and event_field in self.types_map:
                     self._events[event.name][event_field].update(event_value)
 
-    async def submit_metrics(self, metrics: List[Any]):
+    async def submit_metrics(self, metrics: List[Metric]):
 
         for metric in metrics:
             

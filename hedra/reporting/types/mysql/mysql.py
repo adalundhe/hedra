@@ -1,28 +1,32 @@
-import asyncio
-from typing import Any, List
+from typing import List
+from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.metric import Metric
 
 
 try:
     import sqlalchemy
     from aiomysql.sa import create_engine
-
+    from .mysql_config import MySQLConfig
     has_connector = True
 
 except Exception:
+    sqlalchemy = None
+    create_engine = None
+    MySQLConfig = None
     has_connector = False
 
 
 
 class MySQL:
 
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: MySQLConfig) -> None:
         self.host = config.host
         self.database = config.database
         self.username = config.username
         self.password = config.password
         self.events_table: config.events_table
         self.metrics_table: config.metrics_table
-        self.custom_fields = config.custom_fields or {}
+        self.custom_fields = config.custom_fields
         self._events_table = None
         self._metrics_table = None
         self.metadata = sqlalchemy.MetaData()
@@ -40,7 +44,7 @@ class MySQL:
 
         self._connection = await self._engine.acquire()
 
-    async def submit_events(self, events: List[Any]):
+    async def submit_events(self, events: List[BaseEvent]):
         for event in events:
 
             if self._events_table is None:
@@ -61,7 +65,7 @@ class MySQL:
                 self._events_table.insert().values(**event.record)
             )
 
-    async def submit_metrics(self, metrics: List[Any]):
+    async def submit_metrics(self, metrics: List[Metric]):
         for metric in metrics:
 
             if self._metrics_table is None:

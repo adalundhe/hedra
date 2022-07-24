@@ -1,28 +1,34 @@
 from typing import Any, List
 import uuid
-
+from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.metric import Metric
 
 
 try:
     import sqlalchemy
     from sqlalchemy.dialects.postgresql import UUID
     from aiopg.sa import create_engine
+    from .postgres_config import PostgresConfig
     has_connector = True
 
 except ImportError:
+    UUID = None
+    sqlalchemy = None
+    create_engine = None
+    PostgresConfig = None
     has_connector = False
 
 
 class Postgres:
 
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: PostgresConfig) -> None:
         self.host = config.host
         self.database = config.database
         self.username = config.username
         self.password = config.password
         self.events_table = config.events_table
         self.metrics_table = config.metrics_table
-        self.custom_fields = config.custom_fields or {}
+        self.custom_fields = config.custom_fields
         
         self._engine = None
         self._connection = None
@@ -40,7 +46,7 @@ class Postgres:
 
         self._connection = await self._engine.acquire()
 
-    async def submit_events(self, events: List[Any]):
+    async def submit_events(self, events: List[BaseEvent]):
         for event in events:
 
             if self._events_table is None:
@@ -61,7 +67,7 @@ class Postgres:
                 self._events_table.insert().values(**event.record)
             )
 
-    async def submit_metrics(self, metrics: List[Any]):
+    async def submit_metrics(self, metrics: List[Metric]):
         for metric in metrics:
 
             if self._metrics_table is None:

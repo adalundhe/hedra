@@ -1,19 +1,25 @@
 import asyncio
 import functools
 import json
-from typing import Any, List
+from typing import List
+from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.metric import Metric
+
 
 try:
     import boto3
+    from .s3_config import S3Config
     has_connector = True
 
 except ImportError:
+    boto3 = None
+    S3Config = None
     has_connector = False
 
 
 class S3:
 
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: S3Config) -> None:
         self.aws_access_key_id = config.aws_access_key_id
         self.aws_secret_access_key = config.aws_secret_access_key
         self.region_name = config.region_name
@@ -34,7 +40,7 @@ class S3:
             )
         )
 
-    async def submit_events(self, events: List[Any]):
+    async def submit_events(self, events: List[BaseEvent]):
         
         try:
             await self._loop.run_in_executor(
@@ -60,7 +66,7 @@ class S3:
                 )
             )
     
-    async def submit_metrics(self, metrics: List[Any]):
+    async def submit_metrics(self, metrics: List[Metric]):
         
         try:
             await self._loop.run_in_executor(

@@ -1,25 +1,31 @@
-from typing import Any, List
+from typing import List
+from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.metric import Metric
 
 
 try:
     from sqlalchemy_aio import ASYNCIO_STRATEGY
     import sqlalchemy
+    from .sqlite_config import SQLiteConfig
     has_connector = True
 
 except ImportError:
+    ASYNCIO_STRATEGY = None
+    sqlalchemy = None
+    SQLiteConfig = None
     has_connector = False
 
 
 
 class SQLite:
 
-    def __init__(self, config) -> None:
+    def __init__(self, config: SQLiteConfig) -> None:
         self.path = config.path
         self.events_table_name = config.events_table
         self.metrics_table_name = config.metrics_table
+        self.custom_fields = config.custom_fields
         self.metadata = sqlalchemy.MetaData()
         self.database = None
-        self.custom_fields = config.custom_fields or {}
         self._engine = None
         self._connection = None
         self._events_table = None
@@ -30,7 +36,7 @@ class SQLite:
         self._engine = sqlalchemy.create_engine(self.path, strategy=ASYNCIO_STRATEGY)
         self._connection = await self._engine.connect()
     
-    async def submit_events(self, events: List[Any]):
+    async def submit_events(self, events: List[BaseEvent]):
 
         for event in events:
 
@@ -53,7 +59,7 @@ class SQLite:
                 self._events_table.insert().values(**event.record)
             )
 
-    async def submit_metrics(self, metrics: List[Any]):
+    async def submit_metrics(self, metrics: List[Metric]):
 
         for metric in metrics:
 

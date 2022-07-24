@@ -1,11 +1,11 @@
 from hedra.core.engines.types.common.response import Response
-from .base_result import BaseResult
+from .base_event import BaseEvent
 
 
-class HTTP2Result(BaseResult):
+class HTTP2Event(BaseEvent):
 
     def __init__(self, response: Response) -> None:
-        super(HTTP2Result, self).__init__(response)
+        super(HTTP2Event, self).__init__(response)
 
         self.url = response.url
         self.ip_addr = response.ip_addr
@@ -25,3 +25,6 @@ class HTTP2Result(BaseResult):
 
             except Exception:
                 pass
+
+        
+        self.name = f'{self.method}_{self.shortname}'

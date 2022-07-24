@@ -1,11 +1,11 @@
 from hedra.core.engines.types.common.response import Response
-from .base_result import BaseResult
+from .base_event import BaseEvent
 
 
-class HTTPResult(BaseResult):
+class HTTPEvent(BaseEvent):
 
     def __init__(self, response: Response) -> None:
-        super(HTTPResult, self).__init__(response)
+        super(HTTPEvent, self).__init__(response)
 
         self.url = response.url
         self.ip_addr = response.ip_addr
@@ -16,5 +16,4 @@ class HTTPResult(BaseResult):
         self.status = response.status
         self.headers = response.headers
         self.data = response.data
-
-    
+        self.name = f'{self.method}_{self.shortname}'

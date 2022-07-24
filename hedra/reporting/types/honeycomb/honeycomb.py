@@ -1,19 +1,24 @@
 import asyncio
 import functools
-from typing import Any, List
+from typing import List
+from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.metric import Metric
 
 
 try:
     import libhoney
+    from .honeycomb_config import HoneycombConfig
     has_connector = True
 
 except ImportError:
+    libhoney = None
+    HoneycombConfig = None
     has_connector = False
 
 
 class Honeycomb:
 
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: HoneycombConfig) -> None:
         self.api_key = config.api_key
         self.dataset = config.dataset
         self.client = None
@@ -29,7 +34,7 @@ class Honeycomb:
             )
         )
 
-    async def submit_events(self, events: List[Any]):
+    async def submit_events(self, events: List[BaseEvent]):
 
         for event in events:
 
@@ -47,7 +52,7 @@ class Honeycomb:
             libhoney.flush
         )
 
-    async def submit_metrics(self, metrics: List[Any]):
+    async def submit_metrics(self, metrics: List[Metric]):
 
         for metric in metrics:
 

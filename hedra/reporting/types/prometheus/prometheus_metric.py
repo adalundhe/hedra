@@ -10,7 +10,12 @@ try:
     )
 
 except ImportError:
-    pass
+    Info = None
+    Summary = None
+    Counter = None
+    Gauge = None
+    Histogram = None
+    Enum = None
 
 
 class PrometheusMetric:

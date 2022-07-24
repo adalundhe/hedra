@@ -1,22 +1,26 @@
 import asyncio
-from datetime import datetime
-import json
-from typing import Any, List
 import uuid
+from datetime import datetime
+from typing import List
+from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.metric import Metric
 
 try:
-
     from google.cloud import bigtable
     from google.auth.credentials import Credentials
+    from .bigtable_config import BigTableConfig
     has_connector = True
 
 except ImportError:
+    bigtable = None
+    Credentials = None
+    BigTableConfig = None
     has_connector = False
 
 
-class Bigtable:
+class BigTable:
 
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: BigTableConfig) -> None:
         self.token = config.token
         self.instance_name = config.instance
         self.instance = None
@@ -45,7 +49,7 @@ class Bigtable:
             self.instance.create
         )
 
-    async def submit_events(self, events: List[Any]):
+    async def submit_events(self, events: List[BaseEvent]):
         self._events_table = self.instance.table(self.events_table_id)
         
         try:
@@ -93,7 +97,7 @@ class Bigtable:
             rows
         )
     
-    async def submit_metrics(self, metrics: List[Any]):
+    async def submit_metrics(self, metrics: List[Metric]):
         self._metrics_table = self.instance.table(self.metrics_table_id)
         
         try:

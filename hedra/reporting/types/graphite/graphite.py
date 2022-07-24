@@ -1,19 +1,25 @@
 
-from typing import Any, List
+from typing import List
+from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.metric import Metric
 
 
 try:
     from hedra.reporting.types.statsd import StatsD
     from aio_statsd import GraphiteClient
+    from .graphite_config import GraphiteConfig
     has_connector = True
 
 except ImportError:
+    from hedra.reporting.types.empty import Empty as StatsD
+    GraphiteClient = None
+    GraphiteConfig = None
     has_connector = False
 
 
 class Graphite(StatsD):
 
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: GraphiteConfig) -> None:
         super().__init__(config)
 
         self.connection = GraphiteClient(
@@ -21,18 +27,18 @@ class Graphite(StatsD):
             port=self.port
         )
 
-    async def submit_events(self, events: List[Any]):
+    async def submit_events(self, events: List[BaseEvent]):
 
-        for event in events:
+         for event in events:
+            self.connection.send_graphite(f'{event.name}_time', event.time)
             
-            record = event.stats
+            if event.success:
+                self.connection.send_graphite(f'{event.name}_success', 1)
+            
+            else:
+                self.connection.send_graphite(f'{event.name}_failed', 1)
 
-            for event_field, event_value in record.items():
-                if event_value and event_field in self.types_map:
-
-                    self.connection.send_graphite(event_field, event_value)
-
-    async def submit_metrics(self, metrics: List[Any]):
+    async def submit_metrics(self, metrics: List[Metric]):
 
         for metric in metrics:
             
@@ -40,6 +46,4 @@ class Graphite(StatsD):
 
             for metric_field, metric_value in record.items():
                 if metric_value and metric_field in self.types_map:
-                    update_type = self.types_map.get(metric_field)
-
                     self.connection.send_graphite(metric_field, metric_value)
