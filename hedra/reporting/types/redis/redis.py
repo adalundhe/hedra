@@ -20,6 +20,7 @@ class Redis:
 
     def __init__(self, config: RedisConfig) -> None:
         self.host = config.host
+        self.base = 'rediss' if config.secure else 'redis'
         self.username = config.username
         self.password = config.password
         self.database = config.database
@@ -30,7 +31,7 @@ class Redis:
 
     async def connect(self):
         self.connection = await aioredis.from_url(
-            self.host,
+            f'{self.base}://{self.host}',
             username=self.username,
             password=self.password,
             db=self.database

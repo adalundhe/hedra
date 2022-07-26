@@ -1,5 +1,7 @@
+from datetime import datetime
 import json
 from typing import List
+import uuid
 from hedra.reporting.events.types.base_event import BaseEvent
 from hedra.reporting.metric import Metric
 
@@ -10,8 +12,8 @@ try:
     has_connector = True
 
 except ImportError:
-    AIOKafkaProducer = None
-    KafkaConfig = None
+    # AIOKafkaProducer = None
+    # KafkaConfig = None
     has_connector = False
 
 
@@ -34,37 +36,51 @@ class Kafka:
         self._producer = AIOKafkaProducer(
             bootstrap_servers=self.host,
             client_id=self.client_id,
-            value_serializer=self._json_serializer,
             compression_type=self.compression_type,
             request_timeout_ms=self.timeout,
             enable_idempotence=self.enable_idempotence,
             **self.options
         )
 
-    async def _json_serializer(self, value) -> bytes:
-        return json.dumps(value).encode('utf-8')
+        await self._producer.start()
 
     async def submit_events(self, events: List[BaseEvent]):
+
+        batch = self._producer.create_batch()
         for event in events:
-            await self._producer.send_and_wait(
-                self.events_topic,
-                {
-                    'event_value': event.record
-                },
-                key=event.name,
-                partition=self.events_partition
+
+            batch.append(
+                value=json.dumps(
+                    event.record
+                ).encode('utf-8'),
+                timestamp=None, 
+                key=bytes(event.name, 'utf')
             )
 
+        await self._producer.send_batch(
+            batch,
+            self.events_topic,
+            partition=self.events_partition
+        )
+
     async def submit_metrics(self, metrics: List[Metric]):
+        
+        batch = self._producer.create_batch()
         for metric in metrics:
-            await self._producer.send_and_wait(
-                self.metrics_topic,
-                {
-                    'metric_value': metric.record
-                },
-                key=metric.name,
-                partition=self.metrics_partition
+
+            batch.append(
+                value=json.dumps(
+                    metric.record
+                ).encode('utf-8'),
+                timestamp=None, 
+                key=bytes(metric.name, 'utf')
             )
+
+        await self._producer.send_batch(
+            batch,
+            self.metrics_topic,
+            partition=self.metrics_partition
+        )
 
     async def close(self):
         await self._producer.stop()

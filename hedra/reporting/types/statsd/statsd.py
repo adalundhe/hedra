@@ -71,15 +71,13 @@ class StatsD:
     async def submit_metrics(self, metrics: List[Metric]):
 
         for metric in metrics:
-            
-            record = metric.stats
 
-            for metric_field, metric_value in record.items():
+            for metric_field, metric_value in metric.stats.items():
                 if metric_value and metric_field in self.types_map:
                     update_type = self.types_map.get(metric_field)
                     update_function = self._update_map.get(update_type)
 
-                    update_function(metric_field, metric_value)
+                    update_function(f'{metric.name}_{metric_field}', metric_value)
 
     async def close(self):
         await self.connection.close()

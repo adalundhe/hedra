@@ -1,6 +1,8 @@
 import asyncio
 import functools
 from typing import List
+
+from attr import fields
 from hedra.reporting.events.types.base_event import BaseEvent
 from hedra.reporting.metric import Metric
 
@@ -48,7 +50,6 @@ class Prometheus:
             'stdev': 'gauge',
             'minimum': 'gauge',
             'maximum': 'gauge',
-            'quantiles': 'gauge',
             **self.custom_fields
         }
 
@@ -76,7 +77,7 @@ class Prometheus:
             password=self.password
         )
     
-    async def _submit_metrics_to_pushgateway(self):
+    async def _submit_to_pushgateway(self):
         if self._has_auth:
             await self._loop.run_in_executor(
                 None,
@@ -112,7 +113,7 @@ class Prometheus:
 
             if self._events.get(event.name) is None:
 
-                self._events[event.name] = {}
+                fields = {}
 
                 for event_field in record.keys():
                     metric_type = self.types_map.get(event_field)
@@ -126,11 +127,17 @@ class Prometheus:
                         registry=self.registry
                     )
 
-                    self._events[event.name][event_field] = metric
+                    metric.create_metric()
+
+                    fields[event_field] = metric
+
+                self._events[event.name] = fields
                 
             for event_field, event_value in record.items():
                 if event_value and event_field in self.types_map:
                     self._events[event.name][event_field].update(event_value)
+
+            await self._submit_to_pushgateway()
 
     async def submit_metrics(self, metrics: List[Metric]):
 
@@ -139,13 +146,17 @@ class Prometheus:
             record = metric.record
             if self._metrics.get(metric.name) is None:
 
-                self._metrics[metric.name] = {}
+                for quantile_name in metric.quantiles.keys():
+                    self.types_map[quantile_name] = 'gauge'
 
-                for metric_field in metric.fields:
+                fields = {}
+
+                for metric_field in metric.stats:
                     metric_type = self.types_map.get(metric_field)
-                
-                    metric = PrometheusMetric(
-                        f'{metric.name}_{metric_field}',
+                    metric_name = f'{metric.name}_{metric_field}'.replace('.', '_')
+
+                    prometheus_metric = PrometheusMetric(
+                        metric_name,
                         metric_type,
                         metric_description=f'{metric.name} {metric_field}',
                         metric_labels=[],
@@ -153,11 +164,17 @@ class Prometheus:
                         registry=self.registry
                     )
 
-                    self._metrics[metric.name][metric_field] = metric
+                    prometheus_metric.create_metric()
+
+                    fields[metric_field] = prometheus_metric
+                
+                self._metrics[metric.name] = fields
                 
             for metric_field, metric_value in record.items():
                 if metric_value and metric_field in self.types_map:
                     self._metrics[metric.name][metric_field].update(metric_value)
+
+        await self._submit_to_pushgateway()
 
     async def close(self):
         pass

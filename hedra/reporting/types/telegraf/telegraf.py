@@ -12,15 +12,15 @@ try:
 
 except ImportError:
     from hedra.reporting.types.empty import Empty as StatsD
-    TelegrafConfig = None
-    TelegrafClient = None
+
     has_connector = False
 
 
 class Telegraf(StatsD):
 
     def __init__(self, config: TelegrafConfig) -> None:
-        super(Telegraf, self).__init__(config)
+        self.host = config.host
+        self.port = config.port
 
         self.connection = TelegrafClient(
             host=self.host,
@@ -41,11 +41,5 @@ class Telegraf(StatsD):
     async def submit_metrics(self, metrics: List[Metric]):
 
         for metric in metrics:
-            
-            record = metric.stats
-
-            for metric_field, metric_value in record.items():
-                if metric_value and metric_field in self.types_map:
-                    update_type = self.types_map.get(metric_field)
-
-                    self.connection.send_telegraf(metric_field, {metric_field: metric_value})
+            for metric_field, metric_value in metric.stats.items():
+                self.connection.send_telegraf(f'{metric.name}_{metric_field}', {metric_field: metric_value})

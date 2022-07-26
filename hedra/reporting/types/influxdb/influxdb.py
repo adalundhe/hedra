@@ -9,9 +9,9 @@ try:
     has_connector = True
 
 except ImportError:
-    Point = None
-    InfluxDBClientAsync = None
-    InfluxDBConfig = None
+    # Point = None
+    # InfluxDBClientAsync = None
+    # InfluxDBConfig = None
     has_connector = False
 
 
@@ -20,17 +20,20 @@ class InfluxDB:
     def __init__(self, config: InfluxDBConfig) -> None:
         self.host = config.host
         self.token = config.token
+        self.protocol = 'https' if config.secure else 'http'
         self.organization = config.organization
         self.connect_timeout = config.connect_timeout
         self.events_bucket = config.events_bucket
         self.metrics_bucket = config.metrics_bucket
+        self.events_database = None
+        self.metrics_database = None
 
         self.client = None
         self.write_api = None
 
     async def connect(self):
         self.client = InfluxDBClientAsync(
-            self.host,
+            f'{self.protocol}://{self.host}',
             token=self.token,
             org=self.organization,
             timeout=self.connect_timeout
@@ -69,12 +72,10 @@ class InfluxDB:
         for metric in metrics:
             point = Point(metric.name)
 
-            record = metric.stats
-            
             for tag in metric.tags:
                 point.tag(tag.name, tag.value)
 
-            for field, value in record:
+            for field, value in metric.stats.items():
                 point.field(field, value)
 
             points.append(point)
