@@ -45,6 +45,10 @@ class AWSTimestreamRecord:
             {
                 "Name": "field_name", 
                 "Value": field_name
+            },
+            {
+                "Name": "session_uuid",
+                "Value": session_uuid
             }
         ]
         self.measure_name = f'{record_name}_{field_name}_{session_uuid}'
