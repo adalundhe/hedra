@@ -2,11 +2,10 @@ from pydantic import BaseModel
 from hedra.reporting.types.common.types import ReporterTypes
 
 
-class S3Config(BaseModel):
+class AWSLambdaConfig(BaseModel):
     aws_access_key_id: str
     aws_secret_access_key: str
     region_name: str
-    buckets_namespace: str
-    events_bucket: str='events'
-    metrics_bucket: str='metrics'
-    reporter_type: ReporterTypes=ReporterTypes.S3
+    events_lambda: str
+    metrics_lambda: str
+    reporter_type: ReporterTypes=ReporterTypes.AWSLambda

@@ -1,6 +1,10 @@
 from typing import Any, List, TypeVar
 from .types import ReporterTypes
 from .types import (
+    AWSLambda,
+    AWSLambdaConfig,
+    AWSTimestream,
+    AWSTimestreamConfig,
     BigQuery,
     BigQueryConfig,
     BigTable,
@@ -17,8 +21,8 @@ from .types import (
     DatadogConfig,
     DogStatsD,
     DogStatsDConfig,
-    GCS,
-    GCSConfig,
+    GoogleCloudStorage,
+    GoogleCloudStorageConfig,
     Graphite,
     GraphiteConfig,
     Honeycomb,
@@ -61,6 +65,8 @@ from .types import (
 
 ReporterType = TypeVar(
     'ReporterType',
+    AWSLambdaConfig,
+    AWSTimestreamConfig,
     BigQueryConfig, 
     BigTableConfig, 
     CassandraConfig,
@@ -69,7 +75,7 @@ ReporterType = TypeVar(
     CSVConfig,
     DatadogConfig,
     DogStatsDConfig,
-    GCSConfig,
+    GoogleCloudStorageConfig,
     GraphiteConfig,
     HoneycombConfig,
     InfluxDBConfig,
@@ -95,6 +101,8 @@ class Reporter:
 
     def __init__(self, reporter_config: ReporterType) -> None:
         self._reporters = {
+            ReporterTypes.AWSLambda: lambda config: AWSLambda(config),
+            ReporterTypes.AWSTimestream: lambda config: AWSTimestream(config),
             ReporterTypes.BigQuery: lambda config: BigQuery(config),
             ReporterTypes.BigTable: lambda config: BigTable(config),
             ReporterTypes.Cassandra: lambda config: Cassandra(config),
@@ -103,7 +111,7 @@ class Reporter:
             ReporterTypes.CSV: lambda config: CSV(config),
             ReporterTypes.Datadog: lambda config: Datadog(config),
             ReporterTypes.DogStatsD: lambda config: DogStatsD(config),
-            ReporterTypes.GCS: lambda config: GCS(config),
+            ReporterTypes.GCS: lambda config: GoogleCloudStorage(config),
             ReporterTypes.Graphite: lambda config: Graphite(config),
             ReporterTypes.Honeycomb: lambda config: Honeycomb(config),
             ReporterTypes.InfluxDB: lambda config: InfluxDB(config),

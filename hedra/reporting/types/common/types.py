@@ -2,6 +2,8 @@ from enum import Enum
 
 
 class ReporterTypes(Enum):
+    AWSLambda='aws_lambda'
+    AWSTimestream='aws_timestream'
     BigQuery='bigquery'
     BigTable='bigtable'
     Cassandra='cassandra'

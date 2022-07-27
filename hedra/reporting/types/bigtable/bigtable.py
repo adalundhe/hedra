@@ -1,13 +1,16 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import uuid
 from datetime import datetime
 from typing import List
+
+import psutil
 from hedra.reporting.events.types.base_event import BaseEvent
 from hedra.reporting.metric import Metric
 
 try:
     from google.cloud import bigtable
-    from google.auth.credentials import Credentials
+    from google.auth import load_credentials_from_file
     from .bigtable_config import BigTableConfig
     has_connector = True
 
@@ -21,12 +24,13 @@ except ImportError:
 class BigTable:
 
     def __init__(self, config: BigTableConfig) -> None:
-        self.token = config.token
-        self.instance_name = config.instance
-        self.instance = None
+        self.service_account_json_path = config.service_account_json_path
+        self.instance_id = config.instance_id
         self.events_table_id = config.events_table
         self.metrics_table_id = config.metrics_table
 
+        self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
+        self.instance = None
         self._events_table = None
         self._metrics_table = None
         self._events_table_columns = None
@@ -38,23 +42,20 @@ class BigTable:
         self._loop = asyncio.get_event_loop()
 
     async def connect(self):
-        self.credentials = Credentials()
-        self.credentials.token = self.token
-
-        self.client = bigtable.Client(credentials=self.credentials)
-        self.instance = self.client.instance(self.instance_name)
-        
-        await self._loop.run_in_executor(
-            None,
-            self.instance.create
+        credentials, project_id = load_credentials_from_file(self.service_account_json_path)
+        self.client = bigtable.Client(
+            project=project_id,
+            credentials=credentials,
+            admin=True
         )
+        self.instance = self.client.instance(self.instance_id)
 
     async def submit_events(self, events: List[BaseEvent]):
         self._events_table = self.instance.table(self.events_table_id)
         
         try:
             await self._loop.run_in_executor(
-                None,
+                self._executor,
                 self._events_table.create
             )
 
@@ -67,7 +68,7 @@ class BigTable:
 
         try:
             await self._loop.run_in_executor(
-                None,
+                self._executor,
                 self._events_table_columns.create
             )
         except Exception:
@@ -92,7 +93,7 @@ class BigTable:
             rows.append(row)
 
         await self._loop.run_in_executor(
-            None,
+            self._executor,
             self._events_table.mutate_rows,
             rows
         )
@@ -102,7 +103,7 @@ class BigTable:
         
         try:
             await self._loop.run_in_executor(
-                None,
+                self._executor,
                 self._metrics_table.create
             )
 
@@ -115,7 +116,7 @@ class BigTable:
 
         try:
             await self._loop.run_in_executor(
-                None,
+                self._executor,
                 self._metrics_table_columns.create
             )
         except Exception:
@@ -140,14 +141,14 @@ class BigTable:
             rows.append(row)
 
         await self._loop.run_in_executor(
-            None,
+            self._executor,
             self._metrics_table.mutate_rows,
             rows
         )
 
     async def close(self):
         await self._loop.run_in_executor(
-            None,
+            self._executor,
             self.client.close
         )
         

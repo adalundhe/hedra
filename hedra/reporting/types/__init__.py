@@ -1,4 +1,15 @@
 from .common import ReporterTypes
+
+from .aws_lambda import (
+    AWSLambda,
+    AWSLambdaConfig
+)
+
+from .aws_timestream import (
+    AWSTimestream,
+    AWSTimestreamConfig
+)
+
 from .bigquery import (
     BigQuery,
     BigQueryConfig
@@ -39,9 +50,9 @@ from .dogstatsd import (
     DogStatsDConfig
 )
 
-from .gcs import (
-    GCS,
-    GCSConfig
+from .google_cloud_storage import (
+    GoogleCloudStorage,
+    GoogleCloudStorageConfig
 )
 
 from .graphite import (

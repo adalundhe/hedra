@@ -3,9 +3,11 @@ import functools
 import datetime
 import json
 from typing import List
+
+import psutil
 from hedra.reporting.events.types.base_event import BaseEvent
 from hedra.reporting.metric import Metric
-
+from concurrent.futures import ThreadPoolExecutor
 
 try:
     import boto3
@@ -24,12 +26,15 @@ class Cloudwatch:
         self.aws_access_key_id = config.aws_access_key_id
         self.aws_secret_access_key = config.aws_secret_access_key
         self.region_name = config.region_name
-        self.iam_role = config.iam_role
+        self.iam_role_arn = config.iam_role_arn
         self.schedule_rate = config.schedule_rate
         self.cloudwatch_targets = config.cloudwatch_targets
         self.aws_resource_arns = config.aws_resource_arns
-        self.cloudwatch_source = config.cloudwatch_source
+        self.submit_timeout = config.submit_timeout
+        self.events_rule_name = config.events_rule
+        self.metrics_rule_name = config.metrics_rule
 
+        self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self.events_rule = None
         self.metrics_rule= None
 
@@ -38,101 +43,61 @@ class Cloudwatch:
 
     async def connect(self):
         self.client = await self._loop.run_in_executor(
-            None,
+            self._executor,
             functools.partial(
                 boto3.client,
                 'events',
                 aws_access_key_id=self.aws_access_key_id,
-                aws_sercret_access_key=self.aws_secret_access_key,
+                aws_secret_access_key=self.aws_secret_access_key,
                 region_name=self.region_name
             )
         )
 
-        await self._loop.run_in_executor(
-            None,
-            functools.partial(
-                self.client.put_rule,
-                Name=self.events_rule,
-                RoleArn=self.iam_role,
-                ScheduleExpression=self.schedule_rate,
-                State='ENABLED'
-            )
-        )
+    async def submit_events(self, events: List[BaseEvent]):
 
-        await self._loop.run_in_executor(
-            None,
-            functools.partial(
-                self.client.put_rule,
-                Name=self.metrics_rule,
-                RoleArn=self.iam_role,
-                ScheduleExpression=self.schedule_rate,
-                State='ENABLED'
-            )
-        )
+        cloudwatch_events = [
+            {
+                'Time': datetime.datetime.now(),
+                'Detail': json.dumps(event.record),
+                'DetailType': self.events_rule_name,
+                'Resources': self.aws_resource_arns,
+                'Source': self.events_rule_name
+            } for event in events
+        ]
 
-        await self._loop.run_in_executor(
-            None,
-            functools.partial(
-                self.client.put_targets,
-                Rule=self.events_rule,
-                Targets=[
-                    {
-                        'Arn': target.get('arn'),
-                        'Id': target.get('id')
-                    } for target in self.cloudwatch_targets
-                ]
-            )
-        )
-
-        await self._loop.run_in_executor(
-            None,
-            functools.partial(
-                self.client.put_targets,
-                Rule=self.metrics_rule,
-                Targets=[
-                    {
-                        'Arn': target.get('arn'),
-                        'Id': target.get('id')
-                    } for target in self.cloudwatch_targets
-                ]
-            )
-        )
-
-    async def submit_events(self, events: List[BaseEvent]):                
-        for event in events:
-            await self._loop.run_in_executor(
-                None,
+        await asyncio.wait_for(
+            self._loop.run_in_executor(
+                self._executor,
                 functools.partial(
                     self.client.put_events,
-                    Entries=[
-                        {
-                            'Time': datetime.datetime.now(),
-                            'Detail': json.dumps(event.record),
-                            'DetailType': self.events_rule,
-                            'Resources': self.aws_resource_arns,
-                            'Source': self.cloudwatch_source
-                        }
-                    ]
+                    Entries=cloudwatch_events
                 )
-            )
+            ),
+            timeout=self.submit_timeout
+        )
 
     async def submit_metrics(self, metrics: List[Metric]):
-        for metric in metrics:
-            await self._loop.run_in_executor(
-                None,
+
+        cloudwatch_metrics = [
+            {
+                'Time': datetime.datetime.now(),
+                'Detail': json.dumps(metric.record),
+                'DetailType': self.metrics_rule_name,
+                'Resources': self.aws_resource_arns,
+                'Source': self.metrics_rule_name
+            } for metric in metrics
+        ]
+
+        await asyncio.wait_for(
+            self._loop.run_in_executor(
+                self._executor,
                 functools.partial(
                     self.client.put_events,
-                    Entries=[
-                        {
-                            'Time': datetime.datetime.now(),
-                            'Detail': json.dumps(metric.record),
-                            'DetailType': self.metrics_rule,
-                            'Resources': self.aws_resource_arns,
-                            'Source': self.cloudwatch_source
-                        }
-                    ]
+                    Entries=cloudwatch_metrics
                 )
-            )
+            ),
+            timeout=self.submit_timeout
+        )
 
     async def close(self):
         pass

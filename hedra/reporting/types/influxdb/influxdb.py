@@ -9,9 +9,9 @@ try:
     has_connector = True
 
 except ImportError:
-    # Point = None
-    # InfluxDBClientAsync = None
-    # InfluxDBConfig = None
+    Point = None
+    InfluxDBClientAsync = None
+    InfluxDBConfig = None
     has_connector = False
 
 

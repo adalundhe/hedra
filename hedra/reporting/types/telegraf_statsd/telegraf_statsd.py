@@ -10,9 +10,9 @@ try:
     has_connector = True
 
 except ImportError:
-    # from hedra.reporting.types.empty import Empty as StatsD
-    # TelegrafStatsDConfig=None
-    # TelegrafStatsdClient = None
+    from hedra.reporting.types.empty import Empty as StatsD
+    TelegrafStatsDConfig=None
+    TelegrafStatsdClient = None
     has_connector = False
 
 

@@ -12,9 +12,9 @@ try:
     has_connector = True
 
 except ImportError:
-    # from hedra.reporting.types.empty import Empty as StatsD
-    # GraphiteClient = None
-    # GraphiteConfig = None
+    from hedra.reporting.types.empty import Empty as StatsD
+    GraphiteClient = None
+    GraphiteConfig = None
     has_connector = False
 
 

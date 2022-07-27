@@ -11,7 +11,7 @@ from hedra.reporting import (
     CSVConfig,
     DatadogConfig,
     DogStatsDConfig,
-    GCSConfig,
+    GoogleCloudStorageConfig,
     GraphiteConfig,
     HoneycombConfig,
     InfluxDBConfig,
@@ -39,7 +39,7 @@ class Submit(Stage):
     stage_type=StageTypes.SUBMIT
     config: (
         BigQueryConfig | BigTableConfig | CassandraConfig | CloudwatchConfig | CosmosDBConfig |
-        CSVConfig | DatadogConfig | DogStatsDConfig | GCSConfig | GraphiteConfig | HoneycombConfig |
+        CSVConfig | DatadogConfig | DogStatsDConfig | GoogleCloudStorageConfig | GraphiteConfig | HoneycombConfig |
         InfluxDBConfig | JSONConfig | KafkaConfig | MongoDBConfig | MySQLConfig | NetdataConfig |
         NewRelicConfig | PostgresConfig | PrometheusConfig | RedisConfig | S3Config | SnowflakeConfig |
         SQLiteConfig | StatsDConfig | TelegrafConfig | TelegrafStatsDConfig | TimescaleDBConfig

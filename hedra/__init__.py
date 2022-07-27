@@ -22,6 +22,8 @@ from .core.pipelines import (
 
 
 from .reporting import (
+    AWSLambdaConfig,
+    AWSTimestreamConfig,
     BigQueryConfig,
     BigTableConfig,
     CassandraConfig,
@@ -30,7 +32,7 @@ from .reporting import (
     CSVConfig,
     DatadogConfig,
     DogStatsDConfig,
-    GCSConfig,
+    GoogleCloudStorageConfig,
     GraphiteConfig,
     HoneycombConfig,
     InfluxDBConfig,

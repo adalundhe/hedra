@@ -1,10 +1,11 @@
+from pydantic import BaseModel
 from hedra.reporting.types.common.types import ReporterTypes
 
 
-class BigTableConfig:
-    token: str = None
-    instance: str = None
-    events_table: str = None
-    metrics_table: str = None
+class BigTableConfig(BaseModel):
+    service_account_json_path: str
+    instance_id: str
+    events_table: str = 'events'
+    metrics_table: str = 'metrics'
     reporter_type: ReporterTypes=ReporterTypes.BigTable
 

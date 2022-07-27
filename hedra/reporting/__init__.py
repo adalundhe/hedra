@@ -1,5 +1,7 @@
 from .reporter import (
     Reporter,
+    AWSLambdaConfig,
+    AWSTimestreamConfig,
     BigQueryConfig,
     BigTableConfig,
     CassandraConfig,
@@ -8,7 +10,7 @@ from .reporter import (
     CSVConfig,
     DatadogConfig,
     DogStatsDConfig,
-    GCSConfig,
+    GoogleCloudStorageConfig,
     GraphiteConfig,
     HoneycombConfig,
     InfluxDBConfig,

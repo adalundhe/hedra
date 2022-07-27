@@ -24,9 +24,9 @@ class CosmosDB:
         self.database_name = config.database
         self.events_container_name = config.events_container
         self.metrics_container_name = config.metrics_container
+        self.events_partition_key = config.events_partition_key
+        self.metrics_partition_key = config.metrics_partition_key
         self.analytics_ttl = config.analytics_ttl
-        self.events_partition = config.events_partition or f'/{self.events_container_name}'
-        self.metrics_partition = config.metrics_partition or f'/{self.metrics_container_name}'
 
         self.events_container = None
         self.metrics_container = None
@@ -39,36 +39,34 @@ class CosmosDB:
             credential=self.account_key
         )
 
-        self.database = self.client.get_database_client(self.database_name)
+        self.database = await self.client.create_database_if_not_exists(self.database_name)
 
     async def submit_events(self, events: List[BaseEvent]):
 
         self.events_container = await self.database.create_container_if_not_exists(
-            id=self.events_container_name,
-            partition_key=PartitionKey(self.events_partition),
-            analytical_storage_ttl=self.analytics_ttl
+            self.events_container_name,
+            PartitionKey(f'/{self.events_partition_key}')
         )
 
         for event in events:
             await self.events_container.upsert_item({
-                'id': uuid.uuid4(),
+                'id': str(uuid.uuid4()),
                 **event.record
             })
         
     async def submit_metrics(self, metrics: List[Metric]):
 
         self.metrics_container = await self.database.create_container_if_not_exists(
-            id=self.metrics_container_name,
-            partition_key=PartitionKey(self.metrics_partition),
-            analytical_storage_ttl=self.analytics_ttl
+            self.metrics_container_name,
+            PartitionKey(f'/{self.metrics_partition_key}')
         )
 
         for metric in metrics:
             await self.metrics_container.upsert_item({
-                'id': uuid.uuid4(),
+                'id': str(uuid.uuid4()),
                 **metric.record
             })
 
     async def close(self):
-        pass
+        await self.client.close()
         

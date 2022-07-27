@@ -12,8 +12,8 @@ try:
     has_connector = True
 
 except ImportError:
-    # AIOKafkaProducer = None
-    # KafkaConfig = None
+    AIOKafkaProducer = None
+    KafkaConfig = None
     has_connector = False
 
 

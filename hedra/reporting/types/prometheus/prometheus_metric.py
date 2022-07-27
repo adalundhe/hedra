@@ -10,12 +10,12 @@ try:
     )
 
 except ImportError:
-    # Info = None
-    # Summary = None
-    # Counter = None
-    # Gauge = None
-    # Histogram = None
-    # Enum = None
+    Info = None
+    Summary = None
+    Counter = None
+    Gauge = None
+    Histogram = None
+    Enum = None
     pass
 
 
