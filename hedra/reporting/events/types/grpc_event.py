@@ -1,4 +1,5 @@
 import binascii
+import json
 from hedra.core.engines.types.common.response import Response
 from .http2_event import HTTP2Event
 

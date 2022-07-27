@@ -1,9 +1,22 @@
 import asyncio
+import functools
+from re import S
 from hedra.reporting.events.types.base_event import BaseEvent
 from hedra.reporting.metric import Metric
 
 try:
-    import datadog
+    # Datadog uses aiosonic
+    from aiosonic import HTTPClient, TCPConnector, Timeouts
+    from datadog_api_client import (
+        AsyncApiClient, 
+        Configuration
+    )
+    from datadog_api_client.v2.api.metrics_api import (MetricsApi, MetricPayload)
+    from datadog_api_client.v2.model.metric_series import MetricSeries
+    from datadog_api_client.v2.model.metric_point import MetricPoint
+
+    from datadog_api_client.v1.api.events_api import EventsApi
+    from datadog_api_client.v1.api.events_api import EventCreateRequest
     from .datadog_config import DatadogConfig
     has_connector = True
 
@@ -36,20 +49,37 @@ class Datadog:
             'stdev': 'gauge',
             'minimum': 'gauge',
             'maximum': 'gauge',
-            'quantiles': 'gauge',
             **self.custom_fields
         }
-
-        self._loop = asyncio.get_event_loop()
-
-    async def connect(self):
-        config = {
-            'api_key': self.datadog_api_key,
-            'app_key': self.datadog_app_key
-
+        
+        self._datadog_api_map = {
+            'count': 1,
+            'rate': 2,
+            'gauge': 3
         }
 
-        datadog.initialize(**config)
+        self._config = None
+        self._client = None
+        self.events_api = None
+        self.metrics_api = None
+
+    async def connect(self):
+        self._config = Configuration()
+        self._config.api_key["apiKeyAuth"] = self.datadog_api_key
+        self._config.api_key["appKeyAuth"] = self.datadog_app_key
+
+        self._client = AsyncApiClient(self._config)
+
+        # Datadog's implementation of aiosonic's HTTPClient lacks a lot
+        # of configurability, incuding actually being able to set request timeouts
+        # so we substitute our own implementation.
+
+        tcp_connection = TCPConnector(timeouts=Timeouts(sock_connect=30))
+        self._client.rest_client._client = HTTPClient(tcp_connection)
+
+        self.events_api = EventsApi(self._client)
+        self.metrics_api = MetricsApi(self._client)
+
 
     async def submit_events(self, events: List[BaseEvent]):
 
@@ -59,21 +89,21 @@ class Datadog:
                 f'{tag.name}:{tag.value}' for tag in event.tags
             }
 
-            await self._loop.run_in_executor(
-                None,
-                datadog.api.Event.create,
-                title=event.name,
-                text=event.data_as_string(),
-                alert_type=self.event_alert_type,
-                aggregation_key=event.type,
-                device_name=self.device_name,
-                date_happened=datetime.now().strftime('%Y-%m-%dT%H:%M:%S.Z'),
-                priority=self.priority,
-                tags=tags,
-                host=event.hostname
+            await self.events_api.create_event(
+                EventCreateRequest(
+                    title=event.name,
+                    text=event.serialize(),
+                    alert_type=self.event_alert_type,
+                    aggregation_key=event.type,
+                    device_name=self.device_name,
+                    date_happened=datetime.now().strftime('%Y-%m-%dT%H:%M:%S.Z'),
+                    priority=self.priority,
+                    tags=tags,
+                    host=event.hostname
+                )
             )
 
-    async def submit_metics(self, metrics: List[Metric]):
+    async def submit_metrics(self, metrics: List[Metric]):
 
         for metric in metrics:
 
@@ -81,22 +111,35 @@ class Datadog:
                 f'{tag.name}:{tag.value}' for tag in metric.tags
             ]
 
-            record = metric.record
 
-            for field in self.types_map:
-                value = record.get(field)
+            for field, metric_type in self.types_map.items():
+                value = metric.stats.get(field)
+                datadog_metric_type = self._datadog_api_map.get(metric_type)
 
-                await self._loop.run_in_executor(
-                    None,
-                    datadog.api.Metric.send,
-                    metrics=[{
-                        'metric': f'{metric.name}_{field}',
-                        'points': [value],
-                        'host': metric.source,
-                        'tags': tags,
-                        'type': self.types_map.get(field)
-                    }]
+                series = MetricSeries(
+                    f'{metric.name}_{field}', 
+                    [MetricPoint(
+                        timestamp=int(datetime.now().timestamp()),
+                        value=float(value)
+                    )],
+                    type=datadog_metric_type,
+                    tags=tags
                 )
+                await self.metrics_api.submit_metrics(MetricPayload([series]))
+
+            for quantile_name, quantile_value in metric.quantiles.items():
+                datadog_metric_type = self._datadog_api_map.get('gauge')
+                series = MetricSeries(
+                    f'{metric.name}_{quantile_name}', 
+                    [MetricPoint(
+                        timestamp=int(datetime.now().timestamp()),
+                        value=float(quantile_value)
+                    )],
+                    type=datadog_metric_type,
+                    tags=tags
+                )
+                await self.metrics_api.submit_metrics(MetricPayload([series]))
+
 
     async def close(self):
         pass

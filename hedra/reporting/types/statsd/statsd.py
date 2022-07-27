@@ -43,7 +43,7 @@ class StatsD:
         self._update_map = {
             'count': self.connection.counter,
             'gauge': self.connection.gauge,
-            'increment': self.connection.gauge,
+            'increment': self.connection.increment,
             'sets': self.connection.sets,
             'histogram': lambda: NotImplementedError('StatsD does not support histograms.'),
             'distribution': lambda: NotImplementedError('StatsD does not support distributions.'),

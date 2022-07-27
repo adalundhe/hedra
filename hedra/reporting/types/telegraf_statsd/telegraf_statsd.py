@@ -10,9 +10,9 @@ try:
     has_connector = True
 
 except ImportError:
-    from hedra.reporting.types.empty import Empty as StatsD
-    TelegrafStatsDConfig=None
-    TelegrafStatsdClient = None
+    # from hedra.reporting.types.empty import Empty as StatsD
+    # TelegrafStatsDConfig=None
+    # TelegrafStatsdClient = None
     has_connector = False
 
 
@@ -20,11 +20,24 @@ class TelegrafStatsD(StatsD):
 
     def __init__(self, config: TelegrafStatsDConfig) -> None:
         super().__init__(config)
-
         self.connection = TelegrafStatsdClient(
             host=self.host,
             port=self.port
         )
+
+        self.types_map = {
+            'total': 'increment',
+            'succeeded': 'increment',
+            'failed': 'increment',
+            'median': 'gauge',
+            'mean': 'gauge',
+            'variance': 'gauge',
+            'stdev': 'gauge',
+            'minimum': 'gauge',
+            'maximum': 'gauge',
+            'quantiles': 'gauge',
+            **self.custom_fields
+        }
 
         self._update_map = {
             'count': lambda: NotImplementedError('TelegrafStatsD does not support counts.'),

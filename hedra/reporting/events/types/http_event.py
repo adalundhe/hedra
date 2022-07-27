@@ -1,3 +1,4 @@
+import json
 from hedra.core.engines.types.common.response import Response
 from .base_event import BaseEvent
 
@@ -17,3 +18,33 @@ class HTTPEvent(BaseEvent):
         self.headers = response.headers
         self.data = response.data
         self.name = f'{self.method}_{self.shortname}'
+
+    def serialize(self):
+
+        data = self.data
+        if isinstance(data, (bytes, bytearray)):
+            data = data.decode()
+
+        serializable_headers = {}
+        for key, value in self.headers.items():
+            serializable_headers[key.decode()] = value.decode()
+
+        return json.dumps({
+            'name': self.name,
+            'stage': self.stage,
+            'shortname': self.shortname,
+            'checks': [check.__name__ for check in self.checks],
+            'error': str(self.error),
+            'time': self.time,
+            'type': self.type,
+            'source': self.source,
+            'url': self.url,
+            'ip_addr': self.ip_addr,
+            'method': self.method,
+            'path': self.path,
+            'params': self.params,
+            'hostname': self.hostname,
+            'status': self.status,
+            'headers': serializable_headers,
+            'data': data
+        })

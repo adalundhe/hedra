@@ -19,6 +19,8 @@ except ImportError:
 class NewRelic:
 
     def __init__(self, config: NewRelicConfig) -> None:
+        self.config_path = config.config_path
+        self.environment = config.environment
         self.registration_timeout = config.registration_timeout
         self.shutdown_timeout = config.shutdown_timeout or 60
         self.newrelic_application_name = config.newrelic_application_name
@@ -26,6 +28,15 @@ class NewRelic:
         self._loop = asyncio.get_event_loop()
 
     async def connect(self):
+        await self._loop.run_in_executor(
+            None,
+            functools.partial(
+                newrelic.agent.initialize,
+                config_file=self.config_path,
+                environment=self.environment
+            )
+        )
+
         self.client = await self._loop.run_in_executor(
             None,
             functools.partial(
@@ -35,6 +46,8 @@ class NewRelic:
             )
         )
 
+        await asyncio.sleep(1)
+
     async def submit_events(self, events: List[BaseEvent]):
         for event in events:
             await self._loop.run_in_executor(
@@ -42,23 +55,20 @@ class NewRelic:
                 functools.partial(
                     self.client.record_custom_event,
                     event.name,
-                    event.record,
-                    self.newrelic_application_name
+                    event.record
                 )
             )
 
     async def submit_metrics(self, metrics: List[Metric]):
 
         for metric in metrics:
-            record = metric.record
-            del record['name']
             
-            for field, value in record.items():
+            for field, value in metric.stats.items():
                 await self._loop.run_in_executor(
                     None,
                     functools.partial(
                         self.client.record_custom_metric,
-                        field,
+                        f'{metric.name}_{field}',
                         value
                     )
                 )
@@ -66,6 +76,5 @@ class NewRelic:
     async def close(self):
         await self._loop.run_in_executor(
             None,
-            self.client.shutdown,
-            self.shutdown_timeout
+            self.client.shutdown
         )

@@ -1,11 +1,11 @@
 from typing import Dict
-
+from pydantic import BaseModel
 from hedra.reporting.types.common.types import ReporterTypes
 
 
-class DatadogConfig:
-    api_key: str=None
-    app_key: str=None
+class DatadogConfig(BaseModel):
+    api_key: str
+    app_key: str
     event_alert_type: str='info'
     device_name: str='hedra'
     priority: str='normal'

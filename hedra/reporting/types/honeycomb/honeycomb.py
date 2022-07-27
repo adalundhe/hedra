@@ -55,14 +55,17 @@ class Honeycomb:
     async def submit_metrics(self, metrics: List[Metric]):
 
         for metric in metrics:
-
-            Honeycomb_event = libhoney.Event(data={
-                **metric.record
+            
+            named_metric = {
+                f'{metric.name}_{field}': value for field, value in metric.stats.items()
+            }
+            honeycomb_event = libhoney.Event(data={
+                **named_metric
             })
 
             await self._loop.run_in_executor(
                 None,
-                Honeycomb_event.send
+                honeycomb_event.send
             )
 
         await self._loop.run_in_executor(

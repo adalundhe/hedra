@@ -18,12 +18,29 @@ except ImportError:
 class DogStatsD(StatsD):
 
     def __init__(self, config: DogStatsDConfig) -> None:
-        super().__init__(config)
+        super(DogStatsD, self).__init__(config)
+    
+        self.host = config.host
+        self.port = config.port
 
         self.connection = DogStatsdClient(
             host=self.host,
             port=self.port
         )
+
+        self.types_map = {
+            'total': 'increment',
+            'succeeded': 'increment',
+            'failed': 'increment',
+            'median': 'gauge',
+            'mean': 'gauge',
+            'variance': 'gauge',
+            'stdev': 'gauge',
+            'minimum': 'gauge',
+            'maximum': 'gauge',
+            'quantiles': 'gauge',
+            **self.custom_fields
+        }
 
         self._update_map = {
             'count': lambda: NotImplementedError('DogStatsD does not support counts.'),
