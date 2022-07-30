@@ -1,6 +1,6 @@
 from typing import Any, List
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric
+from hedra.reporting.metric import MetricsGroup
 
 try:
     from influxdb_client import Point
@@ -25,6 +25,7 @@ class InfluxDB:
         self.connect_timeout = config.connect_timeout
         self.events_bucket = config.events_bucket
         self.metrics_bucket = config.metrics_bucket
+        self.errors_bucket = f'{self.metrics_bucket}_errors'
         self.events_database = None
         self.metrics_database = None
 
@@ -66,22 +67,45 @@ class InfluxDB:
             record=points
         )
 
-    async def submit_metrics(self, metrics: List[Metric]):
+    async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         points = []
-        for metric in metrics:
-            point = Point(metric.name)
+        for metrics_group in metrics:
+            
+            for timings_group_name, timings_group in metrics_group.groups.items():
+                point = Point(metrics_group.name)
 
-            for tag in metric.tags:
-                point.tag(tag.name, tag.value)
+                for tag in metrics_group.tags:
+                    point.tag(tag.name, tag.value)
 
-            for field, value in metric.stats.items():
-                point.field(field, value)
+                metric_record = {
+                    **timings_group.stats, 
+                    **timings_group.custom,
+                    'timings_group': timings_group_name
+                }
+
+                for field, value in metric_record.items():
+                    point.field(field, value)
+
+        await self.write_api.write(
+            bucket=self.metrics_bucket,
+            record=points
+        )
+
+    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+        points = []
+        for metrics_group in metrics_groups:
+            for error in metrics_group.errors:
+                point = Point(metrics_group.name)
+                point.field(
+                    error.get('message'),
+                    error.get('count')
+                )
 
             points.append(point)
 
         await self.write_api.write(
-            bucket=self.metrics_bucket,
+            bucket=self.errors_bucket,
             record=points
         )
 

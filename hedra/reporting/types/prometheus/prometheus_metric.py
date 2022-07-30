@@ -121,6 +121,8 @@ class PrometheusMetric:
         if labels is None:
             labels = {label: '' for label in self.label_names}
 
+            self.prometheus_object.labels(**labels)
+
         self.generators.get(self.type)(value, labels, options)
 
     def _update_info(self, value, labels, options) -> None:

@@ -6,7 +6,7 @@ from typing import List
 
 import psutil
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric
+from hedra.reporting.metric import MetricsGroup
 from concurrent.futures import ThreadPoolExecutor
 
 try:
@@ -33,6 +33,7 @@ class Cloudwatch:
         self.submit_timeout = config.submit_timeout
         self.events_rule_name = config.events_rule
         self.metrics_rule_name = config.metrics_rule
+        self.errors_rule_name = f'{self.metrics_rule_name}_errors'
 
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self.events_rule = None
@@ -76,17 +77,21 @@ class Cloudwatch:
             timeout=self.submit_timeout
         )
 
-    async def submit_metrics(self, metrics: List[Metric]):
+    async def submit_metrics(self, metrics: List[MetricsGroup]):
 
-        cloudwatch_metrics = [
-            {
+        cloudwatch_metrics = []
+        for metrics_group in metrics:
+            for timings_group_name, timings_group in metrics_group.groups.items():
+                cloudwatch_metrics.append({
                 'Time': datetime.datetime.now(),
-                'Detail': json.dumps(metric.record),
+                'Detail': json.dumps({
+                    **timings_group.record,
+                    'timings_group': timings_group_name
+                }),
                 'DetailType': self.metrics_rule_name,
                 'Resources': self.aws_resource_arns,
                 'Source': self.metrics_rule_name
-            } for metric in metrics
-        ]
+            })
 
         await asyncio.wait_for(
             self._loop.run_in_executor(
@@ -94,6 +99,29 @@ class Cloudwatch:
                 functools.partial(
                     self.client.put_events,
                     Entries=cloudwatch_metrics
+                )
+            ),
+            timeout=self.submit_timeout
+        )
+
+    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+        cloudwatch_errors = []
+        for metrics_group in metrics_groups:
+            for error in metrics_group.errors:
+                cloudwatch_errors.append({
+                    'Time': datetime.datetime.now(),
+                    'Detail': json.dumps(error),
+                    'DetailType': self.errors_rule_name,
+                    'Resources': self.aws_resource_arns,
+                    'Source': self.errors_rule_name
+                })
+
+        await asyncio.wait_for(
+            self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.put_events,
+                    Entries=cloudwatch_errors
                 )
             ),
             timeout=self.submit_timeout

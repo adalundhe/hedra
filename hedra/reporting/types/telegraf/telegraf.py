@@ -1,7 +1,8 @@
 
+import re
 from typing import List
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric
+from hedra.reporting.metric import MetricsGroup
 
 
 try:
@@ -38,8 +39,25 @@ class Telegraf(StatsD):
             else:
                 self.connection.send_telegraf(event.name, {'failed': 1})
 
-    async def submit_metrics(self, metrics: List[Metric]):
+    async def submit_metrics(self, metrics: List[MetricsGroup]):
 
-        for metric in metrics:
-            for metric_field, metric_value in metric.stats.items():
-                self.connection.send_telegraf(f'{metric.name}_{metric_field}', {metric_field: metric_value})
+        for metrics_group in metrics:
+
+            for timings_group_name, timings_group in metrics_group.groups.items():
+                self.connection.send_telegraf(
+                    f'{metrics_group.name}_{timings_group_name}', 
+                    timings_group.record
+                )
+
+    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+
+        for metrics_group in metrics_groups:
+
+            for error in metrics_group.errors:
+                self.connection.send_telegraf(
+                    f'{metrics_group.name}_errors', {
+                        'metric_name': metrics_group.name,
+                        'metric_stage': metrics_group.stage,
+                        'error_message': error.get('message'),
+                        'error_count': error.get('count')
+                    })

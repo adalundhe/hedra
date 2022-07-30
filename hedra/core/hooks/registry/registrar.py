@@ -40,7 +40,29 @@ class Registrar:
                 
                 return wrapped_method
 
-        elif hook_type in [HookType.BEFORE, HookType.AFTER, HookType.CHECK]:
+        elif hook_type in [HookType.METRIC]:
+
+            def wrap_hook(reporter_field: Any=None):
+                def wrapped_method(func):
+
+                    hook_name = func.__qualname__
+                    hook_shortname = func.__name__
+
+
+                    self.all[hook_name] = Hook(
+                        hook_name, 
+                        hook_shortname,
+                        func, 
+                        hook_type=hook_type,
+                        metadata=Metadata(),
+                        reporter_field=reporter_field
+                    )
+
+                    return func
+                
+                return wrapped_method
+
+        elif hook_type in [HookType.BEFORE, HookType.AFTER, HookType.CHECK, HookType.VALIDATE]:
             
             def wrap_hook(*names):
                 def wrapped_method(func):

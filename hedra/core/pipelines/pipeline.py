@@ -109,6 +109,8 @@ class Pipeline:
                     )) for transition in transition_group
                 ])
 
+        print('DONE!')
+
     def _append_stage(self, stage_type: StageTypes):
 
         appended_stage = self.stage_types.get(stage_type)

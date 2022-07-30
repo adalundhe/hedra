@@ -5,9 +5,10 @@ import psutil
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric
+from hedra.reporting.metric import MetricsGroup
 from .aws_timestream_config import AWSTimestreamConfig
 from .aws_timestream_record import AWSTimestreamRecord
+from .aws_timestream_error_record import AWSTimestreamErrorRecord
 
 try:
 
@@ -15,9 +16,6 @@ try:
     has_connector = True
 except ImportError:
     has_connector = False
-
-
-
 
 
 class AWSTimestream:
@@ -101,7 +99,7 @@ class AWSTimestream:
             )
         )
 
-    async def submit_metrics(self, metrics: List[Metric]):
+    async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         try:
             await self._loop.run_in_executor(
@@ -119,18 +117,24 @@ class AWSTimestream:
 
         records = []
 
-        for metric in metrics:
-            for field, value in metric.stats.items():
-                timestream_record = AWSTimestreamRecord(
-                    'metric',
-                    metric.name,
-                    field,
-                    value,
-                    self.session_uuid
-                )
+        for metrics_group in metrics:
 
-                records.append(timestream_record.to_dict())
+            for timings_group_name, timings_group in metrics_group.groups.items():
+            
+                metric_result = {**timings_group.stats, **timings_group.custom}
 
+                for field, value in metric_result.items():
+                    timestream_record = AWSTimestreamRecord(
+                        'metric',
+                        metrics_group.name,
+                        metrics_group.stage,
+                        timings_group_name,
+                        field,
+                        value,
+                        self.session_uuid,
+                    )
+
+                    records.append(timestream_record.to_dict())
         await self._loop.run_in_executor(
             self._executor,
             functools.partial(
@@ -141,6 +145,51 @@ class AWSTimestream:
                 CommonAttributes={}
             )
         )
+        
+    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+
+        try:
+
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.create_table,
+                    DatabaseName=self.database_name,
+                    TableName=f'{self.metrics_table_name}_errors',
+                    RetentionProperties=self.retention_options
+                )
+            )
+
+
+        except Exception:
+            pass
+
+        error_records = []
+
+        for metrics_group in metrics_groups:
+            for error in metrics_group.errors:
+                timestream_record = AWSTimestreamErrorRecord(
+                    'metric',
+                    metrics_group.name,
+                    metrics_group.stage,
+                    error.get('message'),
+                    error.get('count'),
+                    self.session_uuid
+                )
+
+                error_records.append(timestream_record.to_dict())
+
+        await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                self.client.write_records,
+                DatabaseName=self.database_name,
+                TableName=f'{self.metrics_table_name}_errors',
+                Records=error_records,
+                CommonAttributes={}
+            )
+        )
+
 
     async def close(self):
         pass

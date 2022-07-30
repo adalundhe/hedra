@@ -1,19 +1,20 @@
-from typing import Any, Dict, List, Union
-from hedra.reporting.tags import Tag
+from typing import Any, Dict, Union
 
 
-class Metric:
+class TimingsGroup:
 
     def __init__(
         self,
         name: str,
         source: str,
         stage: str, 
-        data: Dict[str, Union[int, float, str, bool]], 
-        tags: Dict[str, str]
+        group_name: str,
+        data: Dict[str, Union[int, float, str, bool]],
+        common: Dict[str, int]
     ) -> None:
         self.name = name
         self.stage = stage
+        self.group_name = group_name
         self.data = []
 
         self.fields = [
@@ -25,17 +26,16 @@ class Metric:
             stage
         ]
 
-        self._additional_fields = ["quantiles", "errors", "custom_fields"]
+        self._additional_fields = ["quantiles", "errors", "custom_metrics"]
         self.source = source
         self._raw_data = data
-        self.tags = [
-            Tag(tag_name, tag_value) for tag_name, tag_value in tags.items()
-        ]
+        self._common = common
 
         flattened_data = dict({
             field: value for field, value in data.items() if field not in self._additional_fields
         })
-  
+
+    
         for metric_name, metric_value in flattened_data.items():
             self.data.append((
                 metric_name,
@@ -53,9 +53,23 @@ class Metric:
 
             self.fields.append(quantile)
             self.values.append(quantile_value)
+            
 
-        self.errors: List[Dict[str, Union[str, int]]] = data.get('errors')
-        self.custom_fields: Dict[str, Dict[str, Union[int, float, Any]]] = None
+        self.unique = list(self.data)
+        self.unique_fields = list(self.fields)
+        self.unique_values = list(self.values)
+
+        for common_name, common_value in common.items():
+            self.data.append((
+                common_name,
+                common_value
+            ))
+
+            self.fields.append(common_name)
+            self.values.append(common_value)
+
+
+        self.custom_fields: Dict[str, Dict[str, Union[int, float, Any]]] = data.get('custom_metrics')
 
     @property
     def custom(self):

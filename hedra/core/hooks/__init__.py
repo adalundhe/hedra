@@ -6,7 +6,9 @@ from .types import (
     before,
     after,
     depends,
-    check
+    check,
+    metric,
+    validate
 )
 
 from .config import Config

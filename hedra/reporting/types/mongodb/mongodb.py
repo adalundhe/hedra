@@ -1,6 +1,6 @@
 from typing import List
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric
+from hedra.reporting.metric import MetricsGroup
 
 
 try:
@@ -43,10 +43,21 @@ class MongoDB:
             [event.record for event in events]
         )
 
-    async def submit_metrics(self, metrics: List[Metric]):
+    async def submit_metrics(self, metrics: List[MetricsGroup]):
         await self.database[self.metrics_collection].insert_many(
-            [metric.record for metric in metrics]
+            [{
+                'name': metrics_group.name,
+                'stage': metrics_group.stage,
+                'errors': metrics_group.errors,
+                **metrics_group.common_stats,
+                'timings': {
+                    timings_group_name: timings_group.record for timings_group_name, timings_group in metrics_group.groups.items()
+                }
+            } for metrics_group in metrics]
         )
+
+    async def submit_errors(self, metrics: List[MetricsGroup]):
+        pass
 
     async def close(self):
         pass

@@ -1,6 +1,6 @@
 from typing import List
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric
+from hedra.reporting.metric import MetricsGroup
 
 
 try:
@@ -33,6 +33,7 @@ class SQLite:
         self._connection = None
         self._events_table = None
         self._metrics_table = None
+        self._errors_table = None
 
     async def connect(self):
         self._engine = create_async_engine(self.path)
@@ -56,15 +57,16 @@ class SQLite:
 
                     
                     await connection.execute(CreateTable(events_table, if_not_exists=True))
+                    self._events_table = events_table
             
-                await connection.execute(self._events_table.insert().values(**event.record))
+                await connection.execute(self._events_table.insert(values=event.record))
             
             await connection.commit()
 
-    async def submit_metrics(self, metrics: List[Metric]):
+    async def submit_metrics(self, metrics: List[MetricsGroup]):
         async with self._engine.begin() as connection:
 
-            for metric in metrics:
+            for metrics_group in metrics:
 
                 if self._metrics_table is None:
 
@@ -74,6 +76,7 @@ class SQLite:
                         sqlalchemy.Column('id', sqlalchemy.INTEGER, primary_key=True),
                         sqlalchemy.Column('name', sqlalchemy.TEXT),
                         sqlalchemy.Column('stage', sqlalchemy.TEXT),
+                        sqlalchemy.Column('timings_group', sqlalchemy.TEXT),
                         sqlalchemy.Column('total', sqlalchemy.INTEGER),
                         sqlalchemy.Column('succeeded', sqlalchemy.INTEGER),
                         sqlalchemy.Column('failed', sqlalchemy.INTEGER),
@@ -85,19 +88,56 @@ class SQLite:
                         sqlalchemy.Column('maximum', sqlalchemy.REAL)
                     )
 
-                    for quantile in metric.quantiles:
+                    for quantile in metrics_group.quantiles:
                         metrics_table.append_column(
                             sqlalchemy.Column(f'{quantile}', sqlalchemy.REAL)
                         )
 
-                    for custom_field_name, sql_alchemy_type in self.custom_fields:
-                        metrics_table.append_column(custom_field_name, sql_alchemy_type)    
-
+                    for custom_field_name, sql_alchemy_type in metrics_group.custom_schemas:
+                        metrics_table.append_column(custom_field_name, sql_alchemy_type)   
+                    
                     await connection.execute(CreateTable(metrics_table, if_not_exists=True))
-
                     self._metrics_table = metrics_table
 
-                await connection.execute(self._metrics_table.insert().values(**metric.record))
+                for timings_group_name, timings_group in metrics_group.groups.items():
+                    await connection.execute(self._metrics_table.insert(values={
+                        **timings_group.record,
+                        'timings_group': timings_group_name
+                    }))
+
+
+
+    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+
+        async with self._engine.begin() as connection:
+            for metrics_group in metrics_groups:
+
+                if self._errors_table is None:
+
+                    metrics_errors_table = sqlalchemy.Table(
+                        f'{self.metrics_table_name}_errors',
+                        self.metadata,
+                        sqlalchemy.Column('id', sqlalchemy.INTEGER, primary_key=True),
+                        sqlalchemy.Column('metric_name', sqlalchemy.TEXT),
+                        sqlalchemy.Column('metrics_stage', sqlalchemy.TEXT),
+                        sqlalchemy.Column('error_message', sqlalchemy.TEXT),
+                        sqlalchemy.Column('error_count', sqlalchemy.INTEGER)
+                    ) 
+
+                    await connection.execute(CreateTable(metrics_errors_table, if_not_exists=True))
+
+                    self._errors_table = metrics_errors_table
+
+                for error in metrics_group.errors:
+                    await connection.execute(
+                        self._errors_table.insert(values={
+                            'metric_name': metrics_group.name,
+                            'metric_stage': metrics_group.stage,
+                            'error_message': error.get('message'),
+                            'error_count': error.get('count')
+                        })
+                    )
+
 
             await connection.commit()
 

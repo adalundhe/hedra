@@ -38,6 +38,7 @@ class MercuryHTTPClient:
         self.responses = []
         self.context = Context()
         self.ssl_context = get_default_ssl_context()
+        self._loop = asyncio.get_event_loop()
 
         self.pool.create_pool()
     
@@ -99,7 +100,7 @@ class MercuryHTTPClient:
    
         response = Response(request)
 
-
+        response.wait_start = self._loop.time()
         async with self.sem:
             connection = self.pool.connections.pop()
             
@@ -108,7 +109,7 @@ class MercuryHTTPClient:
                     request = await request.hooks.before(request)
                     request.setup_http_request()
 
-                start = time.time()
+                response.start = self._loop.time()
 
                 await connection.make_connection(
                     request.url.hostname,
@@ -119,6 +120,8 @@ class MercuryHTTPClient:
                     ssl=request.ssl_context
                 )
 
+                response.connect_end = self._loop.time()
+
                 connection.write(request.headers.encoded_headers)
                 
                 if request.payload.has_data:
@@ -128,22 +131,13 @@ class MercuryHTTPClient:
                     else:
                         connection.write(request.payload.encoded_data)
 
-                chunk = await connection.readuntil()
+                response.write_end = self._loop.time()
+
+                chunk = await connection._connection._reader.readline_fast()
 
                 response.response_code = chunk
 
-                headers = {}
-                while True:
-                    res_data = await connection.readuntil()
-                    if b":" not in res_data:
-                        break
-
-                    decoded = res_data.strip()
-                    pair = decoded.split(b":", 1)
-        
-                    key, value = pair
-
-                    headers[key.lower()] = value.strip()
+                headers = await connection.read_headers()
 
                 content_length = headers.get(b'content-length')
                 transfer_encoding = headers.get(b'transfer-encoding')
@@ -176,9 +170,9 @@ class MercuryHTTPClient:
 
                     all_chunks_read = True
 
+                response.read_end = self._loop.time()
                 response.headers = headers
                 response.body = body
-                response.time = time.time() - start
                 
                 self.pool.connections.append(connection)
 

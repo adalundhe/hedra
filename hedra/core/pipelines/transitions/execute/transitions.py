@@ -7,7 +7,10 @@ from hedra.core.pipelines.stages.types.stage_types import StageTypes
 async def execute_transition(current_stage: Stage, next_stage: Stage):
     results = await current_stage.run()
 
-    current_stage.context.results[current_stage.name] = results
+    current_stage.context.results[current_stage.name] = {
+        'results': results,
+        'total_elapsed': current_stage.persona.total_elapsed
+    }
     current_stage.context.results_stages.append(current_stage)
     current_stage.context.visited.append(current_stage.name)
     

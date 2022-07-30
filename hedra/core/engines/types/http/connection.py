@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 from ssl import SSLContext
+import traceback
 from typing import Optional, Tuple, Union
 from hedra.core.engines.types.common.connection_factory import (
     ConnectionFactory, 
@@ -50,20 +51,23 @@ class Connection:
     def empty(self):
         return not self._connection._reader._buffer
 
-    async def read(self):
-        return await self._connection.read()
+    def read(self):
+        return self._connection.read()
 
-    async def readexactly(self, n_bytes: int):
-        return await self._connection._reader.read(n_bytes)
+    def readexactly(self, n_bytes: int):
+        return self._connection.read(n_bytes)
 
-    async def readuntil(self, sep=b'\n'):
-        return await self._connection._reader.readuntil(separator=sep)
+    def readuntil(self, sep=b'\n'):
+        return self._connection.readuntil(sep=sep)
 
     def write(self, data):
         self._connection.send(data)
 
     def reset_buffer(self):
         self._connection._reader._buffer = bytearray()
+
+    def read_headers(self):
+        return self._connection.read_headers()
 
     async def close(self):
         try:

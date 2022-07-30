@@ -324,14 +324,6 @@ class FastReader:
             if not waiter.cancelled():
                 waiter.set_exception(exc)
 
-    def _wakeup_waiter(self):
-        """Wakeup read*() functions waiting for data or EOF."""
-        waiter = self._waiter
-        if waiter is not None:
-            self._waiter = None
-            if not waiter.cancelled():
-                waiter.set_result(None)
-
     def set_transport(self, transport):
         # assert self._transport is None, 'Transport already set'
         self._transport = transport
@@ -343,7 +335,12 @@ class FastReader:
 
     def feed_eof(self):
         self._eof = True
-        self._wakeup_waiter()
+
+        waiter = self._waiter
+        if waiter is not None:
+            self._waiter = None
+            if not waiter.cancelled():
+                waiter.set_result(None)
 
     def at_eof(self):
         """Return True if the buffer is empty and 'feed_eof' was called."""
@@ -356,7 +353,12 @@ class FastReader:
             return
 
         self._buffer.extend(data)
-        self._wakeup_waiter()
+        
+        waiter = self._waiter
+        if waiter is not None:
+            self._waiter = None
+            if not waiter.cancelled():
+                waiter.set_result(None)
 
         if self._transport and self._paused == False and len(self._buffer) > 2 * self._limit:
             try:
@@ -408,6 +410,35 @@ class FastReader:
         self._maybe_resume_transport()
         return data
 
+    async def readline_fast(self, sep=b'\n'):
+        seplen = len(sep)
+        if self._exception is not None:
+            raise self._exception
+        
+        if not self._buffer:
+
+            if self._paused:
+                self._paused = False
+                self._transport.resume_reading()
+
+            self._waiter = self._loop.create_future()
+            try:
+                await self._waiter
+            finally:
+                self._waiter = None
+
+        isep = self._buffer.find(sep)
+        if isep < 0:
+            chunk = bytes(self._buffer)
+            self._buffer.clear()
+            return chunk
+
+
+        chunk = self._buffer[:isep + seplen]
+        del self._buffer[:isep + seplen]
+        self._maybe_resume_transport()
+        return bytes(chunk)
+
     async def readuntil(self, separator=b'\n'):
         """Read data from the stream until ``separator`` is found.
         On success, the data and separator will be removed from the
@@ -425,8 +456,6 @@ class FastReader:
         will be left in the internal buffer, so it can be read again.
         """
         seplen = len(separator)
-        if seplen == 0:
-            raise ValueError('Separator should be at least one-byte string')
 
         if self._exception is not None:
             raise self._exception
@@ -484,7 +513,8 @@ class FastReader:
                 raise Exception('Connection closed.')
 
             # _wait_for_data() will resume reading if stream was paused.
-            await self._wait_for_data('readuntil')
+            if not self._buffer:
+                await self._wait_for_data('readuntil')
 
         if isep > self._limit:
             raise LimitOverrunError(
@@ -494,6 +524,62 @@ class FastReader:
         del self._buffer[:isep + seplen]
         self._maybe_resume_transport()
         return bytes(chunk)
+
+    async def read_headers(self, separator=b'\n'):
+        """Read data from the stream until ``separator`` is found.
+        On success, the data and separator will be removed from the
+        internal buffer (consumed). Returned data will include the
+        separator at the end.
+        Configured stream limit is used to check result. Limit sets the
+        maximal length of data that can be returned, not counting the
+        separator.
+        If an EOF occurs and the complete separator is still not found,
+        an IncompleteReadError exception will be raised, and the internal
+        buffer will be reset.  The IncompleteReadError.partial attribute
+        may contain the separator partially.
+        If the data cannot be read because of over limit, a
+        LimitOverrunError exception  will be raised, and the data
+        will be left in the internal buffer, so it can be read again.
+        """
+        headers = {}
+        seplen = len(separator)
+
+        while True:
+
+            if self._exception is not None:
+                raise self._exception
+            
+            if not self._buffer:
+
+                if self._paused:
+                    self._paused = False
+                    self._transport.resume_reading()
+
+                self._waiter = self._loop.create_future()
+                try:
+                    await self._waiter
+                finally:
+                    self._waiter = None
+
+            isep = self._buffer.find(separator)
+            if isep < 0:
+                chunk = bytes(self._buffer)
+                self._buffer.clear()
+
+            else:
+                chunk = bytes(self._buffer[:isep + seplen])
+                del self._buffer[:isep + seplen]
+                self._maybe_resume_transport()
+
+            if b':' not in chunk:
+                break
+            
+            decoded = chunk.strip().split(b':',1)
+
+            key, value = decoded
+            headers[bytes(key).lower()] = value.strip()
+            
+        return headers
 
     async def __aiter__(self):
         line = await self.readuntil()

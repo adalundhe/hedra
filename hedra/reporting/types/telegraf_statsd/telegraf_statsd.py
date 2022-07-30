@@ -35,8 +35,7 @@ class TelegrafStatsD(StatsD):
             'stdev': 'gauge',
             'minimum': 'gauge',
             'maximum': 'gauge',
-            'quantiles': 'gauge',
-            **self.custom_fields
+            'quantiles': 'gauge'
         }
 
         self._update_map = {

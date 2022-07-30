@@ -6,7 +6,7 @@ from typing import List
 
 import psutil
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric
+from hedra.reporting.metric import MetricsGroup
 from concurrent.futures import ThreadPoolExecutor
 
 try:
@@ -29,6 +29,7 @@ class S3:
         self.buckets_namespace = config.buckets_namespace
         self.events_bucket_name = config.events_bucket
         self.metrics_bucket_name = config.metrics_bucket
+        self.errors_bucket_name = f'{self.metrics_bucket_name}-errors'
 
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self.client = None
@@ -78,7 +79,7 @@ class S3:
                 )
             )
     
-    async def submit_metrics(self, metrics: List[Metric]):
+    async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         metrics_bucket_name = f'{self.buckets_namespace}-{self.metrics_bucket_name}'
         
@@ -97,17 +98,58 @@ class S3:
         except Exception:
             pass
 
-        for metric in metrics:
-            timestamp = int(datetime.now().timestamp())
+        for metrics_group in metrics:
+            for timings_group_name, timings_group in metrics_group.groups.items():
+                timestamp = int(datetime.now().timestamp())
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self.client.put_object,
+                        Bucket=metrics_bucket_name,
+                        Key=f'{metrics_group.name}-{timestamp}',
+                        Body=json.dumps({
+                            **timings_group.record,
+                            'timings_group': timings_group_name
+                        })
+                    )
+                )
+
+    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+
+        errors_bucket_name = f'{self.buckets_namespace}-{self.errors_bucket_name}'
+
+        try:
             await self._loop.run_in_executor(
                 self._executor,
                 functools.partial(
-                    self.client.put_object,
-                    Bucket=metrics_bucket_name,
-                    Key=f'{metric.name}-{timestamp}',
-                    Body=json.dumps(metric.record)
+                    self.client.create_bucket,
+                    Bucket=errors_bucket_name,
+                    CreateBucketConfiguration={
+                        'LocationConstraint': self.region_name
+                    }
                 )
             )
+
+        except Exception:
+            pass
+
+        for metrics_group in metrics_groups:
+            for error in metrics_group.errors:
+                timestamp = int(datetime.now().timestamp())
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self.client.put_object,
+                        Bucket=errors_bucket_name,
+                        Key=f'{metrics_group.name}-{timestamp}',
+                        Body=json.dumps({
+                            'metrics_name': metrics_group.name,
+                            'metrics_stage': metrics_group.stage,
+                            'error_message': error.get('message'),
+                            'error_count': error.get('count')
+                        })
+                    )
+                )
 
     async def close(self):
         pass

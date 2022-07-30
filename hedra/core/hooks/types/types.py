@@ -8,3 +8,5 @@ class HookType(Enum):
     BEFORE='BEFORE'
     AFTER='AFTER'
     CHECK='CHECK'
+    METRIC='METRIC'
+    VALIDATE='VALIDATE'

@@ -1,4 +1,4 @@
-from typing import Any, Coroutine, Dict, List, Union
+from typing import Any, Coroutine, Dict, List, Optional, Union
 from hedra.core.hooks.types.types import HookType
 
 
@@ -31,7 +31,8 @@ class Hook:
         hook_type=HookType.ACTION,
         names: List[str] = [], 
         metadata: Metadata = Metadata(), 
-        checks: List[Coroutine]=[]
+        checks: List[Coroutine]=[],
+        reporter_field: Optional[Any]=None
     ) -> None:
         self.name = name
         self.shortname = shortname
@@ -42,3 +43,4 @@ class Hook:
         self.checks = checks
         self.session = None
         self.action = None
+        self.reporter_field = reporter_field

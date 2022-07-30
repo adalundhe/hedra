@@ -37,11 +37,15 @@ class Connection:
     def send(self, data: bytes):
         return self._writer.write(data)
 
-    async def read(self, size: int=_DEFAULT_LIMIT):
-        return await self._reader.read(size)
+    def read(self, size: int=_DEFAULT_LIMIT):
+        return self._reader.read(size)
 
-    async def readuntil(self, sep=b'\n'):
-        return await self._reader.readuntil(separator=sep)
+    def readuntil(self, sep=b'\n'):
+        return self._reader.readuntil(separator=sep)
+
+    def read_headers(self):
+        return self._reader.read_headers()
+
 
 class ConnectionFactory:
 
@@ -52,7 +56,7 @@ class ConnectionFactory:
         self._connection = None
 
     async def create(self, hostname=None, socket_config=None, *, limit=_DEFAULT_LIMIT, ssl=None):
-        
+
         family, type_, proto, _, address = socket_config
 
         sock = socket.socket(family=family, type=type_, proto=proto)

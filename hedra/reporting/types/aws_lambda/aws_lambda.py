@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 import psutil
 from .aws_lambda_config import AWSLambdaConfig
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric
+from hedra.reporting.metric import MetricsGroup, timings_group
 
 try:
     import boto3
@@ -52,16 +52,41 @@ class AWSLambda:
                 )
             )
 
-    async def submit_metrics(self, metrics: List[Metric]):
-        for metric in metrics:
-            await self._loop.run_in_executor(
-                self._executor,
-                functools.partial(
-                    self._client.invoke,
-                    FunctionName=self.metrics_lambda_name,
-                    Payload=json.dumps(metric.record)
+    async def submit_metrics(self, metrics: List[MetricsGroup]):
+        for metrics_group in metrics:
+
+            for timings_group_name, timings_group in metrics_group.groups.items():
+                
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self._client.invoke,
+                        FunctionName=self.metrics_lambda_name,
+                        Payload=json.dumps({
+                            'timings_group': timings_group_name,
+                            **timings_group.record,
+                            **timings_group.custom
+                        })
+                    )
                 )
-            )
+
+    async def submit_errors(self, metrics: List[MetricsGroup]):
+        for metrics_group in metrics:
+            for error in metrics_group.errors:
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self._client.invoke,
+                        FunctionName=self.metrics_lambda_name,
+                        Payload=json.dumps({
+                            'name': metrics_group.name,
+                            'stage': metrics_group.stage,
+                            **error
+                        })
+                    )
+                )
+
+            
 
     async def close(self):
         pass

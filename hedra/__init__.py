@@ -6,7 +6,9 @@ from .core.hooks import (
     before,
     after,
     depends,
-    check
+    check,
+    metric,
+    validate
 )
 
 from .core.pipelines import (

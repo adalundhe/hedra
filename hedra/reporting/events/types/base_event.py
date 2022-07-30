@@ -10,7 +10,11 @@ class BaseEvent:
         self.shortname = response.name
         self.checks = response.checks
         self.error = response.error
-        self.time = response.time
+        self.time = response.read_end - response.start
+        self.time_waiting = response.start - response.wait_start
+        self.time_connecting = response.connect_end - response.start
+        self.time_writing = response.write_end - response.connect_end
+        self.time_reading = response.read_end - response.write_end
         self.type = response.type
         self.source = response.hostname
 

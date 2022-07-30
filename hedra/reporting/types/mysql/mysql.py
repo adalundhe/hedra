@@ -1,7 +1,7 @@
 import warnings
 from typing import List
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric
+from hedra.reporting.metric import MetricsGroup
 
 
 try:
@@ -40,6 +40,7 @@ class MySQL:
         self.custom_fields = config.custom_fields
         self._events_table = None
         self._metrics_table = None
+        self._errors_table = None
         self.metadata = sa.MetaData()
         self._engine = None
         self._connection = None
@@ -81,11 +82,11 @@ class MySQL:
                     
             await transaction.commit()
 
-    async def submit_metrics(self, metrics: List[Metric]):
+    async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         async with self._connection.begin() as transaction:
         
-            for metric in metrics:
+            for metrics_group in metrics:
 
                 if self._metrics_table is None:
 
@@ -95,6 +96,7 @@ class MySQL:
                         sa.Column('id', sa.Integer, primary_key=True),
                         sa.Column('name', sa.VARCHAR(255)),
                         sa.Column('stage', sa.VARCHAR(255)),
+                        sa.Column('timings_group', sa.TEXT()),
                         sa.Column('total', sa.BIGINT),
                         sa.Column('succeeded', sa.BIGINT),
                         sa.Column('failed', sa.BIGINT),
@@ -106,22 +108,53 @@ class MySQL:
                         sa.Column('maximum', sa.FLOAT)
                     )
 
-                    for quantile in metric.quantiles:
+                    for quantile in metrics_group.quantiles:
                         metrics_table.append_column(
                             sa.Column(f'{quantile}', sa.FLOAT)
                         )
 
-                    for custom_field_name, sql_alchemy_type in self.custom_fields:
-                        metrics_table.append_column(custom_field_name, sql_alchemy_type)    
+                    for custom_field_name, sql_alchemy_type in metrics_group.custom_schemas:
+                        metrics_table.append_column(custom_field_name, sql_alchemy_type)
 
-                    
+
                     await self._connection.execute(CreateTable(metrics_table, if_not_exists=True))
+                    
 
                     self._metrics_table = metrics_table
 
-                await self._connection.execute(self._metrics_table.insert(values=metric.record))
+                for timings_group_name, timings_group in metrics_group.groups.items():
+                    await self._connection.execute(self._metrics_table.insert(values={
+                        'timings_group': timings_group_name,
+                        **timings_group.record
+                    }))
                     
             await transaction.commit()
+
+    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+
+        async with self._connection.begin() as transaction:
+            for metrics_group in metrics_groups:
+                if self._errors_table is None:
+
+                    errors_table = sa.Table(
+                        f'{self.metrics_table_name}_errors',
+                        self.metadata,
+                        sa.Column('id', sa.Integer, primary_key=True),
+                        sa.Column('metric_name', sa.VARCHAR(255)),
+                        sa.Column('error_message', sa.TEXT),
+                        sa.Column('error_count', sa.Integer)
+                    ) 
+
+                    await self._connection.execute(CreateTable(errors_table, if_not_exists=True))   
+                    self._errors_table = errors_table
+
+                for error in metrics_group.errors:
+                    await self._connection.execute(self._errors_table.insert(values={
+                        'metric_name': metrics_group.name,
+                        'metrics_stage': metrics_group.stage,
+                        'error_messages': error.get('message'),
+                        'error_count': error.get('count')
+                    }))
 
     async def close(self):
         await self._connection.close()

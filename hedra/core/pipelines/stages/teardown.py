@@ -33,6 +33,6 @@ class Teardown(Stage):
         
         await asyncio.gather(*[
             hook.call() for hook in self.hooks.get(
-                HookType.ACTION
+                HookType.TEARDOWN
             )
         ])

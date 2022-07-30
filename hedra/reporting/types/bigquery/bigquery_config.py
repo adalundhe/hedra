@@ -9,7 +9,7 @@ try:
     from google.cloud import bigquery
     has_connector = True
 
-except ImportError:
+except Exception:
     bigquery = SimpleNamespace(SchemaField=None)
     has_connector = False
 

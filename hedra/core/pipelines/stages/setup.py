@@ -1,6 +1,5 @@
 import asyncio
 import psutil
-import functools
 import inspect
 from typing import Dict, List
 from hedra.core.hooks.client.client import Client
@@ -20,11 +19,11 @@ class Setup(Stage):
     persona_type='simple'
     total_time='1m'
     batch_size=1000
-    batch_interval=1
+    batch_interval=0
     batch_gradient=0.1
     cpus=psutil.cpu_count(logical=False)
     no_run_visuals=False
-    connect_timeout=5
+    connect_timeout=10
     request_timeout=60
     reporting_config={}
     options={}
@@ -64,7 +63,7 @@ class Setup(Stage):
             if hook:
                 self.hooks[hook.hook_type].append(hook)
         
-        await asyncio.gather(*[hook.call() for hook in self.hooks.get(HookType.ACTION)])
+        await asyncio.gather(*[hook.call() for hook in self.hooks.get(HookType.SETUP)])
 
         
         for execute_stage_name, execute_stage in self.stages.items():

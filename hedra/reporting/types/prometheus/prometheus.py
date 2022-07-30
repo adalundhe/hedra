@@ -1,10 +1,11 @@
 import asyncio
 import functools
+import re
 from typing import List
 
 from attr import fields
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric
+from hedra.reporting.metric import MetricsGroup
 
 try:
     from prometheus_client.exposition import basic_auth_handler
@@ -33,7 +34,6 @@ class Prometheus:
         self.password = config.password
         self.namespace = config.namespace
         self.job_name = config.job_name
-        self.custom_fields = config.custom_fields
 
         self.registry = None
         self._auth_handler = None
@@ -49,12 +49,12 @@ class Prometheus:
             'variance': 'gauge',
             'stdev': 'gauge',
             'minimum': 'gauge',
-            'maximum': 'gauge',
-            **self.custom_fields
+            'maximum': 'gauge'
         }
 
         self._events = {}
         self._metrics = {}
+        self._errors = {}
         
     async def connect(self) -> None:
         self.registry = CollectorRegistry()
@@ -139,41 +139,91 @@ class Prometheus:
 
             await self._submit_to_pushgateway()
 
-    async def submit_metrics(self, metrics: List[Metric]):
+    async def submit_metrics(self, metrics: List[MetricsGroup]):
 
-        for metric in metrics:
-            
-            record = metric.record
-            if self._metrics.get(metric.name) is None:
+        for metrics_group in metrics:
 
-                for quantile_name in metric.quantiles.keys():
-                    self.types_map[quantile_name] = 'gauge'
+            timings_groups_metrics = self._metrics.get(metrics_group.name)
+            if timings_groups_metrics is None:
+                timings_groups_metrics = {}
 
-                fields = {}
+                for timings_group_name, timings_group in metrics_group.groups.items():
+                    timings_group_metrics = timings_groups_metrics.get(timings_group_name)
 
-                for metric_field in metric.stats:
-                    metric_type = self.types_map.get(metric_field)
-                    metric_name = f'{metric.name}_{metric_field}'.replace('.', '_')
+                    if timings_group_metrics is None:
 
-                    prometheus_metric = PrometheusMetric(
-                        metric_name,
-                        metric_type,
-                        metric_description=f'{metric.name} {metric_field}',
-                        metric_labels=[],
-                        metric_namespace=self.namespace,
-                        registry=self.registry
-                    )
+                        for quantile_name in metrics_group.quantiles.keys():
+                            self.types_map[quantile_name] = 'gauge'
 
-                    prometheus_metric.create_metric()
+                        fields = {}
 
-                    fields[metric_field] = prometheus_metric
+                        types_map = { **self.types_map, **metrics_group.custom_schemas}
+
+                        for metric_field in metrics_group.stats_fields:
+                            metric_type = types_map.get(metric_field)
+                            metric_name = f'{metrics_group.name}_{metric_field}'.replace('.', '_')
+
+                            tags = [
+                                f'{tag.name}:{tag.value}' for tag in metrics_group.tags
+                            ]
+
+                            prometheus_metric = PrometheusMetric(
+                                metric_name,
+                                metric_type,
+                                metric_description=f'{metrics_group.name} {metric_field}',
+                                metric_labels=tags,
+                                metric_namespace=self.namespace,
+                                registry=self.registry
+                            )
+                            prometheus_metric.create_metric()
+
+                            fields[metric_field] = prometheus_metric
+
+                        timings_groups_metrics[timings_group_name] = fields
+
+                self._metrics[metrics_group.name] = timings_groups_metrics
                 
-                self._metrics[metric.name] = fields
-                
-            for metric_field, metric_value in record.items():
-                if metric_value and metric_field in self.types_map:
-                    self._metrics[metric.name][metric_field].update(metric_value)
 
+            timings_groups_metrics = self._metrics.get(metrics_group.name)
+            for timings_group_name, timings_group in metrics_group.groups.items():
+
+                timings_group_metrics = timings_groups_metrics.get(timings_group_name)
+
+                record = timings_group.record
+                for field in timings_group_metrics[timings_group_name]:
+                    metric_value = record.get(field)
+                    field_metric = timings_group_metrics.get(field)
+                    field_metric.update(metric_value)
+        
+        await self._submit_to_pushgateway()
+    
+    async def submit_events(self, metrics_groups: List[MetricsGroup]):
+
+        for metrics_group in metrics_groups:
+
+            if self._errors.get(metrics_group.name) is None:
+                errors_metric = PrometheusMetric(
+                    f'{metrics_group.name}_errors',
+                    'count',
+                    metric_description=f'Errors for action - {metrics_group.name}.',
+                    metric_labels=[],
+                    metric_namespace=self.namespace,
+                    registry=self.registry
+                )
+
+                errors_metric.create_metric()
+
+                self._errors[metrics_group.name] = errors_metric
+
+            for error in metrics_group.errors:
+                
+                errors_metric.update(
+                    error.get('count'),
+                    labels={
+                        'message': error.get('message')
+                    }
+                )
+                
         await self._submit_to_pushgateway()
 
     async def close(self):

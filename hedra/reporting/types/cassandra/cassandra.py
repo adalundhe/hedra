@@ -1,9 +1,12 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import functools
 import os
 from typing import List
+
+import psutil
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric
+from hedra.reporting.metric import MetricsGroup
 
 
 try:
@@ -45,7 +48,9 @@ class Cassandra:
 
 
         self._metrics_table = None
+        self._errors_table = None
         self._events_table = None
+        self._executor =ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._loop = asyncio.get_event_loop()
 
     async def connect(self):
@@ -88,7 +93,7 @@ class Cassandra:
             os.environ['CQLENG_ALLOW_SCHEMA_MANAGEMENT'] = '1'
 
         await self._loop.run_in_executor(
-            None,
+            self._executor,
             functools.partial(
                 connection.setup,
                 self.hosts, 
@@ -122,7 +127,7 @@ class Cassandra:
             )
 
             await self._loop.run_in_executor(
-                None,
+                self._executor,
                 functools.partial(
                     sync_table,
                     self._events_table,
@@ -133,65 +138,115 @@ class Cassandra:
         for event in events:
             
             await self._loop.run_in_executor(
-                None,
+                self._executor,
                 functools.partial(
                     self._metrics_table.create,
                     **event.record
                 )
             )
 
-    async def submit_metrics(self, metrics: List[Metric]):
+    async def submit_metrics(self, metrics: List[MetricsGroup]):
+
+        for metrics_group in metrics:
        
-        if self._metrics_table is None:
-            
-            fields = {
-                'id': columns.UUID(primary_key=True, default=uuid.uuid4),
-                'name': columns.Text(min_length=1, index=True),
-                'stage': columns.Text(min_length=1),
-                'total': columns.Integer(),
-                'succeeded': columns.Integer(),
-                'failed': columns.Integer(),
-                'median': columns.Float(),
-                'mean': columns.Float(),
-                'variance': columns.Float(),
-                'stdev': columns.Float(),
-                'minimum': columns.Float(),
-                'maximum': columns.Float(),
-                'created_at': columns.DateTime(default=datetime.now)
-            }
-
-            quantiles = metrics[0].quantiles
-            for quantile_name in quantiles.keys():
-                fields[quantile_name] = columns.Float()
-            
-            for custom_field_name, custom_field_type in self.custom_fields.items():
-                fields[custom_field_name] = custom_field_type
+            if self._metrics_table is None:
+                
+                fields = {
+                    'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+                    'name': columns.Text(min_length=1, index=True),
+                    'stage': columns.Text(min_length=1),
+                    'timings_group': columns.Text(),
+                    'total': columns.Integer(),
+                    'succeeded': columns.Integer(),
+                    'failed': columns.Integer(),
+                    'median': columns.Float(),
+                    'mean': columns.Float(),
+                    'variance': columns.Float(),
+                    'stdev': columns.Float(),
+                    'minimum': columns.Float(),
+                    'maximum': columns.Float(),
+                    'created_at': columns.DateTime(default=datetime.now)
+                }
 
 
-            self._metrics_table = type(
-                self._metrics_table_name.capitalize(), 
-                (Model, ), 
-                fields
-            )
+                for quantile_name in metrics_group.quantiles:
+                    fields[quantile_name] = columns.Float()
+                
+                for custom_field_name, custom_field_type in metrics_group.custom_schemas:
+                    fields[custom_field_name] = custom_field_type
 
-            await self._loop.run_in_executor(
-                None,
-                functools.partial(
-                    sync_table,
-                    self._metrics_table,
-                    keyspaces=[self.keyspace]
+
+                self._metrics_table = type(
+                    self._metrics_table_name.capitalize(), 
+                    (Model, ), 
+                    fields
                 )
-            )
-  
-        for metric in metrics:
-            
-            await self._loop.run_in_executor(
-                None,
-                functools.partial(
-                    self._metrics_table.create,
-                    **metric.record
+
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        sync_table,
+                        self._metrics_table,
+                        keyspaces=[self.keyspace]
+                    )
                 )
-            )
+
+            for timings_group_name, timings_group in metrics_group.groups.items():
+                
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self._metrics_table.create,
+                        **{
+                            **timings_group.record,
+                            'timings_group': timings_group_name
+                        }
+                    )
+                )
+
+                
+
+    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+
+        for metrics_group in metrics_groups:
+
+            if self._errors_table is None:
+                errors_table_fields = {
+                    'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+                    'metric_name': columns.Text(min_length=1, index=True),
+                    'metric_stage': columns.Text(min_length=1),
+                    'error_message': columns.Text(min_length=1),
+                    'error_count': columns.Integer()
+                }
+
+                self._errors_table = type(
+                    f'{self._metrics_error_table}_errors'.capitalize()
+                    (Model, ),
+                    errors_table_fields
+                )
+
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        sync_table,
+                        self._errors_table,
+                        keyspaces=[self.keyspace]
+                    )
+                )
+
+            for error in metrics_group.errors:
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self._errors_table.create,
+                        {
+                            'metric_name': metrics_group.name,
+                            'metric_stage': metrics_group.stage,
+                            'error_message': error.get('message'),
+                            'error_count': error.get('count')
+                        }
+                    )
+                )
  
     async def close(self):
         await self._loop.run_in_executor(

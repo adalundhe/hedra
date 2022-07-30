@@ -1,7 +1,9 @@
 import uuid
 from typing import Any, List
+
+from matplotlib.pyplot import get
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric
+from hedra.reporting.metric import MetricsGroup, timings_group
 
 
 try:
@@ -24,12 +26,15 @@ class CosmosDB:
         self.database_name = config.database
         self.events_container_name = config.events_container
         self.metrics_container_name = config.metrics_container
+        self.errors_container_name = f'{self.metrics_container_name}_errors'
         self.events_partition_key = config.events_partition_key
         self.metrics_partition_key = config.metrics_partition_key
+        self.errors_partition_key = f'{self.metrics_partition_key}_errors'
         self.analytics_ttl = config.analytics_ttl
 
         self.events_container = None
         self.metrics_container = None
+        self.errors_container = None
         self.client = None
         self.database = None
 
@@ -54,18 +59,36 @@ class CosmosDB:
                 **event.record
             })
         
-    async def submit_metrics(self, metrics: List[Metric]):
+    async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         self.metrics_container = await self.database.create_container_if_not_exists(
             self.metrics_container_name,
             PartitionKey(f'/{self.metrics_partition_key}')
         )
 
-        for metric in metrics:
-            await self.metrics_container.upsert_item({
-                'id': str(uuid.uuid4()),
-                **metric.record
-            })
+        for metrics_group in metrics:
+            for timings_group_name, timings_group in metrics_group.groups.items():
+                await self.metrics_container.upsert_item({
+                    'id': str(uuid.uuid4()),
+                    'timings_group': timings_group_name,
+                    **timings_group.record
+                })
+
+    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+        self.errors_container = await self.database.create_container_if_not_exists(
+            self.errors_container_name,
+            PartitionKey(f'/{self.errors_partition_key}')
+        )
+
+        for metrics_group in metrics_groups:
+            for error in metrics_group.errors:
+                await self.metrics_container.upsert_item({
+                    'id': str(uuid.uuid4()),
+                    'metric_name': metrics_group.name,
+                    'metrics_stage': metrics_group.stage,
+                    'error_message': error.get('message'),
+                    'error_count': error.get('count')
+                })
 
     async def close(self):
         await self.client.close()

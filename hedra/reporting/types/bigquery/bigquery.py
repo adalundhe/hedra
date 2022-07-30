@@ -5,14 +5,14 @@ from typing import List
 
 import psutil
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric
+from hedra.reporting.metric import MetricsGroup, timings_group
 
 try:
     from google.cloud import bigquery
     from .bigquery_config import BigQueryConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     bigquery = None
     BigQueryConfig = None
     has_connector = False
@@ -34,6 +34,7 @@ class BigQuery:
         self.credentials = None
         self.client = None
         self._events_table = None
+        self._errors_table = None
         self._metrics_table = None
 
         self._loop = asyncio.get_event_loop()
@@ -53,7 +54,8 @@ class BigQuery:
                     bigquery.SchemaField('name', 'STRING', mode='REQUIRED'),
                     bigquery.SchemaField('stage', 'STRING', mode='REQUIRED'),
                     bigquery.SchemaField('time', 'FLOAT', mode='REQUIRED'),
-                    bigquery.SchemaField('succeeded', 'BOOLEAN', mode='REQUIRED')
+                    bigquery.SchemaField('succeeded', 'BOOLEAN', mode='REQUIRED'),
+                    bigquery.SchemaField('error', 'STRING')
                 ])
 
             table_reference = bigquery.TableReference(
@@ -93,70 +95,135 @@ class BigQuery:
             )
         )
 
-    async def submit_metrics(self, metrics: List[Metric]):
-        metric = metrics[0]
-        if self._metrics_table is None:
+    async def submit_metrics(self, metrics: List[MetricsGroup]):
+        for metrics_group in metrics:
 
-            table_schema = [
-                bigquery.SchemaField('name', 'STRING', mode='REQUIRED'),
-                bigquery.SchemaField('stage', 'STRING', mode='REQUIRED'),
-                bigquery.SchemaField('total', 'INTEGER', mode='REQUIRED'),
-                bigquery.SchemaField('succeeded', 'INTEGER', mode='REQUIRED'),
-                bigquery.SchemaField('failed', 'INTEGER', mode='REQUIRED'),
-                bigquery.SchemaField('median', 'FLOAT', mode='REQUIRED'),
-                bigquery.SchemaField('mean', 'FLOAT', mode='REQUIRED'),
-                bigquery.SchemaField('variance', 'FLOAT', mode='REQUIRED'),
-                bigquery.SchemaField('stdev','FLOAT', mode='REQUIRED'),
-                bigquery.SchemaField('minimum', 'FLOAT', mode='REQUIRED'),
-                bigquery.SchemaField('maximum', 'FLOAT', mode='REQUIRED')
-            ]
+            if self._metrics_table is None:
 
-            for quantile in metric.quantiles:
-                table_schema.append(
-                    bigquery.SchemaField(f'{quantile}', 'FLOAT')
+                table_schema = [
+                    bigquery.SchemaField('name', 'STRING', mode='REQUIRED'),
+                    bigquery.SchemaField('stage', 'STRING', mode='REQUIRED'),
+                    bigquery.SchemaField('timings_group', 'STRING', mode='REQUIRED'),
+                    bigquery.SchemaField('total', 'INTEGER', mode='REQUIRED'),
+                    bigquery.SchemaField('succeeded', 'INTEGER', mode='REQUIRED'),
+                    bigquery.SchemaField('failed', 'INTEGER', mode='REQUIRED'),
+                    bigquery.SchemaField('median', 'FLOAT', mode='REQUIRED'),
+                    bigquery.SchemaField('mean', 'FLOAT', mode='REQUIRED'),
+                    bigquery.SchemaField('variance', 'FLOAT', mode='REQUIRED'),
+                    bigquery.SchemaField('stdev','FLOAT', mode='REQUIRED'),
+                    bigquery.SchemaField('minimum', 'FLOAT', mode='REQUIRED'),
+                    bigquery.SchemaField('maximum', 'FLOAT', mode='REQUIRED')
+                ]
+
+                for quantile in metrics_group.quantiles:
+                    table_schema.append(
+                        bigquery.SchemaField(f'{quantile}', 'FLOAT')
+                    )
+
+                for custom_field_name, bigquery_schema_field in metrics_group.custom_schemas.items():
+                    table_schema.append(
+                        custom_field_name, 
+                        bigquery_schema_field
+                    ) 
+
+                table_reference = bigquery.TableReference(
+                    bigquery.DatasetReference(
+                        self.project_name,
+                        self.dataset_name
+                    ),
+                    self.metrics_table_name
                 )
 
-            for custom_field_name, bigquery_schema_field in self.custom_fields:
-                table_schema.append(
-                    custom_field_name, 
-                    bigquery_schema_field
-                ) 
+                metrics_table = bigquery.Table(
+                    table_reference,
+                    schema=table_schema
+                )
 
-            table_reference = bigquery.TableReference(
-                bigquery.DatasetReference(
-                    self.project_name,
-                    self.dataset_name
-                ),
-                self.metrics_table_name
-            )
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self.client.create_table,
+                        metrics_table,
+                        exists_ok=True
+                    )
+                )
 
-            self._metrics_table = bigquery.Table(
-                table_reference,
-                schema=table_schema
-            )
+                self._metrics_table = metrics_table
+            
+            for timing_group_name, timing_group in metrics_group.groups.items():
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self.client.insert_rows_json,
+                        self._metrics_table,
+                        {
+                            'timings_group': timing_group_name,
+                            **timing_group.record
+                        },
+                        retry=bigquery.DEFAULT_RETRY.with_predicate(
+                            lambda exc: exc is not None
+                        ).with_deadline(
+                            self.retry_timeout
+                        )
+                    )
+                )
+
+    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+
+        for metrics_group in metrics_groups:
+
+            if self._errors_table is None:
+                table_schema = [
+                    bigquery.SchemaField('metric_name', 'STRING', mode='REQUIRED'),
+                    bigquery.SchemaField('metric_stage', 'STRING', mode='REQUIRED'),
+                    bigquery.SchemaField('error_message', 'STRING', mode='REQUIRED'),
+                    bigquery.SchemaField('error_count', 'INTEGER', mode='REQUIRED'),
+                ]
+
+                table_reference = bigquery.TableReference(
+                    bigquery.DatasetReference(
+                        self.project_name,
+                        self.dataset_name
+                    ),
+                    f'{self.metrics_table_name}_errors'
+                )
+
+                errors_table = bigquery.Table(
+                    table_reference,
+                    schema=table_schema
+                )
+
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self.client.create_table,
+                        errors_table,
+                        exists_ok=True
+                    )
+                )
+
+                self._errors_table = errors_table
 
             await self._loop.run_in_executor(
                 self._executor,
                 functools.partial(
-                    self.client.create_table,
-                    self._metrics_table,
-                    exists_ok=True
+                    self.client.insert_rows_json,
+                    self._errors_table,
+                    [
+                        {
+                            'metric_name': metrics_group.name,
+                            'metric_stage': metrics_group.stage,
+                            'error_message': error.get('message'),
+                            'error_count': error.get('count')
+                        } for error in metrics_group.errors
+                    ],
+                    retry=bigquery.DEFAULT_RETRY.with_predicate(
+                        lambda exc: exc is not None
+                    ).with_deadline(
+                        self.retry_timeout
+                    )
                 )
             )
-
-        await self._loop.run_in_executor(
-            self._executor,
-            functools.partial(
-                self.client.insert_rows_json,
-                table_reference,
-                [metric.record for metric in metrics],
-                retry=bigquery.DEFAULT_RETRY.with_predicate(
-                    lambda exc: exc is not None
-                ).with_deadline(
-                    self.retry_timeout
-                )
-            )
-        )
 
     async def close(self):
         await self._loop.run_in_executor(

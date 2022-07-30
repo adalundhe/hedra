@@ -4,7 +4,7 @@ from typing import Any, List
 
 import psutil
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric
+from hedra.reporting.metric import MetricsGroup
 
 
 try:
@@ -15,7 +15,7 @@ try:
     from .snowflake_config import SnowflakeConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     snowflake = None
     SnowflakeConfig = None
     has_connector = False
@@ -33,6 +33,7 @@ class Snowflake:
         self.schema = config.database_schema
         self.events_table_name = config.events_table
         self.metrics_table_name = config.metrics_table
+        self.errors_table_name = f'{self.metrics_table_name}_errors'
         self.custom_fields = config.custom_fields
         self.connect_timeout = config.connect_timeout
         
@@ -43,6 +44,7 @@ class Snowflake:
         self._connection = None
         self._events_table = None
         self._metrics_table = None
+        self._errors_table = None
         self._loop = asyncio.get_event_loop()
 
     async def connect(self):
@@ -105,17 +107,19 @@ class Snowflake:
             )
         
 
-    async def submit_metrics(self, metrics: List[Metric]):
+    async def submit_metrics(self, metrics: List[MetricsGroup]):
 
-        for metric in metrics:
+        for metrics_group in metrics:
 
             if self._metrics_table is None:
 
                 metrics_table = sqlalchemy.Table(
                     self.metrics_table_name,
-                    self.metadata,sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
+                    self.metadata,
+                    sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
                     sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
                     sqlalchemy.Column('stage', sqlalchemy.VARCHAR(255)),
+                    sqlalchemy.Column('timings_group', sqlalchemy.VARCHAR(255)),
                     sqlalchemy.Column('total', sqlalchemy.BIGINT),
                     sqlalchemy.Column('succeeded', sqlalchemy.BIGINT),
                     sqlalchemy.Column('failed', sqlalchemy.BIGINT),
@@ -127,14 +131,15 @@ class Snowflake:
                     sqlalchemy.Column('maximum', sqlalchemy.FLOAT)
                 )
 
-                for quantile in metric.quantiles:
+                for quantile in metrics_group.quantiles:
                     metrics_table.append_column(
                         sqlalchemy.Column(f'{quantile}', sqlalchemy.FLOAT)
                     )
 
-                for custom_field_name, sql_alchemy_type in self.custom_fields:
-                    metrics_table.append_column(custom_field_name, sql_alchemy_type)   
+                for custom_field_name, sql_alchemy_type in metrics_group.custom_schemas:
+                    metrics_table.append_column(custom_field_name, sql_alchemy_type)  
 
+                
                 await self._loop.run_in_executor(
                     self._executor,
                     self._connection.execute,
@@ -143,11 +148,50 @@ class Snowflake:
 
                 self._metrics_table = metrics_table
 
+        for timings_group_name, timings_group in metrics_group.groups.items():
             await self._loop.run_in_executor(
                 self._executor,
                 self._connection.execute,
-                self._metrics_table.insert(values=metric.record)
+                self._metrics_table.insert(values={
+                    **timings_group.record,
+                    'timings_group': timings_group_name
+                })
             )
+
+    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+
+        for metrics_group in metrics_groups:
+
+            if self._errors_table is None:
+                errors_table = sqlalchemy.Table(
+                    self.errors_table_name,
+                    self.metadata,
+                    sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
+                    sqlalchemy.Column('metric_name', sqlalchemy.VARCHAR(255)),
+                    sqlalchemy.Column('metrics_stage', sqlalchemy.TEXT),
+                    sqlalchemy.Column('error_message', sqlalchemy.TEXT),
+                    sqlalchemy.Column('error_count', sqlalchemy.BIGINT)
+                )
+
+                await self._loop.run_in_executor(
+                    self._executor,
+                    self._connection.execute,
+                    CreateTable(errors_table, if_not_exists=True)
+                )
+
+                self._errors_table = errors_table
+
+            for error in metrics_group.errors:
+                await self._loop.run_in_executor(
+                    self._executor,
+                    self._connection.execute,
+                    self._errors_table.insert(values={
+                        'metric_name': metrics_group.name,
+                        'metric_stage': metrics_group.stage,
+                        'error_message': error.get('message'),
+                        'error_count': error.get('count')
+                    })
+                )
         
     async def close(self):
         await self._loop.run_in_executor(

@@ -62,6 +62,7 @@ class Headers:
             self.data = {
                 "HOST": hostname,
                 "User-Agent": "mercury-http",
+                'Keep-Alive': "timeout=60, max=10000",
                 **self.data
             }
 

@@ -22,7 +22,13 @@ class BaseResponse:
         self.compressed = None
         self.body = bytearray()
         self.error = None
+
         self.time = 0
+        self.time_connecting = 0
+        self.time_reading = 0
+        self.time_writing = 0
+        self.time_waiting = 0
+
         self.user = None
         self.tags = None
         self.extentions = {}
@@ -78,7 +84,14 @@ class Response:
         self.compressed = None
         self.body = bytearray()
         self.error = error
+
         self.time = 0
+        self.start = 0
+        self.connect_end = 0
+        self.read_end = 0
+        self.write_end = 0
+        self.wait_start = 0
+
         self.user = request.metadata.user
         self.tags = request.metadata.tags
         self.extentions = {}

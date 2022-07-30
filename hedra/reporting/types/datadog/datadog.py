@@ -1,8 +1,10 @@
 import asyncio
 import functools
 from re import S
+import re
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric
+from hedra.reporting.metric import Metric, timings_group
+from hedra.reporting.metric.metrics_group import MetricsGroup
 
 try:
     # Datadog uses aiosonic
@@ -103,43 +105,102 @@ class Datadog:
                 )
             )
 
-    async def submit_metrics(self, metrics: List[Metric]):
+    async def submit_metrics(self, metrics: List[MetricsGroup]):
 
-        for metric in metrics:
+        for metrics_group in metrics:
 
             tags = [
-                f'{tag.name}:{tag.value}' for tag in metric.tags
+                f'{tag.name}:{tag.value}' for tag in metrics_group.tags
             ]
 
+            metrics_series = []
+            for timings_group_name, timings_group in metrics_group.groups.items():
+                for field, metric_type in self.types_map.items():
+                    value = timings_group.stats.get(field)
+                    datadog_metric_type = self._datadog_api_map.get(metric_type)
 
-            for field, metric_type in self.types_map.items():
-                value = metric.stats.get(field)
-                datadog_metric_type = self._datadog_api_map.get(metric_type)
+                    series = MetricSeries(
+                        f'{metrics_group.name}_{field}', 
+                        [MetricPoint(
+                            timestamp=int(datetime.now().timestamp()),
+                            value=float(value)
+                        )],
+                        type=datadog_metric_type,
+                        tags=[
+                            *tags,
+                            f'metric_stage:{metrics_group.stage}',
+                            f'timings_group:{timings_group_name}'
+                        ]
+                    )
+
+                    metrics_series.append(series)
+
+                for quantile_name, quantile_value in timings_group.quantiles.items():
+                    datadog_metric_type = self._datadog_api_map.get('gauge')
+                    series = MetricSeries(
+                        f'{metrics_group.name}_{quantile_name}', 
+                        [MetricPoint(
+                            timestamp=int(datetime.now().timestamp()),
+                            value=float(quantile_value)
+                        )],
+                        type=datadog_metric_type,
+                        tags=[
+                            *tags,
+                            f'metric_stage:{metrics_group.stage}',
+                            f'timings_group:{timings_group_name}'
+                        ]
+                    )
+
+                    metrics_series.append(series)
+     
+                for custom_field_name, value in timings_group.custom.items():
+                    datadog_metric_type = timings_group.custom_schemas.get(custom_field_name)
+                    datadog_type = self._datadog_api_map.get(datadog_metric_type)
+
+                    series = MetricSeries(
+                        f'{metrics_group.name}_{custom_field_name}', 
+                        [MetricPoint(
+                            timestamp=int(datetime.now().timestamp()),
+                            value=float(value)
+                        )],
+                        type=datadog_type,
+                        tags=[
+                            *tags,
+                            f'metric_stage:{metrics_group.stage}',
+                            f'timings_group:{timings_group_name}'
+                        ]
+                    )
+
+                    metrics_series.append(series)
+            
+            await self.metrics_api.submit_metrics(MetricPayload(metrics_series))
+
+    async def submit_events(self, metrics_groups: List[MetricsGroup]):
+
+        for metrics_group in metrics_groups:
+            error_series = [] 
+
+            for error in metrics_group.errors:
+                
+            
+                error_message = error.get('error_message')
 
                 series = MetricSeries(
-                    f'{metric.name}_{field}', 
+                    f'{metrics_group.name}_errors',
                     [MetricPoint(
                         timestamp=int(datetime.now().timestamp()),
-                        value=float(value)
+                        value=float(error.get('count'))
                     )],
-                    type=datadog_metric_type,
-                    tags=tags
+                    type=self._datadog_api_map.get('count'),
+                    tags=[
+                        f'metric_stage:{metrics_group.stage}',
+                        f'error_message:{error_message}'
+                    ]
                 )
-                await self.metrics_api.submit_metrics(MetricPayload([series]))
+               
+                error_series.append(series)
 
-            for quantile_name, quantile_value in metric.quantiles.items():
-                datadog_metric_type = self._datadog_api_map.get('gauge')
-                series = MetricSeries(
-                    f'{metric.name}_{quantile_name}', 
-                    [MetricPoint(
-                        timestamp=int(datetime.now().timestamp()),
-                        value=float(quantile_value)
-                    )],
-                    type=datadog_metric_type,
-                    tags=tags
-                )
-                await self.metrics_api.submit_metrics(MetricPayload([series]))
-
+            await self.metrics_api.submit_metrics(MetricPayload(error_series))
 
     async def close(self):
         pass

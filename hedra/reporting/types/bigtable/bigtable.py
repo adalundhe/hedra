@@ -6,7 +6,7 @@ from typing import List
 
 import psutil
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric
+from hedra.reporting.metric import MetricsGroup, timings_group
 
 try:
     from google.cloud import bigtable
@@ -14,7 +14,7 @@ try:
     from .bigtable_config import BigTableConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     bigtable = None
     Credentials = None
     BigTableConfig = None
@@ -30,13 +30,17 @@ class BigTable:
         self.metrics_table_id = config.metrics_table
 
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
+        self._events_column_family_id = f'{self.events_table_id}_columns'
+        self._metrics_column_family_id = f'{self.metrics_table_id}_columns'
+        self._errors_table_id = f'{self.metrics_table_id}_errors'
+
         self.instance = None
         self._events_table = None
         self._metrics_table = None
+        self._errors_table = None
         self._events_table_columns = None
         self._metrics_table_columns = None
-        self._events_column_family_id = f'{self.events_table_id}_columns'
-        self._metrics_column_family_id = f'{self.metrics_table_id}_columns'
+        self._errors_table_columns = None
         self.credentials = None
         self.client = None
         self._loop = asyncio.get_event_loop()
@@ -98,53 +102,122 @@ class BigTable:
             rows
         )
     
-    async def submit_metrics(self, metrics: List[Metric]):
-        self._metrics_table = self.instance.table(self.metrics_table_id)
-        
-        try:
-            await self._loop.run_in_executor(
-                self._executor,
-                self._metrics_table.create
-            )
+    async def submit_metrics(self, metrics: List[MetricsGroup]):
 
-        except Exception:
-            pass
-
-        self._metrics_table_columns = self._metrics_table.column_family(
-            self._metrics_column_family_id
-        )
-
-        try:
-            await self._loop.run_in_executor(
-                self._executor,
-                self._metrics_table_columns.create
-            )
-        except Exception:
-            pass
-
-        rows = []
-        for metric in metrics:
-            row_key = f'{metric.name}_{str(uuid.uuid4())}'
-            row = self._metrics_table.direct_row(row_key)
-
-            for field, value in metric.record.items():
-                if not isinstance(value, bytes):
-                    value = f'{value}'.encode()
-
-                row.set_cell(
-                    self._metrics_column_family_id,
-                    field,
-                    value,
-                    timestamp=datetime.now()
+        for metrics_group in metrics:
+            metrics_table = self.instance.table(self.metrics_table_id)
+            
+            try:
+                await self._loop.run_in_executor(
+                    self._executor,
+                    metrics_table.create
                 )
 
-            rows.append(row)
+            except Exception:
+                pass
 
-        await self._loop.run_in_executor(
-            self._executor,
-            self._metrics_table.mutate_rows,
-            rows
-        )
+            self._metrics_table_columns = metrics_table.column_family(
+                self._metrics_column_family_id
+            )
+
+            rows = []
+            try:
+                await self._loop.run_in_executor(
+                    self._executor,
+                    self._metrics_table_columns.create
+                )
+            except Exception:
+                pass
+
+
+            for timings_group_name, timings_group in metrics_group.groups.items():
+
+                
+                row_key = f'{self.metrics_table_id}_{str(uuid.uuid4())}'
+                row = metrics_table.direct_row(row_key)
+
+                timings_record = {
+                    'timings_group': timings_group_name,
+                    **timings_group.record
+                }
+
+                for field, value in timings_record.items():
+                    if not isinstance(value, bytes):
+                        value = f'{value}'.encode()
+
+                    row.set_cell(
+                        self._metrics_column_family_id,
+                        field,
+                        value,
+                        timestamp=datetime.now()
+                    )
+
+                    
+
+                    rows.append(row)
+
+            await self._loop.run_in_executor(
+                self._executor,
+                metrics_table.mutate_rows,
+                rows
+            )
+
+    async def sumbmit_errors(self, metrics_groups: List[MetricsGroup]):
+        
+        for metrics_group in metrics_groups:
+            errors_table = self.instance.table(self._errors_table_id)
+            
+            try:
+                await self._loop.run_in_executor(
+                    self._executor,
+                    errors_table.create
+                )
+
+            except Exception:
+                pass
+
+            self._errors_table = errors_table
+
+            self._errors_table_columns = errors_table.column_family(
+                self._metrics_column_family_id
+            )
+
+            try:
+                await self._loop.run_in_executor(
+                    self._executor,
+                    self._metrics_table_columns.create
+                )
+            except Exception:
+                pass
+
+            rows = []
+            for error in metrics_group.errors:
+
+                row_key = f'{self._errors_table_id}_{str(uuid.uuid4())}'
+                errors_row = errors_table.direct_row(row_key)
+
+                error_message = error.get('message')
+                error_count = error.get('count')
+
+                errors_row.set_cell(
+                    self._metrics_column_family_id,
+                    'error_type',
+                    f'{error_message}'.encode()
+                )
+
+                errors_row.set_cell(
+                    self._metrics_column_family_id,
+                    'error_count',
+                    f'{error_count}'.encode()
+                )
+
+                rows.append(errors_row)
+                
+            await self._loop.run_in_executor(
+                self._executor,
+                errors_table.mutate_rows,
+                rows
+            )
 
     async def close(self):
         await self._loop.run_in_executor(
