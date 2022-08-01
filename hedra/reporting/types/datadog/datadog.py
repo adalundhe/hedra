@@ -2,8 +2,10 @@ import asyncio
 import functools
 from re import S
 import re
+
+from numpy import float32, float64, int16, int32, int64
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric.metrics_group import MetricsGroup
+from hedra.reporting.metric.metrics_set import MetricsSet
 
 try:
     # Datadog uses aiosonic
@@ -44,6 +46,7 @@ class Datadog:
             'total': 'count',
             'succeeded': 'count',
             'failed': 'count',
+            'actions_per_second': 'gauge',
             'median': 'gauge',
             'mean': 'gauge',
             'variance': 'gauge',
@@ -104,28 +107,34 @@ class Datadog:
                 )
             )
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
 
         metrics_series = []
-        for metrics_group in metrics_groups:
+        for metrics_set in metrics_sets:
             tags = [
-                f'{tag.name}:{tag.value}' for tag in metrics_group.tags
+                f'{tag.name}:{tag.value}' for tag in metrics_set.tags
             ]
 
-            for field, value in metrics_group.common_stats.items():
+            for field, value in metrics_set.common_stats.items():
                 metric_type = self.types_map.get(field)
                 datadog_metric_type = self._datadog_api_map.get(metric_type)
 
+                if isinstance(value, (int, int16, int32, int64)):
+                    value = int(value)
+
+                elif isinstance(value, (float, float32, float64)):
+                    value = float(value)
+
                 series = MetricSeries(
-                    f'{metrics_group.name}_{field}', 
+                    f'{metrics_set.name}_{field}', 
                     [MetricPoint(
                         timestamp=int(datetime.now().timestamp()),
-                        value=float(value)
+                        value=value
                     )],
                     type=datadog_metric_type,
                     tags=[
                         *tags,
-                        f'metric_stage:{metrics_group.stage}',
+                        f'metric_stage:{metrics_set.stage}',
                         f'group:common'
                     ]
                 )
@@ -134,22 +143,22 @@ class Datadog:
                 
         await self.metrics_api.submit_metrics(MetricPayload(metrics_series))        
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
-        for metrics_group in metrics:
+        for metrics_set in metrics:
 
             tags = [
-                f'{tag.name}:{tag.value}' for tag in metrics_group.tags
+                f'{tag.name}:{tag.value}' for tag in metrics_set.tags
             ]
 
             metrics_series = []
-            for group_name, group in metrics_group.groups.items():
+            for group_name, group in metrics_set.groups.items():
                 for field, value in group.stats.items():
                     metric_type = self.types_map.get(field)
                     datadog_metric_type = self._datadog_api_map.get(metric_type)
 
                     series = MetricSeries(
-                        f'{metrics_group.name}_{field}', 
+                        f'{metrics_set.name}_{field}', 
                         [MetricPoint(
                             timestamp=int(datetime.now().timestamp()),
                             value=float(value)
@@ -157,7 +166,7 @@ class Datadog:
                         type=datadog_metric_type,
                         tags=[
                             *tags,
-                            f'metric_stage:{metrics_group.stage}',
+                            f'metric_stage:{metrics_set.stage}',
                             f'group:{group_name}'
                         ]
                     )
@@ -167,7 +176,7 @@ class Datadog:
                 for quantile_name, quantile_value in group.quantiles.items():
                     datadog_metric_type = self._datadog_api_map.get('gauge')
                     series = MetricSeries(
-                        f'{metrics_group.name}_{quantile_name}', 
+                        f'{metrics_set.name}_{quantile_name}', 
                         [MetricPoint(
                             timestamp=int(datetime.now().timestamp()),
                             value=float(quantile_value)
@@ -175,7 +184,7 @@ class Datadog:
                         type=datadog_metric_type,
                         tags=[
                             *tags,
-                            f'metric_stage:{metrics_group.stage}',
+                            f'metric_stage:{metrics_set.stage}',
                             f'group:{group_name}'
                         ]
                     )
@@ -186,16 +195,22 @@ class Datadog:
                     datadog_metric_type = group.custom_schemas.get(custom_field_name)
                     datadog_type = self._datadog_api_map.get(datadog_metric_type)
 
+                    if isinstance(value, (int, int16, int32, int64)):
+                        value = int(value)
+
+                    elif isinstance(value, (float, float32, float64)):
+                        value = float(value)
+
                     series = MetricSeries(
-                        f'{metrics_group.name}_{custom_field_name}', 
+                        f'{metrics_set.name}_{custom_field_name}', 
                         [MetricPoint(
                             timestamp=int(datetime.now().timestamp()),
-                            value=float(value)
+                            value=value
                         )],
                         type=datadog_type,
                         tags=[
                             *tags,
-                            f'metric_stage:{metrics_group.stage}',
+                            f'metric_stage:{metrics_set.stage}',
                             f'group:{group_name}'
                         ]
                     )
@@ -204,32 +219,76 @@ class Datadog:
             
             await self.metrics_api.submit_metrics(MetricPayload(metrics_series))
 
-    async def submit_events(self, metrics_groups: List[MetricsGroup]):
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
-        for metrics_group in metrics_groups:
-            error_series = [] 
+        metrics_series = []
+        for metrics_set in metrics_sets:
 
-            for error in metrics_group.errors:
+            tags = [
+                f'{tag.name}:{tag.value}' for tag in metrics_set.tags
+            ]
+
+            for custom_group_name, group in metrics_set.custom_metrics.items():
+                for field, value in group.items():
+                    
+                    metric_type = None
+                    if isinstance(value, (int, int16, int32, int64)):
+                        value = int(value)
+                        metric_type = 'count'
+
+                    elif isinstance(value, (float, float32, float64)):
+                        value = float(value)
+                        metric_type = 'gauge'
+
+                    series = MetricSeries(
+                        f'{metrics_set.name}_{custom_group_name}_{field}',
+                        [MetricPoint(
+                            timestamp=int(datetime.now().timestamp()),
+                            value=value
+                        )],
+                        type=metric_type,
+                        tags=[
+                            *tags,
+                            f'metric_stage:{metrics_set.stage}',
+                            f'group:{custom_group_name}'
+                        ]
+                    )
+
+                    metrics_series.append(series)
+
+        await self.metrics_api.submit_metrics(MetricPayload(metrics_series))
+
+    async def submit_events(self, metrics_sets: List[MetricsSet]):
+
+        error_series = [] 
+        for metrics_set in metrics_sets:
+
+            tags = [
+                f'{tag.name}:{tag.value}' for tag in metrics_set.tags
+            ]
+
+            for error in metrics_set.errors:
                 
             
                 error_message = error.get('error_message')
 
                 series = MetricSeries(
-                    f'{metrics_group.name}_errors',
+                    f'{metrics_set.name}_errors',
                     [MetricPoint(
                         timestamp=int(datetime.now().timestamp()),
-                        value=float(error.get('count'))
+                        value=int(error.get('count'))
                     )],
                     type=self._datadog_api_map.get('count'),
                     tags=[
-                        f'metric_stage:{metrics_group.stage}',
+                        *tags,
+                        f'metric_stage:{metrics_set.stage}',
                         f'error_message:{error_message}'
                     ]
                 )
                
                 error_series.append(series)
 
-            await self.metrics_api.submit_metrics(MetricPayload(error_series))
+        await self.metrics_api.submit_metrics(MetricPayload(error_series))
 
     async def close(self):
         pass

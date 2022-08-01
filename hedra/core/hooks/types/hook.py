@@ -32,7 +32,7 @@ class Hook:
         names: List[str] = [], 
         metadata: Metadata = Metadata(), 
         checks: List[Coroutine]=[],
-        reporter_field: Optional[Any]=None
+        group: Optional[str]=None
     ) -> None:
         self.name = name
         self.shortname = shortname
@@ -43,4 +43,4 @@ class Hook:
         self.checks = checks
         self.session = None
         self.action = None
-        self.reporter_field = reporter_field
+        self.group = group

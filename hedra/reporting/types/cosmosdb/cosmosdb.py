@@ -1,9 +1,10 @@
+from os import name
 import uuid
 from typing import Any, List
 
 from matplotlib.pyplot import get
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 
 
 try:
@@ -28,6 +29,7 @@ class CosmosDB:
         self.metrics_container_name = config.metrics_container
         self.group_metrics_container_name = f'{self.metrics_container_name}_group_metrics'
         self.errors_container_name = f'{self.metrics_container_name}_errors'
+        self.custom_metrics_containers = {}
         self.events_partition_key = config.events_partition_key
         self.metrics_partition_key = config.metrics_partition_key
         self.group_metrics_partition_key = f'{self.metrics_partition_key}_group_metrics'
@@ -62,47 +64,69 @@ class CosmosDB:
                 **event.record
             })
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
         self.group_metrics_container = await self.database.create_container_if_not_exists(
             self.group_metrics_container_name,
             PartitionKey(f'/{self.group_metrics_partition_key}')
         )
 
-        for metrics_group in metrics_groups:
+        for metrics_set in metrics_sets:
             await self.group_metrics_container.upsert_item({
                 'id': str(uuid.uuid4()),
-                'name': metrics_group.name,
-                'stage': metrics_group.stage,
-                **metrics_group.common_stats
+                'name': metrics_set.name,
+                'stage': metrics_set.stage,
+                'group': 'common',
+                **metrics_set.common_stats
             })
         
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
         self.metrics_container = await self.database.create_container_if_not_exists(
             self.metrics_container_name,
             PartitionKey(f'/{self.metrics_partition_key}')
         )
 
-        for metrics_group in metrics:
-            for group_name, group in metrics_group.groups.items():
+        for metrics_set in metrics:
+            for group_name, group in metrics_set.groups.items():
                 await self.metrics_container.upsert_item({
                     'id': str(uuid.uuid4()),
                     'group': group_name,
                     **group.record
                 })
 
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
+        for metrics_set in metrics_sets:
+            for custom_group_name, group in metrics_set.custom_metrics.items():
+
+                custom_metrics_container_name = f'{self.metrics_container_name}_{custom_group_name}_metrics'
+
+                custom_container = await self.database.create_container_if_not_exists(
+                    custom_metrics_container_name,
+                    PartitionKey(f'/{self.metrics_partition_key}_{custom_group_name}_metrics')
+                )
+
+                self.custom_metrics_containers[custom_metrics_container_name] = custom_container
+
+                await custom_container.upsert_item({
+                    'id': str(uuid.uuid4()),
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
+                    'group': custom_group_name,
+                    **group
+                })
+
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
         self.errors_container = await self.database.create_container_if_not_exists(
             self.errors_container_name,
             PartitionKey(f'/{self.errors_partition_key}')
         )
 
-        for metrics_group in metrics_groups:
-            for error in metrics_group.errors:
+        for metrics_set in metrics_sets:
+            for error in metrics_set.errors:
                 await self.metrics_container.upsert_item({
                     'id': str(uuid.uuid4()),
-                    'metric_name': metrics_group.name,
-                    'metrics_stage': metrics_group.stage,
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
                     'error_message': error.get('message'),
                     'error_count': error.get('count')
                 })

@@ -6,7 +6,7 @@ from typing import List
 
 import psutil
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 from concurrent.futures import ThreadPoolExecutor
 
 try:
@@ -80,7 +80,7 @@ class S3:
                 )
             )
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
 
         group_metrics_bucket_name = f'{self.buckets_namespace}-{self.group_metrics_bucket_name}'
 
@@ -99,23 +99,23 @@ class S3:
         except Exception:
             pass
         
-        for metrics_group in metrics_groups:
+        for metrics_set in metrics_sets:
             timestamp = int(datetime.now().timestamp())
             await self._loop.run_in_executor(
                 self._executor,
                 functools.partial(
                     self.client.put_object,
                     Bucket=group_metrics_bucket_name,
-                    Key=f'{metrics_group.name}-{timestamp}',
+                    Key=f'{metrics_set.name}-{timestamp}',
                     Body=json.dumps({
-                        'name': metrics_group.name,
-                        'stage': metrics_group.stage,
-                        **metrics_group.common_stats
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        **metrics_set.common_stats
                     })
                 )
             )
     
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
         metrics_bucket_name = f'{self.buckets_namespace}-{self.metrics_bucket_name}'
         
@@ -134,15 +134,15 @@ class S3:
         except Exception:
             pass
 
-        for metrics_group in metrics:
-            for group_name, group in metrics_group.groups.items():
+        for metrics_set in metrics:
+            for group_name, group in metrics_set.groups.items():
                 timestamp = int(datetime.now().timestamp())
                 await self._loop.run_in_executor(
                     self._executor,
                     functools.partial(
                         self.client.put_object,
                         Bucket=metrics_bucket_name,
-                        Key=f'{metrics_group.name}-{timestamp}',
+                        Key=f'{metrics_set.name}-{timestamp}',
                         Body=json.dumps({
                             **group.record,
                             'group': group_name
@@ -150,7 +150,45 @@ class S3:
                     )
                 )
 
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
+
+        for metrics_set in metrics_sets:
+            for custom_group_name, group in metrics_set.custom_metrics.items():
+
+                custom_bucket_name = f'{self.buckets_namespace}-{self.metrics_bucket_name}-{custom_group_name}'
+                
+                try:
+                    await self._loop.run_in_executor(
+                        self._executor,
+                        functools.partial(
+                            self.client.create_bucket,
+                            Bucket=custom_bucket_name,
+                            CreateBucketConfiguration={
+                                'LocationConstraint': self.region_name
+                            }
+                        )
+                    )
+
+                except Exception:
+                    pass
+
+                timestamp = int(datetime.now().timestamp())
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self.client.put_object,
+                        Bucket=custom_bucket_name,
+                        Key=f'{metrics_set.name}-{custom_group_name}-{timestamp}',
+                        Body=json.dumps({
+                            'name': metrics_set.name,
+                            'stage': metrics_set.stage,
+                            'group': custom_group_name,
+                            **group
+                        })
+                    )
+                )
+
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
 
         errors_bucket_name = f'{self.buckets_namespace}-{self.errors_bucket_name}'
 
@@ -169,18 +207,18 @@ class S3:
         except Exception:
             pass
 
-        for metrics_group in metrics_groups:
-            for error in metrics_group.errors:
+        for metrics_set in metrics_sets:
+            for error in metrics_set.errors:
                 timestamp = int(datetime.now().timestamp())
                 await self._loop.run_in_executor(
                     self._executor,
                     functools.partial(
                         self.client.put_object,
                         Bucket=errors_bucket_name,
-                        Key=f'{metrics_group.name}-{timestamp}',
+                        Key=f'{metrics_set.name}-{timestamp}',
                         Body=json.dumps({
-                            'metrics_name': metrics_group.name,
-                            'metrics_stage': metrics_group.stage,
+                            'metrics_name': metrics_set.name,
+                            'metrics_stage': metrics_set.stage,
                             'error_message': error.get('message'),
                             'error_count': error.get('count')
                         })

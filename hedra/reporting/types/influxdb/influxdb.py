@@ -1,6 +1,7 @@
+from collections import defaultdict
 from typing import Any, List
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 
 try:
     from influxdb_client import Point
@@ -67,38 +68,40 @@ class InfluxDB:
             record=points
         )
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
 
         points = []
-        for metrics_group in metrics_groups:
-            point = Point(f'{metrics_group.name}_group_metrics')
+        for metrics_set in metrics_sets:
+            point = Point(f'{metrics_set.name}_group_metrics')
 
-            for tag in metrics_group.tags:
+            for tag in metrics_set.tags:
                 point.tag(tag.name, tag.value)
 
             metric_record = {
-                'name': metrics_group.name,
-                'stage': metrics_group.stage,
-                **metrics_group.common_stats
+                'name': metrics_set.name,
+                'stage': metrics_set.stage,
+                **metrics_set.common_stats
             }
 
             for field, value in metric_record.items():
                 point.field(field, value)
+
+            points.append(point)
 
         await self.write_api.write(
             bucket=self.metrics_bucket,
             record=points
         )
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
         points = []
-        for metrics_group in metrics:
+        for metrics_set in metrics:
             
-            for group_name, group in metrics_group.groups.items():
-                point = Point(f'{metrics_group.name}_metrics')
+            for group_name, group in metrics_set.groups.items():
+                point = Point(f'{metrics_set.name}_metrics')
 
-                for tag in metrics_group.tags:
+                for tag in metrics_set.tags:
                     point.tag(tag.name, tag.value)
 
                 metric_record = {
@@ -110,16 +113,47 @@ class InfluxDB:
                 for field, value in metric_record.items():
                     point.field(field, value)
 
+                points.append(point)
+
         await self.write_api.write(
             bucket=self.metrics_bucket,
             record=points
         )
 
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
+
+        points = defaultdict(list)
+        for metrics_set in metrics_sets:
+            for custom_group_name, group in metrics_set.custom_metrics.items():
+
+                point = Point(f'{metrics_set.name}_{custom_group_name}_metrics')
+
+                for tag in metrics_set.tags:
+                    point.tag(tag.name, tag.value)
+                
+                metric_record = {
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
+                    'group': custom_group_name,
+                    **group
+                }
+
+                for field, value in metric_record.items():
+                    point.field(field, value)
+
+                points[custom_group_name].append(point)
+
+        for group_name, points in points.items():
+            await self.write_api.write(
+                bucket=f'{self.metrics_bucket}_{group_name}',
+                record=points
+            )
+
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
         points = []
-        for metrics_group in metrics_groups:
-            for error in metrics_group.errors:
-                point = Point(f'{metrics_group.name}_errors')
+        for metrics_set in metrics_sets:
+            for error in metrics_set.errors:
+                point = Point(f'{metrics_set.name}_errors')
                 point.field(
                     error.get('message'),
                     error.get('count')

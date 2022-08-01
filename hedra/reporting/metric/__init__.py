@@ -1,3 +1,2 @@
-from .metric import Metric
+from .metrics_set import MetricsSet
 from .metrics_group import MetricsGroup
-from .timings_group import TimingsGroup

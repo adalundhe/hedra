@@ -1,6 +1,9 @@
 
 from typing import List
+
+from numpy import float32, float64, int16, int32, int64
 from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.metric.metrics_set import MetricsSet
 
 try:
     from hedra.reporting.types.statsd import StatsD
@@ -32,6 +35,7 @@ class DogStatsD(StatsD):
             'total': 'increment',
             'succeeded': 'increment',
             'failed': 'increment',
+            'actions_per_second': 'gauge',
             'median': 'gauge',
             'mean': 'gauge',
             'variance': 'gauge',
@@ -65,3 +69,23 @@ class DogStatsD(StatsD):
             else:
                 failed_update_function = self._update_map.get('increment')
                 failed_update_function(f'{event.name}_failed', 1)
+
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
+
+        for metrics_set in metrics_sets:
+            for custom_group_name, group in metrics_set.custom_metrics.items():
+
+                for field, value in group.items():
+                    
+                    update_type = None
+                    if isinstance(value, (int, int16, int32, int64)):
+                        update_type = 'increment'
+
+                    elif isinstance(value, (float, float32, float64)):
+                        update_type = 'gauge'
+
+                    update_function = self._update_map.get(update_type)
+                    update_function(
+                        f'{metrics_set.name}_{custom_group_name}_{field}',
+                        value
+                    )

@@ -1,7 +1,9 @@
 import warnings
 from typing import List
+
+from numpy import float32, float64, int16, int32, int64
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet, custom_metrics_group
 
 
 try:
@@ -40,10 +42,13 @@ class MySQL:
         self.groups_metrics_table_name = f'{self.metrics_table_name}_groups_metrics'
         self.errors_table_name = f'{self.metrics_table_name}_errors'
         self.custom_fields = config.custom_fields
+
         self._events_table = None
         self._metrics_table = None
         self._groups_metrics_table = None
+        self._custom_metrics_table = {}
         self._errors_table = None
+
         self.metadata = sa.MetaData()
         self._engine = None
         self._connection = None
@@ -85,7 +90,7 @@ class MySQL:
                     
             await transaction.commit()
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
 
         if self._groups_metrics_table is None:
             
@@ -95,9 +100,11 @@ class MySQL:
                 sa.Column('id', sa.Integer, primary_key=True),
                 sa.Column('name', sa.VARCHAR(255)),
                 sa.Column('stage', sa.VARCHAR(255)),
+                sa.Column('group', sa.VARCHAR(255)),
                 sa.Column('total', sa.BIGINT),
                 sa.Column('succeeded', sa.BIGINT),
                 sa.Column('failed', sa.BIGINT),
+                sa.Column('actions_per_second', sa.FLOAT)
             )
 
             await self._connection.execute(CreateTable(group_metrics_table, if_not_exists=True))
@@ -105,20 +112,21 @@ class MySQL:
 
         async with self._connection.begin() as transaction:
 
-            for metrics_group in metrics_groups:
+            for metrics_set in metrics_sets:
                 await self._connection.execute(self._groups_metrics_table.insert(values={
-                        'name': metrics_group.name,
-                        'stage': metrics_group.stage,
-                        **metrics_group.common_stats
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        'group': 'common',
+                        **metrics_set.common_stats
                     }))
 
             await transaction.commit()
                 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
         async with self._connection.begin() as transaction:
         
-            for metrics_group in metrics:
+            for metrics_set in metrics:
 
                 if self._metrics_table is None:
 
@@ -137,19 +145,19 @@ class MySQL:
                         sa.Column('maximum', sa.FLOAT)
                     )
 
-                    for quantile in metrics_group.quantiles:
+                    for quantile in metrics_set.quantiles:
                         metrics_table.append_column(
                             sa.Column(f'{quantile}', sa.FLOAT)
                         )
 
-                    for custom_field_name, sql_alchemy_type in metrics_group.custom_schemas:
+                    for custom_field_name, sql_alchemy_type in metrics_set.custom_schemas:
                         metrics_table.append_column(custom_field_name, sql_alchemy_type)
 
                     await self._connection.execute(CreateTable(metrics_table, if_not_exists=True))
                 
                     self._metrics_table = metrics_table
 
-                for group_name, group in metrics_group.groups.items():
+                for group_name, group in metrics_set.groups.items():
                     await self._connection.execute(self._metrics_table.insert(values={
                         'group': group_name,
                         **group.record
@@ -157,17 +165,64 @@ class MySQL:
                     
             await transaction.commit()
 
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
 
         async with self._connection.begin() as transaction:
-            for metrics_group in metrics_groups:
+            for metrics_set in metrics_sets:
+
+                for custom_group_name, group in metrics_set.custom_metrics.items():
+                    custom_metrics_table_name = f'{self.metrics_table_name}_{custom_group_name}'
+
+                    if self._custom_metrics_table.get(custom_metrics_group) is None:
+                        
+                        custom_metrics_table = sa.Table(
+                            custom_metrics_table_name,
+                            self.metadata,
+                            sa.Column('id', sa.Integer, primary_key=True),
+                            sa.Column('name', sa.VARCHAR(255)),
+                            sa.Column('stage', sa.VARCHAR(255)),
+                            sa.Column('group', sa.VARCHAR(255))
+                        )
+
+                        for field, value in group.items():
+
+                            if isinstance(value, (int, int16, int32, int64)):
+                                custom_metrics_table.append_column(
+                                    sa.Column(field, sa.Integer)
+                                )
+
+                            elif isinstance(value, (float, float32, float64)):
+                                custom_metrics_table.append_column(
+                                    sa.Column(field, sa.Float)
+                                )
+
+                        await self._connection.execute(CreateTable(custom_metrics_table, if_not_exists=True))   
+                        self._custom_metrics_table[custom_metrics_table_name] = custom_metrics_table
+
+                    await self._connection.execute(
+                        self._custom_metrics_table[custom_metrics_table_name].insert(values={
+                            'name': metrics_set.name,
+                            'stage': metrics_set.stage,
+                            'group': custom_group_name,
+                            **group
+                        })
+                    )
+
+            await transaction.commit()
+
+
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
+
+        async with self._connection.begin() as transaction:
+            for metrics_set in metrics_sets:
                 if self._errors_table is None:
 
                     errors_table = sa.Table(
-                        f'{self.metrics_table_name}_errors',
+                        self.errors_table_name,
                         self.metadata,
                         sa.Column('id', sa.Integer, primary_key=True),
-                        sa.Column('metric_name', sa.VARCHAR(255)),
+                        sa.Column('name', sa.VARCHAR(255)),
+                        sa.Column('stage', sa.VARCHAR(255)),
                         sa.Column('error_message', sa.TEXT),
                         sa.Column('error_count', sa.Integer)
                     ) 
@@ -175,13 +230,15 @@ class MySQL:
                     await self._connection.execute(CreateTable(errors_table, if_not_exists=True))   
                     self._errors_table = errors_table
 
-                for error in metrics_group.errors:
+                for error in metrics_set.errors:
                     await self._connection.execute(self._errors_table.insert(values={
-                        'metric_name': metrics_group.name,
-                        'metrics_stage': metrics_group.stage,
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
                         'error_messages': error.get('message'),
                         'error_count': error.get('count')
                     }))
+
+            await transaction.commit()
 
     async def close(self):
         await self._connection.close()

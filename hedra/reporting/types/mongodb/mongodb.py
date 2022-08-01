@@ -1,6 +1,7 @@
+from collections import defaultdict
 from typing import List
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 
 
 try:
@@ -45,37 +46,55 @@ class MongoDB:
             [event.record for event in events]
         )
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
         await self.database[self.group_metrics_collection].insert_many([
             {
-                'name': metrics_group.name,
-                'stage': metrics_group.stage,
-                **metrics_group.common_stats
-            } for metrics_group in metrics_groups
+                'name': metrics_set.name,
+                'stage': metrics_set.stage,
+                'group': 'common',
+                **metrics_set.common_stats
+            } for metrics_set in metrics_sets
         ])
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
-        await self.database[self.metrics_collection].insert_many(
-            [{
-                'name': metrics_group.name,
-                'stage': metrics_group.stage,
-                **metrics_group.common_stats,
-                'timings': {
-                    group_name: group.record for group_name, group in metrics_group.groups.items()
-                }
-            } for metrics_group in metrics]
-        )
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
-    async def submit_errors(self, metrics: List[MetricsGroup]):
+        records = []
+        for metrics_set in metrics:
+            
+            for group_name, group in metrics_set.groups.items():
+                records.append({
+                    'group': group_name,
+                    **group.record
+                })
 
-        for metrics_group in metrics:
+        await self.database[self.metrics_collection].insert_many(records)
+
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
+
+        records = defaultdict(list)
+        for metrics_set in metrics_sets:
+            for custom_group_name, group in metrics_set.custom_metrics.items():
+                records[custom_group_name].append({
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
+                    'group': custom_group_name,
+                    **group
+                })
+
+        for group_name, records in records.items():
+            metrics_collection_name = f'{self.metrics_collection}_{group_name}_metrics'
+            await self.database[metrics_collection_name].insert_many(records)
+
+    async def submit_errors(self, metrics: List[MetricsSet]):
+
+        for metrics_set in metrics:
             await self.database[self.errors_collection].insert_many([
                 {
-                    'name': metrics_group.name,
-                    'stage': metrics_group.stage,
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
                     'error_message': error.get('message'),
                     'error_count': error.get('count')
-                } for error in metrics_group.errors
+                } for error in metrics_set.errors
             ])
 
     async def close(self):

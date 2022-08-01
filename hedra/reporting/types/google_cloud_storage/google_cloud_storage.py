@@ -7,7 +7,7 @@ from typing import List
 import psutil
 from hedra.reporting import metric
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 
 try:
 
@@ -36,6 +36,7 @@ class GoogleCloudStorage:
         self.group_metrics_bucket = None
         self.metrics_bucket = None
         self.errors_bucket = None
+        self._custom_metrics_buckets = {}
 
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._loop = asyncio.get_event_loop()
@@ -74,7 +75,7 @@ class GoogleCloudStorage:
                 json.dumps(event.record)
             )
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
 
         try:
 
@@ -92,25 +93,26 @@ class GoogleCloudStorage:
                 f'{self.bucket_namespace}_{self.group_metrics_bucket_name}'
             )
 
-        for metrics_group in metrics_groups:
+        for metrics_set in metrics_sets:
 
             blob = await self._loop.run_in_executor(
                 self._executor,
                 self.metrics_bucket.blob,
-                metrics_group.name
+                metrics_set.name
             )
 
             await self._loop.run_in_executor(
                 self._executor,
                 blob.upload_from_string,
                 json.dumps({
-                    'name': metrics_group.name,
-                    'stage': metrics_group.stage,
-                    **metrics_group.common_stats
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
+                    'group': 'common',
+                    **metrics_set.common_stats
                 })
             )
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
         try:
 
@@ -128,13 +130,13 @@ class GoogleCloudStorage:
                 f'{self.bucket_namespace}_{self.metrics_bucket_name}'
             )
 
-        for metrics_group in metrics:
+        for metrics_set in metrics:
 
-            for group_name, group in metrics_group.groups.items():
+            for group_name, group in metrics_set.groups.items():
                 blob = await self._loop.run_in_executor(
                     self._executor,
                     self.metrics_bucket.blob,
-                    metrics_group.name
+                    metrics_set.name
                 )
 
                 await self._loop.run_in_executor(
@@ -146,7 +148,47 @@ class GoogleCloudStorage:
                     })
                 )
 
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
+
+        for metrics_set in metrics_sets:
+            for custom_group_name, group in metrics_set.custom_metrics.items():
+
+                custom_bucket_name = f'{self.bucket_namespace}_{self.metrics_bucket_name}_{custom_group_name}_metrics'
+
+                try:
+
+                    self._custom_metrics_buckets[custom_bucket_name] = await self._loop.run_in_executor(
+                        self._executor,
+                        self.client.get_bucket,
+                        custom_bucket_name
+                    )
+                
+                except Exception:
+
+                    self._custom_metrics_buckets[custom_bucket_name] = await self._loop.run_in_executor(
+                        self._executor,
+                        self.client.create_bucket,
+                        custom_bucket_name
+                    )
+
+                blob = await self._loop.run_in_executor(
+                    self._executor,
+                    self.metrics_bucket.blob,
+                    f'{metrics_set.name}_{custom_bucket_name}'
+                )
+
+                await self._loop.run_in_executor(
+                    self._executor,
+                    blob.upload_from_string,
+                    json.dumps({
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        'group': custom_group_name,
+                        **group
+                    })
+                )
+
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
 
         try:
 
@@ -164,8 +206,8 @@ class GoogleCloudStorage:
                 f'{self.bucket_namespace}_{self.errors_bucket_name}'
             )
 
-        for metrics_group in metrics_groups:
-            for error in metrics_group.errors:
+        for metrics_set in metrics_sets:
+            for error in metrics_set.errors:
                 error_message = re.sub(
                     '[^0-9a-zA-Z]+', 
                     '_',
@@ -178,15 +220,15 @@ class GoogleCloudStorage:
                 blob = await self._loop.run_in_executor(
                     self._executor,
                     self.metrics_bucket.blob,
-                    f'{metrics_group.name}_{error_message}'
+                    f'{metrics_set.name}_{error_message}'
                 )
 
                 await self._loop.run_in_executor(
                     self._executor,
                     blob.upload_from_string,
                     json.dumps({
-                        'metric_name': metrics_group.name,
-                        'metric_stage': metrics_group.stage,
+                        'metric_name': metrics_set.name,
+                        'metric_stage': metrics_set.stage,
                         'error_message': error.get('message'),
                         'error_count': error.get('count')
                     })

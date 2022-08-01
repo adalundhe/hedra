@@ -34,6 +34,7 @@ class DefaultPersona:
         self.start = 0
         self.end = 0
         self.completed_actions = 0
+        self.pending_actions = 0
         self.completed_time = 0
         self.run_timer = False
         self.actions_count = 0
@@ -69,6 +70,7 @@ class DefaultPersona:
 
         self.end = time.time()
         self.start = start
+        self.pending_actions = len(pending)
         
         results = await asyncio.gather(*completed)
         

@@ -1,7 +1,9 @@
 import re
 from typing import List
+
+from numpy import float32, float64, int16, int32, int64
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 
 
 try:
@@ -30,6 +32,7 @@ class StatsD:
             'total': 'count',
             'succeeded': 'count',
             'failed': 'count',
+            'actions_per_second': 'gauge',
             'median': 'gauge',
             'mean': 'gauge',
             'variance': 'gauge',
@@ -67,23 +70,23 @@ class StatsD:
                 failed_update_function = self._update_map.get('count')
                 failed_update_function(f'{event.name}_failed', 1)
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
 
-        for metrics_group in metrics_groups:
+        for metrics_set in metrics_sets:
             
-            for field, value in metrics_group.common_stats.items():
+            for field, value in metrics_set.common_stats.items():
                 update_type = self.types_map.get(field)
                 update_function = self._update_map.get(update_type)
 
                 update_function(
-                    f'{metrics_group.name}_{field}', value
+                    f'{metrics_set.name}_{field}', value
                 )
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
-        for metrics_group in metrics:
+        for metrics_set in metrics:
 
-            for group_name, group in metrics_group.groups.items():
+            for group_name, group in metrics_set.groups.items():
 
                 metric_record = {**group.stats, **group.custom}
                 metric_types = {**self.types_map, **group.custom_schemas}
@@ -93,13 +96,33 @@ class StatsD:
                     update_function = self._update_map.get(update_type)
                     
                     update_function(
-                        f'{metrics_group.name}_{group_name}_{metric_field}', metric_value
+                        f'{metrics_set.name}_{group_name}_{metric_field}', metric_value
                     )
 
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
-        for metrics_group in metrics_groups:
-            for error in metrics_group.errors:
+        for metrics_set in metrics_sets:
+            for custom_group_name, group in metrics_set.custom_metrics.items():
+
+                for field, value in group.items():
+                    
+                    update_type = None
+                    if isinstance(value, (int, int16, int32, int64)):
+                        update_type = 'count'
+
+                    elif isinstance(value, (float, float32, float64)):
+                        update_type = 'gauge'
+
+                    update_function = self._update_map.get(update_type)
+                    update_function(
+                        f'{metrics_set.name}_{custom_group_name}_{field}',
+                        value
+                    )
+
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
+
+        for metrics_set in metrics_sets:
+            for error in metrics_set.errors:
                 error_message = re.sub(
                     '[^0-9a-zA-Z]+', 
                     '_',
@@ -109,7 +132,7 @@ class StatsD:
                 )
 
                 update_function = self._update_map.get('count')
-                update_function(f'{metrics_group.name}_{error_message}', error.get('count'))
+                update_function(f'{metrics_set.name}_{error_message}', error.get('count'))
 
 
     async def close(self):

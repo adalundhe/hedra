@@ -6,7 +6,7 @@ from typing import List
 
 import psutil
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 
 
 try:
@@ -57,14 +57,14 @@ class Honeycomb:
             libhoney.flush
         )
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
 
-        for metrics_group in metrics_groups:
+        for metrics_set in metrics_sets:
 
             group_metric = {
-                'name': metrics_group.name,
-                'stage': metrics_group.stage,
-                **metrics_group.common_stats
+                'name': metrics_set.name,
+                'stage': metrics_set.stage,
+                **metrics_set.common_stats
             }
 
             honeycomb_group_metric = libhoney.Event(data=group_metric)
@@ -79,11 +79,11 @@ class Honeycomb:
             libhoney.flush
         )
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
-        for metrics_group in metrics:
+        for metrics_set in metrics:
 
-            for group_name, group in metrics_group.groups.items():
+            for group_name, group in metrics_set.groups.items():
 
                 metric_record = {
                     **group.stats, 
@@ -103,14 +103,39 @@ class Honeycomb:
             libhoney.flush
         )
 
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
-        for metrics_group in metrics_groups:
-            for error in metrics_group.errors:
+        for metrics_set in metrics_sets:
+
+            for custom_group_name, group in metrics_set.custom_metrics.items():
+
+                metric_record ={
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
+                    'group': custom_group_name,
+                    **group
+                }
+
+                honeycomb_event = libhoney.Event(data=metric_record)
+
+                await self._loop.run_in_executor(
+                    self._executor,
+                    honeycomb_event.send
+                )
+
+        await self._loop.run_in_executor(
+            self._executor,
+            libhoney.flush
+        )
+
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
+
+        for metrics_set in metrics_sets:
+            for error in metrics_set.errors:
 
                 error_event = libhoney.Event(data={
-                    'name': metrics_group.name,
-                    'stage': metrics_group.stage,
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
                     'error_message': error.get('message'),
                     'error_count': error.get('count')
                 })

@@ -3,7 +3,7 @@ import json
 from typing import List
 import uuid
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 
 try:
 
@@ -22,14 +22,19 @@ class Kafka:
     def __init__(self, config: KafkaConfig) -> None:
         self.host = config.host
         self.client_id = config.client_id
+
         self.events_topic = config.events_topic
         self.metrics_topic = config.metrics_topic
+        self.custom_metrics_topics = {}
         self.group_metrics_topic = f'{self.metrics_topic}_group_metrics'
         self.errors_topic = f'{self.metrics_topic}_errors'
+
         self.events_partition = config.events_partition
         self.metrics_partition = config.metrics_partition
         self.group_metrics_partition = f'{self.metrics_partition}_group_metrics'
         self.errors_partition = f'{self.metrics_partition}_errors'
+        self.custom_metrics_partitions = {}
+
         self.compression_type = config.compression_type
         self.timeout = config.timeout
         self.enable_idempotence = config.idempotent or True
@@ -67,17 +72,18 @@ class Kafka:
             partition=self.events_partition
         )
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
         batch = self._producer.create_batch()
-        for metrics_group in metrics_groups:
+        for metrics_set in metrics_sets:
             batch.append(
                 value=json.dumps({
-                    'name': metrics_group.name,
-                    'stage': metrics_group.stage,
-                    **metrics_group.common_stats
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
+                    'group': 'common',
+                    **metrics_set.common_stats
                 }).encode('utf-8'),
                 timestamp=None, 
-                key=bytes(metrics_group.name, 'utf')
+                key=bytes(metrics_set.name, 'utf')
             )
 
         await self._producer.send_batch(
@@ -86,22 +92,22 @@ class Kafka:
             partition=self.group_metrics_partition
         )
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+    async def submit_metrics(self, metrics: List[MetricsSet]):
         
         batch = self._producer.create_batch()
-        for metrics_group in metrics:
-            for group_name, group in metrics_group.groups.items():
+        for metrics_set in metrics:
+            for group_name, group in metrics_set.groups.items():
                 batch.append(
                     value=json.dumps(
                         {
                             **group.record,
-                            'name': metrics_group.name,
-                            'stage': metrics_group.stage,
+                            'name': metrics_set.name,
+                            'stage': metrics_set.stage,
                             'group': group_name
                         }
                     ).encode('utf-8'),
                     timestamp=None, 
-                    key=bytes(metrics_group.name, 'utf')
+                    key=bytes(metrics_set.name, 'utf')
                 )
 
         await self._producer.send_batch(
@@ -109,10 +115,37 @@ class Kafka:
             self.metrics_topic,
             partition=self.metrics_partition
         )
+    
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+        for metrics_set in metrics_sets:
+            for custom_group_name, group in metrics_set.custom_metrics.items():
+
+                if self.custom_metrics_topics.get(custom_group_name) is None:
+                    self.custom_metrics_topics[custom_group_name] = self._producer.create_batch()
+                    self.custom_metrics_partitions[custom_group_name] = f'{self.metrics_partition}_{custom_group_name}'
+                
+                self.custom_metrics_topics[custom_group_name].append(
+                    value=json.dumps({
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        'group': custom_group_name,
+                        **group
+                    }).encode('utf-8'),
+                    timestamp=None,
+                    key=bytes(f'{metrics_set.name}_{custom_group_name}', 'utf')
+                )
+
+        for topic_name, batch in self.custom_metrics_topics.items():
+            await self._producer.send_batch(
+                batch,
+                topic_name,
+                partition=self.custom_metrics_partitions.get(topic_name)
+            )
+
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
         batch = self._producer.create_batch()
-        for metric_group in metrics_groups:
+        for metric_group in metrics_sets:
             for error in metric_group.errors:
                 batch.append(
                     value=json.dumps(

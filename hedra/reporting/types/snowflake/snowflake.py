@@ -1,10 +1,11 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, List
+from numpy import float32, float64, int16, int32, int64
 
 import psutil
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 
 
 try:
@@ -31,10 +32,12 @@ class Snowflake:
         self.warehouse = config.warehouse
         self.database = config.database
         self.schema = config.database_schema
+
         self.events_table_name = config.events_table
         self.metrics_table_name = config.metrics_table
         self.group_metrics_table_name = f'{self.metrics_table_name}_group_metrics'
         self.errors_table_name = f'{self.metrics_table_name}_errors'
+
         self.custom_fields = config.custom_fields
         self.connect_timeout = config.connect_timeout
         
@@ -46,7 +49,9 @@ class Snowflake:
         self._events_table = None
         self._metrics_table = None
         self._group_metrics_table = None
+        self.custom_metrics_tables = {}
         self._errors_table = None
+
         self._loop = asyncio.get_event_loop()
 
     async def connect(self):
@@ -107,7 +112,7 @@ class Snowflake:
                 self._events_table.insert(values=event.record)
             )
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
 
         if self._group_metrics_table is None:
 
@@ -117,9 +122,11 @@ class Snowflake:
                 sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
                 sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
                 sqlalchemy.Column('stage', sqlalchemy.VARCHAR(255)),
+                sqlalchemy.Column('group', sqlalchemy.TEXT),
                 sqlalchemy.Column('total', sqlalchemy.BIGINT),
                 sqlalchemy.Column('succeeded', sqlalchemy.BIGINT),
-                sqlalchemy.Column('failed', sqlalchemy.BIGINT)
+                sqlalchemy.Column('failed', sqlalchemy.BIGINT),
+                sqlalchemy.Column('actions_per_second', sqlalchemy.FLOAT)
             )
 
             await self._loop.run_in_executor(
@@ -130,20 +137,21 @@ class Snowflake:
 
             self._group_metrics_table = group_metrics_table
 
-        for metrics_group in metrics_groups:
+        for metrics_set in metrics_sets:
             await self._loop.run_in_executor(
                 self._executor,
                 self._connection.execute,
                 self._group_metrics_table.insert(values={
-                    'name': metrics_group.name,
-                    'stage': metrics_group.stage,
-                    **metrics_group.common_stats
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
+                    'group': 'common',
+                    **metrics_set.common_stats
                 })
             )
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
-        for metrics_group in metrics:
+        for metrics_set in metrics:
 
             if self._metrics_table is None:
 
@@ -162,12 +170,12 @@ class Snowflake:
                     sqlalchemy.Column('maximum', sqlalchemy.FLOAT)
                 )
 
-                for quantile in metrics_group.quantiles:
+                for quantile in metrics_set.quantiles:
                     metrics_table.append_column(
                         sqlalchemy.Column(f'{quantile}', sqlalchemy.FLOAT)
                     )
 
-                for custom_field_name, sql_alchemy_type in metrics_group.custom_schemas:
+                for custom_field_name, sql_alchemy_type in metrics_set.custom_schemas:
                     metrics_table.append_column(custom_field_name, sql_alchemy_type)  
 
                 
@@ -179,7 +187,7 @@ class Snowflake:
 
                 self._metrics_table = metrics_table
 
-        for group_name, group in metrics_group.groups.items():
+        for group_name, group in metrics_set.groups.items():
             await self._loop.run_in_executor(
                 self._executor,
                 self._connection.execute,
@@ -189,17 +197,67 @@ class Snowflake:
                 })
             )
 
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
-        for metrics_group in metrics_groups:
+        for metrics_set in metrics_sets:
+
+            for custom_group_name, group in metrics_set.custom_metrics.items():
+
+                custom_table_name = f'{self.metrics_table_name}_{custom_group_name}'
+
+                if self.custom_metrics_tables.get(custom_table_name) is None:
+
+                    custom_table = sqlalchemy.Table(
+                        custom_table_name,
+                        self.metadata,
+                        sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
+                        sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
+                        sqlalchemy.Column('stage', sqlalchemy.VARCHAR(255)),
+                        sqlalchemy.Column('group', sqlalchemy.TEXT),
+                    )
+
+                    for field, value in group.items():
+
+                        if isinstance(value, (int, int16, int32, int64)):
+                            custom_table.append_column(
+                                sqlalchemy.Column(field, sqlalchemy.Integer)
+                            )
+                        
+                        elif isinstance(value, (float, float32, float64)):
+                            custom_table.append_column(
+                                sqlalchemy.Column(field, sqlalchemy.FLOAT)
+                            )
+                    
+                    await self._loop.run_in_executor(
+                        self._executor,
+                        self._connection.execute,
+                        CreateTable(custom_table, if_not_exists=True)
+                    )
+
+                    self.custom_metrics_tables[custom_table_name] = custom_table
+
+                await self._loop.run_in_executor(
+                    self._executor,
+                    self._connection.execute,
+                    self.custom_metrics_tables[custom_table_name].insert(values={
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        'group': custom_group_name,
+                        **group
+                    })
+                )
+
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
+
+        for metrics_set in metrics_sets:
 
             if self._errors_table is None:
                 errors_table = sqlalchemy.Table(
                     self.errors_table_name,
                     self.metadata,
                     sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
-                    sqlalchemy.Column('metric_name', sqlalchemy.VARCHAR(255)),
-                    sqlalchemy.Column('metrics_stage', sqlalchemy.TEXT),
+                    sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
+                    sqlalchemy.Column('stage', sqlalchemy.TEXT),
                     sqlalchemy.Column('error_message', sqlalchemy.TEXT),
                     sqlalchemy.Column('error_count', sqlalchemy.BIGINT)
                 )
@@ -212,13 +270,13 @@ class Snowflake:
 
                 self._errors_table = errors_table
 
-            for error in metrics_group.errors:
+            for error in metrics_set.errors:
                 await self._loop.run_in_executor(
                     self._executor,
                     self._connection.execute,
                     self._errors_table.insert(values={
-                        'metric_name': metrics_group.name,
-                        'metric_stage': metrics_group.stage,
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
                         'error_message': error.get('message'),
                         'error_count': error.get('count')
                     })

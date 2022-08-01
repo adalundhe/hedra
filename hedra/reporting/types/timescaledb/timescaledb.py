@@ -1,8 +1,10 @@
 from datetime import datetime
 import uuid
 from typing import List
+
+from numpy import float32, float64, int16, int32, int64
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 
 
 try:
@@ -66,7 +68,7 @@ class TimescaleDB(Postgres):
                 
             await transaction.commit()
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
         
         async with self._connection.begin() as transaction:
 
@@ -78,9 +80,12 @@ class TimescaleDB(Postgres):
                     sqlalchemy.Column('id', UUID(as_uuid=True), default=uuid.uuid4),
                     sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
                     sqlalchemy.Column('stage', sqlalchemy.VARCHAR(255)),
+                    sqlalchemy.Column('group', sqlalchemy.VARCHAR(255)),
                     sqlalchemy.Column('total', sqlalchemy.BIGINT),
                     sqlalchemy.Column('succeeded', sqlalchemy.BIGINT),
                     sqlalchemy.Column('failed', sqlalchemy.BIGINT),
+                    sqlalchemy.Column('actions_per_second', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('time', sqlalchemy.TIMESTAMP(timezone=False), nullable=False, default=datetime.now())
                 )
 
                 await self._connection.execute(CreateTable(group_metrics_table, if_not_exists=True))
@@ -92,17 +97,20 @@ class TimescaleDB(Postgres):
 
                 self._group_metrics_table = group_metrics_table
 
-            for metrics_group in metrics_groups:
+            for metrics_set in metrics_sets:
                 await self._connection.execute(self._metrics_table.insert(values={
-                    'name': metrics_group.name,
-                    'stage': metrics_group.stage,
-                    **metrics_group.common_stats
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
+                    'group': 'common',
+                    **metrics_set.common_stats
                 }))
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+            await transaction.commit()
+
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
         async with self._connection.begin() as transaction:
-            for metrics_group in metrics:
+            for metrics_set in metrics:
 
                 if self._metrics_table is None:
 
@@ -122,12 +130,12 @@ class TimescaleDB(Postgres):
                         sqlalchemy.Column('time', sqlalchemy.TIMESTAMP(timezone=False), nullable=False, default=datetime.now())
                     )
 
-                    for quantile in metrics_group.quantiles:
+                    for quantile in metrics_set.quantiles:
                         metrics_table.append_column(
                             sqlalchemy.Column(f'{quantile}', sqlalchemy.FLOAT)
                         )
 
-                    for custom_field_name, sql_alchemy_type in metrics_group.custom_schemas:
+                    for custom_field_name, sql_alchemy_type in metrics_set.custom_schemas:
                         metrics_table.append_column(custom_field_name, sql_alchemy_type)
 
                     await self._connection.execute(CreateTable(metrics_table, if_not_exists=True))
@@ -139,7 +147,7 @@ class TimescaleDB(Postgres):
 
                     self._metrics_table = metrics_table
 
-                for group_name, group in metrics_group.groups.items():
+                for group_name, group in metrics_set.groups.items():
                     await self._connection.execute(self._metrics_table.insert(values={
                         **group.record,
                         'group': group_name
@@ -147,10 +155,63 @@ class TimescaleDB(Postgres):
 
             await transaction.commit()
 
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
         async with self._connection.begin() as transaction:
-            for metrics_group in metrics_groups:
+            for metrics_set in metrics_sets:
+                
+                for custom_group_name, group in metrics_set.custom_metrics.items():
+                    custom_table_name = f'{self.metrics_table_name}'
+
+                    if self._custom_metrics_tables.get(custom_table_name) is None:
+
+                        custom_metrics_table = sqlalchemy.Table(
+                            custom_table_name,
+                            self.metadata,
+                            sqlalchemy.Column('id', UUID(as_uuid=True), default=uuid.uuid4),
+                            sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
+                            sqlalchemy.Column('stage', sqlalchemy.VARCHAR(255)),
+                            sqlalchemy.Column('group', sqlalchemy.TEXT),
+                            sqlalchemy.Column('time', sqlalchemy.TIMESTAMP(timezone=False), nullable=False, default=datetime.now())
+                        )
+
+                        for field, value in group.items():
+
+                            if isinstance(value, (int, int16, int32, int64)):
+                                custom_metrics_table.append_column(
+                                    sqlalchemy.Column(field, sqlalchemy.INTEGER)
+                                )
+
+                            elif isinstance(value, (float, float32, float64)):
+                                custom_metrics_table.append_column(
+                                    sqlalchemy.Column(field, sqlalchemy.FLOAT)
+                                )
+
+
+                        await self._connection.execute(CreateTable(custom_metrics_table, if_not_exists=True))
+                        await self._connection.execute(
+                            f"SELECT create_hypertable('{custom_table_name}', 'time', migrate_data => true, if_not_exists => TRUE, create_default_indexes=>FALSE);"
+                        )
+
+                        await self._connection.execute(f"CREATE INDEX ON {custom_table_name} (name, time DESC);")
+
+                        self._custom_metrics_tables[custom_group_name] = custom_metrics_table
+
+                    await self._connection.execute(
+                        self._custom_metrics_tables[custom_table_name].insert(values={
+                            'name': metrics_set.name,
+                            'stage': metrics_set.stage,
+                            'group': custom_group_name,
+                            **group
+                        })
+                    )
+
+            await transaction.commit()
+
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
+
+        async with self._connection.begin() as transaction:
+            for metrics_set in metrics_sets:
 
                 if self._errors_table is None:
                     errors_table = sqlalchemy.Table(
@@ -160,7 +221,8 @@ class TimescaleDB(Postgres):
                         sqlalchemy.Column('metric_name', sqlalchemy.VARCHAR(255)),
                         sqlalchemy.Column('metrics_stage', sqlalchemy.TEXT),
                         sqlalchemy.Column('error_message', sqlalchemy.TEXT),
-                        sqlalchemy.Column('error_count', sqlalchemy.BIGINT)
+                        sqlalchemy.Column('error_count', sqlalchemy.BIGINT),
+                        sqlalchemy.Column('time', sqlalchemy.TIMESTAMP(timezone=False), nullable=False, default=datetime.now())
                     )    
 
                     
@@ -174,10 +236,10 @@ class TimescaleDB(Postgres):
                     self._errors_table = errors_table    
 
 
-                for error in metrics_group.errors:
+                for error in metrics_set.errors:
                     await self._connection.execute(self._metrics_table.insert(values={
-                        'metric_name': metrics_group.name,
-                        'metrics_stage': metrics_group.stage,
+                        'metric_name': metrics_set.name,
+                        'metrics_stage': metrics_set.stage,
                         'error_message': error.get('message'),
                         'error_count': error.get('count')
                     }))

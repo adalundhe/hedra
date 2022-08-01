@@ -5,7 +5,7 @@ from hedra.core.hooks.registry.registrar import registar
 
 
 @registar(HookType.METRIC)
-def metric(reporter_field: Optional[Any]=None):
+def metric(group: Optional[str]='user_metrics'):
     
     def wrapper(func):
 

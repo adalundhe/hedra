@@ -7,7 +7,7 @@ from collections import defaultdict
 from typing import Dict, List, Union
 from easy_logger import Logger
 import psutil
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 from hedra.core.hooks.types.hook import Hook
 from hedra.core.hooks.types.types import HookType
 from hedra.core.hooks.registry.registrar import registar
@@ -54,8 +54,6 @@ class Analyze(Stage):
             .99 
         ]
 
-        self.timings = defaultdict(list)
-
         for hook_type in HookType:
             self.hooks[hook_type] = []
 
@@ -94,35 +92,38 @@ class Analyze(Stage):
             grouped_stats = {}
             
             for event_group_name, events_group in events.items():  
+
+                custom_metrics = defaultdict(dict)
+                for custom_metric in self.hooks.get(HookType.METRIC):
+                    custom_metrics[custom_metric.group][custom_metric.shortname] = custom_metric.call(events_group)
     
                 group_total = events_group.succeeded + events_group.failed
 
-                timings_dict = {}
+                metrics_groups = {}
                 for group_name, group_timings in events_group.timings.items():
-                    timings_group = self.calculate_timings_group(
+                    metrics_group = self.calculate_group_stats(
                         group_name,
                         group_timings
                     )
 
-                    timings_dict= {
-                        **timings_dict,
-                        **timings_group
-                    }
+                    metrics_groups = {**metrics_groups, **metrics_group}
 
                 metric_data = {
                     'total': group_total,
                     'succeeded': events_group.succeeded,
                     'failed': events_group.failed,
+                    'actions_per_second': group_total/stage_total_time,
                     'errors': list([
                         {
                             'message': error_message,
                             'count': error_count
                         } for error_message, error_count in events_group.errors.items()
                     ]),
-                    'timings': timings_dict
+                    'groups': metrics_groups,
+                    'custom': custom_metrics
                 }
 
-                metric = MetricsGroup(
+                metric = MetricsSet(
                     event_group_name,
                     events_group.events[0].source,
                     stage_name,
@@ -136,7 +137,7 @@ class Analyze(Stage):
 
             summaries['stages'][stage_name] = {
                 'total': stage_total,
-                'aps': stage_total/stage_total_time,
+                'actions_per_second': stage_total/stage_total_time,
                 'actions': grouped_stats
             }
 
@@ -148,33 +149,24 @@ class Analyze(Stage):
         print('TOOK: ', stop-start)
         return summaries
 
-    def calculate_timings_group(self, group_name: str, timings: List[Union[int, float]]):
-        custom_metrics = {}
-        for custom_metric in self.hooks.get(HookType.METRIC):
-            result = custom_metric.call(timings)
-
-            custom_metrics[custom_metric.shortname] = {
-                'result': result,
-                'field_type': custom_metric.reporter_field
-            }
+    def calculate_group_stats(self, group_name: str, data: List[Union[int, float]]):
 
         quantiles = {
             f'quantile_{int(quantile_range * 100)}th': quantile for quantile, quantile_range in zip(
-                numpy.quantile(timings, self.quantile_ranges),
+                numpy.quantile(data, self.quantile_ranges),
                 self.quantile_ranges
             )
         }
         
         return {
             group_name: {
-                'median': float((numpy.median(timings))),
-                'mean': float(numpy.mean(timings)),
-                'variance': float(numpy.var(timings)),
-                'stdev': float(numpy.std(timings)),
-                'minimum': min(timings),
-                'maximum': max(timings),
-                'quantiles': quantiles,
-                'custom_metrics': custom_metrics
+                'median': float((numpy.median(data))),
+                'mean': float(numpy.mean(data)),
+                'variance': float(numpy.var(data)),
+                'stdev': float(numpy.std(data)),
+                'minimum': min(data),
+                'maximum': max(data),
+                'quantiles': quantiles
             }
 
         }

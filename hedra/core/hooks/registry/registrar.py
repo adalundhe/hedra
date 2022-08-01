@@ -15,7 +15,6 @@ class Registrar:
     def __call__(self, _: FunctionType) -> Any:
         return self.add_hook(self.hook_type)
 
-
     def add_hook(self, hook_type: str):
         if hook_type == HookType.SETUP or hook_type == HookType.TEARDOWN:
 
@@ -41,8 +40,7 @@ class Registrar:
                 return wrapped_method
 
         elif hook_type in [HookType.METRIC]:
-
-            def wrap_hook(reporter_field: Any=None):
+            def wrap_hook(group: str='user_metrics'):
                 def wrapped_method(func):
 
                     hook_name = func.__qualname__
@@ -55,7 +53,7 @@ class Registrar:
                         func, 
                         hook_type=hook_type,
                         metadata=Metadata(),
-                        reporter_field=reporter_field
+                        group=group
                     )
 
                     return func

@@ -6,7 +6,7 @@ from typing import List
 
 import psutil
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 
 
 try:
@@ -65,25 +65,23 @@ class NewRelic:
                 )
             )
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
         
-        for metrics_group in metrics_groups:
-            
-            for field, value in metrics_group.common_stats.items():
+        for metrics_set in metrics_sets:  
+            for field, value in metrics_set.common_stats.items():
                 await self._loop.run_in_executor(
                     self._executor,
                     functools.partial(
                         self.client.record_custom_metric,
-                        f'{metrics_group.name}_{field}',
+                        f'{metrics_set.name}_{field}',
                         value
                     )
                 )
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
-        for metrics_group in metrics:
-
-            for group in metrics_group.groups.values():
+        for metrics_set in metrics:
+            for group in metrics_set.groups.values():
 
                 metric_record = {
                     **group.stats, 
@@ -95,14 +93,28 @@ class NewRelic:
                         self._executor,
                         functools.partial(
                             self.client.record_custom_metric,
-                            f'{metrics_group.name}_{field}',
+                            f'{metrics_set.name}_{field}',
                             value
                         )
                     )
 
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
-        for metrics_group in metrics_groups:
-            for error in metrics_group.errors:
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
+
+        for metrics_set in metrics_sets:
+            for custom_group_name, group in metrics_set.custom_metrics.items():
+                for field, value in group.items():
+                    await self._loop.run_in_executor(
+                        self._executor,
+                        functools.partial(
+                            self.client.record_custom_metric,
+                            f'{metrics_set.name}_{custom_group_name}_{field}',
+                            value
+                        )
+                    )
+
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
+        for metrics_set in metrics_sets:
+            for error in metrics_set.errors:
                 error_message = re.sub(
                     '[^0-9a-zA-Z]+', 
                     '_',
@@ -115,7 +127,7 @@ class NewRelic:
                     self._executor,
                     functools.partial(
                         self.client.record_custom_metric,
-                        f'{metrics_group.name}_{error_message}',
+                        f'{metrics_set.name}_{error_message}',
                         error.get('count')
                     )
                 )            

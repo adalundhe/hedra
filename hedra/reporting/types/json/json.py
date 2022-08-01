@@ -7,7 +7,7 @@ from typing import Any, List
 import psutil
 from .json_config import JSONConfig
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 has_connector = True
 
 class JSON:
@@ -37,34 +37,35 @@ class JSON:
                 )
             )
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
         pass
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
-        metrics_records = [
-            {
-                'name': metrics_group.name,
-                'stage': metrics_group.stage,
-                'errors': metrics_group.errors,
-                **metrics_group.common_stats,
-                'timings': {
-                    timings_group_name: timings_group.record for timings_group_name, timings_group in metrics_group.groups.items()
-                }
-            } for metrics_group in metrics
-        ]
+    async def submit_metrics(self, metrics: List[MetricsSet]):
+
+        records = {}
+        for metrics_set in metrics:
+            
+            groups = {**metrics_set.groups, **metrics_set.custom_metrics}
+            records[metrics_set.name] = {
+                'name': metrics_set.name,
+                'stage': metrics_set.stage,
+                'errors': metrics_set.errors,
+                **metrics_set.common_stats,
+                'groups': groups
+            }
 
         with open(self.metrics_filepath, 'w') as metrics_file:
             await self._loop.run_in_executor(
                 self._executor,
                 functools.partial(
                     json.dump,
-                    metrics_records, 
+                    records, 
                     metrics_file, 
                     indent=4
                 )
             )
 
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
         pass
 
     async def close(self):

@@ -5,8 +5,7 @@ from typing import List
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric
-from hedra.reporting.metric.metrics_group import MetricsGroup
+from hedra.reporting.metric.metrics_set import MetricsSet
 from .csv_config import CSVConfig
 has_connector = True
 
@@ -21,7 +20,9 @@ class CSV:
 
         self._events_csv_writer = None
         self._metrics_csv_writer = None
+        self._group_metrics_csv_writer = None
         self._errors_csv_writer = None
+        self._custom_metrics_csv_writers = {}
 
     async def connect(self):
         pass
@@ -46,11 +47,12 @@ class CSV:
                     event.record
                 )
 
-    async def submt_common(self, metrics_groups: List[MetricsGroup]):
+    async def submt_common(self, metrics_sets: List[MetricsSet]):
 
         headers = [
             'name',
             'stage',
+            'group',
             'total',
             'succeeded',
             'failed'
@@ -67,26 +69,27 @@ class CSV:
                     self._group_metrics_csv_writer.writeheader
                 )
 
-            for metrics_group in metrics_groups:
+            for metrics_set in metrics_sets:
                 await self._loop.run_in_executor(
                     self._executor,
                     self._group_metrics_csv_writer.writerow,
                     {
-                        'name': metrics_group.name,
-                        'stage': metrics_group.stage,
-                        **metrics_group.common_stats
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        'group': 'common',
+                        **metrics_set.common_stats
                     }
                 )
 
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
         with open(self.metrics_filepath, 'a') as metrics_file:
 
-            for metrics_group in metrics:
+            for metrics_set in metrics:
                 if self._metrics_csv_writer is None:
                     self._metrics_csv_writer = csv.DictWriter(metrics_file, fieldnames=[
-                        *metrics_group.fields,
+                        *metrics_set.fields,
                         'group'
                     ])
 
@@ -95,7 +98,7 @@ class CSV:
                         self._metrics_csv_writer.writeheader
                     )
 
-                for group_name, group in metrics_group.groups.items():
+                for group_name, group in metrics_set.groups.items():
                     await self._loop.run_in_executor(
                         self._executor,
                         self._metrics_csv_writer.writerow,
@@ -105,7 +108,43 @@ class CSV:
                         }
                     )
 
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
+
+        for metrics_set in metrics_sets:
+            for custom_group_name, group in metrics_set.custom_metrics.items():
+
+                base_filepath = Path(self.metrics_filepath).stem
+                with open(f'{base_filepath}_{custom_group_name}.csv', 'a') as custom_metrics_file:
+
+                    headers = [
+                        'name',
+                        'stage',
+                        'group',
+                        *list(group.keys())
+                    ]
+                    
+                    if self._custom_metrics_csv_writers.get(custom_group_name) is None:
+                        custom_group_csv_writer = csv.DictWriter(custom_metrics_file, fieldnames=headers)
+                        self._custom_metrics_csv_writers[custom_group_name] = custom_group_csv_writer
+
+                        await self._loop.run_in_executor(
+                            self._executor,
+                            custom_group_csv_writer.writeheader
+                        )
+
+
+                    await self._loop.run_in_executor(
+                        self._executor,
+                        self._custom_metrics_csv_writers[custom_group_name].writerow,
+                        {
+                            'name': metrics_set.name,
+                            'stage': metrics_set.stage,
+                            'group': custom_group_name,
+                            **group
+                        }
+                    )
+
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
 
         error_csv_headers = [
             'name',
@@ -125,15 +164,15 @@ class CSV:
                     error_csv_writer.writeheader
                 )
 
-            for metrics_group in metrics_groups:
+            for metrics_set in metrics_sets:
 
-                for error in metrics_group.errors:
+                for error in metrics_set.errors:
                     await self._loop.run_in_executor(
                         self._executor,
                         error_csv_writer.writerow,
                         {
-                            'name': metrics_group.name,
-                            'stage': metrics_group.stage,
+                            'name': metrics_set.name,
+                            'stage': metrics_set.stage,
                             'error_message': error.get('message'),
                             'error_count': error.get('count')
                         }

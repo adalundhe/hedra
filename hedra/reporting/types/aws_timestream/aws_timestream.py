@@ -5,7 +5,7 @@ import psutil
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 from .aws_timestream_config import AWSTimestreamConfig
 from .aws_timestream_record import AWSTimestreamRecord
 from .aws_timestream_error_record import AWSTimestreamErrorRecord
@@ -101,7 +101,7 @@ class AWSTimestream:
             )
         )
 
-    async def submit_common(self, metrics: List[MetricsGroup]):
+    async def submit_common(self, metrics: List[MetricsSet]):
         try:
             await self._loop.run_in_executor(
                 self._executor,
@@ -117,13 +117,13 @@ class AWSTimestream:
             pass
 
         records = []
-        for metrics_group in metrics:
+        for metrics_set in metrics:
  
-            for field, value in metrics_group.common_stats.items():
+            for field, value in metrics_set.common_stats.items():
                 timestream_record = AWSTimestreamRecord(
                     'group_metrics',
-                    metrics_group.name,
-                    metrics_group.stage,
+                    metrics_set.name,
+                    metrics_set.stage,
                     'common',
                     field,
                     value,
@@ -143,7 +143,7 @@ class AWSTimestream:
             )
         )
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
         try:
             await self._loop.run_in_executor(
@@ -160,17 +160,19 @@ class AWSTimestream:
             pass
 
         records = []
-        for metrics_group in metrics:
+        for metrics_set in metrics:
 
-            for group_name, group in metrics_group.groups.items():
+            metrics_groups = {**metrics_set.groups, **metrics_set.custom_metrics}
+
+            for group_name, group in metrics_groups.items():
             
                 metric_result = {**group.stats, **group.custom}
 
                 for field, value in metric_result.items():
                     timestream_record = AWSTimestreamRecord(
                         'metric',
-                        metrics_group.name,
-                        metrics_group.stage,
+                        metrics_set.name,
+                        metrics_set.stage,
                         group_name,
                         field,
                         value,
@@ -189,8 +191,11 @@ class AWSTimestream:
                 CommonAttributes={}
             )
         )
+
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
+        pass
         
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
 
         try:
 
@@ -210,11 +215,11 @@ class AWSTimestream:
 
         error_records = []
 
-        for metrics_group in metrics_groups:
-            for error in metrics_group.errors:
+        for metrics_set in metrics_sets:
+            for error in metrics_set.errors:
                 timestream_record = AWSTimestreamErrorRecord(
-                    metrics_group.name,
-                    metrics_group.stage,
+                    metrics_set.name,
+                    metrics_set.stage,
                     error.get('message'),
                     error.get('count'),
                     self.session_uuid

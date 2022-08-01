@@ -1,7 +1,7 @@
 import json
 from typing import List
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 
 
 try:
@@ -56,16 +56,17 @@ class Redis:
                     json.dumps(events.record)
                 )
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
 
-        for metrics_group in metrics_groups:
+        for metrics_set in metrics_sets:
             if self.channel_type == 'channel':
                 await self.connection.publish(
                     self.group_metrics_channel,
                     json.dumps({
-                        'name': metrics_group.name,
-                        'stage': metrics_group.stage,
-                        **metrics_group.common_stats
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        'group': 'common',
+                        **metrics_set.common_stats
                     })
                 )
 
@@ -73,16 +74,16 @@ class Redis:
                 await self.connection.sadd(
                     self.group_metrics_channel,
                     json.dumps({
-                        'name': metrics_group.name,
-                        'stage': metrics_group.stage,
-                        **metrics_group.common_stats
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        **metrics_set.common_stats
                     })
                 )
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
-        for metrics_group in metrics:
-            for group_name, group in metrics_group.groups.items():
+        for metrics_set in metrics:
+            for group_name, group in metrics_set.groups.items():
                 if self.channel_type == 'channel':
                     await self.connection.publish(
                         self.metrics_channel,
@@ -101,17 +102,46 @@ class Redis:
                         })
                     )
 
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
+
+        for metrics_set in metrics_sets:
+            for custom_group_name, group in metrics_set.custom_metrics.items():
+
+                custom_metrics_channel_name = f'{self.metrics_channel}_{custom_group_name}'
+
+                if self.channel_type == 'channel':
+                    await self.connection.publish(
+                        custom_metrics_channel_name,
+                        json.dumps({
+                            'name': metrics_set.name,
+                            'stage': metrics_set.stage,
+                            'group': custom_group_name,
+                            **group
+                        })
+                    )
+
+                else:
+                    await self.connection.sadd(
+                        custom_metrics_channel_name,
+                        json.dumps({
+                            'name': metrics_set.name,
+                            'stage': metrics_set.stage,
+                            'group': custom_group_name,
+                            **group
+                        })
+                    )
+
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
         
-        for metrics_group in metrics_groups:
-            for error in metrics_group.errors:
+        for metrics_set in metrics_sets:
+            for error in metrics_set.errors:
 
                 if self.channel_type == 'channel':
                     await self.connection.publish(
                         self.errors_channel,
                         json.dumps({
-                            'metrics_name': metrics_group.name,
-                            'metrics_stage': metrics_group.stage,
+                            'metrics_name': metrics_set.name,
+                            'metrics_stage': metrics_set.stage,
                             'errors_message': error.get('message'),
                             'errors_count': error.get('count')
                         })
@@ -121,8 +151,8 @@ class Redis:
                     await self.connection.sadd(
                         self.errors_channel,
                         json.dumps({
-                            'metrics_name': metrics_group.name,
-                            'metrics_stage': metrics_group.stage,
+                            'metrics_name': metrics_set.name,
+                            'metrics_stage': metrics_set.stage,
                             'errors_message': error.get('message'),
                             'errors_count': error.get('count')
                         })

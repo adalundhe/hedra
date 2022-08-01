@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 import psutil
 from .aws_lambda_config import AWSLambdaConfig
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 
 try:
     import boto3
@@ -54,25 +54,26 @@ class AWSLambda:
                 )
             )
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
-        for metrics_group in metrics_groups:
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
+        for metrics_set in metrics_sets:
             await self._loop.run_in_executor(
                 self._executor,
                 functools.partial(
                     self._client.invoke,
                     FunctionName=self.group_metrics_lambda_name,
                         Payload=json.dumps({
-                            'name': metrics_group.name,
-                            'stage': metrics_group.stage,
-                            **metrics_group.common_stats
+                            'name': metrics_set.name,
+                            'stage': metrics_set.stage,
+                            'group': 'common',
+                            **metrics_set.common_stats
                         })
                 )
             )
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
-        for metrics_group in metrics:
+    async def submit_metrics(self, metrics: List[MetricsSet]):
+        for metrics_set in metrics:
 
-            for group_name, group in metrics_group.groups.items():
+            for group_name, group in metrics_set.groups.items():
                 
                 await self._loop.run_in_executor(
                     self._executor,
@@ -87,17 +88,36 @@ class AWSLambda:
                     )
                 )
 
-    async def submit_errors(self, metrics: List[MetricsGroup]):
-        for metrics_group in metrics:
-            for error in metrics_group.errors:
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
+        for metrics_set in metrics_sets:
+
+            for group_name, group in metrics_set.custom_metrics.items():
+                
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self._client.invoke,
+                        FunctionName=self.metrics_lambda_name,
+                        Payload=json.dumps({
+                            'name': metrics_set.name,
+                            'stage': metrics_set.stage,
+                            'group': group_name,
+                            **group
+                        })
+                    )
+                )
+
+    async def submit_errors(self, metrics: List[MetricsSet]):
+        for metrics_set in metrics:
+            for error in metrics_set.errors:
                 await self._loop.run_in_executor(
                     self._executor,
                     functools.partial(
                         self._client.invoke,
                         FunctionName=self.errors_lambda_name,
                         Payload=json.dumps({
-                            'name': metrics_group.name,
-                            'stage': metrics_group.stage,
+                            'name': metrics_set.name,
+                            'stage': metrics_set.stage,
                             **error
                         })
                     )

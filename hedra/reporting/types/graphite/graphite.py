@@ -2,7 +2,7 @@
 import re
 from typing import List
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 
 
 try:
@@ -39,34 +39,44 @@ class Graphite(StatsD):
             else:
                 self.connection.send_graphite(f'{event.name}_failed', 1)
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
-        for metrics_group in metrics_groups:
-            for field, value in metrics_group.common_stats.items():
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
+        for metrics_set in metrics_sets:
+            for field, value in metrics_set.common_stats.items():
                 self.connection.send_graphite(
-                    f'{metrics_group.name}_{field}', value
+                    f'{metrics_set.name}_{field}', value
                 )
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
-        for metrics_group in metrics:
+        for metrics_set in metrics:
 
-            for group_name, group in metrics_group.groups.items():
+            for group_name, group in metrics_set.groups.items():
             
                 for metric_field, metric_value in group.stats.items():
                     self.connection.send_graphite(
-                        f'{metrics_group.name}_{group_name}_{metric_field}', metric_value
+                        f'{metrics_set.name}_{group_name}_{metric_field}', metric_value
                     )
 
                 for metric_field, metric_value in group.custom.items():
                     self.connection.send_graphite(
-                        f'{metrics_group.name}_{group_name}_{metric_field}', metric_value
+                        f'{metrics_set.name}_{group_name}_{metric_field}', metric_value
                     )
 
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
-        for metrics_group in metrics_groups:
+        for metrics_set in metrics_sets:
+            for custom_group_name, group in metrics_set.custom_metrics.items():
+                for field, value in group.items():
+                    self.connection.send_graphite(
+                        f'{metrics_set.name}_{custom_group_name}_{field}', value
+                    )
 
-            for error in metrics_group.errors:
+
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
+
+        for metrics_set in metrics_sets:
+
+            for error in metrics_set.errors:
                 error_message = re.sub(
                     '[^0-9a-zA-Z]+', 
                     '_',
@@ -76,6 +86,6 @@ class Graphite(StatsD):
                 )
 
                 self.connection.send_graphite(
-                    f'{metrics_group.name}_{error_message}',
+                    f'{metrics_set.name}_{error_message}',
                     error.get('count')
                 )

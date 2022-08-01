@@ -1,12 +1,14 @@
 import asyncio
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 import functools
 import os
 from typing import List
+from numpy import float32, float64, int16, int32, int64
 
 import psutil
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 
 
 try:
@@ -43,6 +45,7 @@ class Cassandra:
         self._events_table_name: str = config.events_table
         self._metrics_table_name: str = config.metrics_table
         self._group_metrics_table_name = f'{self._metrics_table_name}_group_metrics'
+        self._custom_metrics_table_names = {}
         self._errors_table_name = f'{self._metrics_table_name}_errors'
         self.replication_strategy = config.replication_strategy
         self.replication = config.replication       
@@ -53,6 +56,7 @@ class Cassandra:
         self._errors_table = None
         self._events_table = None
         self._group_metrics_table = None
+        self._custom_metrics_tables = {}
 
         self._executor =ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._loop = asyncio.get_event_loop()
@@ -142,7 +146,7 @@ class Cassandra:
                 )
             )
 
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
         
         if self._group_metrics_table is None:
 
@@ -150,9 +154,11 @@ class Cassandra:
                 'id': columns.UUID(primary_key=True, default=uuid.uuid4),
                 'name': columns.Text(min_length=1, index=True),
                 'stage': columns.Text(min_length=1),
+                'group': columns.Text(min_length=1),
                 'total': columns.Integer(),
                 'succeeded': columns.Integer(),
                 'failed': columns.Integer(),
+                'actions_per_second': columns.Float()
             }
 
             self._group_metrics_table = type(
@@ -170,23 +176,24 @@ class Cassandra:
                 )
             )
 
-        for metrics_group in metrics_groups:
+        for metrics_set in metrics_sets:
             
             await self._loop.run_in_executor(
                     self._executor,
                     functools.partial(
                         self._metrics_table.create,
                         **{
-                            'name': metrics_group.name,
-                            'stage': metrics_group.stage,
-                            **metrics_group.common_stats
+                            'name': metrics_set.name,
+                            'stage': metrics_set.stage,
+                            'group': 'common',
+                            **metrics_set.common_stats
                         }
                     )
                 )
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
-        for metrics_group in metrics:
+        for metrics_set in metrics:
        
             if self._metrics_table is None:
                 
@@ -205,10 +212,10 @@ class Cassandra:
                 }
 
 
-                for quantile_name in metrics_group.quantiles:
+                for quantile_name in metrics_set.quantiles:
                     fields[quantile_name] = columns.Float()
                 
-                for custom_field_name, custom_field_type in metrics_group.custom_schemas:
+                for custom_field_name, custom_field_type in metrics_set.custom_schemas:
                     fields[custom_field_name] = custom_field_type
 
 
@@ -227,7 +234,7 @@ class Cassandra:
                     )
                 )
 
-            for group_name, group in metrics_group.groups.items():
+            for group_name, group in metrics_set.groups.items():
                 
                 await self._loop.run_in_executor(
                     self._executor,
@@ -240,15 +247,71 @@ class Cassandra:
                     )
                 )
 
-                
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+        for metrics_set in metrics_sets:
+            
+            for custom_group_name, group in metrics_set.custom_metrics.items():
+
+                custom_metrics_table_name = f'{self._metrics_table_name}_{custom_group_name}_metrics'
+                if self._custom_metrics_tables.get(custom_metrics_table_name):
+                    
+                    custom_table = {
+                        'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+                        'name': columns.Text(min_length=1, index=True),
+                        'stage': columns.Text(min_length=1),
+                        'group': columns.Text(min_length=1)
+                    }
+
+                    for field_name, value in group.items():
+
+                        cassandra_column = None
+                        if isinstance(value, (int, int16, int32, int64)):
+                            cassandra_column = columns.Integer()
+                        
+                        elif isinstance(value, (float, float32, float64)):
+                            cassandra_column = columns.Float()
+
+                        custom_table[field_name] = cassandra_column
+
+                    custom_metrics_table = type(
+                        custom_metrics_table_name.capitalize(), 
+                        (Model, ), 
+                        custom_table
+                    )
+
+                    await self._loop.run_in_executor(
+                        self._executor,
+                        functools.partial(
+                            sync_table,
+                            custom_metrics_table,
+                            keyspaces=[self.keyspace]
+                        )
+                    )
+
+                    self._custom_metrics_tables[custom_metrics_table_name] = custom_metrics_table
+    
+                table = self._custom_metrics_tables.get(custom_metrics_table_name)
+                await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    table.create,
+                    {
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        'group': custom_group_name,
+                        **group
+                    }
+                )
+            )
+
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
 
         if self._errors_table is None:
             errors_table_fields = {
                 'id': columns.UUID(primary_key=True, default=uuid.uuid4),
-                'metric_name': columns.Text(min_length=1, index=True),
-                'metric_stage': columns.Text(min_length=1),
+                'name': columns.Text(min_length=1, index=True),
+                'stage': columns.Text(min_length=1),
                 'error_message': columns.Text(min_length=1),
                 'error_count': columns.Integer()
             }
@@ -268,16 +331,16 @@ class Cassandra:
                 )
             )
 
-        for metrics_group in metrics_groups:
+        for metrics_set in metrics_sets:
 
-            for error in metrics_group.errors:
+            for error in metrics_set.errors:
                 await self._loop.run_in_executor(
                     self._executor,
                     functools.partial(
                         self._errors_table.create,
                         {
-                            'metric_name': metrics_group.name,
-                            'metric_stage': metrics_group.stage,
+                            'name': metrics_set.name,
+                            'stage': metrics_set.stage,
                             'error_message': error.get('message'),
                             'error_count': error.get('count')
                         }

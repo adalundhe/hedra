@@ -6,7 +6,7 @@ from typing import List
 
 import psutil
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup
+from hedra.reporting.metric import MetricsSet
 from concurrent.futures import ThreadPoolExecutor
 
 try:
@@ -79,19 +79,20 @@ class Cloudwatch:
         )
 
     
-    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
         cloudwatch_group_metrics = [
             {
                 'Time': datetime.datetime.now(),
                 'Detail': json.dumps({
-                    'name': metrics_group.name,
-                    'stage': metrics_group.stage,
-                    **metrics_group.common_stats
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
+                    'group': 'common',
+                    **metrics_set.common_stats
                 }),
                 'DetailType': self.events_rule_name,
                 'Resources': self.aws_resource_arns,
                 'Source': self.events_rule_name
-            } for metrics_group in metrics_groups
+            } for metrics_set in metrics_sets
         ]
 
         await asyncio.wait_for(
@@ -105,21 +106,21 @@ class Cloudwatch:
             timeout=self.submit_timeout
         )
 
-    async def submit_metrics(self, metrics: List[MetricsGroup]):
+    async def submit_metrics(self, metrics: List[MetricsSet]):
 
         cloudwatch_metrics = []
-        for metrics_group in metrics:
-            for group_name, group in metrics_group.groups.items():
+        for metrics_set in metrics:
+            for group_name, group in metrics_set.groups.items():
                 cloudwatch_metrics.append({
-                'Time': datetime.datetime.now(),
-                'Detail': json.dumps({
-                    **group.record,
-                    'group': group_name
-                }),
-                'DetailType': self.metrics_rule_name,
-                'Resources': self.aws_resource_arns,
-                'Source': self.metrics_rule_name
-            })
+                    'Time': datetime.datetime.now(),
+                    'Detail': json.dumps({
+                        **group.record,
+                        'group': group_name
+                    }),
+                    'DetailType': self.metrics_rule_name,
+                    'Resources': self.aws_resource_arns,
+                    'Source': self.metrics_rule_name
+                })
 
         await asyncio.wait_for(
             self._loop.run_in_executor(
@@ -132,10 +133,39 @@ class Cloudwatch:
             timeout=self.submit_timeout
         )
 
-    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
+
+        cloudwatch_custom_metrics = []
+        for metrics_set in metrics_sets:
+            for custom_group_name, group in metrics_set.custom_metrics.items():
+                cloudwatch_custom_metrics.append({
+                    'Time': datetime.datetime.now(),
+                    'Detail': json.dumps({
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        'group': custom_group_name,
+                        **group
+                    }),
+                    'DetailType': self.metrics_rule_name,
+                    'Resources': self.aws_resource_arns,
+                    'Source': self.metrics_rule_name
+                })
+
+        await asyncio.wait_for(
+            self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.put_events,
+                    Entries=cloudwatch_custom_metrics
+                )
+            ),
+            timeout=self.submit_timeout
+        )
+
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
         cloudwatch_errors = []
-        for metrics_group in metrics_groups:
-            for error in metrics_group.errors:
+        for metrics_set in metrics_sets:
+            for error in metrics_set.errors:
                 cloudwatch_errors.append({
                     'Time': datetime.datetime.now(),
                     'Detail': json.dumps(error),
