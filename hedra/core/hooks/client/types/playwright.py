@@ -104,8 +104,9 @@ class PlaywrightClient(BaseClient):
             if isinstance(result, Exception):
                 raise result
 
-            self.actions.store(self.next_name, command, self.session)
             if self.intercept:
+                self.actions.store(self.next_name, command, self.session)
+                
                 loop = asyncio.get_event_loop()
                 self.waiter = loop.create_future()
                 await self.waiter

@@ -64,8 +64,9 @@ class GraphQLClient(BaseClient):
             if isinstance(result, Exception):
                 raise result
 
-            self.actions.store(self.next_name, request, self.session)
             if self.intercept:
+                self.actions.store(self.next_name, request, self.session)
+                
                 loop = asyncio.get_event_loop()
                 self.waiter = loop.create_future()
                 await self.waiter
