@@ -12,7 +12,7 @@ class ActionsStore:
         self.current_stage: str = None
         self.waiter = None
 
-    def add_placeholder(self, stage: str):
+    def set_waiter(self, stage: str):
 
         if self._loop is None:
             self._loop = asyncio.get_event_loop()

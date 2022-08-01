@@ -91,7 +91,7 @@ class Setup(Stage):
                 execute_stage.client.next_name = hook.name
                 execute_stage.client.intercept = True
 
-                execute_stage.client.actions.add_placeholder(execute_stage.name)
+                execute_stage.client.actions.set_waiter(execute_stage.name)
                 task = asyncio.create_task(hook.call())
 
                 await execute_stage.client.actions.wait_for_ready()
