@@ -43,5 +43,3 @@ class ActionsStore:
         ).get(action_name)
 
         return action, session
-
-storage = ActionsStore()
