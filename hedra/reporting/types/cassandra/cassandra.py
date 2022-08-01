@@ -21,7 +21,7 @@ try:
     from .cassandra_config import CassandraConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     Cluster = None
     PlainTextAuthProvider = None
     CassandraConfig = None
@@ -40,8 +40,10 @@ class Cassandra:
         self.password = config.password
         self.keyspace = config.keyspace
         self.custom_fields = config.custom_fields
-        self._events_table_name = config.events_table
-        self._metrics_table_name = config.metrics_table
+        self._events_table_name: str = config.events_table
+        self._metrics_table_name: str = config.metrics_table
+        self._group_metrics_table_name = f'{self._metrics_table_name}_group_metrics'
+        self._errors_table_name = f'{self._metrics_table_name}_errors'
         self.replication_strategy = config.replication_strategy
         self.replication = config.replication       
         self.ssl = config.ssl
@@ -50,6 +52,8 @@ class Cassandra:
         self._metrics_table = None
         self._errors_table = None
         self._events_table = None
+        self._group_metrics_table = None
+
         self._executor =ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._loop = asyncio.get_event_loop()
 
@@ -104,13 +108,6 @@ class Cassandra:
 
     async def submit_events(self, events: List[BaseEvent]):
 
-        self._events_table_types = {
-            'name': 'text',
-            'stage': 'text',
-            'time': 'float',
-            'succeeded': 'boolean'
-        }
-
         if self._events_table is None:
 
             self._events_table = type(
@@ -145,6 +142,48 @@ class Cassandra:
                 )
             )
 
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+        
+        if self._group_metrics_table is None:
+
+            fields = {
+                'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+                'name': columns.Text(min_length=1, index=True),
+                'stage': columns.Text(min_length=1),
+                'total': columns.Integer(),
+                'succeeded': columns.Integer(),
+                'failed': columns.Integer(),
+            }
+
+            self._group_metrics_table = type(
+                self._group_metrics_table_name.capitalize(), 
+                (Model, ), 
+                fields
+            )
+
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    sync_table,
+                    self._group_metrics_table,
+                    keyspaces=[self.keyspace]
+                )
+            )
+
+        for metrics_group in metrics_groups:
+            
+            await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self._metrics_table.create,
+                        **{
+                            'name': metrics_group.name,
+                            'stage': metrics_group.stage,
+                            **metrics_group.common_stats
+                        }
+                    )
+                )
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         for metrics_group in metrics:
@@ -155,10 +194,7 @@ class Cassandra:
                     'id': columns.UUID(primary_key=True, default=uuid.uuid4),
                     'name': columns.Text(min_length=1, index=True),
                     'stage': columns.Text(min_length=1),
-                    'timings_group': columns.Text(),
-                    'total': columns.Integer(),
-                    'succeeded': columns.Integer(),
-                    'failed': columns.Integer(),
+                    'group': columns.Text(),
                     'median': columns.Float(),
                     'mean': columns.Float(),
                     'variance': columns.Float(),
@@ -191,15 +227,15 @@ class Cassandra:
                     )
                 )
 
-            for timings_group_name, timings_group in metrics_group.groups.items():
+            for group_name, group in metrics_group.groups.items():
                 
                 await self._loop.run_in_executor(
                     self._executor,
                     functools.partial(
                         self._metrics_table.create,
                         **{
-                            **timings_group.record,
-                            'timings_group': timings_group_name
+                            **group.record,
+                            'group': group_name
                         }
                     )
                 )
@@ -208,31 +244,31 @@ class Cassandra:
 
     async def submit_errors(self, metrics_groups: List[MetricsGroup]):
 
+        if self._errors_table is None:
+            errors_table_fields = {
+                'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+                'metric_name': columns.Text(min_length=1, index=True),
+                'metric_stage': columns.Text(min_length=1),
+                'error_message': columns.Text(min_length=1),
+                'error_count': columns.Integer()
+            }
+
+            self._errors_table = type(
+                self._errors_table_name.capitalize()
+                (Model, ),
+                errors_table_fields
+            )
+
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    sync_table,
+                    self._errors_table,
+                    keyspaces=[self.keyspace]
+                )
+            )
+
         for metrics_group in metrics_groups:
-
-            if self._errors_table is None:
-                errors_table_fields = {
-                    'id': columns.UUID(primary_key=True, default=uuid.uuid4),
-                    'metric_name': columns.Text(min_length=1, index=True),
-                    'metric_stage': columns.Text(min_length=1),
-                    'error_message': columns.Text(min_length=1),
-                    'error_count': columns.Integer()
-                }
-
-                self._errors_table = type(
-                    f'{self._metrics_error_table}_errors'.capitalize()
-                    (Model, ),
-                    errors_table_fields
-                )
-
-                await self._loop.run_in_executor(
-                    self._executor,
-                    functools.partial(
-                        sync_table,
-                        self._errors_table,
-                        keyspaces=[self.keyspace]
-                    )
-                )
 
             for error in metrics_group.errors:
                 await self._loop.run_in_executor(

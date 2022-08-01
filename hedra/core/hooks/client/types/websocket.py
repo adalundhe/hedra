@@ -1,11 +1,12 @@
+import asyncio
 from types import FunctionType
 from typing import Any, Dict, List
 from hedra.core.hooks.client.config import Config
-from hedra.core.engines.types.common.hooks import Hooks
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.types.websocket.client import MercuryWebsocketClient
 from hedra.core.engines.types.common.request import Request
 from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core.hooks.client.store import ActionsStore
 from .base_client import BaseClient
 
 
@@ -22,7 +23,9 @@ class WebsocketClient(BaseClient):
             reset_connections=config.options.get('reset_connections')
         )
         self.request_type = RequestTypes.WEBSOCKET
+        self.actions: ActionsStore = None
         self.next_name = None
+        self.intercept = False
 
     def __getitem__(self, key: str):
         return self.session.registered.get(key)
@@ -38,23 +41,28 @@ class WebsocketClient(BaseClient):
         
     ):
         if self.session.registered.get(self.next_name) is None:
-            result = await self.session.prepare(
-                Request(
-                    self.next_name,
-                    url,
-                    method='GET',
-                    headers=headers,
-                    params=params,
-                    payload=None,
-                    user=user,
-                    tags=tags,
-                    checks=checks,
-                    request_type=self.request_type
-                )
+            request = Request(
+                self.next_name,
+                url,
+                method='GET',
+                headers=headers,
+                params=params,
+                payload=None,
+                user=user,
+                tags=tags,
+                checks=checks,
+                request_type=self.request_type
             )
 
+            result = await self.session.prepare(request)
             if isinstance(result, Exception):
                 raise result
+            
+            self.actions.store(self.next_name, request, self.session)
+            if self.intercept:
+                loop = asyncio.get_event_loop()
+                self.waiter = loop.create_future()
+                await self.waiter
 
         return self.session
 
@@ -71,22 +79,27 @@ class WebsocketClient(BaseClient):
     ):
 
         if self.session.registered.get(self.next_name) is None:
-            result = await self.session.prepare(
-                Request(
-                    self.next_name,
-                    url,
-                    method='POST',
-                    headers=headers,
-                    params=params,
-                    payload=data,
-                    user=user,
-                    tags=tags,
-                    checks=checks,
-                    request_type=self.request_type
-                )
+            request = Request(
+                self.next_name,
+                url,
+                method='POST',
+                headers=headers,
+                params=params,
+                payload=data,
+                user=user,
+                tags=tags,
+                checks=checks,
+                request_type=self.request_type
             )
 
+            result = await self.session.prepare(request)
             if isinstance(result, Exception):
                 raise result
+                
+            self.actions.store(self.next_name, request, self.session)
+            if self.intercept:
+                loop = asyncio.get_event_loop()
+                self.waiter = loop.create_future()
+                await self.waiter
 
         return self.session

@@ -7,7 +7,7 @@ from typing import List
 import psutil
 from hedra.reporting import metric
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup, timings_group
+from hedra.reporting.metric import MetricsGroup
 
 try:
 
@@ -27,11 +27,13 @@ class GoogleCloudStorage:
         self.bucket_namespace = config.bucket_namespace
         self.events_bucket_name = config.events_bucket
         self.metrics_bucket_name = config.metrics_bucket
+        self.group_metrics_bucket_name = f'{self.group_metrics_bucket_name}_group_metrics'
         self.errors_bucket_name = f'{self.metrics_bucket_name}_errors'
 
         self.credentials = None
         self.client = None
         self.events_bucket = None
+        self.group_metrics_bucket = None
         self.metrics_bucket = None
         self.errors_bucket = None
 
@@ -72,6 +74,42 @@ class GoogleCloudStorage:
                 json.dumps(event.record)
             )
 
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+
+        try:
+
+            self.group_metrics_bucket = await self._loop.run_in_executor(
+                self._executor,
+                self.client.get_bucket,
+                f'{self.bucket_namespace}_{self.group_metrics_bucket_name}'
+            )
+        
+        except Exception:
+
+            self.group_metrics_bucket = await self._loop.run_in_executor(
+                self._executor,
+                self.client.create_bucket,
+                f'{self.bucket_namespace}_{self.group_metrics_bucket_name}'
+            )
+
+        for metrics_group in metrics_groups:
+
+            blob = await self._loop.run_in_executor(
+                self._executor,
+                self.metrics_bucket.blob,
+                metrics_group.name
+            )
+
+            await self._loop.run_in_executor(
+                self._executor,
+                blob.upload_from_string,
+                json.dumps({
+                    'name': metrics_group.name,
+                    'stage': metrics_group.stage,
+                    **metrics_group.common_stats
+                })
+            )
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         try:
@@ -92,7 +130,7 @@ class GoogleCloudStorage:
 
         for metrics_group in metrics:
 
-            for timings_group_name, timings_group in metrics_group.groups.items():
+            for group_name, group in metrics_group.groups.items():
                 blob = await self._loop.run_in_executor(
                     self._executor,
                     self.metrics_bucket.blob,
@@ -103,8 +141,8 @@ class GoogleCloudStorage:
                     self._executor,
                     blob.upload_from_string,
                     json.dumps({
-                        **timings_group.record,
-                        'timings_group': timings_group_name
+                        **group.record,
+                        'group': group_name
                     })
                 )
 

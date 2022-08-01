@@ -7,7 +7,7 @@ from datetime import datetime
 
 class AWSTimestreamErrorRecord:
 
-    def __init__(self, record_name: str, error_message: str, count: int, session_uuid: str) -> None:
+    def __init__(self, record_name: str, record_stage: str, error_message: str, count: int, session_uuid: str) -> None:
 
 
         self.record_type = 'error_metric'
@@ -21,8 +21,12 @@ class AWSTimestreamErrorRecord:
                 "Value": 'error_metric'
             },
             {
-                "Name": "source",
+                "Name": "name",
                 "Value": record_name
+            },
+            {
+                "Name": "stage",
+                "Value": record_stage
             },
             {
                 "Name": "error_message",

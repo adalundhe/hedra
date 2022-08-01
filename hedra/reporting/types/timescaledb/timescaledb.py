@@ -14,7 +14,7 @@ try:
     from .timescaledb_config import TimescaleDBConfig
     has_connector=True
 
-except ImportError:
+except Exception:
     # sqlalchemy = None
     # UUID = None
     # Postgres = None
@@ -66,6 +66,39 @@ class TimescaleDB(Postgres):
                 
             await transaction.commit()
 
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+        
+        async with self._connection.begin() as transaction:
+
+            if self._group_metrics_table is None:
+
+                group_metrics_table = sqlalchemy.Table(
+                    self.group_metrics_table_name,
+                    self.metadata,
+                    sqlalchemy.Column('id', UUID(as_uuid=True), default=uuid.uuid4),
+                    sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
+                    sqlalchemy.Column('stage', sqlalchemy.VARCHAR(255)),
+                    sqlalchemy.Column('total', sqlalchemy.BIGINT),
+                    sqlalchemy.Column('succeeded', sqlalchemy.BIGINT),
+                    sqlalchemy.Column('failed', sqlalchemy.BIGINT),
+                )
+
+                await self._connection.execute(CreateTable(group_metrics_table, if_not_exists=True))
+                await self._connection.execute(
+                    f"SELECT create_hypertable('{self.group_metrics_table_name}', 'time', migrate_data => true, if_not_exists => TRUE, create_default_indexes=>FALSE);"
+                )
+
+                await self._connection.execute(f"CREATE INDEX ON {self.group_metrics_table_name} (name, time DESC);")
+
+                self._group_metrics_table = group_metrics_table
+
+            for metrics_group in metrics_groups:
+                await self._connection.execute(self._metrics_table.insert(values={
+                    'name': metrics_group.name,
+                    'stage': metrics_group.stage,
+                    **metrics_group.common_stats
+                }))
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         async with self._connection.begin() as transaction:
@@ -79,10 +112,7 @@ class TimescaleDB(Postgres):
                         sqlalchemy.Column('id', UUID(as_uuid=True), default=uuid.uuid4),
                         sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
                         sqlalchemy.Column('stage', sqlalchemy.VARCHAR(255)),
-                        sqlalchemy.Column('timings_group', sqlalchemy.TEXT),
-                        sqlalchemy.Column('total', sqlalchemy.BIGINT),
-                        sqlalchemy.Column('succeeded', sqlalchemy.BIGINT),
-                        sqlalchemy.Column('failed', sqlalchemy.BIGINT),
+                        sqlalchemy.Column('group', sqlalchemy.TEXT),
                         sqlalchemy.Column('median', sqlalchemy.FLOAT),
                         sqlalchemy.Column('mean', sqlalchemy.FLOAT),
                         sqlalchemy.Column('variance', sqlalchemy.FLOAT),
@@ -109,10 +139,10 @@ class TimescaleDB(Postgres):
 
                     self._metrics_table = metrics_table
 
-                for timings_group_name, timings_group in metrics_group.groups.items():
+                for group_name, group in metrics_group.groups.items():
                     await self._connection.execute(self._metrics_table.insert(values={
-                        **timings_group.record,
-                        'timings_group': timings_group_name
+                        **group.record,
+                        'group': group_name
                     }))
 
             await transaction.commit()

@@ -6,7 +6,7 @@ from typing import List
 
 import psutil
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup, timings_group
+from hedra.reporting.metric import MetricsGroup
 
 
 try:
@@ -14,7 +14,7 @@ try:
     from .newrelic_config import NewRelicConfig
     has_connector=True
 
-except ImportError:
+except Exception:
     newrelic = None
     NewRelicConfig = None
     has_connector=False
@@ -65,16 +65,29 @@ class NewRelic:
                 )
             )
 
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+        
+        for metrics_group in metrics_groups:
+            
+            for field, value in metrics_group.common_stats.items():
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self.client.record_custom_metric,
+                        f'{metrics_group.name}_{field}',
+                        value
+                    )
+                )
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         for metrics_group in metrics:
 
-            for timings_group_name, timings_group in metrics_group.groups.items():
+            for group in metrics_group.groups.values():
 
                 metric_record = {
-                    **timings_group.stats, 
-                    **timings_group.custom,
-                    'timings_group': timings_group_name
+                    **group.stats, 
+                    **group.custom
                 }
                 
                 for field, value in metric_record.items():

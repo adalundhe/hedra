@@ -8,7 +8,7 @@ try:
     from .dogstatsd_config import DogStatsDConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     from hedra.reporting.types.empty import Empty as StatsD
     DogStatsdClient = None
     DogStatsDConfig = None

@@ -24,6 +24,8 @@ class MongoDB:
         self.database_name = config.database
         self.events_collection = config.events_collection
         self.metrics_collection = config.metrics_collection
+        self.group_metrics_collection = f'{self.metrics_collection}_group_metrics'
+        self.errors_collection = f'{self.metrics_collection}_errors'
 
         self.connection: AsyncIOMotorClient = None
         self.database = None
@@ -43,21 +45,38 @@ class MongoDB:
             [event.record for event in events]
         )
 
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+        await self.database[self.group_metrics_collection].insert_many([
+            {
+                'name': metrics_group.name,
+                'stage': metrics_group.stage,
+                **metrics_group.common_stats
+            } for metrics_group in metrics_groups
+        ])
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
         await self.database[self.metrics_collection].insert_many(
             [{
                 'name': metrics_group.name,
                 'stage': metrics_group.stage,
-                'errors': metrics_group.errors,
                 **metrics_group.common_stats,
                 'timings': {
-                    timings_group_name: timings_group.record for timings_group_name, timings_group in metrics_group.groups.items()
+                    group_name: group.record for group_name, group in metrics_group.groups.items()
                 }
             } for metrics_group in metrics]
         )
 
     async def submit_errors(self, metrics: List[MetricsGroup]):
-        pass
+
+        for metrics_group in metrics:
+            await self.database[self.errors_collection].insert_many([
+                {
+                    'name': metrics_group.name,
+                    'stage': metrics_group.stage,
+                    'error_message': error.get('message'),
+                    'error_count': error.get('count')
+                } for error in metrics_group.errors
+            ])
 
     async def close(self):
         pass

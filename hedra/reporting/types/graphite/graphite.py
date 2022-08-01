@@ -2,7 +2,7 @@
 import re
 from typing import List
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup, timings_group
+from hedra.reporting.metric import MetricsGroup
 
 
 try:
@@ -11,7 +11,7 @@ try:
     from .graphite_config import GraphiteConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     from hedra.reporting.types.empty import Empty as StatsD
     GraphiteClient = None
     GraphiteConfig = None
@@ -39,20 +39,27 @@ class Graphite(StatsD):
             else:
                 self.connection.send_graphite(f'{event.name}_failed', 1)
 
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+        for metrics_group in metrics_groups:
+            for field, value in metrics_group.common_stats.items():
+                self.connection.send_graphite(
+                    f'{metrics_group.name}_{field}', value
+                )
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         for metrics_group in metrics:
 
-            for timings_group_name, timings_group in metrics_group.groups.items():
+            for group_name, group in metrics_group.groups.items():
             
-                for metric_field, metric_value in timings_group.stats.items():
+                for metric_field, metric_value in group.stats.items():
                     self.connection.send_graphite(
-                        f'{metrics_group.name}_{timings_group_name}_{metric_field}', metric_value
+                        f'{metrics_group.name}_{group_name}_{metric_field}', metric_value
                     )
 
-                for metric_field, metric_value in timings_group.custom.items():
+                for metric_field, metric_value in group.custom.items():
                     self.connection.send_graphite(
-                        f'{metrics_group.name}_{timings_group_name}_{metric_field}', metric_value
+                        f'{metrics_group.name}_{group_name}_{metric_field}', metric_value
                     )
 
     async def submit_errors(self, metrics_groups: List[MetricsGroup]):

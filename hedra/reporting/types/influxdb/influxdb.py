@@ -8,7 +8,7 @@ try:
     from .influxdb_config import InfluxDBConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     Point = None
     InfluxDBClientAsync = None
     InfluxDBConfig = None
@@ -67,21 +67,44 @@ class InfluxDB:
             record=points
         )
 
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+
+        points = []
+        for metrics_group in metrics_groups:
+            point = Point(f'{metrics_group.name}_group_metrics')
+
+            for tag in metrics_group.tags:
+                point.tag(tag.name, tag.value)
+
+            metric_record = {
+                'name': metrics_group.name,
+                'stage': metrics_group.stage,
+                **metrics_group.common_stats
+            }
+
+            for field, value in metric_record.items():
+                point.field(field, value)
+
+        await self.write_api.write(
+            bucket=self.metrics_bucket,
+            record=points
+        )
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         points = []
         for metrics_group in metrics:
             
-            for timings_group_name, timings_group in metrics_group.groups.items():
-                point = Point(metrics_group.name)
+            for group_name, group in metrics_group.groups.items():
+                point = Point(f'{metrics_group.name}_metrics')
 
                 for tag in metrics_group.tags:
                     point.tag(tag.name, tag.value)
 
                 metric_record = {
-                    **timings_group.stats, 
-                    **timings_group.custom,
-                    'timings_group': timings_group_name
+                    **group.stats, 
+                    **group.custom,
+                    'group': group_name
                 }
 
                 for field, value in metric_record.items():
@@ -96,7 +119,7 @@ class InfluxDB:
         points = []
         for metrics_group in metrics_groups:
             for error in metrics_group.errors:
-                point = Point(metrics_group.name)
+                point = Point(f'{metrics_group.name}_errors')
                 point.field(
                     error.get('message'),
                     error.get('count')

@@ -149,11 +149,17 @@ class Reporter:
     async def connect(self):
         await self.selected_reporter.connect()
 
+    async def submit_common(self, metrics: List[Any]):
+        await self.selected_reporter.submit_common(metrics)
+
     async def submit_events(self, events: List[Any]):
         await self.selected_reporter.submit_events(events)
 
     async def submit_metrics(self, metrics: List[Any]):
         await self.selected_reporter.submit_metrics(metrics)
+
+    async def submit_errors(self, metrics: List[Any]):
+        await self.selected_reporter.submit_errors(metrics)
 
     async def close(self):
         await self.selected_reporter.close()

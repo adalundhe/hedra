@@ -14,7 +14,7 @@ try:
 
     import boto3
     has_connector = True
-except ImportError:
+except Exception:
     has_connector = False
 
 
@@ -27,6 +27,8 @@ class AWSTimestream:
         self.database_name = config.database_name
         self.events_table_name = config.events_table
         self.metrics_table_name = config.metrics_table
+        self.group_metrics_table_name = f'{self.metrics_table_name}_group_metrics'
+        self.errors_table_name = f'{self.metrics_table_name}_errors'
         self.retention_options = config.retention_options
         self.session_uuid = str(uuid.uuid4())
 
@@ -99,6 +101,48 @@ class AWSTimestream:
             )
         )
 
+    async def submit_common(self, metrics: List[MetricsGroup]):
+        try:
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.create_table,
+                    DatabaseName=self.database_name,
+                    TableName=self.group_metrics_table_name,
+                    RetentionProperties=self.retention_options
+                )
+            )
+
+        except Exception:
+            pass
+
+        records = []
+        for metrics_group in metrics:
+ 
+            for field, value in metrics_group.common_stats.items():
+                timestream_record = AWSTimestreamRecord(
+                    'group_metrics',
+                    metrics_group.name,
+                    metrics_group.stage,
+                    'common',
+                    field,
+                    value,
+                    self.session_uuid,
+                )
+
+                records.append(timestream_record.to_dict())
+                    
+        await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                self.client.write_records,
+                DatabaseName=self.database_name,
+                TableName=self.group_metrics_table_name,
+                Records=records,
+                CommonAttributes={}
+            )
+        )
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         try:
@@ -116,25 +160,25 @@ class AWSTimestream:
             pass
 
         records = []
-
         for metrics_group in metrics:
 
-            for timings_group_name, timings_group in metrics_group.groups.items():
+            for group_name, group in metrics_group.groups.items():
             
-                metric_result = {**timings_group.stats, **timings_group.custom}
+                metric_result = {**group.stats, **group.custom}
 
                 for field, value in metric_result.items():
                     timestream_record = AWSTimestreamRecord(
                         'metric',
                         metrics_group.name,
                         metrics_group.stage,
-                        timings_group_name,
+                        group_name,
                         field,
                         value,
                         self.session_uuid,
                     )
 
                     records.append(timestream_record.to_dict())
+
         await self._loop.run_in_executor(
             self._executor,
             functools.partial(
@@ -169,7 +213,6 @@ class AWSTimestream:
         for metrics_group in metrics_groups:
             for error in metrics_group.errors:
                 timestream_record = AWSTimestreamErrorRecord(
-                    'metric',
                     metrics_group.name,
                     metrics_group.stage,
                     error.get('message'),

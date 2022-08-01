@@ -3,7 +3,7 @@ from typing import Any, List
 
 from matplotlib.pyplot import get
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup, timings_group
+from hedra.reporting.metric import MetricsGroup
 
 
 try:
@@ -11,7 +11,7 @@ try:
     from azure.cosmos import PartitionKey
     from .cosmosdb_config import CosmosDBConfig
     has_connector = True
-except ImportError:
+except Exception:
     CosmosClient = None
     PartitionKey = None
     CosmosDBConfig = None
@@ -26,14 +26,17 @@ class CosmosDB:
         self.database_name = config.database
         self.events_container_name = config.events_container
         self.metrics_container_name = config.metrics_container
+        self.group_metrics_container_name = f'{self.metrics_container_name}_group_metrics'
         self.errors_container_name = f'{self.metrics_container_name}_errors'
         self.events_partition_key = config.events_partition_key
         self.metrics_partition_key = config.metrics_partition_key
+        self.group_metrics_partition_key = f'{self.metrics_partition_key}_group_metrics'
         self.errors_partition_key = f'{self.metrics_partition_key}_errors'
         self.analytics_ttl = config.analytics_ttl
 
         self.events_container = None
         self.metrics_container = None
+        self.group_metrics_container = None
         self.errors_container = None
         self.client = None
         self.database = None
@@ -58,6 +61,20 @@ class CosmosDB:
                 'id': str(uuid.uuid4()),
                 **event.record
             })
+
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+        self.group_metrics_container = await self.database.create_container_if_not_exists(
+            self.group_metrics_container_name,
+            PartitionKey(f'/{self.group_metrics_partition_key}')
+        )
+
+        for metrics_group in metrics_groups:
+            await self.group_metrics_container.upsert_item({
+                'id': str(uuid.uuid4()),
+                'name': metrics_group.name,
+                'stage': metrics_group.stage,
+                **metrics_group.common_stats
+            })
         
     async def submit_metrics(self, metrics: List[MetricsGroup]):
 
@@ -67,11 +84,11 @@ class CosmosDB:
         )
 
         for metrics_group in metrics:
-            for timings_group_name, timings_group in metrics_group.groups.items():
+            for group_name, group in metrics_group.groups.items():
                 await self.metrics_container.upsert_item({
                     'id': str(uuid.uuid4()),
-                    'timings_group': timings_group_name,
-                    **timings_group.record
+                    'group': group_name,
+                    **group.record
                 })
 
     async def submit_errors(self, metrics_groups: List[MetricsGroup]):

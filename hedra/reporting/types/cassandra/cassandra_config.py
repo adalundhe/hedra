@@ -8,7 +8,7 @@ try:
 
     from cassandra.cqlengine import columns
 
-except ImportError:
+except Exception:
     columns = SimpleNamespace(Column=None)
 
 

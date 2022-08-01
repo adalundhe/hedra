@@ -9,7 +9,7 @@ try:
         Enum
     )
 
-except ImportError:
+except Exception:
     Info = None
     Summary = None
     Counter = None

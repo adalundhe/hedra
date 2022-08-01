@@ -18,7 +18,7 @@ try:
     from .mysql_config import MySQLConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     sqlalchemy = None
     create_engine = None
     MySQLConfig = None
@@ -37,9 +37,12 @@ class MySQL:
         self.password = config.password
         self.events_table_name =  config.events_table
         self.metrics_table_name = config.metrics_table
+        self.groups_metrics_table_name = f'{self.metrics_table_name}_groups_metrics'
+        self.errors_table_name = f'{self.metrics_table_name}_errors'
         self.custom_fields = config.custom_fields
         self._events_table = None
         self._metrics_table = None
+        self._groups_metrics_table = None
         self._errors_table = None
         self.metadata = sa.MetaData()
         self._engine = None
@@ -82,6 +85,35 @@ class MySQL:
                     
             await transaction.commit()
 
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+
+        if self._groups_metrics_table is None:
+            
+            group_metrics_table = sa.Table(
+                self.groups_metrics_table_name,
+                self.metadata,
+                sa.Column('id', sa.Integer, primary_key=True),
+                sa.Column('name', sa.VARCHAR(255)),
+                sa.Column('stage', sa.VARCHAR(255)),
+                sa.Column('total', sa.BIGINT),
+                sa.Column('succeeded', sa.BIGINT),
+                sa.Column('failed', sa.BIGINT),
+            )
+
+            await self._connection.execute(CreateTable(group_metrics_table, if_not_exists=True))
+            self._groups_metrics_table = group_metrics_table
+
+        async with self._connection.begin() as transaction:
+
+            for metrics_group in metrics_groups:
+                await self._connection.execute(self._groups_metrics_table.insert(values={
+                        'name': metrics_group.name,
+                        'stage': metrics_group.stage,
+                        **metrics_group.common_stats
+                    }))
+
+            await transaction.commit()
+                
     async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         async with self._connection.begin() as transaction:
@@ -96,10 +128,7 @@ class MySQL:
                         sa.Column('id', sa.Integer, primary_key=True),
                         sa.Column('name', sa.VARCHAR(255)),
                         sa.Column('stage', sa.VARCHAR(255)),
-                        sa.Column('timings_group', sa.TEXT()),
-                        sa.Column('total', sa.BIGINT),
-                        sa.Column('succeeded', sa.BIGINT),
-                        sa.Column('failed', sa.BIGINT),
+                        sa.Column('group', sa.TEXT()),
                         sa.Column('median', sa.FLOAT),
                         sa.Column('mean', sa.FLOAT),
                         sa.Column('variance', sa.FLOAT),
@@ -116,16 +145,14 @@ class MySQL:
                     for custom_field_name, sql_alchemy_type in metrics_group.custom_schemas:
                         metrics_table.append_column(custom_field_name, sql_alchemy_type)
 
-
                     await self._connection.execute(CreateTable(metrics_table, if_not_exists=True))
-                    
-
+                
                     self._metrics_table = metrics_table
 
-                for timings_group_name, timings_group in metrics_group.groups.items():
+                for group_name, group in metrics_group.groups.items():
                     await self._connection.execute(self._metrics_table.insert(values={
-                        'timings_group': timings_group_name,
-                        **timings_group.record
+                        'group': group_name,
+                        **group.record
                     }))
                     
             await transaction.commit()

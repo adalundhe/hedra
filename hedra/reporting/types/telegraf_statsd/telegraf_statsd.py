@@ -9,7 +9,7 @@ try:
     from .teleraf_statsd_config import TelegrafStatsDConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     from hedra.reporting.types.empty import Empty as StatsD
     TelegrafStatsDConfig=None
     TelegrafStatsdClient = None

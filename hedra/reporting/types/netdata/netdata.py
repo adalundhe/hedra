@@ -3,7 +3,7 @@ try:
     from .netdata_config import NetdataConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     from hedra.reporting.types.empty import Empty as StatsD
     NetdataConfig = None
     has_connector = False

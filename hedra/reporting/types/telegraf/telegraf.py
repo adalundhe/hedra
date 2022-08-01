@@ -11,7 +11,7 @@ try:
     from .telegraf_config import TelegrafConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     from hedra.reporting.types.empty import Empty as StatsD
 
     has_connector = False
@@ -38,6 +38,18 @@ class Telegraf(StatsD):
             
             else:
                 self.connection.send_telegraf(event.name, {'failed': 1})
+
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+
+        for metrics_group in metrics_groups:
+            self.connection.send_telegraf(
+                f'{metrics_group.name}_common',
+                {
+                    'name': metrics_group.name,
+                    'stage': metrics_group.stage,
+                    **metrics_group.common_stats
+                }
+            )
 
     async def submit_metrics(self, metrics: List[MetricsGroup]):
 

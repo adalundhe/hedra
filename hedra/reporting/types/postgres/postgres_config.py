@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 try:
     import sqlalchemy
-except ImportError:
+except Exception:
     sqlalchemy = SimpleNamespace(Column=None)
 
 

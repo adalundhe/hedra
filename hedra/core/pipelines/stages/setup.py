@@ -89,22 +89,34 @@ class Setup(Stage):
             
             for hook in execute_stage.hooks.get(HookType.ACTION):
                 execute_stage.client.next_name = hook.name
-                session = await hook.call()
+                execute_stage.client.intercept = True
+
+                execute_stage.client.actions.add_placeholder(execute_stage.name)
+                task = asyncio.create_task(hook.call())
+
+                await execute_stage.client.actions.wait_for_ready()
+                try:
+                    task.cancel()
+                except Exception:
+                    pass
+                     
+                action, session = execute_stage.client.actions.get(
+                    execute_stage.name,
+                    hook.name
+                )
 
                 session.context.history.add_row(
                     hook.name
                 )
 
-                parsed_action = session.registered.get(hook.name)
-
-                parsed_action.hooks.before = self.get_hook(execute_stage, hook.shortname, HookType.BEFORE)
-                parsed_action.hooks.after = self.get_hook(execute_stage, hook.shortname, HookType.AFTER)
-                parsed_action.hooks.checks = self.get_checks(execute_stage, hook.shortname)
+                action.hooks.before = self.get_hook(execute_stage, hook.shortname, HookType.BEFORE)
+                action.hooks.after = self.get_hook(execute_stage, hook.shortname, HookType.AFTER)
+                action.hooks.checks = self.get_checks(execute_stage, hook.shortname)
 
                 hook.session = session
-                hook.action = parsed_action          
+                hook.action = action          
 
-
+            execute_stage.client.intercept = False
             for setup_hook in execute_stage.hooks.get(HookType.SETUP):
                 await setup_hook.call()
 

@@ -10,7 +10,7 @@ try:
     from .redis_config import RedisConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     aioredis = None
     RedisConfig = None
     has_connector = True
@@ -26,6 +26,7 @@ class Redis:
         self.database = config.database
         self.events_channel = config.events_channel
         self.metrics_channel = config.metrics_channel
+        self.group_metrics_channel = f'{self.group_metrics_channel}_group_metrics'
         self.errors_channel = f'{self.metrics_channel}_errors'
         self.channel_type = config.channel_type
         self.connection = None
@@ -55,16 +56,39 @@ class Redis:
                     json.dumps(events.record)
                 )
 
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+
+        for metrics_group in metrics_groups:
+            if self.channel_type == 'channel':
+                await self.connection.publish(
+                    self.group_metrics_channel,
+                    json.dumps({
+                        'name': metrics_group.name,
+                        'stage': metrics_group.stage,
+                        **metrics_group.common_stats
+                    })
+                )
+
+            else:
+                await self.connection.sadd(
+                    self.group_metrics_channel,
+                    json.dumps({
+                        'name': metrics_group.name,
+                        'stage': metrics_group.stage,
+                        **metrics_group.common_stats
+                    })
+                )
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         for metrics_group in metrics:
-            for timings_group_name, timings_group in metrics_group.groups.items():
+            for group_name, group in metrics_group.groups.items():
                 if self.channel_type == 'channel':
                     await self.connection.publish(
                         self.metrics_channel,
                         json.dumps({
-                            **timings_group.record,
-                            'timings_group': timings_group_name
+                            **group.record,
+                            'group': group_name
                         })
                     )
 
@@ -72,8 +96,8 @@ class Redis:
                     await self.connection.sadd(
                         self.metrics_channel,
                         json.dumps({
-                            **timings_group.record,
-                            'timings_group': timings_group_name
+                            **group.record,
+                            'group': group_name
                         })
                     )
 

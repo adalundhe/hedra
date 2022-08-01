@@ -1,8 +1,4 @@
 import asyncio
-import chunk
-from inspect import trace
-import traceback
-from types import FunctionType
 import aiodns
 import time
 from typing import Awaitable, Dict, List, Optional, Set, Tuple, Union
@@ -100,7 +96,7 @@ class MercuryHTTPClient:
    
         response = Response(request)
 
-        response.wait_start = self._loop.time()
+        response.wait_start = time.monotonic()
         async with self.sem:
             connection = self.pool.connections.pop()
             
@@ -109,7 +105,7 @@ class MercuryHTTPClient:
                     request = await request.hooks.before(request)
                     request.setup_http_request()
 
-                response.start = self._loop.time()
+                response.start = time.monotonic()
 
                 await connection.make_connection(
                     request.url.hostname,
@@ -120,7 +116,7 @@ class MercuryHTTPClient:
                     ssl=request.ssl_context
                 )
 
-                response.connect_end = self._loop.time()
+                response.connect_end = time.monotonic()
 
                 connection.write(request.headers.encoded_headers)
                 
@@ -131,7 +127,7 @@ class MercuryHTTPClient:
                     else:
                         connection.write(request.payload.encoded_data)
 
-                response.write_end = self._loop.time()
+                response.write_end = time.monotonic()
 
                 chunk = await connection._connection._reader.readline_fast()
 
@@ -170,7 +166,7 @@ class MercuryHTTPClient:
 
                     all_chunks_read = True
 
-                response.read_end = self._loop.time()
+                response.read_end = time.monotonic()
                 response.headers = headers
                 response.body = body
                 
@@ -182,6 +178,7 @@ class MercuryHTTPClient:
                 return response
 
             except Exception as e:
+                response.read_end = time.monotonic()
                 response.error = str(e)
                 self.pool.connections.append(Connection(reset_connection=self.pool.reset_connections))
                 return response

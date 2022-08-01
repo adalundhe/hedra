@@ -3,7 +3,6 @@ import functools
 from re import S
 import re
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import Metric, timings_group
 from hedra.reporting.metric.metrics_group import MetricsGroup
 
 try:
@@ -22,7 +21,7 @@ try:
     from .datadog_config import DatadogConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     datadog = None
     DatadogConfig = None
     has_connector = False
@@ -105,6 +104,36 @@ class Datadog:
                 )
             )
 
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+
+        metrics_series = []
+        for metrics_group in metrics_groups:
+            tags = [
+                f'{tag.name}:{tag.value}' for tag in metrics_group.tags
+            ]
+
+            for field, value in metrics_group.common_stats.items():
+                metric_type = self.types_map.get(field)
+                datadog_metric_type = self._datadog_api_map.get(metric_type)
+
+                series = MetricSeries(
+                    f'{metrics_group.name}_{field}', 
+                    [MetricPoint(
+                        timestamp=int(datetime.now().timestamp()),
+                        value=float(value)
+                    )],
+                    type=datadog_metric_type,
+                    tags=[
+                        *tags,
+                        f'metric_stage:{metrics_group.stage}',
+                        f'group:common'
+                    ]
+                )
+
+                metrics_series.append(series)
+                
+        await self.metrics_api.submit_metrics(MetricPayload(metrics_series))        
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         for metrics_group in metrics:
@@ -114,9 +143,9 @@ class Datadog:
             ]
 
             metrics_series = []
-            for timings_group_name, timings_group in metrics_group.groups.items():
-                for field, metric_type in self.types_map.items():
-                    value = timings_group.stats.get(field)
+            for group_name, group in metrics_group.groups.items():
+                for field, value in group.stats.items():
+                    metric_type = self.types_map.get(field)
                     datadog_metric_type = self._datadog_api_map.get(metric_type)
 
                     series = MetricSeries(
@@ -129,13 +158,13 @@ class Datadog:
                         tags=[
                             *tags,
                             f'metric_stage:{metrics_group.stage}',
-                            f'timings_group:{timings_group_name}'
+                            f'group:{group_name}'
                         ]
                     )
 
                     metrics_series.append(series)
 
-                for quantile_name, quantile_value in timings_group.quantiles.items():
+                for quantile_name, quantile_value in group.quantiles.items():
                     datadog_metric_type = self._datadog_api_map.get('gauge')
                     series = MetricSeries(
                         f'{metrics_group.name}_{quantile_name}', 
@@ -147,14 +176,14 @@ class Datadog:
                         tags=[
                             *tags,
                             f'metric_stage:{metrics_group.stage}',
-                            f'timings_group:{timings_group_name}'
+                            f'group:{group_name}'
                         ]
                     )
 
                     metrics_series.append(series)
      
-                for custom_field_name, value in timings_group.custom.items():
-                    datadog_metric_type = timings_group.custom_schemas.get(custom_field_name)
+                for custom_field_name, value in group.custom.items():
+                    datadog_metric_type = group.custom_schemas.get(custom_field_name)
                     datadog_type = self._datadog_api_map.get(datadog_metric_type)
 
                     series = MetricSeries(
@@ -167,7 +196,7 @@ class Datadog:
                         tags=[
                             *tags,
                             f'metric_stage:{metrics_group.stage}',
-                            f'timings_group:{timings_group_name}'
+                            f'group:{group_name}'
                         ]
                     )
 

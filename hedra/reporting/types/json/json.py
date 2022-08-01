@@ -37,6 +37,9 @@ class JSON:
                 )
             )
 
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+        pass
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
         metrics_records = [
             {

@@ -6,7 +6,7 @@ from hedra.reporting.types.common.types import ReporterTypes
 try:
     import sqlalchemy
 
-except ImportError:
+except Exception:
     sqlalchemy = SimpleNamespace(Column=None)
 
 

@@ -59,16 +59,6 @@ class TimingsGroup:
         self.unique_fields = list(self.fields)
         self.unique_values = list(self.values)
 
-        for common_name, common_value in common.items():
-            self.data.append((
-                common_name,
-                common_value
-            ))
-
-            self.fields.append(common_name)
-            self.values.append(common_value)
-
-
         self.custom_fields: Dict[str, Dict[str, Union[int, float, Any]]] = data.get('custom_metrics')
 
     @property

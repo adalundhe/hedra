@@ -14,7 +14,7 @@ try:
     from .cloudwatch_config import CloudwatchConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     boto3 = None
     CloudwatchConfig = None
     has_connector = False
@@ -33,6 +33,7 @@ class Cloudwatch:
         self.submit_timeout = config.submit_timeout
         self.events_rule_name = config.events_rule
         self.metrics_rule_name = config.metrics_rule
+        self.group_metrics_rule_name = f'{self.metrics_rule_name}_group_metrics'
         self.errors_rule_name = f'{self.metrics_rule_name}_errors'
 
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
@@ -77,16 +78,43 @@ class Cloudwatch:
             timeout=self.submit_timeout
         )
 
+    
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+        cloudwatch_group_metrics = [
+            {
+                'Time': datetime.datetime.now(),
+                'Detail': json.dumps({
+                    'name': metrics_group.name,
+                    'stage': metrics_group.stage,
+                    **metrics_group.common_stats
+                }),
+                'DetailType': self.events_rule_name,
+                'Resources': self.aws_resource_arns,
+                'Source': self.events_rule_name
+            } for metrics_group in metrics_groups
+        ]
+
+        await asyncio.wait_for(
+            self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.put_events,
+                    Entries=cloudwatch_group_metrics
+                )
+            ),
+            timeout=self.submit_timeout
+        )
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         cloudwatch_metrics = []
         for metrics_group in metrics:
-            for timings_group_name, timings_group in metrics_group.groups.items():
+            for group_name, group in metrics_group.groups.items():
                 cloudwatch_metrics.append({
                 'Time': datetime.datetime.now(),
                 'Detail': json.dumps({
-                    **timings_group.record,
-                    'timings_group': timings_group_name
+                    **group.record,
+                    'group': group_name
                 }),
                 'DetailType': self.metrics_rule_name,
                 'Resources': self.aws_resource_arns,

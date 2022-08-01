@@ -7,12 +7,12 @@ from concurrent.futures import ThreadPoolExecutor
 import psutil
 from .aws_lambda_config import AWSLambdaConfig
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup, timings_group
+from hedra.reporting.metric import MetricsGroup
 
 try:
     import boto3
     has_connector=True
-except ImportError:
+except Exception:
     boto3 = None
     has_connector=False
 
@@ -23,7 +23,9 @@ class AWSLambda:
         self.aws_secret_access_key = config.aws_secret_access_key
         self.region_name = config.region_name
         self.events_lambda_name = config.events_lambda
-        self.metrics_lambda_name = config.metrics_lambda    
+        self.metrics_lambda_name = config.metrics_lambda 
+        self.group_metrics_lambda_name = f'{self.metrics_lambda_name}_group_metrics'
+        self.errors_lambda_name = f'{self.metrics_lambda_name}_errors'   
 
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._client = None
@@ -52,10 +54,25 @@ class AWSLambda:
                 )
             )
 
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+        for metrics_group in metrics_groups:
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self._client.invoke,
+                    FunctionName=self.group_metrics_lambda_name,
+                        Payload=json.dumps({
+                            'name': metrics_group.name,
+                            'stage': metrics_group.stage,
+                            **metrics_group.common_stats
+                        })
+                )
+            )
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
         for metrics_group in metrics:
 
-            for timings_group_name, timings_group in metrics_group.groups.items():
+            for group_name, group in metrics_group.groups.items():
                 
                 await self._loop.run_in_executor(
                     self._executor,
@@ -63,9 +80,9 @@ class AWSLambda:
                         self._client.invoke,
                         FunctionName=self.metrics_lambda_name,
                         Payload=json.dumps({
-                            'timings_group': timings_group_name,
-                            **timings_group.record,
-                            **timings_group.custom
+                            'group': group_name,
+                            **group.record,
+                            **group.custom
                         })
                     )
                 )
@@ -77,7 +94,7 @@ class AWSLambda:
                     self._executor,
                     functools.partial(
                         self._client.invoke,
-                        FunctionName=self.metrics_lambda_name,
+                        FunctionName=self.errors_lambda_name,
                         Payload=json.dumps({
                             'name': metrics_group.name,
                             'stage': metrics_group.stage,

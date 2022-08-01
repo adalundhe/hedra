@@ -7,7 +7,7 @@ from datetime import datetime
 
 class AWSTimestreamRecord:
 
-    def __init__(self, record_type: str, record_name: str, record_stage: str, timings_group_name: str, field_name: str, value: Any, session_uuid: str) -> None:
+    def __init__(self, record_type: str, record_name: str, record_stage: str, group_name: str, field_name: str, value: Any, session_uuid: str) -> None:
 
         measure_value_type = None
 
@@ -47,8 +47,8 @@ class AWSTimestreamRecord:
                 "Value": record_stage
             },
             {
-                "Name": "timings_type",
-                "Value": timings_group_name
+                "Name": "group",
+                "Value": group_name
             },
             {
                 "Name": "field_name", 

@@ -29,7 +29,7 @@ class CSV:
     async def submit_events(self, events: List[BaseEvent]):
 
 
-        with open(self.events_filepath, 'w') as events_file:
+        with open(self.events_filepath, 'a') as events_file:
 
             for event in events:
                 if self._events_csv_writer is None:
@@ -46,15 +46,48 @@ class CSV:
                     event.record
                 )
 
+    async def submt_common(self, metrics_groups: List[MetricsGroup]):
+
+        headers = [
+            'name',
+            'stage',
+            'total',
+            'succeeded',
+            'failed'
+        ]
+
+        group_metrics_filepath = Path(self.metrics_filepath).stem
+        with open(f'{group_metrics_filepath}_group_metrics.csv', 'a') as group_metrics_file:
+
+            if self._group_metrics_csv_writer is None:
+                self._group_metrics_csv_writer = csv.DictWriter(group_metrics_filepath, fieldnames=headers)
+
+                await self._loop.run_in_executor(
+                    self._executor,
+                    self._group_metrics_csv_writer.writeheader
+                )
+
+            for metrics_group in metrics_groups:
+                await self._loop.run_in_executor(
+                    self._executor,
+                    self._group_metrics_csv_writer.writerow,
+                    {
+                        'name': metrics_group.name,
+                        'stage': metrics_group.stage,
+                        **metrics_group.common_stats
+                    }
+                )
+
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
 
-        with open(self.metrics_filepath, 'w') as metrics_file:
+        with open(self.metrics_filepath, 'a') as metrics_file:
 
             for metrics_group in metrics:
                 if self._metrics_csv_writer is None:
                     self._metrics_csv_writer = csv.DictWriter(metrics_file, fieldnames=[
                         *metrics_group.fields,
-                        'timings_group'
+                        'group'
                     ])
 
                     await self._loop.run_in_executor(
@@ -62,34 +95,35 @@ class CSV:
                         self._metrics_csv_writer.writeheader
                     )
 
-                for timings_group_name, timings_group in metrics_group.groups.items():
+                for group_name, group in metrics_group.groups.items():
                     await self._loop.run_in_executor(
                         self._executor,
                         self._metrics_csv_writer.writerow,
                         {
-                            **timings_group.record,
-                            'timings_group': timings_group_name
+                            **group.record,
+                            'group': group_name
                         }
                     )
 
-    async def submit_events(self, metrics_groups: List[MetricsGroup]):
+    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
 
         error_csv_headers = [
-            'metric_name',
-            'metric_stage',
+            'name',
+            'stage',
             'error_message',
             'error_count'
         ]
 
         errors_file_path = Path(self.metrics_filepath).stem
-        with open (f'{errors_file_path}_errors.csv', 'w') as errors_file:
+        with open (f'{errors_file_path}_errors.csv', 'a') as errors_file:
             
-            error_csv_writer = csv.DictWriter(errors_file, fieldnames=error_csv_headers)
+            if self._errors_csv_writer is None:
+                error_csv_writer = csv.DictWriter(errors_file, fieldnames=error_csv_headers)
 
-            await self._loop.run_in_executor(
-                self._executor,
-                error_csv_writer.writeheader
-            )
+                await self._loop.run_in_executor(
+                    self._executor,
+                    error_csv_writer.writeheader
+                )
 
             for metrics_group in metrics_groups:
 
@@ -98,8 +132,8 @@ class CSV:
                         self._executor,
                         error_csv_writer.writerow,
                         {
-                            'metric_name': metrics_group.name,
-                            'metric_stage': metrics_group.stage,
+                            'name': metrics_group.name,
+                            'stage': metrics_group.stage,
                             'error_message': error.get('message'),
                             'error_count': error.get('count')
                         }

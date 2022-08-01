@@ -14,7 +14,7 @@ try:
     from .s3_config import S3Config
     has_connector = True
 
-except ImportError:
+except Exception:
     boto3 = None
     S3Config = None
     has_connector = False
@@ -29,6 +29,7 @@ class S3:
         self.buckets_namespace = config.buckets_namespace
         self.events_bucket_name = config.events_bucket
         self.metrics_bucket_name = config.metrics_bucket
+        self.group_metrics_bucket_name = f'{self.metrics_bucket_name}-group-metrics'
         self.errors_bucket_name = f'{self.metrics_bucket_name}-errors'
 
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
@@ -78,6 +79,41 @@ class S3:
                     Body=json.dumps(event.record)
                 )
             )
+
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+
+        group_metrics_bucket_name = f'{self.buckets_namespace}-{self.group_metrics_bucket_name}'
+
+        try:
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.create_bucket,
+                    Bucket=group_metrics_bucket_name,
+                    CreateBucketConfiguration={
+                        'LocationConstraint': self.region_name
+                    }
+                )
+            )
+
+        except Exception:
+            pass
+        
+        for metrics_group in metrics_groups:
+            timestamp = int(datetime.now().timestamp())
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.put_object,
+                    Bucket=group_metrics_bucket_name,
+                    Key=f'{metrics_group.name}-{timestamp}',
+                    Body=json.dumps({
+                        'name': metrics_group.name,
+                        'stage': metrics_group.stage,
+                        **metrics_group.common_stats
+                    })
+                )
+            )
     
     async def submit_metrics(self, metrics: List[MetricsGroup]):
 
@@ -99,7 +135,7 @@ class S3:
             pass
 
         for metrics_group in metrics:
-            for timings_group_name, timings_group in metrics_group.groups.items():
+            for group_name, group in metrics_group.groups.items():
                 timestamp = int(datetime.now().timestamp())
                 await self._loop.run_in_executor(
                     self._executor,
@@ -108,8 +144,8 @@ class S3:
                         Bucket=metrics_bucket_name,
                         Key=f'{metrics_group.name}-{timestamp}',
                         Body=json.dumps({
-                            **timings_group.record,
-                            'timings_group': timings_group_name
+                            **group.record,
+                            'group': group_name
                         })
                     )
                 )

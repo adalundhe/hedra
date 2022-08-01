@@ -10,7 +10,7 @@ try:
     from .sqlite_config import SQLiteConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     ASYNCIO_STRATEGY = None
     sqlalchemy = None
     SQLiteConfig = None
@@ -26,6 +26,8 @@ class SQLite:
         self.path = f'sqlite+aiosqlite:///{config.path}'
         self.events_table_name = config.events_table
         self.metrics_table_name = config.metrics_table
+        self.group_metrics_table_name = f'{self.metrics_table_name}_group_metrics'
+        self.errors_table_name = f'{self.metrics_table_name}_errors'
         self.custom_fields = config.custom_fields
         self.metadata = sqlalchemy.MetaData()
         self.database = None
@@ -33,6 +35,7 @@ class SQLite:
         self._connection = None
         self._events_table = None
         self._metrics_table = None
+        self._group_metrics_table = None
         self._errors_table = None
 
     async def connect(self):
@@ -63,6 +66,32 @@ class SQLite:
             
             await connection.commit()
 
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+
+        async with self._engine.begin() as connection:
+            if self._group_metrics_table is None:
+
+                group_metrics_table = sqlalchemy.Table(
+                    self.group_metrics_table_name,
+                    self.metadata,
+                    sqlalchemy.Column('id', sqlalchemy.INTEGER, primary_key=True),
+                    sqlalchemy.Column('name', sqlalchemy.TEXT),
+                    sqlalchemy.Column('stage', sqlalchemy.TEXT),
+                    sqlalchemy.Column('total', sqlalchemy.INTEGER),
+                    sqlalchemy.Column('succeeded', sqlalchemy.INTEGER),
+                    sqlalchemy.Column('failed', sqlalchemy.INTEGER),
+                )
+
+                await connection.execute(CreateTable(group_metrics_table, if_not_exists=True))
+                self._group_metrics_table = group_metrics_table
+
+            for metrics_group in metrics_groups:
+                await connection.execute(self._metrics_table.insert(values={
+                    'name': metrics_group.name,
+                    'stage': metrics_group.stage,
+                    **metrics_group.common_stats
+                }))
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
         async with self._engine.begin() as connection:
 
@@ -76,10 +105,7 @@ class SQLite:
                         sqlalchemy.Column('id', sqlalchemy.INTEGER, primary_key=True),
                         sqlalchemy.Column('name', sqlalchemy.TEXT),
                         sqlalchemy.Column('stage', sqlalchemy.TEXT),
-                        sqlalchemy.Column('timings_group', sqlalchemy.TEXT),
-                        sqlalchemy.Column('total', sqlalchemy.INTEGER),
-                        sqlalchemy.Column('succeeded', sqlalchemy.INTEGER),
-                        sqlalchemy.Column('failed', sqlalchemy.INTEGER),
+                        sqlalchemy.Column('group', sqlalchemy.TEXT),
                         sqlalchemy.Column('median', sqlalchemy.REAL),
                         sqlalchemy.Column('mean', sqlalchemy.REAL),
                         sqlalchemy.Column('variance', sqlalchemy.REAL),
@@ -99,10 +125,10 @@ class SQLite:
                     await connection.execute(CreateTable(metrics_table, if_not_exists=True))
                     self._metrics_table = metrics_table
 
-                for timings_group_name, timings_group in metrics_group.groups.items():
+                for group_name, group in metrics_group.groups.items():
                     await connection.execute(self._metrics_table.insert(values={
-                        **timings_group.record,
-                        'timings_group': timings_group_name
+                        **group.record,
+                        'group': group_name
                     }))
 
 
@@ -137,7 +163,6 @@ class SQLite:
                             'error_count': error.get('count')
                         })
                     )
-
 
             await connection.commit()
 

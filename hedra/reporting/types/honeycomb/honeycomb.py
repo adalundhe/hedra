@@ -6,7 +6,7 @@ from typing import List
 
 import psutil
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.reporting.metric import MetricsGroup, timings_group
+from hedra.reporting.metric import MetricsGroup
 
 
 try:
@@ -14,7 +14,7 @@ try:
     from .honeycomb_config import HoneycombConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     libhoney = None
     HoneycombConfig = None
     has_connector = False
@@ -57,24 +57,41 @@ class Honeycomb:
             libhoney.flush
         )
 
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+
+        for metrics_group in metrics_groups:
+
+            group_metric = {
+                'name': metrics_group.name,
+                'stage': metrics_group.stage,
+                **metrics_group.common_stats
+            }
+
+            honeycomb_group_metric = libhoney.Event(data=group_metric)
+
+            await self._loop.run_in_executor(
+                self._executor,
+                honeycomb_group_metric.send
+            )
+
+        await self._loop.run_in_executor(
+            self._executor,
+            libhoney.flush
+        )
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         for metrics_group in metrics:
 
-            for timings_group_name, timings_group in metrics_group.groups.items():
+            for group_name, group in metrics_group.groups.items():
 
                 metric_record = {
-                    **timings_group.stats, 
-                    **timings_group.custom,
-                    'timings_group': timings_group_name
-                }
-                
-                named_metric = {
-                    f'{metrics_group.name}_{field}': value for field, value in metric_record.items()
-                }
-                honeycomb_event = libhoney.Event(data={
-                    **named_metric
-                })
+                    **group.stats, 
+                    **group.custom,
+                    'group': group_name
+                }     
+    
+                honeycomb_event = libhoney.Event(data=metric_record)
 
                 await self._loop.run_in_executor(
                     self._executor,
@@ -92,8 +109,8 @@ class Honeycomb:
             for error in metrics_group.errors:
 
                 error_event = libhoney.Event(data={
-                    'metric_name': metrics_group.name,
-                    'metric_stage': metrics_group.stage,
+                    'name': metrics_group.name,
+                    'stage': metrics_group.stage,
                     'error_message': error.get('message'),
                     'error_count': error.get('count')
                 })

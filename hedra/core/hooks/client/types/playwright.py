@@ -1,3 +1,4 @@
+import asyncio
 from types import FunctionType
 from typing import Any, Dict, List
 from hedra.core.hooks.client.config import Config
@@ -12,6 +13,7 @@ from hedra.core.engines.types.playwright import (
     Options
 )
 from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core.hooks.client.store import ActionsStore
 from .base_client import BaseClient
 
 
@@ -29,7 +31,9 @@ class PlaywrightClient(BaseClient):
         )
 
         self.request_type = RequestTypes.PLAYWRIGHT
+        self.actions: ActionsStore = None
         self.next_name = None
+        self.intercept = False
 
     def __getitem__(self, key: str):
         return self.session.registered.get(key)
@@ -61,44 +65,49 @@ class PlaywrightClient(BaseClient):
         checks: List[FunctionType] = []
     ):
         if self.session.registered.get(self.next_name) is None:
-            result = await self.session.prepare(
-                Command(
-                    self.next_name,
-                    command,
-                    page=Page(
-                        selector=selector,
-                        attribute=attribute,
-                        x_coordinate=x_coordinate,
-                        y_coordinate=y_coordinate,
-                        frame=frame
-                    ),
-                    url=URL(
-                        location=location,
-                        headers=headers
-                    ),
-                    input=Input(
-                        key=key,
-                        text=text,
-                        function=function,
-                        args=args,
-                        filepath=filepath,
-                        file=file
-                    ),
-                    options=Options(
-                        event=event,
-                        option=option,
-                        is_checked=is_checked,
-                        timeout=timeout,
-                        extra=extra,
-                        switch_by=switch_by
-                    ),
-                    user=user,
-                    tags=tags,
-                    checks=checks
-                )
+            command = Command(
+                self.next_name,
+                command,
+                page=Page(
+                    selector=selector,
+                    attribute=attribute,
+                    x_coordinate=x_coordinate,
+                    y_coordinate=y_coordinate,
+                    frame=frame
+                ),
+                url=URL(
+                    location=location,
+                    headers=headers
+                ),
+                input=Input(
+                    key=key,
+                    text=text,
+                    function=function,
+                    args=args,
+                    filepath=filepath,
+                    file=file
+                ),
+                options=Options(
+                    event=event,
+                    option=option,
+                    is_checked=is_checked,
+                    timeout=timeout,
+                    extra=extra,
+                    switch_by=switch_by
+                ),
+                user=user,
+                tags=tags,
+                checks=checks
             )
 
+            result = await self.session.prepare(command)
             if isinstance(result, Exception):
                 raise result
+
+            self.actions.store(self.next_name, command, self.session)
+            if self.intercept:
+                loop = asyncio.get_event_loop()
+                self.waiter = loop.create_future()
+                await self.waiter
 
         return self.session

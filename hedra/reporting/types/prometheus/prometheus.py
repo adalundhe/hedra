@@ -4,6 +4,7 @@ import re
 from typing import List
 
 from attr import fields
+from sklearn import metrics
 from hedra.reporting.events.types.base_event import BaseEvent
 from hedra.reporting.metric import MetricsGroup
 
@@ -18,7 +19,7 @@ try:
     from .prometheus_config import PrometheusConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     PrometheusConfig = None
     has_connector = False
 
@@ -54,6 +55,7 @@ class Prometheus:
 
         self._events = {}
         self._metrics = {}
+        self._group_metrics = {}
         self._errors = {}
         
     async def connect(self) -> None:
@@ -139,18 +141,58 @@ class Prometheus:
 
             await self._submit_to_pushgateway()
 
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+        
+        for metrics_group in metrics_groups:
+            
+            metrics_set = self._group_metrics.get(metrics_group.name)
+            if metrics_set is None:
+                metrics_set = {}
+
+                for field in metrics_group.common_stats.keys():
+                    tags = [
+                        f'{tag.name}:{tag.value}' for tag in metrics_group.tags
+                    ]
+
+                    metric_name = f'{metrics_group.name}_{field}'.replace('.', '_')
+                    metric_type = self.types_map.get(field)
+
+                    prometheus_metric = PrometheusMetric(
+                        metric_name,
+                        metric_type,
+                        metric_description=f'{metrics_group.name} {field}',
+                        metric_labels=[
+                            *tags,
+                            f'stage:{metrics_group.stage}'
+                        ],
+                        metric_namespace=self.namespace,
+                        registry=self.registry
+                    )
+                    prometheus_metric.create_metric()
+                    
+                    metrics_set[field] = prometheus_metric
+                
+                self._group_metrics[metrics_group.name] = metrics_group
+            
+            metrics_set = self._group_metrics.get(metrics_group.name)
+            for field, value in metrics_group.common_stats.items():
+                metric = metrics_set.get(field)
+                metric.update(value)
+
+        await self._submit_to_pushgateway()
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
 
         for metrics_group in metrics:
 
-            timings_groups_metrics = self._metrics.get(metrics_group.name)
-            if timings_groups_metrics is None:
-                timings_groups_metrics = {}
+            groups_metrics = self._metrics.get(metrics_group.name)
+            if groups_metrics is None:
+                groups_metrics = {}
 
-                for timings_group_name, timings_group in metrics_group.groups.items():
-                    timings_group_metrics = timings_groups_metrics.get(timings_group_name)
+                for group_name, group in metrics_group.groups.items():
+                    group_metrics = groups_metrics.get(group_name)
 
-                    if timings_group_metrics is None:
+                    if group_metrics is None:
 
                         for quantile_name in metrics_group.quantiles.keys():
                             self.types_map[quantile_name] = 'gauge'
@@ -171,7 +213,10 @@ class Prometheus:
                                 metric_name,
                                 metric_type,
                                 metric_description=f'{metrics_group.name} {metric_field}',
-                                metric_labels=tags,
+                                metric_labels=[
+                                    *tags,
+                                    f'stage:{metrics_group.stage}'
+                                ],
                                 metric_namespace=self.namespace,
                                 registry=self.registry
                             )
@@ -179,25 +224,25 @@ class Prometheus:
 
                             fields[metric_field] = prometheus_metric
 
-                        timings_groups_metrics[timings_group_name] = fields
+                        groups_metrics[group_name] = fields
 
-                self._metrics[metrics_group.name] = timings_groups_metrics
+                self._metrics[metrics_group.name] = groups_metrics
                 
 
-            timings_groups_metrics = self._metrics.get(metrics_group.name)
-            for timings_group_name, timings_group in metrics_group.groups.items():
+            groups_metrics = self._metrics.get(metrics_group.name)
+            for group_name, group in metrics_group.groups.items():
 
-                timings_group_metrics = timings_groups_metrics.get(timings_group_name)
+                group_metrics = groups_metrics.get(group_name)
 
-                record = timings_group.record
-                for field in timings_group_metrics[timings_group_name]:
+                record = group.record
+                for field in group_metrics[group_name]:
                     metric_value = record.get(field)
-                    field_metric = timings_group_metrics.get(field)
+                    field_metric = group_metrics.get(field)
                     field_metric.update(metric_value)
         
         await self._submit_to_pushgateway()
     
-    async def submit_events(self, metrics_groups: List[MetricsGroup]):
+    async def submit_errors(self, metrics_groups: List[MetricsGroup]):
 
         for metrics_group in metrics_groups:
 

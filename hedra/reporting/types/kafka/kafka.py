@@ -11,7 +11,7 @@ try:
     from .kafka_config import KafkaConfig
     has_connector = True
 
-except ImportError:
+except Exception:
     AIOKafkaProducer = None
     KafkaConfig = None
     has_connector = False
@@ -24,9 +24,11 @@ class Kafka:
         self.client_id = config.client_id
         self.events_topic = config.events_topic
         self.metrics_topic = config.metrics_topic
+        self.group_metrics_topic = f'{self.metrics_topic}_group_metrics'
         self.errors_topic = f'{self.metrics_topic}_errors'
         self.events_partition = config.events_partition
         self.metrics_partition = config.metrics_partition
+        self.group_metrics_partition = f'{self.metrics_partition}_group_metrics'
         self.errors_partition = f'{self.metrics_partition}_errors'
         self.compression_type = config.compression_type
         self.timeout = config.timeout
@@ -65,18 +67,37 @@ class Kafka:
             partition=self.events_partition
         )
 
+    async def submit_common(self, metrics_groups: List[MetricsGroup]):
+        batch = self._producer.create_batch()
+        for metrics_group in metrics_groups:
+            batch.append(
+                value=json.dumps({
+                    'name': metrics_group.name,
+                    'stage': metrics_group.stage,
+                    **metrics_group.common_stats
+                }).encode('utf-8'),
+                timestamp=None, 
+                key=bytes(metrics_group.name, 'utf')
+            )
+
+        await self._producer.send_batch(
+            batch,
+            self.group_metrics_topic,
+            partition=self.group_metrics_partition
+        )
+
     async def submit_metrics(self, metrics: List[MetricsGroup]):
         
         batch = self._producer.create_batch()
         for metrics_group in metrics:
-            for timings_group_name, timings_group in metrics_group.groups.items():
+            for group_name, group in metrics_group.groups.items():
                 batch.append(
                     value=json.dumps(
                         {
-                            **timings_group.record,
+                            **group.record,
                             'name': metrics_group.name,
                             'stage': metrics_group.stage,
-                            'timings_group': timings_group_name
+                            'group': group_name
                         }
                     ).encode('utf-8'),
                     timestamp=None, 

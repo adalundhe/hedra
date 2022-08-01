@@ -7,7 +7,7 @@ from collections import defaultdict
 from typing import Dict, List, Union
 from easy_logger import Logger
 import psutil
-from hedra.reporting.metric import MetricsGroup, TimingsGroup
+from hedra.reporting.metric import MetricsGroup
 from hedra.core.hooks.types.hook import Hook
 from hedra.core.hooks.types.types import HookType
 from hedra.core.hooks.registry.registrar import registar
@@ -20,7 +20,7 @@ from hedra.reporting.events.types import (
     WebsocketEvent, 
     PlaywrightEvent
 )
-from hedra.reporting.events import results_types
+from hedra.reporting.events import EventsGroup
 from .stage import Stage
 
 
@@ -54,13 +54,7 @@ class Analyze(Stage):
             .99 
         ]
 
-        self.timings = {
-            'total': [],
-            'waiting': [],
-            'connecting': [],
-            'writing': [],
-            'reading': []
-        }
+        self.timings = defaultdict(list)
 
         for hook_type in HookType:
             self.hooks[hook_type] = []
@@ -87,55 +81,29 @@ class Analyze(Stage):
         
         for stage_name, stage_results in self.raw_results.items():
     
-            events =  defaultdict(list)
+            events =  defaultdict(EventsGroup)
             stage_total = 0
             stage_total_time = stage_results.get('total_elapsed')
-            
+
             for stage_result in stage_results.get('results'):
-                event = results_types.get(stage_result.type)(stage_result)
-                event.stage = stage_name
-                events[event.shortname].append(event)
-            
+                await events[stage_result.name].add(
+                    stage_result,
+                    stage_name
+                )
+
             grouped_stats = {}
             
             for event_group_name, events_group in events.items():  
-                tags = {}
-                succeeded = 0
-                errors = defaultdict(lambda: 0)
-
-                await asyncio.gather(*[event.check_result() for event in events_group])
-
-                for event in events_group:
-
-                    tags.update(event.tags_to_dict())
-
-                    if event.error is None:
-                        succeeded += 1
-                    
-                    else:
-                        errors[event.error] += 1
-                    
-                    self.timings['total'].append(event.time)
-                    self.timings['waiting'].append(event.time_waiting)
-                    self.timings['connecting'].append(event.time_connecting)
-                    self.timings['writing'].append(event.time_writing)
-                    self.timings['reading'].append(event.time_reading)
-
-                failed = sum(errors.values())
-                group_total = succeeded + failed
-
-                
-                results = await asyncio.gather(*[
-                    asyncio.create_task(
-                        self.calculate_timings_group(
-                            group_name,
-                            group_timings
-                        )
-                    ) for group_name, group_timings in self.timings.items()
-                ])
+    
+                group_total = events_group.succeeded + events_group.failed
 
                 timings_dict = {}
-                for timings_group in results:
+                for group_name, group_timings in events_group.timings.items():
+                    timings_group = self.calculate_timings_group(
+                        group_name,
+                        group_timings
+                    )
+
                     timings_dict= {
                         **timings_dict,
                         **timings_group
@@ -143,23 +111,23 @@ class Analyze(Stage):
 
                 metric_data = {
                     'total': group_total,
-                    'succeeded': succeeded,
-                    'failed': failed,
+                    'succeeded': events_group.succeeded,
+                    'failed': events_group.failed,
                     'errors': list([
                         {
                             'message': error_message,
                             'count': error_count
-                        } for error_message, error_count in errors.items()
+                        } for error_message, error_count in events_group.errors.items()
                     ]),
                     'timings': timings_dict
                 }
 
                 metric = MetricsGroup(
                     event_group_name,
-                    events_group[0].source,
+                    events_group.events[0].source,
                     stage_name,
                     metric_data,
-                    tags
+                    events_group.tags
                 )
 
                 grouped_stats[event_group_name] = metric
@@ -172,16 +140,18 @@ class Analyze(Stage):
                 'actions': grouped_stats
             }
 
+            print(stage_total/stage_total_time)
+
             summaries['session_total'] += stage_total
 
         stop = time.time()
         print('TOOK: ', stop-start)
         return summaries
 
-    async def calculate_timings_group(self, group_name: str, timings: List[Union[int, float]]):
+    def calculate_timings_group(self, group_name: str, timings: List[Union[int, float]]):
         custom_metrics = {}
         for custom_metric in self.hooks.get(HookType.METRIC):
-            result = await custom_metric.call(timings)
+            result = custom_metric.call(timings)
 
             custom_metrics[custom_metric.shortname] = {
                 'result': result,
