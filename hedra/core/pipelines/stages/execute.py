@@ -1,5 +1,5 @@
-from hedra.core.hooks.client import Client
-from hedra.core.hooks.types.types import HookType
+from hedra.core.engines.client import Client
+from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.stages.types.stage_states import StageStates
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from .stage import Stage

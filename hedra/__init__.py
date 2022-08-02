@@ -1,8 +1,7 @@
-from .core.hooks import (
+from .core.pipelines.hooks import (
     action,
     setup,
     teardown,
-    configure,
     before,
     after,
     depends,

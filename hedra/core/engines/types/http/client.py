@@ -1,17 +1,18 @@
 import asyncio
+import traceback
 import aiodns
 import time
 from typing import Awaitable, Dict, List, Optional, Set, Tuple, Union
-from hedra.core.engines.types.common import Response
 from hedra.core.engines.types.common.context import Context
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
 from hedra.core.engines.types.common.timeouts import Timeouts
 from .connection import Connection
 from .action import HTTPAction
+from .result import HTTPResult
 from .pool import Pool
 
 
-HTTPResponseFuture = Awaitable[Union[Response, Exception]]
+HTTPResponseFuture = Awaitable[Union[HTTPResult, Exception]]
 HTTPBatchResponseFuture = Awaitable[Tuple[Set[HTTPResponseFuture], Set[HTTPResponseFuture]]]
 
 
@@ -42,13 +43,11 @@ class MercuryHTTPClient:
             if action.url.is_ssl:
                 action.ssl_context = self.ssl_context
 
-            print(action.url.hostname)
             if self._hosts.get(action.url.hostname) is None:
 
                     socket_configs = await action.url.lookup()
                     for ip_addr, configs in socket_configs.items():
                         for config in configs:
-                            print(config)
                             try:
                                 connection = Connection()
                                 await connection.make_connection(
@@ -83,13 +82,8 @@ class MercuryHTTPClient:
                 action.url.ip_addr = host_config.get('ip_addr')
                 action.url.socket_config = host_config.get('socket_config')
 
-            print('HERE!')
             if action.is_setup is False:
                 action.setup()
-                print('DONE!')
-                print(action.encoded_data)
-                print(action.encoded_headers)
-                exit(0)
 
             self.registered[action.name] = action
 
@@ -100,7 +94,7 @@ class MercuryHTTPClient:
 
     async def execute_prepared_request(self, action: HTTPAction) -> HTTPResponseFuture:
    
-        response = Response(action)
+        response = HTTPResult(action)
 
         response.wait_start = time.monotonic()
         async with self.sem:
@@ -184,6 +178,7 @@ class MercuryHTTPClient:
                 return response
 
             except Exception as e:
+                print(traceback.format_exc())
                 response.read_end = time.monotonic()
                 response.error = str(e)
                 self.pool.connections.append(Connection(reset_connection=self.pool.reset_connections))

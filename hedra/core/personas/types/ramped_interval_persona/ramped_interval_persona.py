@@ -1,7 +1,7 @@
 import time
 import asyncio
 from hedra.core.personas.types.default_persona import DefaultPersona
-from hedra.core.hooks.client.config import Config
+from hedra.core.engines.client.config import Config
 
 
 class RampedIntervalPersona(DefaultPersona):

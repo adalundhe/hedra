@@ -3,7 +3,7 @@ from typing import List
 from hedra.core.personas.types.default_persona import DefaultPersona
 from .sequence_persona import SequencedPersonaCollection
 from async_tools.datatypes import AsyncList
-from hedra.core.hooks.client.config import Config
+from hedra.core.engines.client.config import Config
 
 
 class MultiSequencePersona(DefaultPersona):

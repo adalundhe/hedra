@@ -3,8 +3,8 @@ import time
 import asyncio
 from typing import List
 from hedra.core.personas.types.default_persona import DefaultPersona
-from hedra.core.hooks.types.types import HookType
-from hedra.core.hooks.client.config import Config
+from hedra.core.pipelines.hooks.types.types import HookType
+from hedra.core.engines.client.config import Config
 
 
 class WeightedSelectionPersona(DefaultPersona):

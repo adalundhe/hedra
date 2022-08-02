@@ -1,6 +1,6 @@
 import asyncio
 from easy_logger import Logger
-from hedra.core.optimizers import Optimizer
+from .optimizers import Optimizer
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from .stage import Stage
 

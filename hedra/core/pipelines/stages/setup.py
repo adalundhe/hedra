@@ -2,11 +2,11 @@ import asyncio
 import psutil
 import inspect
 from typing import Dict, List
-from hedra.core.hooks.client.client import Client
-from hedra.core.hooks.types.hook import Hook
-from hedra.core.hooks.types.types import HookType
-from hedra.core.hooks.client.config import Config
-from hedra.core.hooks.registry.registrar import registar
+from hedra.core.pipelines.hooks.types.hook import Hook
+from hedra.core.pipelines.hooks.types.types import HookType
+from hedra.core.engines.client.client import Client
+from hedra.core.engines.client.config import Config
+from hedra.core.pipelines.hooks.registry.registrar import registar
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.personas import get_persona
 from .execute import Execute

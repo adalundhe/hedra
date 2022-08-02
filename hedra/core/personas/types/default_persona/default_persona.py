@@ -4,12 +4,12 @@ from typing import Dict, List
 from easy_logger import Logger
 from async_tools.functions.awaitable import awaitable
 from asyncio import Task
-from hedra.core.hooks.types.types import HookType
+from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.personas.batching.batch import Batch
-from hedra.core.hooks.types.hook import Hook
+from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.personas.batching import Batch
 from hedra.core.personas.batching.batch_interval import BatchInterval
-from hedra.core.hooks.client.config import Config
+from hedra.core.engines.client.config import Config
 
 async def cancel_pending(pend: Task):
     try:

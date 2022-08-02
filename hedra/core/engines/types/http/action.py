@@ -5,9 +5,7 @@ from urllib.parse import urlencode
 from hedra.core.engines.types.common.base_action import BaseAction
 from hedra.core.engines.types.common.constants import NEW_LINE
 from hedra.core.engines.types.common.fast_streams import FastWriter
-from hedra.core.engines.types.common import (
-    URL
-)
+from hedra.core.engines.types.common import URL
 from hedra.core.engines.types.common.types import RequestTypes
 
 
@@ -46,6 +44,7 @@ class HTTPAction(BaseAction):
 
         self.encoded_params = None
         self.encoded_data = None
+        self.encoded_headers = None
         self.is_stream = False
         self.ssl_context = None
 
@@ -83,21 +82,17 @@ class HTTPAction(BaseAction):
     def params(self, value):
         self._params = value
         self.encoded_params = None
+        self.encoded_headers = None
 
     def setup(self):
-        print('A')
+        
         if self.encoded_params is None:
-            print('B')
             self._setup_params()
 
-        print('C')
         if self.encoded_data is None:
-            print('D')
             self._setup_data()
 
-        print('E')
         if self.encoded_headers is None:
-            print('F')
             self._setup_headers()
 
     def _setup_data(self):

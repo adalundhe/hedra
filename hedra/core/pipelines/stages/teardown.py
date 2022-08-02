@@ -1,10 +1,10 @@
 import asyncio
 import inspect
 from typing import Dict, List
-from hedra.core.hooks.registry.registrar import registar
-from hedra.core.hooks.client import Client
-from hedra.core.hooks.types.hook import Hook
-from hedra.core.hooks.types.types import HookType
+from hedra.core.pipelines.hooks.registry.registrar import registar
+from hedra.core.engines.client import Client
+from hedra.core.pipelines.hooks.types.hook import Hook
+from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from .stage import Stage
 

@@ -1,5 +1,5 @@
 from typing import Dict
-from hedra.core.hooks.types.types import HookType
+from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from .stage import Stage
 

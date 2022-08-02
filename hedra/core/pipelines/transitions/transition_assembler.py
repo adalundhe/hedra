@@ -5,8 +5,8 @@ from typing import Dict, List
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.pipelines.simple_context import SimpleContext
-from hedra.core.hooks.registry.registrar import registar
-from hedra.core.hooks.types.hook import Hook
+from hedra.core.pipelines.hooks.registry.registrar import registar
+from hedra.core.pipelines.hooks.types.hook import Hook
 from .transition import Transition
 from .common import (
     invalid_transition

@@ -8,9 +8,9 @@ from typing import Dict, List, Union
 from easy_logger import Logger
 import psutil
 from hedra.reporting.metric import MetricsSet
-from hedra.core.hooks.types.hook import Hook
-from hedra.core.hooks.types.types import HookType
-from hedra.core.hooks.registry.registrar import registar
+from hedra.core.pipelines.hooks.types.hook import Hook
+from hedra.core.pipelines.hooks.types.types import HookType
+from hedra.core.pipelines.hooks.registry.registrar import registar
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.reporting.events.types import (
     HTTPEvent, 

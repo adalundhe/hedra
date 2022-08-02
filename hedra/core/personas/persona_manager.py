@@ -7,7 +7,7 @@ from .types.ramped_persona import RampedPersona
 from .types.ramped_interval_persona import RampedIntervalPersona
 from .types.weighted_selection_persona import WeightedSelectionPersona
 from .types.cyclic_nowait_persona import CyclicNoWaitPersona
-from hedra.core.hooks.client.config import Config
+from hedra.core.engines.client.config import Config
 
 
 registered_personas = {

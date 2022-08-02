@@ -4,7 +4,7 @@ import math
 from async_tools.functions import awaitable
 from async_tools.datatypes.async_list import AsyncList
 from hedra.core.personas.types.default_persona import DefaultPersona
-from hedra.core.hooks.client.config import Config
+from hedra.core.engines.client.config import Config
 
 
 class RampedPersona(DefaultPersona):

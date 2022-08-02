@@ -2,7 +2,7 @@ from __future__ import annotations
 import json
 from types import FunctionType
 from typing import Any, Coroutine, Dict, Iterator, Union, List
-from hedra.core.hooks.types.types import HookType
+from hedra.core.pipelines.hooks.types.types import HookType
 from .params import Params
 from .metadata import Metadata
 from .url import URL

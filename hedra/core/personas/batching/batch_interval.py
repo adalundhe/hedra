@@ -1,5 +1,5 @@
 
-from hedra.core.hooks.client.config import Config
+from hedra.core.engines.client.config import Config
 
 
 class BatchInterval:
