@@ -45,7 +45,11 @@ class JSON:
         records = {}
         for metrics_set in metrics:
             
-            groups = {**metrics_set.groups, **metrics_set.custom_metrics}
+            groups = metrics_set.custom_metrics
+
+            for group_name, group in metrics_set.groups.items():
+                groups[group_name] = group.record
+
             records[metrics_set.name] = {
                 'name': metrics_set.name,
                 'stage': metrics_set.stage,
