@@ -6,3 +6,4 @@ from .payload import Payload
 from .request import Request
 from .response import Response
 from .timeouts import Timeouts
+from .params import Params

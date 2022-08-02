@@ -2,13 +2,12 @@ import asyncio
 import aiodns
 import time
 from typing import Awaitable, Dict, List, Optional, Set, Tuple, Union
-from hedra.core.engines.types.common import Request
 from hedra.core.engines.types.common import Response
 from hedra.core.engines.types.common.context import Context
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
 from hedra.core.engines.types.common.timeouts import Timeouts
-from hedra.core.engines.types.common.types import RequestTypes
 from .connection import Connection
+from .action import HTTPAction
 from .pool import Pool
 
 
@@ -23,7 +22,7 @@ class MercuryHTTPClient:
         self.loop = asyncio.get_event_loop()
         self.concurrency = concurrency
         self.pool = Pool(concurrency, reset_connections=reset_connections)
-        self.registered: Dict[str, Request] = {}
+        self.registered: Dict[str, HTTPAction] = {}
         self._hosts = {}
         self._parsed_urls = {}
         self.timeouts = timeouts
@@ -38,94 +37,101 @@ class MercuryHTTPClient:
 
         self.pool.create_pool()
     
-    async def prepare(self, request: Request) -> Awaitable[Union[Request, Exception]]:
+    async def prepare(self, action: HTTPAction) -> Awaitable[Union[HTTPAction, Exception]]:
         try:
-            if request.url.is_ssl:
-                request.ssl_context = self.ssl_context
+            if action.url.is_ssl:
+                action.ssl_context = self.ssl_context
 
-            if self._hosts.get(request.url.hostname) is None:
+            print(action.url.hostname)
+            if self._hosts.get(action.url.hostname) is None:
 
-                    socket_configs = await request.url.lookup()
+                    socket_configs = await action.url.lookup()
                     for ip_addr, configs in socket_configs.items():
                         for config in configs:
+                            print(config)
                             try:
                                 connection = Connection()
                                 await connection.make_connection(
-                                    request.url.hostname,
+                                    action.url.hostname,
                                     ip_addr,
-                                    request.url.port,
+                                    action.url.port,
                                     config,
-                                    ssl=request.ssl_context
+                                    ssl=action.ssl_context
                                 )
 
-                                request.url.socket_config = config
-                                request.url.ip_addr = ip_addr
-                                request.url.has_ip_addr = True
+                                action.url.socket_config = config
+                                action.url.ip_addr = ip_addr
+                                action.url.has_ip_addr = True
                                 break
 
                             except Exception as e:
                                 pass
 
-                        if request.url.socket_config:
+                        if action.url.socket_config:
                             break
                 
-                    self._hosts[request.url.hostname] = {
-                        'ip_addr': request.url.ip_addr,
-                        'socket_config': request.url.socket_config
+                    self._hosts[action.url.hostname] = {
+                        'ip_addr': action.url.ip_addr,
+                        'socket_config': action.url.socket_config
                     }
 
-                    if request.url.socket_config is None:
+                    if action.url.socket_config is None:
                         raise Exception('Err. - No socket found.')
 
             else:
-                host_config = self._hosts[request.url.hostname]
-                request.url.ip_addr = host_config.get('ip_addr')
-                request.url.socket_config = host_config.get('socket_config')
+                host_config = self._hosts[action.url.hostname]
+                action.url.ip_addr = host_config.get('ip_addr')
+                action.url.socket_config = host_config.get('socket_config')
 
-            if request.is_setup is False:
-                request.setup_http_request()
+            print('HERE!')
+            if action.is_setup is False:
+                action.setup()
+                print('DONE!')
+                print(action.encoded_data)
+                print(action.encoded_headers)
+                exit(0)
 
-            self.registered[request.name] = request
+            self.registered[action.name] = action
 
-            return request
+            return action
         
         except Exception as e:
             raise e
 
-    async def execute_prepared_request(self, request: Request) -> HTTPResponseFuture:
+    async def execute_prepared_request(self, action: HTTPAction) -> HTTPResponseFuture:
    
-        response = Response(request)
+        response = Response(action)
 
         response.wait_start = time.monotonic()
         async with self.sem:
             connection = self.pool.connections.pop()
             
             try:
-                if request.hooks.before:
-                    request = await request.hooks.before(request)
-                    request.setup_http_request()
+                if action.hooks.before:
+                    action = await action.hooks.before(action)
+                    action.setup()
 
                 response.start = time.monotonic()
 
                 await connection.make_connection(
-                    request.url.hostname,
-                    request.url.ip_addr,
-                    request.url.port,
-                    request.url.socket_config,
+                    action.url.hostname,
+                    action.url.ip_addr,
+                    action.url.port,
+                    action.url.socket_config,
                     timeout=self.timeouts.connect_timeout,
-                    ssl=request.ssl_context
+                    ssl=action.ssl_context
                 )
 
                 response.connect_end = time.monotonic()
 
-                connection.write(request.headers.encoded_headers)
+                connection.write(action.encoded_headers)
                 
-                if request.payload.has_data:
-                    if request.payload.is_stream:
-                        await request.payload.write_chunks(connection)
+                if action.encoded_data:
+                    if action.is_stream:
+                        action.write_chunks(connection)
 
                     else:
-                        connection.write(request.payload.encoded_data)
+                        connection.write(action.encoded_data)
 
                 response.write_end = time.monotonic()
 
@@ -172,8 +178,8 @@ class MercuryHTTPClient:
                 
                 self.pool.connections.append(connection)
 
-                if request.hooks.after:
-                    response = await request.hooks.after(response)
+                if action.hooks.after:
+                    response = await action.hooks.after(response)
                 
                 return response
 
@@ -182,21 +188,3 @@ class MercuryHTTPClient:
                 response.error = str(e)
                 self.pool.connections.append(Connection(reset_connection=self.pool.reset_connections))
                 return response
-
-    async def request(self, request: Request) -> HTTPResponseFuture:
-        return await self.execute_prepared_request(request.name)
-        
-    def execute_batch(
-        self, 
-        request: Request,
-        concurrency: Optional[int]=None, 
-        timeout: Optional[float]=None
-    ) -> HTTPBatchResponseFuture:
-    
-        if concurrency is None:
-            concurrency = self.concurrency
-
-        if timeout is None:
-            timeout = self.timeouts.total_timeout
-        
-        return [asyncio.create_task(self.execute_prepared_request(request, idx, timeout)) for idx in range(concurrency)]
