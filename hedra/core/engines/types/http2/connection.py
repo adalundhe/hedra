@@ -1,4 +1,5 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import h2.stream
 import h2.config
 import h2.connection
@@ -7,21 +8,24 @@ import h2.exceptions
 import h2.settings
 import h2.errors
 from hyperframe.frame import SettingsFrame
+import psutil
 from hedra.core.engines.types.http2.reader_writer import ReaderWriter
-from hedra.core.engines.types.common import Response, Request
 from hedra.core.engines.types.common.encoder import Encoder
 from hedra.core.engines.types.common.decoder import Decoder
+from .action import HTTP2Action
+from .result import HTTP2Result
 from .windows import WindowManager
 from .frames.types import *
 
 
 class HTTP2Connection:
     CONFIG = h2.config.H2Configuration(
-        validate_inbound_headers=False
+        validate_inbound_headers=False,
     )
 
     def __init__(self, concurrency):
         self.loop = asyncio.get_event_loop()
+        self.executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._h2_state = h2.connection.H2Connection(config=self.CONFIG)
         self.connected = False
         self.concurrency = concurrency
@@ -78,7 +82,7 @@ class HTTP2Connection:
         
         data = await stream.read()
 
-        stream.frame_buffer.add_data(data)
+        stream.frame_buffer.data.extend(data)
         stream.frame_buffer.max_frame_size = stream.max_outbound_frame_size
 
         events = []
@@ -128,22 +132,20 @@ class HTTP2Connection:
         stream.max_outbound_frame_size = self.remote_settings.max_frame_size
         stream.current_outbound_window_size = self.remote_settings.initial_window_size
 
-    async def receive_response(self, response: Response, stream: ReaderWriter):
+    async def receive_response(self, response: HTTP2Result, stream: ReaderWriter):
        
         done = False
         while done is False:
             events = await self._receive_events(stream)
             for event in events:
 
-                event_type = event.event_type
-
                 if event.error_code is not None:
                     raise Exception(f'Connection - {stream.stream_id} err: {str(event)}')
 
-                elif event_type == 'DEFERRED_HEADERS':
+                elif event.event_type == 'DEFERRED_HEADERS':
                     response.deferred_headers = event
 
-                elif event_type == 'DATA_RECEIVED':
+                elif event.event_type == 'DATA_RECEIVED':
                     amount = event.flow_controlled_length
                     frames = []
                     conn_increment = self._inbound_flow_control_window_manager.process_bytes(amount)
@@ -165,22 +167,19 @@ class HTTP2Connection:
 
                     response.body += event.data
 
-                elif event_type== 'STREAM_ENDED' or event_type == 'STREAM_RESET':
+                elif event.event_type== 'STREAM_ENDED' or event.event_type == 'STREAM_RESET':
                     done = True
                     break
 
         return response
 
-    def send_request_headers(self, request: Request, stream: ReaderWriter) -> None:
-        end_stream = request.payload.has_data is False
-        encoded_headers = request.headers.encoded_headers
+    def send_request_headers(self, request: HTTP2Action, stream: ReaderWriter) -> None:
+        end_stream = request.encoded_data is None
+        encoded_headers = request.encoded_headers
 
-        if request.headers.hpack_encoder.header_table.maxsize != self._encoder.header_table.maxsize:
-            request.headers.hpack_encoder.header_table_size = self._encoder.header_table.maxsize
-            request.headers.setup_http2_headers(
-                request.method,
-                request.url
-            )
+        if request.hpack_encoder.header_table.maxsize != self._encoder.header_table.maxsize:
+            request.hpack_encoder.header_table_size = self._encoder.header_table.maxsize
+            request._setup_headers()
 
         header_blocks = [
             encoded_headers[i:i+stream.max_outbound_frame_size]
@@ -189,71 +188,60 @@ class HTTP2Connection:
             )
         ]
 
-        headers_frame = HeadersFrame(stream.stream_id)
-
         frames = []
-        headers_frame.data = header_blocks[0]
+        headers_frame = HeadersFrame(stream.stream_id, data=header_blocks[0])
         if end_stream:
             headers_frame.flags.add('END_STREAM')
 
         frames.append(headers_frame)
 
-        for block in header_blocks[1:]:
-            cf = ContinuationFrame(stream.stream_id)
-            cf.data = block
-            frames.append(cf)
+        frames.extend([ContinuationFrame(stream.stream_id, data=block) for block in header_blocks[1:]])
 
         frames[-1].flags.add('END_HEADERS')
 
-        stream._authority = request.headers.data.get('authority')
+        stream._authority = request.url.authority
 
         self.request_method = request.method
-
         window_size = 65536
         stream.inbound.window_opened(window_size)
 
-        window_update_frame = WindowUpdateFrame(stream.stream_id)
-        window_update_frame.window_increment = window_size
-
-        frames.append(window_update_frame)
-        
-        stream.write(
-            b''.join([frame.serialize() for frame in frames ])
+        frames.append(
+            WindowUpdateFrame(stream.stream_id, window_increment=window_size)
         )
-        self._data_to_send = b''
+        stream.write(b''.join([frame.serialize() for frame in frames ]))
 
+        self._data_to_send = b''
         self._headers_sent = True
 
-    async def submit_request_body(self, request: Request, stream: ReaderWriter) -> None:
-        if request.payload.has_data:
-            data = request.payload.encoded_data
-            
-            while data:
+    async def submit_request_body(self, request: HTTP2Action, stream: ReaderWriter) -> None:
+        data = request.encoded_data
+        
+        while data:
+            local_flow = stream.current_outbound_window_size
+            max_frame_size = stream.max_outbound_frame_size
+            flow = min(local_flow, max_frame_size)
+            while flow == 0:
+                await self._receive_events(stream)
                 local_flow = stream.current_outbound_window_size
                 max_frame_size = stream.max_outbound_frame_size
                 flow = min(local_flow, max_frame_size)
-                while flow == 0:
-                    await self._receive_events(stream)
-                    local_flow = stream.current_outbound_window_size
-                    max_frame_size = stream.max_outbound_frame_size
-                    flow = min(local_flow, max_frame_size)
-                    
-                max_flow = flow
-                chunk_size = min(len(data), max_flow)
-                chunk, data = data[:chunk_size], data[chunk_size:]
-
-                df = DataFrame(stream.stream_id)
-                df.data = chunk
-
-                # Subtract flow_controlled_length to account for possible padding
-                self.outbound_flow_control_window -= df.flow_controlled_length
-                assert self.outbound_flow_control_window >= 0
-
-                stream.write(df.serialize())
-                self._data_to_send = b''
+                
+            max_flow = flow
+            chunk_size = min(len(data), max_flow)
+            chunk, data = data[:chunk_size], data[chunk_size:]
 
             df = DataFrame(stream.stream_id)
-            df.flags.add('END_STREAM')
+            df.data = chunk
+
+            # Subtract flow_controlled_length to account for possible padding
+            self.outbound_flow_control_window -= df.flow_controlled_length
+            assert self.outbound_flow_control_window >= 0
 
             stream.write(df.serialize())
             self._data_to_send = b''
+
+        df = DataFrame(stream.stream_id)
+        df.flags.add('END_STREAM')
+
+        stream.write(df.serialize())
+        self._data_to_send = b''

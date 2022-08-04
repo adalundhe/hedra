@@ -1,4 +1,4 @@
-from typing import Coroutine
+from typing import Coroutine, List
 
 
 
@@ -8,7 +8,7 @@ class Hooks:
         self,
         before: Coroutine = None,
         after: Coroutine = None,
-        checks: Coroutine = []
+        checks: List[Coroutine] = []
     ) -> None:
         self.before = before
         self.after = after

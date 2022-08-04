@@ -2,10 +2,11 @@ import asyncio
 import networkx
 import inspect
 from typing import Dict, List
+from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.pipelines.simple_context import SimpleContext
-from hedra.core.pipelines.hooks.registry.registrar import registar
+from hedra.core.pipelines.hooks.registry.registrar import registrar
 from hedra.core.pipelines.hooks.types.hook import Hook
 from .transition import Transition
 from .common import (
@@ -40,7 +41,7 @@ class TransitionAssembler:
             for _, method in methods:
 
                 method_name = method.__qualname__
-                hook: Hook = registar.all.get(method_name)
+                hook: Hook = registrar.all.get(method_name)
                 
                 if hook:
                     hook.call = hook.call.__get__(stage, stage.__class__)
@@ -60,6 +61,7 @@ class TransitionAssembler:
             for stage_name in generation:
 
                 stage_instance = self.generated_stages.get(stage_name)
+             
                 dependencies = stage_instance.dependencies
 
                 for dependency in dependencies:

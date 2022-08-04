@@ -46,6 +46,9 @@ class Connection:
     def read_headers(self):
         return self._reader.read_headers()
 
+    def iter_headers(self):
+        return self._reader.iter_headers()
+
 
 class ConnectionFactory:
 

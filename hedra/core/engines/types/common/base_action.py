@@ -10,14 +10,11 @@ class BaseAction:
         self, 
         name: str=None,
         user: str=None, 
-        tags: List[Dict[str, str]] = [],  
-        checks: List[FunctionType] = None, 
-        hooks: Dict[str, Coroutine] = {},
+        tags: List[Dict[str, str]] = []
     ) -> None:
         self.protocols = ProtocolMap()
 
         self.name = name
         self.is_setup = False
-        self.checks = checks
         self.metadata = Metadata(user, tags)
-        self.hooks = Hooks(**hooks)
+        self.hooks = Hooks()

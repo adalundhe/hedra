@@ -35,8 +35,8 @@ class Snowflake:
 
         self.events_table_name = config.events_table
         self.metrics_table_name = config.metrics_table
-        self.group_metrics_table_name = f'{self.metrics_table_name}_group_metrics'
-        self.errors_table_name = f'{self.metrics_table_name}_errors'
+        self.stage_metrics_table_name = 'stage_metrics'
+        self.errors_table_name = 'stage_errors'
 
         self.custom_fields = config.custom_fields
         self.connect_timeout = config.connect_timeout
@@ -48,8 +48,8 @@ class Snowflake:
         self._connection = None
         self._events_table = None
         self._metrics_table = None
-        self._group_metrics_table = None
-        self.custom_metrics_tables = {}
+        self._stage_metrics_table = None
+        self._custom_metrics_tables = {}
         self._errors_table = None
 
         self._loop = asyncio.get_event_loop()
@@ -114,10 +114,10 @@ class Snowflake:
 
     async def submit_common(self, metrics_sets: List[MetricsSet]):
 
-        if self._group_metrics_table is None:
+        if self._stage_metrics_table is None:
 
-            group_metrics_table = sqlalchemy.Table(
-                self.group_metrics_table_name,
+            stage_metrics_table = sqlalchemy.Table(
+                self.stage_metrics_table_name,
                 self.metadata,
                 sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
                 sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
@@ -132,16 +132,16 @@ class Snowflake:
             await self._loop.run_in_executor(
                 self._executor,
                 self._connection.execute,
-                CreateTable(group_metrics_table, if_not_exists=True)
+                CreateTable(stage_metrics_table, if_not_exists=True)
             )
 
-            self._group_metrics_table = group_metrics_table
+            self._stage_metrics_table = stage_metrics_table
 
         for metrics_set in metrics_sets:
             await self._loop.run_in_executor(
                 self._executor,
                 self._connection.execute,
-                self._group_metrics_table.insert(values={
+                self._stage_metrics_table.insert(values={
                     'name': metrics_set.name,
                     'stage': metrics_set.stage,
                     'group': 'common',
@@ -203,9 +203,9 @@ class Snowflake:
 
             for custom_group_name, group in metrics_set.custom_metrics.items():
 
-                custom_table_name = f'{self.metrics_table_name}_{custom_group_name}'
+                custom_table_name = f'{custom_group_name}_metrics'
 
-                if self.custom_metrics_tables.get(custom_table_name) is None:
+                if self._custom_metrics_tables.get(custom_table_name) is None:
 
                     custom_table = sqlalchemy.Table(
                         custom_table_name,
@@ -234,12 +234,12 @@ class Snowflake:
                         CreateTable(custom_table, if_not_exists=True)
                     )
 
-                    self.custom_metrics_tables[custom_table_name] = custom_table
+                    self._custom_metrics_tables[custom_table_name] = custom_table
 
                 await self._loop.run_in_executor(
                     self._executor,
                     self._connection.execute,
-                    self.custom_metrics_tables[custom_table_name].insert(values={
+                    self._custom_metrics_tables[custom_table_name].insert(values={
                         'name': metrics_set.name,
                         'stage': metrics_set.stage,
                         'group': custom_group_name,

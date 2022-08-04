@@ -9,7 +9,7 @@ from hedra.core.engines.types.common.connection_factory import (
 )
 
 
-class Connection:
+class HTTPConnection:
 
     def __init__(self, reset_connection: bool=False) -> None:
         self.dns_address: str = None

@@ -58,7 +58,7 @@ class DefaultPersona:
 
         await self.start_updates()
         
-        start = time.time()
+        start = time.monotonic()
 
         completed, pending = await asyncio.wait([
             asyncio.create_task(
@@ -68,14 +68,14 @@ class DefaultPersona:
             ) async for action_idx in self.generator(total_time)
         ], timeout=1)
 
-        self.end = time.time()
+        self.end = time.monotonic()
+
         self.start = start
         self.pending_actions = len(pending)
         
         results = await asyncio.gather(*completed)
         
         await self.stop_updates()
-        
         await asyncio.gather(*[cancel_pending(pend) for pend in pending])
         
         self.total_actions = len(set(results))
@@ -89,11 +89,11 @@ class DefaultPersona:
         idx = 0
         action_idx = 0
 
-        start = time.time()
+        start = time.monotonic()
         while elapsed < total_time:
             yield action_idx
             await asyncio.sleep(0)
-            elapsed = time.time() - start
+            elapsed = time.monotonic() - start
             idx += 1
 
             if idx%self.batch.size == 0:

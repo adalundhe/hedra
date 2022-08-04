@@ -87,6 +87,9 @@ class URL:
         if len(self.parsed.query) > 0:
             url_path += f'?{self.parsed.query}'
 
+        elif len(self.parsed.params) > 0:
+            url_path += self.parsed.params
+
         return url_path
 
     @path.setter

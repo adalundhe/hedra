@@ -91,7 +91,7 @@ class WindowUpdateFrame(Frame):
                     frames = [rsf]
 
                 stream_events.append(event)
-            except Exception as e:
+            except Exception:
                 return [], stream_events
         else:
             connection.outbound_flow_control_window = connection._guard_increment_window(

@@ -57,7 +57,7 @@ class Prometheus:
 
         self._events = {}
         self._metrics = {}
-        self._group_metrics = {}
+        self._stage_metrics = {}
         self._custom_metrics = {}
         self._errors = {}
         
@@ -147,15 +147,16 @@ class Prometheus:
     async def submit_common(self, metrics_sets: List[MetricsSet]):
         
         for metrics_set in metrics_sets:
+
+            tags = [
+                f'{tag.name}:{tag.value}' for tag in metrics_set.tags
+            ]
             
-            metrics_set = self._group_metrics.get(metrics_set.name)
-            if metrics_set is None:
-                metrics_set = {}
+            stage_metrics = self._stage_metrics.get(metrics_set.name)
+            if stage_metrics is None:
+                stage_metrics = {}
 
                 for field in metrics_set.common_stats.keys():
-                    tags = [
-                        f'{tag.name}:{tag.value}' for tag in metrics_set.tags
-                    ]
 
                     metric_name = f'{metrics_set.name}_{field}'.replace('.', '_')
                     metric_type = self.types_map.get(field)
@@ -174,13 +175,13 @@ class Prometheus:
                     )
                     prometheus_metric.create_metric()
                     
-                    metrics_set[field] = prometheus_metric
+                    stage_metrics[field] = prometheus_metric
                 
-                self._group_metrics[metrics_set.name] = metrics_set
-            
-            metrics_set = self._group_metrics.get(metrics_set.name)
+                self._stage_metrics[metrics_set.name] = stage_metrics
+
+            self._stage_metrics[metrics_set.name] = stage_metrics
             for field, value in metrics_set.common_stats.items():
-                metric = metrics_set.get(field)
+                metric = stage_metrics.get(field)
                 metric.update(value)
 
         await self._submit_to_pushgateway()
@@ -189,29 +190,28 @@ class Prometheus:
 
         for metrics_set in metrics:
 
-            groups_metrics = self._metrics.get(metrics_set.name)
-            if groups_metrics is None:
-                groups_metrics = {}
+            tags = [
+                f'{tag.name}:{tag.value}' for tag in metrics_set.tags
+            ]
+
+            stage_metrics = self._metrics.get(metrics_set.name)
+            if stage_metrics is None:
+                stage_metrics = {}
 
                 for group_name, group in metrics_set.groups.items():
-                    group_metrics = groups_metrics.get(group_name)
+                    group_metrics = stage_metrics.get(group_name)
 
                     if group_metrics is None:
+                        group_metrics = {}
 
-                        for quantile_name in metrics_set.quantiles.keys():
+                        for quantile_name in metrics_set.quantiles:
                             self.types_map[quantile_name] = 'gauge'
 
                         fields = {}
 
-                        types_map = { **self.types_map, **metrics_set.custom_schemas}
-
                         for metric_field in metrics_set.stats_fields:
-                            metric_type = types_map.get(metric_field)
-                            metric_name = f'{metrics_set.name}_{metric_field}'.replace('.', '_')
-
-                            tags = [
-                                f'{tag.name}:{tag.value}' for tag in metrics_set.tags
-                            ]
+                            metric_type = self.types_map.get(metric_field)
+                            metric_name = f'{metrics_set.name}_{group_name}_{metric_field}'.replace('.', '_')
 
                             prometheus_metric = PrometheusMetric(
                                 metric_name,
@@ -229,34 +229,32 @@ class Prometheus:
 
                             fields[metric_field] = prometheus_metric
 
-                        groups_metrics[group_name] = fields
+                        group_metrics[group_name] = fields
 
-                self._metrics[metrics_set.name] = groups_metrics
-                
+                stage_metrics[metrics_set.name] = group_metrics
 
-            groups_metrics = self._metrics.get(metrics_set.name)
+            self._metrics[metrics_set.name] = stage_metrics
             for group_name, group in metrics_set.groups.items():
-
-                group_metrics = groups_metrics.get(group_name)
-
+                group_metrics = stage_metrics.get(group_name)
                 record = group.record
+
                 for field in group_metrics[group_name]:
                     metric_value = record.get(field)
                     field_metric = group_metrics.get(field)
                     field_metric.update(metric_value)
-        
+
         await self._submit_to_pushgateway()
 
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
         for metrics_set in metrics_sets:
 
-            groups_metrics = self._custom_metrics.get(metrics_set.name)
-            if groups_metrics is None:
-                groups_metrics = {}
+            stage_metrics = self._custom_metrics.get(metrics_set.name)
+            if stage_metrics is None:
+                stage_metrics = {}
 
                 for custom_group_name, group in metrics_set.custom_metrics.items():
-                    group_metrics = groups_metrics.get(custom_group_name)
+                    group_metrics = stage_metrics.get(custom_group_name)
 
                     if group_metrics is None:
 
@@ -296,18 +294,16 @@ class Prometheus:
 
                             fields[field] = prometheus_metric
 
-                        groups_metrics[custom_group_name] = fields
+                        group_metrics[custom_group_name] = fields
 
-                self._custom_metrics[metrics_set.name] = groups_metrics
+                stage_metrics[metrics_set.name] = group_metrics
 
-            groups_metrics = self._custom_metrics.get(metrics_set.name)
-            for group_name, group in metrics_set.groups.items():
+            self._custom_metrics[metrics_set.name] = stage_metrics
+            for group_name, group in metrics_set.custom_metrics.items():
+                group_metrics = stage_metrics.get(group_name)
 
-                group_metrics = groups_metrics.get(group_name)
-
-                record = group.record
                 for field in group_metrics[group_name]:
-                    metric_value = record.get(field)
+                    metric_value = group.get(field)
                     field_metric = group_metrics.get(field)
                     field_metric.update(metric_value)
 
@@ -328,11 +324,9 @@ class Prometheus:
                 )
 
                 errors_metric.create_metric()
-
                 self._errors[metrics_set.name] = errors_metric
 
-            for error in metrics_set.errors:
-                
+            for error in metrics_set.errors:              
                 errors_metric.update(
                     error.get('count'),
                     labels={

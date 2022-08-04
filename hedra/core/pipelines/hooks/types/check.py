@@ -1,10 +1,10 @@
 import functools
 from .types import HookType
 from .hook import Hook
-from hedra.core.pipelines.hooks.registry.registrar import registar
+from hedra.core.pipelines.hooks.registry.registrar import registrar
 
 
-@registar(HookType.CHECK)
+@registrar(HookType.CHECK)
 def check(*names):
     
     def wrapper(func) -> Hook:

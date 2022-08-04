@@ -1,24 +1,20 @@
+import os
 import struct
-from codecs import StreamReader
 from typing import Tuple
-from hedra.core.engines.types.common.constants import HEADER_LENGTH_INDEX
+from base64 import encodebytes as base64encode
+from hedra.core.engines.types.http.connection import Connection
+from .constants import HEADER_LENGTH_INDEX
 
+def create_sec_websocket_key():
+    randomness = os.urandom(16)
+    return base64encode(randomness).decode('utf-8').strip()
 
-async def websocket_headers_to_iterator(reader: StreamReader):
-    
-    while True:
-        # StreamReader already buffers data reading so it is efficient.
-        res_data = await reader.readline()
-        if b": " not in res_data and b":" not in res_data:
-            break
-  
-        decoded = res_data.rstrip().decode()
-        pair = decoded.split(": ", 1)
-        if pair and len(pair) < 2:
-            pair = decoded.split(":")
+def pack_hostname(hostname):
+    # IPv6 address
+    if ':' in hostname:
+        return '[' + hostname + ']'
 
-        key, value = pair
-        yield key.lower(), value, res_data
+    return hostname
 
 
 def get_header_bits(raw_headers: bytes):
@@ -38,15 +34,15 @@ def get_header_bits(raw_headers: bytes):
     return header_bits
 
 
-async def get_message_buffer_size(header_bits: Tuple[int], reader: StreamReader):
+async def get_message_buffer_size(header_bits: Tuple[int], connection: Connection):
         bits = header_bits[HEADER_LENGTH_INDEX]
         length_bits = bits & 0x7f
         length = 0
         if length_bits == 0x7e:
-            v = await reader.read(2)
+            v = await connection.readexactly(2)
             length = struct.unpack("!H", v)[0]
         elif length_bits == 0x7f:
-            v = await reader.read(8)
+            v = await connection.readexactly(8)
             length = struct.unpack("!Q", v)[0]
         else:
             length = length_bits

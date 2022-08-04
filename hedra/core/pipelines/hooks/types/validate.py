@@ -1,10 +1,10 @@
 import functools
 from .types import HookType
-from hedra.core.pipelines.hooks.registry.registrar import registar
+from hedra.core.pipelines.hooks.registry.registrar import registrar
 
 
-@registar(HookType.VALIDATE)
-def validate():
+@registrar(HookType.VALIDATE)
+def validate(stage: str, *names):
     
     def wrapper(func):
 

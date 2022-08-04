@@ -1,19 +1,12 @@
-import binascii
-import json
-from hedra.core.engines.types.common.response import Response
+from hedra.core.engines.types.grpc import GRPCResult
 from .http2_event import HTTP2Event
 
 
 class GRPCEvent(HTTP2Event):
 
-    def __init__(self, response: Response) -> None:
-        super().__init__(response)
+    def __init__(self, result: GRPCResult) -> None:
+        super().__init__(result)
 
-    def grpc_decode(self, protobuf):
-        wire_msg = binascii.b2a_hex(self.data)
-
-        message_length = wire_msg[4:10]
-        msg = wire_msg[10:10+int(message_length, 16)*2]
-        protobuf.ParseFromString(binascii.a2b_hex(msg))
-
+    def to_protobuf(self, protobuf):
+        protobuf.ParseFromString(self.data)
         return protobuf

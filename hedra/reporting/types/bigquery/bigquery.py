@@ -29,9 +29,9 @@ class BigQuery:
         self.retry_timeout = config.retry_timeout
         self.events_table_name = config.events_table
         self.metrics_table_name = config.metrics_table
-        self.group_metrics_table_name = f'{self.metrics_table_name}_group_metrics'
+        self.stage_metrics_table_name = 'stage_metrics'
         self.custom_metrics_table_names = {}
-        self.errors_table_name = f'{self.metrics_table_name}_errors'
+        self.errors_table_name = f'stage_errors'
         self.custom_fields = config.custom_fields or []
 
 
@@ -42,7 +42,7 @@ class BigQuery:
         self._errors_table = None
         self._metrics_table = None
         self._custom_metrics_tables = {}
-        self._groups_metrics_table = None
+        self._stage_metrics_table = None
 
         self._loop = asyncio.get_event_loop()
 
@@ -103,7 +103,7 @@ class BigQuery:
         )
 
     async def submit_common(self, metrics_sets: List[MetricsSet]):
-        if self._groups_metrics_table is None:
+        if self._stage_metrics_table is None:
             table_schema = [
                 bigquery.SchemaField('name', 'STRING', mode='REQUIRED'),
                 bigquery.SchemaField('stage', 'STRING', mode='REQUIRED'),
@@ -119,10 +119,10 @@ class BigQuery:
                     self.project_name,
                     self.dataset_name
                 ),
-                self.group_metrics_table_name
+                self.stage_metrics_table_name
             )
 
-            group_metrics_table = bigquery.Table(
+            stage_metrics_table = bigquery.Table(
                 table_reference,
                 schema=table_schema
             )
@@ -131,12 +131,12 @@ class BigQuery:
                 self._executor,
                 functools.partial(
                     self.client.create_table,
-                    group_metrics_table,
+                    stage_metrics_table,
                     exists_ok=True
                 )
             )
 
-            self._groups_metrics_table = group_metrics_table
+            self._stage_metrics_table = stage_metrics_table
 
         rows = []
         for metrics_set in metrics_sets:
@@ -243,7 +243,7 @@ class BigQuery:
             
             for custom_metrics_group_name, custom_metrics_group in metrics_set.custom_metrics.items():
 
-                custom_metrics_table_name = f'{self.metrics_table_name}_{custom_metrics_group_name}_metrics'
+                custom_metrics_table_name = f'{custom_metrics_group_name}_metrics'
 
                 if self._custom_metrics_tables.get(custom_metrics_table_name) is None:
                     table_schema = [

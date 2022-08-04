@@ -33,8 +33,7 @@ class Cloudwatch:
         self.submit_timeout = config.submit_timeout
         self.events_rule_name = config.events_rule
         self.metrics_rule_name = config.metrics_rule
-        self.group_metrics_rule_name = f'{self.metrics_rule_name}_group_metrics'
-        self.errors_rule_name = f'{self.metrics_rule_name}_errors'
+        self.errors_rule_name = 'stage_errors'
 
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self.events_rule = None
@@ -80,7 +79,7 @@ class Cloudwatch:
 
     
     async def submit_common(self, metrics_sets: List[MetricsSet]):
-        cloudwatch_group_metrics = [
+        common_metrics = [
             {
                 'Time': datetime.datetime.now(),
                 'Detail': json.dumps({
@@ -91,7 +90,7 @@ class Cloudwatch:
                 }),
                 'DetailType': self.events_rule_name,
                 'Resources': self.aws_resource_arns,
-                'Source': self.events_rule_name
+                'Source': self.metrics_rule_name
             } for metrics_set in metrics_sets
         ]
 
@@ -100,7 +99,7 @@ class Cloudwatch:
                 self._executor,
                 functools.partial(
                     self.client.put_events,
-                    Entries=cloudwatch_group_metrics
+                    Entries=common_metrics
                 )
             ),
             timeout=self.submit_timeout
@@ -108,10 +107,10 @@ class Cloudwatch:
 
     async def submit_metrics(self, metrics: List[MetricsSet]):
 
-        cloudwatch_metrics = []
+        metrics = []
         for metrics_set in metrics:
             for group_name, group in metrics_set.groups.items():
-                cloudwatch_metrics.append({
+                metrics.append({
                     'Time': datetime.datetime.now(),
                     'Detail': json.dumps({
                         **group.record,
@@ -127,7 +126,7 @@ class Cloudwatch:
                 self._executor,
                 functools.partial(
                     self.client.put_events,
-                    Entries=cloudwatch_metrics
+                    Entries=metrics
                 )
             ),
             timeout=self.submit_timeout
@@ -135,10 +134,10 @@ class Cloudwatch:
 
     async def submit_common(self, metrics_sets: List[MetricsSet]):
 
-        cloudwatch_custom_metrics = []
+        custom_metrics = []
         for metrics_set in metrics_sets:
             for custom_group_name, group in metrics_set.custom_metrics.items():
-                cloudwatch_custom_metrics.append({
+                custom_metrics.append({
                     'Time': datetime.datetime.now(),
                     'Detail': json.dumps({
                         'name': metrics_set.name,
@@ -156,7 +155,7 @@ class Cloudwatch:
                 self._executor,
                 functools.partial(
                     self.client.put_events,
-                    Entries=cloudwatch_custom_metrics
+                    Entries=custom_metrics
                 )
             ),
             timeout=self.submit_timeout

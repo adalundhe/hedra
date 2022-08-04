@@ -1,9 +1,9 @@
 import functools
 from .types import HookType
-from hedra.core.pipelines.hooks.registry.registrar import registar
+from hedra.core.pipelines.hooks.registry.registrar import registrar
 
 
-@registar(HookType.TEARDOWN)
+@registrar(HookType.TEARDOWN)
 def teardown(metadata={}):
     '''
     Teardown Hook

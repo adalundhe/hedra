@@ -25,8 +25,8 @@ class MongoDB:
         self.database_name = config.database
         self.events_collection = config.events_collection
         self.metrics_collection = config.metrics_collection
-        self.group_metrics_collection = f'{self.metrics_collection}_group_metrics'
-        self.errors_collection = f'{self.metrics_collection}_errors'
+        self.stage_metrics_collection = 'stage_metrics'
+        self.errors_collection = 'stage_errors'
 
         self.connection: AsyncIOMotorClient = None
         self.database = None
@@ -47,7 +47,7 @@ class MongoDB:
         )
 
     async def submit_common(self, metrics_sets: List[MetricsSet]):
-        await self.database[self.group_metrics_collection].insert_many([
+        await self.database[self.stage_metrics_collection].insert_many([
             {
                 'name': metrics_set.name,
                 'stage': metrics_set.stage,
@@ -82,7 +82,7 @@ class MongoDB:
                 })
 
         for group_name, records in records.items():
-            metrics_collection_name = f'{self.metrics_collection}_{group_name}_metrics'
+            metrics_collection_name = f'{group_name}_metrics'
             await self.database[metrics_collection_name].insert_many(records)
 
     async def submit_errors(self, metrics: List[MetricsSet]):

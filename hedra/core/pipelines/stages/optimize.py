@@ -2,6 +2,7 @@ import asyncio
 from easy_logger import Logger
 from .optimizers import Optimizer
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
+from hedra.core.pipelines.hooks.types.internal import Internal
 from .stage import Stage
 
 
@@ -15,6 +16,7 @@ class Optimize(Stage):
         self.persona = None
         self.results = None
 
+    @Internal
     async def run(self):
         
         optmizer = Optimizer({

@@ -1,22 +1,23 @@
 import json
-from hedra.core.engines.types.common.response import Response
+from typing import Dict
+from hedra.core.engines.types.http import HTTPResult
 from .base_event import BaseEvent
 
 
 class HTTPEvent(BaseEvent):
 
-    def __init__(self, response: Response) -> None:
-        super(HTTPEvent, self).__init__(response)
+    def __init__(self, result: HTTPResult) -> None:
+        super(HTTPEvent, self).__init__(result)
 
-        self.url = response.url
-        self.ip_addr = response.ip_addr
-        self.method = response.method
-        self.path = response.path
-        self.params = response.params
-        self.hostname = response.hostname
-        self.status = response.status
-        self.headers = response.headers
-        self.data = response.data
+        self.url = result.url
+        self.ip_addr = result.ip_addr
+        self.method = result.method
+        self.path = result.path
+        self.params = result.params
+        self.hostname = result.hostname
+        self.status = result.status
+        self.headers: Dict[bytes, bytes] = result.headers
+        self.data = result.data
         self.name = f'{self.method}_{self.shortname}'
 
     def serialize(self):

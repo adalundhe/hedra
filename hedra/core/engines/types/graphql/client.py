@@ -1,86 +1,120 @@
-import asyncio
-from types import FunctionType
-from hedra.core.engines.types.common.types import RequestTypes
-from hedra.core.engines.types.http2 import MercuryHTTP2Client
+import time
 from hedra.core.engines.types.http import MercuryHTTPClient
+from hedra.core.engines.types.http.connection import HTTPConnection
 from hedra.core.engines.types.common import Timeouts
-from hedra.core.engines.types.common.context import Context
-from hedra.core.engines.types.common import Request, Response
-from typing import Awaitable, List, Union, Tuple, Set, Optional
-from async_tools.datatypes import AsyncList
+from typing import Awaitable, Union
+from .action import GraphQLAction
+from .result import GraphQLResult
 
 
-GraphQLResponseFuture = Awaitable[Union[Response, Exception]]
-GraphQLBatchResponseFuture = Awaitable[Tuple[Set[GraphQLResponseFuture], Set[GraphQLResponseFuture]]]
+GraphQLResponseFuture = Awaitable[Union[GraphQLAction, Exception]]
 
 
-class MercuryGraphQLClient:
+class MercuryGraphQLClient(MercuryHTTPClient):
 
-    def __init__(self, concurrency: int = 10 ** 3, timeouts: Timeouts = Timeouts(), hard_cache=False, use_http2=False, reset_connection: bool=False) -> None:
-        
-        if use_http2:
-            self.protocol = MercuryHTTP2Client(
-                concurrency=concurrency,
-                timeouts=timeouts,
-                hard_cache=hard_cache,
-                reset_connections=reset_connection
-            )
-        
-        else:
-            self.protocol = MercuryHTTPClient(
-                concurrency=concurrency,
-                timeouts=timeouts,
-                hard_cache=hard_cache,
-                reset_connections=reset_connection
-            )
-        
-        self._use_http2 = use_http2
-        self.context = Context()
-        self.protocol.context = self.context
-        self.registered = {}
-
-    async def prepare(self, request: Request) -> Awaitable[None]:
-        try:
-            if request.url.is_ssl:
-                request.ssl_context = self.protocol.ssl_context
-
-            if self.protocol._hosts.get(request.url.hostname) is None:
-                    self.protocol._hosts[request.url.hostname] = await request.url.lookup()
-            else:
-                request.url.ip_addr = self.protocol._hosts[request.url.hostname]
-
-            if request.is_setup is False:
-                request.setup_graphql_request(use_http2=self._use_http2)
-
-            self.protocol.registered[request.name] = request
-            self.registered[request.name] = request
-        
-        except Exception as e:
-            return e
-
-    async def execute_prepared_request(self, request: Request):
-        response: Response = await self.protocol.execute_prepared_request(request)
-        response.type = RequestTypes.GRAPHQL
-
-        self.context.last[request.name] = self.protocol.context.last[request.name]
-        return response
-
-    async def request(self, request: Request) -> GraphQLResponseFuture:
-        return await self.execute_prepared_request(request.name)
-        
-    async def execute_batch(
+    def __init__(
         self, 
-        request: Request,
-        concurrency: Optional[int]=None, 
-        timeout: Optional[float]=None
-    ) -> GraphQLBatchResponseFuture:
+        concurrency: int = 10 ** 3, 
+        timeouts: Timeouts = Timeouts(), 
+        reset_connections: bool = False
+    ) -> None:
+
+        super(
+            MercuryGraphQLClient,
+            self
+        ).__init__(
+            concurrency, 
+            timeouts, 
+            reset_connections
+        )
+
+    async def execute_prepared_request(self, action: GraphQLAction) -> GraphQLResponseFuture:
+   
+        response = GraphQLResult(action)
+        response.wait_start = time.monotonic()
+
+        async with self.sem:
+            connection = self.pool.connections.pop()
+            
+            try:
+                if action.hooks.before:
+                    action = await action.hooks.before(action)
+                    action.setup()
+
+                response.start = time.monotonic()
+
+                await connection.make_connection(
+                    action.url.hostname,
+                    action.url.ip_addr,
+                    action.url.port,
+                    action.url.socket_config,
+                    timeout=self.timeouts.connect_timeout,
+                    ssl=action.ssl_context
+                )
+
+                response.connect_end = time.monotonic()
+
+                connection.write(action.encoded_headers)
+                
+                if action.encoded_data:
+                    if action.is_stream:
+                        action.write_chunks(connection)
+
+                    else:
+                        connection.write(action.encoded_data)
+
+                response.write_end = time.monotonic()
+
+                chunk = await connection._connection._reader.readline_fast()
+
+                response.response_code = chunk
+
+                headers = await connection.read_headers()
+
+                content_length = headers.get(b'content-length')
+                transfer_encoding = headers.get(b'transfer-encoding')
     
-        if concurrency is None:
-            concurrency = self.protocol.concurrency
+                # We require Content-Length or Transfer-Encoding headers to read a
+                # request body, otherwise it's anyone's guess as to how big the body
+                # is, and we ain't playing that game.
+                body = bytearray()
+                if content_length:
+                    body = await connection.readexactly(int(content_length))
 
-        if timeout is None:
-            timeout = self.protocol.timeouts.total_timeout
+                elif transfer_encoding:
+                    
+                    all_chunks_read = False
 
-        return [ asyncio.create_task(
-            self.execute_prepared_request(request.name, idx, timeout)
-        ) for idx in range(concurrency)]
+                    while True and not all_chunks_read:
+
+                        chunk_size = int((await connection.readuntil()).rstrip(), 16)
+                        if not chunk_size:
+                            # read last CRLF
+                            body.extend(
+                                await connection.readuntil()
+                            )
+                            break
+                        
+                        chunk = await connection.readexactly(chunk_size + 2)
+                        body.extend(
+                            chunk[:-2]
+                        )
+
+                    all_chunks_read = True
+
+                response.read_end = time.monotonic()
+                response.headers = headers
+                response.body = body
+                
+                self.pool.connections.append(connection)
+
+                if action.hooks.after:
+                    response = await action.hooks.after(response)
+                
+                return response
+
+            except Exception as e:
+                response.read_end = time.monotonic()
+                response.error = str(e)
+                self.pool.connections.append(HTTPConnection(reset_connection=self.pool.reset_connections))
+                return response

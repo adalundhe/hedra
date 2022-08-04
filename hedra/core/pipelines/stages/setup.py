@@ -4,9 +4,10 @@ import inspect
 from typing import Dict, List
 from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.hooks.types.types import HookType
+from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.engines.client.client import Client
 from hedra.core.engines.client.config import Config
-from hedra.core.pipelines.hooks.registry.registrar import registar
+from hedra.core.pipelines.hooks.registry.registrar import registrar
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.personas import get_persona
 from .execute import Execute
@@ -32,11 +33,8 @@ class Setup(Stage):
         super().__init__()
         self.stages = {}
         self.actions = []
-        self.hooks: Dict[str, List[Hook]] = {}
 
-        for hook_type in HookType:
-            self.hooks[hook_type] = []
-
+    @Internal
     async def run(self):
 
         config = Config(
@@ -53,39 +51,17 @@ class Setup(Stage):
             options=self.options
 
         )
-
-        methods = inspect.getmembers(self, predicate=inspect.ismethod) 
-        for _, method in methods:
-
-            method_name = method.__qualname__
-            hook: Hook = registar.all.get(method_name)
-
-            if hook:
-                self.hooks[hook.hook_type].append(hook)
         
         await asyncio.gather(*[hook.call() for hook in self.hooks.get(HookType.SETUP)])
 
         
         for execute_stage_name, execute_stage in self.stages.items():
             persona = get_persona(config)
-            execute_stage.hooks = {
-                hook_type: [] for hook_type in  HookType
-            }
-
+   
             client = Client()
             execute_stage.client = client
 
             execute_stage.client._config = config
-
-            methods = inspect.getmembers(execute_stage, predicate=inspect.ismethod) 
-
-            for _, method in methods:
-
-                method_name = method.__qualname__
-                hook: Hook = registar.all.get(method_name)
-                
-                if hook:
-                    execute_stage.hooks[hook.hook_type].append(hook)
             
             for hook in execute_stage.hooks.get(HookType.ACTION):
                 execute_stage.client.next_name = hook.name
@@ -102,10 +78,6 @@ class Setup(Stage):
                      
                 action, session = execute_stage.client.actions.get(
                     execute_stage.name,
-                    hook.name
-                )
-
-                session.context.history.add_row(
                     hook.name
                 )
 

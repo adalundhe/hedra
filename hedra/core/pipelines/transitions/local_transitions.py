@@ -6,13 +6,12 @@ from .common import (
 )
 
 from .validate import (
-    validate_to_optimize_transition,
-    validate_to_execute_transition
+    validate_to_setup_transition
 )
 
 from .idle import (
     invalid_idle_transition,
-    idle_to_setup_transition,
+    idle_to_validate_transition
 )
 
 from .setup import (
@@ -69,8 +68,8 @@ local_transitions = {
 
         # State: Idle
         (StageTypes.IDLE, StageTypes.IDLE): idle_transition,
-        (StageTypes.IDLE, StageTypes.SETUP): idle_to_setup_transition,
-        (StageTypes.IDLE, StageTypes.VALIDATE): invalid_idle_transition,
+        (StageTypes.IDLE, StageTypes.SETUP): invalid_idle_transition,
+        (StageTypes.IDLE, StageTypes.VALIDATE): idle_to_validate_transition,
         (StageTypes.IDLE, StageTypes.OPTIMIZE): invalid_idle_transition,
         (StageTypes.IDLE, StageTypes.EXECUTE):  invalid_idle_transition,
         (StageTypes.IDLE, StageTypes.TEARDOWN): invalid_idle_transition,
@@ -96,9 +95,9 @@ local_transitions = {
         # State: Validate
         (StageTypes.VALIDATE, StageTypes.VALIDATE): invalid_transition,
         (StageTypes.VALIDATE, StageTypes.IDLE): invalid_transition,
-        (StageTypes.VALIDATE, StageTypes.SETUP): invalid_transition,
-        (StageTypes.VALIDATE, StageTypes.OPTIMIZE): validate_to_optimize_transition,
-        (StageTypes.VALIDATE, StageTypes.EXECUTE): validate_to_execute_transition,
+        (StageTypes.VALIDATE, StageTypes.SETUP): validate_to_setup_transition,
+        (StageTypes.VALIDATE, StageTypes.OPTIMIZE): invalid_transition,
+        (StageTypes.VALIDATE, StageTypes.EXECUTE): invalid_transition,
         (StageTypes.VALIDATE, StageTypes.TEARDOWN): invalid_transition,
         (StageTypes.VALIDATE, StageTypes.ANALYZE): invalid_transition,
         (StageTypes.VALIDATE, StageTypes.CHECKPOINT): invalid_transition,

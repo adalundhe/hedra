@@ -29,7 +29,7 @@ except Exception:
     has_connector = False
 
 from datetime import datetime
-from typing import Any, List
+from typing import List
 
 
 class Datadog:

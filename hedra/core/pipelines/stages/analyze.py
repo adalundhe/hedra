@@ -8,9 +8,10 @@ from typing import Dict, List, Union
 from easy_logger import Logger
 import psutil
 from hedra.reporting.metric import MetricsSet
+from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.hooks.types.types import HookType
-from hedra.core.pipelines.hooks.registry.registrar import registar
+from hedra.core.pipelines.hooks.registry.registrar import registrar
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.reporting.events.types import (
     HTTPEvent, 
@@ -37,7 +38,6 @@ class Analyze(Stage):
         logger = Logger()
         self.session_logger = logger.generate_logger('hedra')
         self.raw_results = {}
-        self.hooks: Dict[str, List[Hook]] = {}
         self.quantile_ranges = [ 
             .10, 
             .20, 
@@ -54,12 +54,10 @@ class Analyze(Stage):
             .99 
         ]
 
-        for hook_type in HookType:
-            self.hooks[hook_type] = []
-
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._loop = asyncio.get_event_loop()
-        
+
+    @Internal
     async def run(self):
 
         summaries = {
@@ -72,7 +70,7 @@ class Analyze(Stage):
         for _, method in methods:
 
             method_name = method.__qualname__
-            hook: Hook = registar.all.get(method_name)
+            hook: Hook = registrar.all.get(method_name)
 
             if hook:
                 self.hooks[hook.hook_type].append(hook)
@@ -95,7 +93,7 @@ class Analyze(Stage):
 
                 custom_metrics = defaultdict(dict)
                 for custom_metric in self.hooks.get(HookType.METRIC):
-                    custom_metrics[custom_metric.group][custom_metric.shortname] = custom_metric.call(events_group)
+                    custom_metrics[custom_metric.group][custom_metric.shortname] = await custom_metric.call(events_group)
     
                 group_total = events_group.succeeded + events_group.failed
 

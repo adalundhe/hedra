@@ -1,34 +1,28 @@
+from hedra.core.engines.types.common.base_result import BaseResult
+from hedra.core.engines.types.common.types import RequestTypes
 from .command import Command
 
 
-class Result:
+class PlaywrightResult(BaseResult):
 
-    def __init__(self, command: Command, error: Exception=None, type=None) -> None:
-        self.type = 'playwright'
-        self.name = command.name
-        self.error = error
-        self.time = 0
-        self.user = command.metadata.user
-        self.tags = command.metadata.tags
+    def __init__(self, command: Command, error: Exception=None) -> None:
+        super(
+            PlaywrightResult,
+            self
+        ).__init__(
+            command.name,
+            command.url.location,
+            command.metadata.user,
+            command.metadata.tags,
+            RequestTypes.PLAYWRIGHT,
+            command.hooks.checks,
+            error
+        )
+
         self.url = command.url.location
         self.headers = command.url.headers
-        self.checks = command.checks
-        self.method = command.command
-        self._selector = command.page.selector
-        self._x_coord = command.page.x_coordinate
-        self._y_coord = command.page.y_coordinate
-        self._frame = command.page.frame
-        self.data = None
-        self.hostname = None
-        self.type = type
-
-    @property
-    def path(self):
-        if self._frame:
-            return self._frame
-        
-        elif self._x_coord is not None and self._y_coord is not None:
-            return f'{self._x_coord},{self._y_coord}'
-        
-        else:
-            return self._selector
+        self.command = command.command
+        self.selector = command.page.selector
+        self.x_coord = command.page.x_coordinate
+        self.y_coord = command.page.y_coordinate
+        self.frame = command.page.frame

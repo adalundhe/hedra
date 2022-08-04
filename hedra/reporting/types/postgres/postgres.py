@@ -5,7 +5,7 @@
 #     selectors._BaseSelectorImpl.modify  # type: ignore
 # )
 
-from typing import List
+from typing import Dict, List
 import uuid
 
 from numpy import float32, float64, int16, int32, int64
@@ -36,21 +36,23 @@ class Postgres:
         self.database = config.database
         self.username = config.username
         self.password = config.password
+
         self.events_table_name = config.events_table
         self.metrics_table_name = config.metrics_table
-        self.group_metrics_table_name = f'{self.group_metrics_table_name}_group_metrics'
-        self.errors_table_name = f'{self.metrics_table_name}_errors'
+        self.stage_metrics_table_name = 'stage_metrics'
+        self.errors_table_name = 'stage_errors'
         self.custom_fields = config.custom_fields
         
         self._engine = None
         self._connection = None
         self.metadata = sqlalchemy.MetaData()
+
         self._events_table = None
         self._metrics_table = None
-        self._group_metrics_table = None
+        self._stage_metrics_table = None
         self._errors_table = None
         self._metrics_errors_table = None
-        self._custom_metrics_tables = {}
+        self._custom_metrics_tables: Dict[str, sqlalchemy.Table] = {}
 
     async def connect(self):
         self._engine = await create_engine(
@@ -91,10 +93,10 @@ class Postgres:
 
         async with self._connection.begin() as transaction:
             
-            if self._group_metrics_table is None:
+            if self._stage_metrics_table is None:
 
-                group_metrics_table = sqlalchemy.Table(
-                    self.group_metrics_table_name,
+                stage_metrics_table = sqlalchemy.Table(
+                    self.stage_metrics_table_name,
                     self.metadata,
                     sqlalchemy.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
                     sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
@@ -106,8 +108,8 @@ class Postgres:
                     sqlalchemy.Column('actions_per_second', sqlalchemy.FLOAT)
                 )
 
-                await self._connection.execute(CreateTable(group_metrics_table, if_not_exists=True))
-                self._group_metrics_table = group_metrics_table
+                await self._connection.execute(CreateTable(stage_metrics_table, if_not_exists=True))
+                self._stage_metrics_table = stage_metrics_table
 
             for metrics_set in metrics_sets:
                 await self._connection.execute(
@@ -172,7 +174,7 @@ class Postgres:
             for metrics_set in metrics_sets:
                 for custom_group_name, group in metrics_set.custom_metrics.items():
 
-                    custom_table_name = f'{self.metrics_table_name}_{custom_group_name}'
+                    custom_table_name = f'{custom_group_name}_metrics'
 
                     if self._custom_metrics_tables.get(custom_table_name) is None:
                         custom_metrics_table = sqlalchemy.Table(

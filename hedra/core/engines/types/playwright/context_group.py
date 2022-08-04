@@ -5,7 +5,7 @@ from async_tools.datatypes import AsyncList
 from typing import List
 from playwright.async_api import async_playwright
 from .command import Command
-from .result import Result
+from .result import PlaywrightResult
 from .command_librarian import CommandLibrarian
 
 class ContextGroup:
@@ -78,7 +78,7 @@ class ContextGroup:
             self.librarians.append(command_librarian)
 
     async def execute(self, command: Command):
-        result = Result(command)
+        result = PlaywrightResult(command)
         await self.sem.acquire()
         start = 0
         librarian = self.librarians.pop()

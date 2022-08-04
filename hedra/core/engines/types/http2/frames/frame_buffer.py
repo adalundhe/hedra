@@ -26,15 +26,6 @@ class FrameBuffer:
         self.max_frame_size = 0
         self._headers_buffer = []
 
-    def add_data(self, data):
-        """
-        Add more data to the frame buffer.
-
-        :param data: A bytestring containing the byte buffer.
-        """
-
-        self.data.extend(data)
-
     # The methods below support the iterator protocol.
     def __iter__(self):
         while len(self.data) >= 9:

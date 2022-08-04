@@ -158,6 +158,9 @@ class Reporter:
     async def submit_metrics(self, metrics: List[Any]):
         await self.selected_reporter.submit_metrics(metrics)
 
+    async def submit_custom(self, metrics: List[Any]):
+        await self.selected_reporter.submit_custom(metrics)
+
     async def submit_errors(self, metrics: List[Any]):
         await self.selected_reporter.submit_errors(metrics)
 

@@ -43,7 +43,7 @@ class Graphite(StatsD):
         for metrics_set in metrics_sets:
             for field, value in metrics_set.common_stats.items():
                 self.connection.send_graphite(
-                    f'{metrics_set.name}_{field}', value
+                    f'{metrics_set.name}_common_{field}', value
                 )
 
     async def submit_metrics(self, metrics: List[MetricsSet]):
@@ -86,6 +86,6 @@ class Graphite(StatsD):
                 )
 
                 self.connection.send_graphite(
-                    f'{metrics_set.name}_{error_message}',
+                    f'{metrics_set.name}_error_{error_message}',
                     error.get('count')
                 )

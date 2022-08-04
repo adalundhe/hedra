@@ -30,7 +30,7 @@ class ReaderWriter:
         self.writer._transport.write(data)
 
     async def read(self, msg_length: int=READ_NUM_BYTES):
-        return await asyncio.wait_for(self.reader.read(msg_length), self.timeouts.total_timeout)
+        return await self.reader.read(msg_length)
 
     def get_raw_buffer(self) -> bytearray:
         return self.reader._buffer

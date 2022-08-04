@@ -2,9 +2,10 @@ import asyncio
 from types import FunctionType
 from typing import Any, Dict, List
 from hedra.core.engines.client.config import Config
-from hedra.core.engines.types.common import Request
-from hedra.core.engines.types.common.hooks import Hooks
-from hedra.core.engines.types.graphql.client import MercuryGraphQLClient
+from hedra.core.engines.types.graphql import (
+    MercuryGraphQLClient,
+    GraphQLAction
+)
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.client.store import ActionsStore
@@ -40,24 +41,21 @@ class GraphQLClient(BaseClient):
         variables: Dict[str, Any] = None, 
         headers: Dict[str, str] = {}, 
         user: str = None, 
-        tags: List[Dict[str, str]] = [], 
-        checks: List[FunctionType]=[]
+        tags: List[Dict[str, str]] = []
     ):
-        if self.session.protocol.registered.get(self.next_name) is None:
-            request = Request(
+        if self.session.registered.get(self.next_name) is None:
+            request = GraphQLAction(
                 self.next_name,
                 url,
                 method='POST',
                 headers=headers,
-                payload={
+                data={
                     "query": query,
                     "operation_name": operation_name,
                     "variables": variables
                 },
                 user=user,
-                tags=tags,
-                checks=checks,
-                request_type=self.request_type
+                tags=tags
             )
 
             result = await self.session.prepare(request)

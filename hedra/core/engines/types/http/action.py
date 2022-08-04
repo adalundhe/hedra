@@ -17,19 +17,14 @@ class HTTPAction(BaseAction):
         url: str, 
         method: str = 'GET', 
         headers: Dict[str, str] = {}, 
-        params: Dict[str, str] = None, 
         data: Union[str, dict, Iterator, bytes, None] = None, 
         user: str=None, 
-        tags: List[Dict[str, str]] = [],  
-        checks: List[FunctionType] = None, 
-        hooks: Dict[str, Coroutine] = {},
+        tags: List[Dict[str, str]] = []
     ) -> None:
         super(HTTPAction, self).__init__(
             name,
             user,
-            tags,
-            checks,
-            hooks
+            tags
         )
 
         self.method = method.upper()
@@ -38,11 +33,9 @@ class HTTPAction(BaseAction):
         address_family, protocol = self.protocols[self.type]
         self.url = URL(url, family=address_family, protocol=protocol)
 
-        self._params = params
         self._headers = headers
         self._data = data
 
-        self.encoded_params = None
         self.encoded_data = None
         self.encoded_headers = None
         self.is_stream = False
@@ -74,20 +67,7 @@ class HTTPAction(BaseAction):
         self._headers = value
         self.encoded_headers = None
 
-    @property
-    def params(self):
-        return self._params_
-
-    @params.setter
-    def params(self, value):
-        self._params = value
-        self.encoded_params = None
-        self.encoded_headers = None
-
     def setup(self):
-        
-        if self.encoded_params is None:
-            self._setup_params()
 
         if self.encoded_data is None:
             self._setup_data()
@@ -123,23 +103,9 @@ class HTTPAction(BaseAction):
                 elif isinstance(self._data, str):
                     self.encoded_data = self._data.encode()
 
-    def _setup_params(self):
-        if self._params:
-            self.encoded_params = urlencode('&'.join([
-                f'{key}={value}' for key, value in self.params.items()
-            ]))
-
     def _setup_headers(self) -> Union[bytes, Dict[str, str]]:
-            path = self.url.path
-            
-            if self.url.query:
-                path = f'{path}?{self.url.query}'
-
-            elif self.encoded_params:
-                path = f'{path}{self.encoded_params}'
-
-
-            get_base = f"{self.method} {path} HTTP/1.1{NEW_LINE}"
+     
+            get_base = f"{self.method} {self.url.path} HTTP/1.1{NEW_LINE}"
 
             port = self.url.port or (443 if self.url.scheme == "https" else 80)
 

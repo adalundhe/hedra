@@ -2,10 +2,10 @@ import functools
 from typing import Coroutine, Dict, List, Union
 from .types import HookType
 from .hook import Hook
-from hedra.core.pipelines.hooks.registry.registrar import registar
+from hedra.core.pipelines.hooks.registry.registrar import registrar
 
 
-@registar(HookType.ACTION)
+@registrar(HookType.ACTION)
 def action(weight: int=1, order: int=1, metadata: Dict[str, Union[str, int]]={}, checks: List[Coroutine]=[]):
 
     def wrapper(func) -> Hook:

@@ -6,6 +6,6 @@ from .command import (
     URL,
     Options
 )
-from .result import Result
+from .result import PlaywrightResult
 
 from .context_config import ContextConfig

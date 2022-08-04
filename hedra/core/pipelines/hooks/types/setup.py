@@ -1,9 +1,9 @@
 import functools
 from .types import HookType
-from hedra.core.pipelines.hooks.registry.registrar import registar
+from hedra.core.pipelines.hooks.registry.registrar import registrar
 
 
-@registar(HookType.SETUP)
+@registrar(HookType.SETUP)
 def setup(metadata={}):
     '''
     Setup Hook

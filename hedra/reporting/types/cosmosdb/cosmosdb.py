@@ -24,16 +24,14 @@ class CosmosDB:
     def __init__(self, config: CosmosDBConfig) -> None:
         self.account_uri = config.account_uri
         self.account_key = config.account_key
+
         self.database_name = config.database
         self.events_container_name = config.events_container
         self.metrics_container_name = config.metrics_container
-        self.group_metrics_container_name = f'{self.metrics_container_name}_group_metrics'
-        self.errors_container_name = f'{self.metrics_container_name}_errors'
+        self.stage_metrics_container_name = 'stage_metrics'
+        self.errors_container_name = 'stage_errors'
         self.custom_metrics_containers = {}
-        self.events_partition_key = config.events_partition_key
-        self.metrics_partition_key = config.metrics_partition_key
-        self.group_metrics_partition_key = f'{self.metrics_partition_key}_group_metrics'
-        self.errors_partition_key = f'{self.metrics_partition_key}_errors'
+
         self.analytics_ttl = config.analytics_ttl
 
         self.events_container = None
@@ -55,7 +53,7 @@ class CosmosDB:
 
         self.events_container = await self.database.create_container_if_not_exists(
             self.events_container_name,
-            PartitionKey(f'/{self.events_partition_key}')
+            PartitionKey(f'/{self.events_container_name}')
         )
 
         for event in events:
@@ -66,8 +64,8 @@ class CosmosDB:
 
     async def submit_common(self, metrics_sets: List[MetricsSet]):
         self.group_metrics_container = await self.database.create_container_if_not_exists(
-            self.group_metrics_container_name,
-            PartitionKey(f'/{self.group_metrics_partition_key}')
+            self.stage_metrics_container_name,
+            PartitionKey(f'/{self.stage_metrics_container_name}')
         )
 
         for metrics_set in metrics_sets:
@@ -83,7 +81,7 @@ class CosmosDB:
 
         self.metrics_container = await self.database.create_container_if_not_exists(
             self.metrics_container_name,
-            PartitionKey(f'/{self.metrics_partition_key}')
+            PartitionKey(f'/{self.metrics_container_name}')
         )
 
         for metrics_set in metrics:
@@ -98,11 +96,11 @@ class CosmosDB:
         for metrics_set in metrics_sets:
             for custom_group_name, group in metrics_set.custom_metrics.items():
 
-                custom_metrics_container_name = f'{self.metrics_container_name}_{custom_group_name}_metrics'
+                custom_metrics_container_name = f'{custom_group_name}_metrics'
 
                 custom_container = await self.database.create_container_if_not_exists(
                     custom_metrics_container_name,
-                    PartitionKey(f'/{self.metrics_partition_key}_{custom_group_name}_metrics')
+                    PartitionKey(f'/{custom_group_name}_metrics')
                 )
 
                 self.custom_metrics_containers[custom_metrics_container_name] = custom_container
@@ -118,7 +116,7 @@ class CosmosDB:
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
         self.errors_container = await self.database.create_container_if_not_exists(
             self.errors_container_name,
-            PartitionKey(f'/{self.errors_partition_key}')
+            PartitionKey(f'/{self.errors_container_name}')
         )
 
         for metrics_set in metrics_sets:

@@ -1,5 +1,6 @@
 from typing import Dict
 from hedra.core.pipelines.hooks.types.types import HookType
+from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.reporting import (
     Reporter,
@@ -51,11 +52,8 @@ class Submit(Stage):
         self.summaries = {}
         self.events = []
         self.reporter = Reporter(self.config)
-        self.hooks: Dict[str, HookType] = {}
 
-        for hook_type in HookType:
-            self.hooks[hook_type] = []
-
+    @Internal
     async def run(self):
         await self.reporter.connect()
 
@@ -74,5 +72,6 @@ class Submit(Stage):
         await self.reporter.submit_common(metrics)
         await self.reporter.submit_metrics(metrics)
         await self.reporter.submit_errors(metrics)
+        await self.reporter.submit_custom(metrics)
         await self.reporter.close()
 

@@ -3,41 +3,41 @@ from gzip import decompress as gzip_decompress
 from typing import List, Union
 from zlib import decompress as zlib_decompress
 from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core.engines.types.common.base_result import BaseResult
 from .action import HTTPAction
 
-class HTTPResult:
+class HTTPResult(BaseResult):
 
     def __init__(self, action: HTTPAction, error: Exception=None) -> None:
-        self.name = action.name
+
+        super(
+            HTTPResult,
+            self
+        ).__init__(
+            action.name,
+            action.url.hostname,
+            action.metadata.user,
+            action.metadata.tags,
+            RequestTypes.HTTP,
+            action.hooks.checks,
+            error
+        )
+
         self.url = action.url.full
         self.ip_addr = action.url.ip_addr
         self.method = action.method
         self.path = action.url.path
-        self.params = action._params
+        self.params = action.url.params
+        self.query = action.url.query
         self.hostname = action.url.hostname
-        self.checks = action.hooks.checks
-        self.type = RequestTypes.HTTP
 
         self.headers = {}
         self.body = bytearray()
-        self.error = error
-
-        self.time = 0
-        self.start = 0
-        self.connect_end = 0
-        self.read_end = 0
-        self.write_end = 0
-        self.wait_start = 0
-
-        self.user = action.metadata.user
-        self.tags = action.metadata.tags
-        self.extentions = {}
         self.response_code = None
-        self.deferred_headers = None
 
     @property
     def content_type(self):
-        return self.headers.get('content-type')
+        return self.headers.get(b'content-type')
 
     @property
     def compression(self):
@@ -45,8 +45,8 @@ class HTTPResult:
 
     @property
     def size(self):
-        if self.headers.get('content-length'):
-            return int(self.headers.get('content-length'))
+        if self.headers.get(b'content-length'):
+            return int(self.headers.get(b'content-length'))
         
         elif self.body:
             return len(self.body)
@@ -56,7 +56,6 @@ class HTTPResult:
 
     @property
     def data(self) -> Union[str, dict, None]:
-        
         data = self.body
         try:
             if self.compression == b"gzip":

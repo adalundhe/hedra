@@ -72,10 +72,10 @@ class TimescaleDB(Postgres):
         
         async with self._connection.begin() as transaction:
 
-            if self._group_metrics_table is None:
+            if self._stage_metrics_table is None:
 
-                group_metrics_table = sqlalchemy.Table(
-                    self.group_metrics_table_name,
+                stage_metrics_table = sqlalchemy.Table(
+                    self.stage_metrics_table_name,
                     self.metadata,
                     sqlalchemy.Column('id', UUID(as_uuid=True), default=uuid.uuid4),
                     sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
@@ -88,22 +88,24 @@ class TimescaleDB(Postgres):
                     sqlalchemy.Column('time', sqlalchemy.TIMESTAMP(timezone=False), nullable=False, default=datetime.now())
                 )
 
-                await self._connection.execute(CreateTable(group_metrics_table, if_not_exists=True))
+                await self._connection.execute(CreateTable(stage_metrics_table, if_not_exists=True))
                 await self._connection.execute(
-                    f"SELECT create_hypertable('{self.group_metrics_table_name}', 'time', migrate_data => true, if_not_exists => TRUE, create_default_indexes=>FALSE);"
+                    f"SELECT create_hypertable('{self.stage_metrics_table_name}', 'time', migrate_data => true, if_not_exists => TRUE, create_default_indexes=>FALSE);"
                 )
 
-                await self._connection.execute(f"CREATE INDEX ON {self.group_metrics_table_name} (name, time DESC);")
+                await self._connection.execute(f"CREATE INDEX ON {self.stage_metrics_table_name} (name, time DESC);")
 
-                self._group_metrics_table = group_metrics_table
+                self._stage_metrics_table = stage_metrics_table
 
             for metrics_set in metrics_sets:
-                await self._connection.execute(self._metrics_table.insert(values={
-                    'name': metrics_set.name,
-                    'stage': metrics_set.stage,
-                    'group': 'common',
-                    **metrics_set.common_stats
-                }))
+                await self._connection.execute(
+                    self._stage_metrics_table.insert(values={
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        'group': 'common',
+                        **metrics_set.common_stats
+                    })
+                )
 
             await transaction.commit()
 
@@ -161,7 +163,7 @@ class TimescaleDB(Postgres):
             for metrics_set in metrics_sets:
                 
                 for custom_group_name, group in metrics_set.custom_metrics.items():
-                    custom_table_name = f'{self.metrics_table_name}'
+                    custom_table_name = f'{custom_group_name}_metrics'
 
                     if self._custom_metrics_tables.get(custom_table_name) is None:
 

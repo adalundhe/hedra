@@ -35,10 +35,8 @@ class HTTPClient(BaseClient):
         self,
         url: str, 
         headers: Dict[str, str] = {}, 
-        params: Dict[str, str] = {},
         user: str = None,
-        tags: List[Dict[str, str]] = [],
-        checks: List[FunctionType]=[]
+        tags: List[Dict[str, str]] = []
     ):
 
         if self.session.registered.get(self.next_name) is None:
@@ -47,11 +45,9 @@ class HTTPClient(BaseClient):
                 url,
                 method='GET',
                 headers=headers,
-                params=params,
                 data=None,
                 user=user,
-                tags=tags,
-                checks=checks              
+                tags=tags             
             )
 
             result = await self.session.prepare(request)
@@ -74,11 +70,9 @@ class HTTPClient(BaseClient):
         self,
         url: str, 
         headers: Dict[str, str] = {}, 
-        params: Dict[str, str] = {},
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
-        tags: List[Dict[str, str]] = [],
-        checks: List[FunctionType]=[]
+        tags: List[Dict[str, str]] = []
     ):
         if self.session.registered.get(self.next_name) is None:
             request = HTTPAction(
@@ -86,11 +80,9 @@ class HTTPClient(BaseClient):
                 url,
                 method='POST',
                 headers=headers,
-                params=params,
                 data=data,
                 user=user,
-                tags=tags,
-                checks=checks             
+                tags=tags           
             )
 
             result = await self.session.prepare(request)     
@@ -112,11 +104,9 @@ class HTTPClient(BaseClient):
         self,
         url: str, 
         headers: Dict[str, str] = {}, 
-        params: Dict[str, str] = {},
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
-        tags: List[Dict[str, str]] = [],
-        checks: List[FunctionType]=[]
+        tags: List[Dict[str, str]] = []
     ):
 
         if self.session.registered.get(self.next_name) is None:
@@ -125,11 +115,9 @@ class HTTPClient(BaseClient):
                 url,
                 method='PUT',
                 headers=headers,
-                params=params,
                 data=data,
                 user=user,
-                tags=tags,
-                checks=checks  
+                tags=tags
             )
 
             result = await self.session.prepare(request)
@@ -151,11 +139,9 @@ class HTTPClient(BaseClient):
         self,
         url: str, 
         headers: Dict[str, str] = {}, 
-        params: Dict[str, str] = {},
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
-        tags: List[Dict[str, str]] = [],
-        checks: List[FunctionType]=[]
+        tags: List[Dict[str, str]] = []
     ):
 
         if self.session.registered.get(self.next_name) is None:
@@ -164,11 +150,9 @@ class HTTPClient(BaseClient):
                 url,
                 method='PATCH',
                 headers=headers,
-                params=params,
                 data=data,
                 user=user,
-                tags=tags,
-                checks=checks
+                tags=tags
             )
 
             result = await self.session.prepare(request)
@@ -190,10 +174,8 @@ class HTTPClient(BaseClient):
         self, 
         url: str, 
         headers: Dict[str, str] = {}, 
-        params: Dict[str, str] = {},
         user: str = None,
-        tags: List[Dict[str, str]] = [],
-        checks: List[FunctionType]=[]
+        tags: List[Dict[str, str]] = []
     ):
 
         if self.session.registered.get(self.next_name) is None:
@@ -202,11 +184,9 @@ class HTTPClient(BaseClient):
                 url,
                 method='DELETE',
                 headers=headers,
-                params=params,
                 data=None,
                 user=user,
-                tags=tags,
-                checks=checks      
+                tags=tags 
             )
 
             result = await self.session.prepare(request)

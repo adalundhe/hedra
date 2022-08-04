@@ -9,6 +9,7 @@ from .types import  (
     HTTP2Client,
     GRPCClient,
     GraphQLClient,
+    GraphQLHTTP2Client,
     WebsocketClient,
     PlaywrightClient
 )
@@ -25,6 +26,7 @@ class Client:
         self._http2 = HTTP2Client
         self._grpc = GRPCClient
         self._graphql = GraphQLClient
+        self._graphqlh2 = GraphQLHTTP2Client
         self._websocket = WebsocketClient
         self._playwright = PlaywrightClient
 
@@ -52,11 +54,11 @@ class Client:
     def http2(self):
         if self._http2.initialized is False:
             self._http2 = self._http2(self._config)
-            self._http.actions = self.actions
+            self._http2.actions = self.actions
             self.clients[RequestTypes.HTTP2] = self._http2
        
         self._http2.next_name = self.next_name
-        self._http.intercept = self.intercept
+        self._http2.intercept = self.intercept
         return self._http2
 
     @property
@@ -64,7 +66,7 @@ class Client:
         self._grpc.next_name = self.next_name
         if self._grpc.initialized is False:
             self._grpc = self._grpc(self._config)
-            self._http.actions = self.actions
+            self._grpc.actions = self.actions
             self.clients[RequestTypes.GRPC] = self._grpc
 
         self._grpc.next_name = self.next_name
@@ -76,7 +78,7 @@ class Client:
         self._graphql.next_name = self.next_name
         if self._graphql.initialized is False:
             self._graphql = self._graphql(self._config)
-            self._http.actions = self.actions
+            self._graphql.actions = self.actions
             self.clients[RequestTypes.GRAPHQL] = self._graphql
 
         self._graphql.next_name = self.next_name
@@ -84,11 +86,23 @@ class Client:
         return self._graphql
 
     @property
+    def graphqlh2(self):
+        self._graphqlh2.next_name = self.next_name
+        if self._graphqlh2.initialized is False:
+            self._graphqlh2 = self._graphqlh2(self._config)
+            self._graphqlh2.actions = self.actions
+            self.clients[RequestTypes.GRAPHQL_HTTP2] = self._graphqlh2
+
+        self._graphqlh2.next_name = self.next_name
+        self._graphqlh2.intercept = self.intercept
+        return self._graphql
+
+    @property
     def websocket(self):
         self._websocket.next_name = self.next_name
         if self._websocket.initialized is False:
             self._websocket = self._websocket(self._config)
-            self._http.actions = self.actions
+            self._websocket.actions = self.actions
             self.clients[RequestTypes.WEBSOCKET] = self._websocket
 
         self._websocket.next_name = self.next_name
@@ -100,7 +114,7 @@ class Client:
         self._playwright.next_name = self.next_name
         if self._playwright.initialized is False:
             self._playwright = self._playwright(self._config)
-            self._http.actions = self.actions
+            self._playwright.actions = self.actions
             self.clients[RequestTypes.PLAYWRIGHT] = self._playwright
 
         self._playwright.next_name = self.next_name

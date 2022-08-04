@@ -26,8 +26,8 @@ class Redis:
         self.database = config.database
         self.events_channel = config.events_channel
         self.metrics_channel = config.metrics_channel
-        self.group_metrics_channel = f'{self.group_metrics_channel}_group_metrics'
-        self.errors_channel = f'{self.metrics_channel}_errors'
+        self.stage_metrics_channel = 'stage_metrics'
+        self.errors_channel = 'stage_errors'
         self.channel_type = config.channel_type
         self.connection = None
 
@@ -61,7 +61,7 @@ class Redis:
         for metrics_set in metrics_sets:
             if self.channel_type == 'channel':
                 await self.connection.publish(
-                    self.group_metrics_channel,
+                    self.stage_metrics_channel,
                     json.dumps({
                         'name': metrics_set.name,
                         'stage': metrics_set.stage,
@@ -72,7 +72,7 @@ class Redis:
 
             else:
                 await self.connection.sadd(
-                    self.group_metrics_channel,
+                    self.stage_metrics_channel,
                     json.dumps({
                         'name': metrics_set.name,
                         'stage': metrics_set.stage,
@@ -107,7 +107,7 @@ class Redis:
         for metrics_set in metrics_sets:
             for custom_group_name, group in metrics_set.custom_metrics.items():
 
-                custom_metrics_channel_name = f'{self.metrics_channel}_{custom_group_name}'
+                custom_metrics_channel_name = f'{custom_group_name}_metrics'
 
                 if self.channel_type == 'channel':
                     await self.connection.publish(

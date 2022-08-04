@@ -2,16 +2,6 @@ from hedra.core.engines.types.http2.streams.changed_setting import ChangedSettin
 from hedra.core.engines.types.http2.streams.stream_settings import SettingCodes
 from .base_event import BaseEvent
 
-def _setting_code_from_int(code):
-    """
-    Given an integer setting code, returns either one of :class:`SettingCodes
-    <h2.settings.SettingCodes>` or, if not present in the known set of codes,
-    returns the integer directly.
-    """
-    try:
-        return SettingCodes(code)
-    except ValueError:
-        return code
 
 class RemoteSettingsChanged(BaseEvent):
     event_type='REMOTE_SETTINGS_CHANGED'
@@ -52,7 +42,12 @@ class RemoteSettingsChanged(BaseEvent):
         """
         e = cls()
         for setting, new_value in new_settings.items():
-            setting = _setting_code_from_int(setting)
+
+            try:
+                setting = SettingCodes(setting)
+            except ValueError:
+                pass
+
             original_value = old_settings.get(setting)
             change = ChangedSetting(setting, original_value, new_value)
             e.changed_settings[setting] = change

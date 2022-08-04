@@ -1,6 +1,7 @@
 from datetime import datetime
 import json
 from typing import Optional
+from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from .stage import Stage
 
@@ -13,6 +14,7 @@ class Checkpoint(Stage):
         self.data = {}
         self.previous_stage = ''
 
+    @Internal
     async def run(self):
         
         if self.checkpoint_path is None:

@@ -3,8 +3,10 @@ from types import FunctionType
 from typing import Any, Dict, List
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.common import Timeouts
-from hedra.core.engines.types.websocket.client import MercuryWebsocketClient
-from hedra.core.engines.types.common.request import Request
+from hedra.core.engines.types.websocket import (
+    MercuryWebsocketClient,
+    WebsocketAction
+)
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.client.store import ActionsStore
 from .base_client import BaseClient
@@ -34,24 +36,18 @@ class WebsocketClient(BaseClient):
         self, 
         url: str, 
         headers: Dict[str, str] = {}, 
-        params: Dict[str, str] = {}, 
         user: str = None, 
-        tags: List[Dict[str, str]] = [], 
-        checks: List[FunctionType]=[]
-        
+        tags: List[Dict[str, str]] = []  
     ):
         if self.session.registered.get(self.next_name) is None:
-            request = Request(
+            request = WebsocketAction(
                 self.next_name,
                 url,
                 method='GET',
                 headers=headers,
-                params=params,
-                payload=None,
+                data=None,
                 user=user,
-                tags=tags,
-                checks=checks,
-                request_type=self.request_type
+                tags=tags
             )
 
             result = await self.session.prepare(request)
@@ -71,26 +67,20 @@ class WebsocketClient(BaseClient):
         self, 
         url: str, 
         headers: Dict[str, str] = {}, 
-        params: Dict[str, str] = {}, 
         data: Any = None, 
         user: str = None, 
-        tags: List[Dict[str, str]] = [], 
-        checks: List[FunctionType]=[]
-        
+        tags: List[Dict[str, str]] = []
     ):
 
         if self.session.registered.get(self.next_name) is None:
-            request = Request(
+            request = WebsocketAction(
                 self.next_name,
                 url,
                 method='POST',
                 headers=headers,
-                params=params,
-                payload=data,
+                data=data,
                 user=user,
-                tags=tags,
-                checks=checks,
-                request_type=self.request_type
+                tags=tags
             )
 
             result = await self.session.prepare(request)

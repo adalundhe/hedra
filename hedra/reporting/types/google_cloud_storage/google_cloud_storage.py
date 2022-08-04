@@ -27,15 +27,16 @@ class GoogleCloudStorage:
         self.bucket_namespace = config.bucket_namespace
         self.events_bucket_name = config.events_bucket
         self.metrics_bucket_name = config.metrics_bucket
-        self.group_metrics_bucket_name = f'{self.group_metrics_bucket_name}_group_metrics'
-        self.errors_bucket_name = f'{self.metrics_bucket_name}_errors'
+        self.stage_metrics_bucket_name = 'stage_metrics'
+        self.errors_bucket_name = 'stage_errors'
 
         self.credentials = None
         self.client = None
-        self.events_bucket = None
-        self.group_metrics_bucket = None
-        self.metrics_bucket = None
-        self.errors_bucket = None
+
+        self._events_bucket = None
+        self._stage_metrics_bucket = None
+        self._metrics_bucket = None
+        self._errors_bucket = None
         self._custom_metrics_buckets = {}
 
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
@@ -48,7 +49,7 @@ class GoogleCloudStorage:
 
         try:
 
-            self.events_bucket = await self._loop.run_in_executor(
+            self._events_bucket = await self._loop.run_in_executor(
                 self._executor,
                 self.client.get_bucket,
                 f'{self.bucket_namespace}_{self.events_bucket_name}'
@@ -56,7 +57,7 @@ class GoogleCloudStorage:
         
         except Exception:
 
-            self.events_bucket = await self._loop.run_in_executor(
+            self._events_bucket = await self._loop.run_in_executor(
                 self._executor,
                 self.client.create_bucket,
                 f'{self.bucket_namespace}_{self.events_bucket_name}'
@@ -65,7 +66,7 @@ class GoogleCloudStorage:
         for event in events:
             blob = await self._loop.run_in_executor(
                 self._executor,
-                self.events_bucket.blob,
+                self._events_bucket.blob,
                 event.name
             )
 
@@ -79,18 +80,18 @@ class GoogleCloudStorage:
 
         try:
 
-            self.group_metrics_bucket = await self._loop.run_in_executor(
+            self._stage_metrics_bucket = await self._loop.run_in_executor(
                 self._executor,
                 self.client.get_bucket,
-                f'{self.bucket_namespace}_{self.group_metrics_bucket_name}'
+                f'{self.bucket_namespace}_{self.stage_metrics_bucket_name}'
             )
         
         except Exception:
 
-            self.group_metrics_bucket = await self._loop.run_in_executor(
+            self._stage_metrics_bucket = await self._loop.run_in_executor(
                 self._executor,
                 self.client.create_bucket,
-                f'{self.bucket_namespace}_{self.group_metrics_bucket_name}'
+                f'{self.bucket_namespace}_{self.stage_metrics_bucket_name}'
             )
 
         for metrics_set in metrics_sets:
@@ -136,7 +137,7 @@ class GoogleCloudStorage:
                 blob = await self._loop.run_in_executor(
                     self._executor,
                     self.metrics_bucket.blob,
-                    metrics_set.name
+                    f'{metrics_set.name}_{group_name}'
                 )
 
                 await self._loop.run_in_executor(
@@ -153,7 +154,7 @@ class GoogleCloudStorage:
         for metrics_set in metrics_sets:
             for custom_group_name, group in metrics_set.custom_metrics.items():
 
-                custom_bucket_name = f'{self.bucket_namespace}_{self.metrics_bucket_name}_{custom_group_name}_metrics'
+                custom_bucket_name = f'{self.bucket_namespace}_{custom_group_name}_metrics'
 
                 try:
 
@@ -174,7 +175,7 @@ class GoogleCloudStorage:
                 blob = await self._loop.run_in_executor(
                     self._executor,
                     self.metrics_bucket.blob,
-                    f'{metrics_set.name}_{custom_bucket_name}'
+                    f'{metrics_set.name}_{custom_group_name}'
                 )
 
                 await self._loop.run_in_executor(
@@ -192,18 +193,18 @@ class GoogleCloudStorage:
 
         try:
 
-            self.errors_bucket = await self._loop.run_in_executor(
+            self._errors_bucket = await self._loop.run_in_executor(
                 self._executor,
                 self.client.get_bucket,
-                f'{self.bucket_namespace}_{self.errors_bucket_name}'
+                f'{self.bucket_namespace}_errors'
             )
         
         except Exception:
 
-            self.errors_bucket = await self._loop.run_in_executor(
+            self._errors_bucket = await self._loop.run_in_executor(
                 self._executor,
                 self.client.create_bucket,
-                f'{self.bucket_namespace}_{self.errors_bucket_name}'
+                f'{self.bucket_namespace}_errors'
             )
 
         for metrics_set in metrics_sets:

@@ -1,2 +1,3 @@
-from multiprocessing.spawn import import_main_path
 from .client import MercuryGraphQLClient
+from .action import GraphQLAction
+from .result import GraphQLResult

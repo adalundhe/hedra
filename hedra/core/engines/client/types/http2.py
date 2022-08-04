@@ -1,12 +1,15 @@
 import asyncio
+import traceback
 from typing import Dict, List, Union, Iterator
 from types import FunctionType
 from hedra.core.engines.client.config import Config
-from hedra.core.engines.types.http2.client import MercuryHTTP2Client
+from hedra.core.engines.types.http2 import(
+    MercuryHTTP2Client,
+    HTTP2Action
+)
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.client.store import ActionsStore
-from hedra.core.engines.types.common.request import Request
 from .base_client import BaseClient
 
 
@@ -35,25 +38,19 @@ class HTTP2Client(BaseClient):
         self, 
         url: str, 
         headers: Dict[str, str] = {}, 
-        params: Dict[str, str] = {},
         user: str = None,
-        tags: List[Dict[str, str]] = [],
-        checks: List[FunctionType]=[]
+        tags: List[Dict[str, str]] = []
     ):
         if self.session.registered.get(self.next_name) is None:
-            request = Request(
+            request = HTTP2Action(
                 self.next_name,
                 url,
                 method='GET',
                 headers=headers,
-                params=params,
-                payload=None,
+                data=None,
                 user=user,
-                tags=tags,
-                checks=checks,
-                request_type=self.request_type
+                tags=tags
             )
-            
             
             result = await self.session.prepare(request)
             if isinstance(result, Exception):
@@ -66,30 +63,27 @@ class HTTP2Client(BaseClient):
                 self.waiter = loop.create_future()
                 await self.waiter
 
-        return self.session
+        return await self.session.execute_prepared_request(
+            self.session.registered.get(self.next_name)
+        )
 
     async def post(
         self,
         url: str, 
         headers: Dict[str, str] = {}, 
-        params: Dict[str, str] = {},
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
-        tags: List[Dict[str, str]] = [],
-        checks: List[FunctionType]=[]
+        tags: List[Dict[str, str]] = []
     ):
         if self.session.registered.get(self.next_name) is None:
-            request = Request(
+            request = HTTP2Action(
                 self.next_name,
                 url,
                 method='POST',
                 headers=headers,
-                params=params,
-                payload=data,
+                data=data,
                 user=user,
-                tags=tags,
-                checks=checks,
-                request_type=self.request_type
+                tags=tags
             )
             
             result = await self.session.prepare(request)
@@ -103,31 +97,29 @@ class HTTP2Client(BaseClient):
                 self.waiter = loop.create_future()
                 await self.waiter
                 
-        return self.session
+        return await self.session.execute_prepared_request(
+            self.session.registered.get(self.next_name)
+        )
+
 
     async def put(
         self,
         url: str, 
         headers: Dict[str, str] = {}, 
-        params: Dict[str, str] = {},
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
-        tags: List[Dict[str, str]] = [],
-        checks: List[FunctionType]=[]
+        tags: List[Dict[str, str]] = []
     ):
 
         if self.session.registered.get(self.next_name) is None:
-            request = Request(
+            request = HTTP2Action(
                 self.next_name,
                 url,
                 method='PUT',
                 headers=headers,
-                params=params,
-                payload=data,
+                data=data,
                 user=user,
-                tags=tags,
-                checks=checks,
-                request_type=self.request_type
+                tags=tags
             )
 
             result = await self.session.prepare(request)
@@ -141,31 +133,29 @@ class HTTP2Client(BaseClient):
                 self.waiter = loop.create_future()
                 await self.waiter
 
-        return self.session
+        return await self.session.execute_prepared_request(
+            self.session.registered.get(self.next_name)
+        )
+
 
     async def patch(
         self,
         url: str, 
         headers: Dict[str, str] = {}, 
-        params: Dict[str, str] = {},
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
-        tags: List[Dict[str, str]] = [],
-        checks: List[FunctionType]=[]
+        tags: List[Dict[str, str]] = []
     ):
 
         if self.session.registered.get(self.next_name) is None:
-            request = Request(
+            request = HTTP2Action(
                 self.next_name,
                 url,
                 method='PATCH',
                 headers=headers,
-                params=params,
-                payload=data,
+                data=data,
                 user=user,
-                tags=tags,
-                checks=checks,
-                request_type=self.request_type
+                tags=tags
             )
 
             result = await self.session.prepare(request)
@@ -179,30 +169,28 @@ class HTTP2Client(BaseClient):
                 self.waiter = loop.create_future()
                 await self.waiter
 
-        return self.session
+        return await self.session.execute_prepared_request(
+            self.session.registered.get(self.next_name)
+        )
+
 
     async def delete(
         self, 
         url: str, 
         headers: Dict[str, str] = {}, 
-        params: Dict[str, str] = {},
         user: str = None,
-        tags: List[Dict[str, str]] = [],
-        checks: List[FunctionType]=[]
+        tags: List[Dict[str, str]] = []
     ):
 
         if self.session.registered.get(self.next_name) is None:
-            request = Request(
+            request = HTTP2Action(
                 self.next_name,
                 url,
                 method='DELETE',
                 headers=headers,
-                params=params,
-                payload=None,
+                data=None,
                 user=user,
-                tags=tags,
-                checks=checks,
-                request_type=self.request_type
+                tags=tags
             )
 
             result = await self.session.prepare(request)
@@ -216,4 +204,6 @@ class HTTP2Client(BaseClient):
                 self.waiter = loop.create_future()
                 await self.waiter
 
-        return self.session
+        return await self.session.execute_prepared_request(
+            self.session.registered.get(self.next_name)
+        )

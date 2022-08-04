@@ -24,11 +24,13 @@ class AWSTimestream:
         self.aws_access_key_id = config.aws_access_key_id
         self.aws_secret_access_key = config.aws_secret_access_key
         self.region_name = config.region_name
+
         self.database_name = config.database_name
         self.events_table_name = config.events_table
         self.metrics_table_name = config.metrics_table
-        self.group_metrics_table_name = f'{self.metrics_table_name}_group_metrics'
-        self.errors_table_name = f'{self.metrics_table_name}_errors'
+        self.stage_metrics_table_name = 'stage_metrics'
+        self.errors_table_name = 'stage_errors'
+
         self.retention_options = config.retention_options
         self.session_uuid = str(uuid.uuid4())
 
@@ -108,7 +110,7 @@ class AWSTimestream:
                 functools.partial(
                     self.client.create_table,
                     DatabaseName=self.database_name,
-                    TableName=self.group_metrics_table_name,
+                    TableName=self.stage_metrics_table_name,
                     RetentionProperties=self.retention_options
                 )
             )
@@ -121,7 +123,7 @@ class AWSTimestream:
  
             for field, value in metrics_set.common_stats.items():
                 timestream_record = AWSTimestreamRecord(
-                    'group_metrics',
+                    'stage_metrics',
                     metrics_set.name,
                     metrics_set.stage,
                     'common',
@@ -137,7 +139,7 @@ class AWSTimestream:
             functools.partial(
                 self.client.write_records,
                 DatabaseName=self.database_name,
-                TableName=self.group_metrics_table_name,
+                TableName=self.stage_metrics_table_name,
                 Records=records,
                 CommonAttributes={}
             )
@@ -204,7 +206,7 @@ class AWSTimestream:
                 functools.partial(
                     self.client.create_table,
                     DatabaseName=self.database_name,
-                    TableName=f'{self.metrics_table_name}_errors',
+                    TableName=self.errors_table_name,
                     RetentionProperties=self.retention_options
                 )
             )

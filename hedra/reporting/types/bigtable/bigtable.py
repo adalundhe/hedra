@@ -29,27 +29,27 @@ class BigTable:
         self.instance_id = config.instance_id
         self.events_table_id = config.events_table
         self.metrics_table_id = config.metrics_table
-        self.groups_metrics_table_id = f'{self.metrics_table_id}_group_metrics'
+        self.stage_metrics_table_id = 'stage_metrics'
         self.custom_metrics_table_ids = {}
-        self.errors_table_id = f'{self.metrics_table_id}_errors'
+        self.errors_table_id = f'session_errors'
 
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._events_column_family_id = f'{self.events_table_id}_columns'
         self._metrics_column_family_id = f'{self.metrics_table_id}_columns'
-        self._group_metrics_column_family_id = f'{self.metrics_table_id}_group_metrics_columns'
+        self._stage_metrics_column_family_id = 'stage_metrics_columns'
         self._custom_metrics_column_family_ids = {}
         self._errors_column_family_id = f'{self.metrics_table_id}_errors_columns'
 
         self.instance = None
 
         self._events_table = None
-        self._group_metrics_table = None
+        self._stage_metrics_table = None
         self._custom_metrics_tables = {}
         self._metrics_table = None
         self._errors_table = None
 
         self._events_table_columns = None
-        self._group_metrics_table_columns = None
+        self._stage_metrics_table_columns = None
         self._custom_metrics_table_columns = {}
         self._metrics_table_columns = None
         self._errors_table_columns = None
@@ -116,19 +116,19 @@ class BigTable:
         )
 
     async def submit_common(self, metrics_sets: List[MetricsSet]):
-        group_metrics_table = self.instance.table(self.groups_metrics_table_id)
+        stage_metrics_table = self.instance.table(self.stage_metrics_table_id)
             
         try:
             await self._loop.run_in_executor(
                 self._executor,
-                group_metrics_table.create
+                stage_metrics_table.create
             )
 
         except Exception:
             pass
 
-        self._metrics_table_columns = group_metrics_table.column_family(
-            self._group_metrics_column_family_id
+        self._metrics_table_columns = stage_metrics_table.column_family(
+            self._stage_metrics_column_family_id
         )
 
         
@@ -144,17 +144,17 @@ class BigTable:
         rows = []
         for metrics_set in metrics_sets:
             
-            row_key = f'{self.groups_metrics_table_id}_{str(uuid.uuid4())}'
-            row = group_metrics_table.direct_row(row_key)
+            row_key = f'{self.stage_metrics_table_id}_{str(uuid.uuid4())}'
+            row = stage_metrics_table.direct_row(row_key)
 
-            group_metrics_record = {
+            stage_metrics_record = {
                 'name': metrics_set.name,
                 'stage': metrics_set.stage,
                 'group': 'common',
                 **metrics_set.common_stats
             }
 
-            for field, value in group_metrics_record.items():
+            for field, value in stage_metrics_record.items():
                 if not isinstance(value, bytes):
                     value = f'{value}'.encode()
 
@@ -169,7 +169,7 @@ class BigTable:
 
         await self._loop.run_in_executor(
             self._executor,
-            group_metrics_table.mutate_rows,
+            stage_metrics_table.mutate_rows,
             rows
         )
     
@@ -236,7 +236,7 @@ class BigTable:
 
             for custom_group_name, custom_group in metrics_set.custom_metrics.items():
 
-                custom_metrics_table_id = f'{self.metrics_table_id}_{custom_group_name}_metrics'
+                custom_metrics_table_id = f'{custom_group_name}_metrics'
                 custom_metrics_table = self.instance.table(custom_metrics_table_id)
 
                 try:

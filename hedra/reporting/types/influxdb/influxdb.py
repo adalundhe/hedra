@@ -24,9 +24,10 @@ class InfluxDB:
         self.protocol = 'https' if config.secure else 'http'
         self.organization = config.organization
         self.connect_timeout = config.connect_timeout
-        self.events_bucket = config.events_bucket
-        self.metrics_bucket = config.metrics_bucket
-        self.errors_bucket = f'{self.metrics_bucket}_errors'
+        self.events_bucket_name = config.events_bucket
+        self.metrics_bucket_name = config.metrics_bucket
+        self.stage_metrics_bucket_name = 'stage_metrics'
+        self.errors_bucket_name = 'stage_errors'
         self.events_database = None
         self.metrics_database = None
 
@@ -64,7 +65,7 @@ class InfluxDB:
             points.append(point)
 
         await self.write_api.write(
-            bucket=self.events_bucket,
+            bucket=self.events_bucket_name,
             record=points
         )
 
@@ -72,7 +73,7 @@ class InfluxDB:
 
         points = []
         for metrics_set in metrics_sets:
-            point = Point(f'{metrics_set.name}_group_metrics')
+            point = Point(metrics_set.name)
 
             for tag in metrics_set.tags:
                 point.tag(tag.name, tag.value)
@@ -89,7 +90,7 @@ class InfluxDB:
             points.append(point)
 
         await self.write_api.write(
-            bucket=self.metrics_bucket,
+            bucket=self.stage_metrics_bucket_name,
             record=points
         )
 
@@ -99,7 +100,7 @@ class InfluxDB:
         for metrics_set in metrics:
             
             for group_name, group in metrics_set.groups.items():
-                point = Point(f'{metrics_set.name}_metrics')
+                point = Point(metrics_set.name)
 
                 for tag in metrics_set.tags:
                     point.tag(tag.name, tag.value)
@@ -116,7 +117,7 @@ class InfluxDB:
                 points.append(point)
 
         await self.write_api.write(
-            bucket=self.metrics_bucket,
+            bucket=self.metrics_bucket_name,
             record=points
         )
 
@@ -126,7 +127,7 @@ class InfluxDB:
         for metrics_set in metrics_sets:
             for custom_group_name, group in metrics_set.custom_metrics.items():
 
-                point = Point(f'{metrics_set.name}_{custom_group_name}_metrics')
+                point = Point(f'{metrics_set.name}_{custom_group_name}')
 
                 for tag in metrics_set.tags:
                     point.tag(tag.name, tag.value)
@@ -145,7 +146,7 @@ class InfluxDB:
 
         for group_name, points in points.items():
             await self.write_api.write(
-                bucket=f'{self.metrics_bucket}_{group_name}',
+                bucket=f'{group_name}_metrics',
                 record=points
             )
 
@@ -162,7 +163,7 @@ class InfluxDB:
             points.append(point)
 
         await self.write_api.write(
-            bucket=self.errors_bucket,
+            bucket=self.errors_bucket_name,
             record=points
         )
 

@@ -28,8 +28,8 @@ class SQLite:
         self.path = f'sqlite+aiosqlite:///{config.path}'
         self.events_table_name = config.events_table
         self.metrics_table_name = config.metrics_table
-        self.group_metrics_table_name = f'{self.metrics_table_name}_group_metrics'
-        self.errors_table_name = f'{self.metrics_table_name}_errors'
+        self.stage_metrics_table_name = 'stage_metrics'
+        self.errors_table_name = 'stage_errors'
         self.custom_fields = config.custom_fields
         self.metadata = sqlalchemy.MetaData()
 
@@ -39,7 +39,7 @@ class SQLite:
 
         self._events_table = None
         self._metrics_table = None
-        self._group_metrics_table = None
+        self._stage_metrics_table = None
         self._custom_metrics_tables = {}
         self._errors_table = None
 
@@ -74,10 +74,10 @@ class SQLite:
     async def submit_common(self, metrics_sets: List[MetricsSet]):
 
         async with self._engine.begin() as connection:
-            if self._group_metrics_table is None:
+            if self._stage_metrics_table is None:
 
-                group_metrics_table = sqlalchemy.Table(
-                    self.group_metrics_table_name,
+                stage_metrics_table = sqlalchemy.Table(
+                    self.stage_metrics_table_name,
                     self.metadata,
                     sqlalchemy.Column('id', sqlalchemy.INTEGER, primary_key=True),
                     sqlalchemy.Column('name', sqlalchemy.TEXT),
@@ -89,16 +89,18 @@ class SQLite:
                     sqlalchemy.Column('actions_per_second', sqlalchemy.REAL)
                 )
 
-                await connection.execute(CreateTable(group_metrics_table, if_not_exists=True))
-                self._group_metrics_table = group_metrics_table
+                await connection.execute(CreateTable(stage_metrics_table, if_not_exists=True))
+                self._stage_metrics_table = stage_metrics_table
 
             for metrics_set in metrics_sets:
-                await connection.execute(self._metrics_table.insert(values={
-                    'name': metrics_set.name,
-                    'stage': metrics_set.stage,
-                    'group': 'common',
-                    **metrics_set.common_stats
-                }))
+                await connection.execute(
+                    self._stage_metrics_table.insert(values={
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        'group': 'common',
+                        **metrics_set.common_stats
+                    })
+                )
 
             await connection.commit()
 
@@ -149,7 +151,7 @@ class SQLite:
             for metrics_set in metrics_sets:
 
                 for custom_group_name, group in metrics_set.custom_metrics.items():
-                    custom_table_name = f'{self.metrics_table_name}_{custom_group_name}'
+                    custom_table_name = f'{custom_group_name}_metrics'
 
                     if self._custom_metrics_tables.get(custom_table_name) is None:
                         custom_metrics_table = sqlalchemy.Table(

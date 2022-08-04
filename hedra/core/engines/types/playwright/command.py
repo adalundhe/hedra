@@ -47,9 +47,7 @@ class Command:
         input: Input = Input(), 
         options: Options = Options(), 
         user: str = None, 
-        tags: List[Dict[str, str]] = [], 
-        checks = None,
-        hooks: Dict[str, Coroutine] = {}
+        tags: List[Dict[str, str]] = []
     ) -> None:
         self.name = name
         self.command = command
@@ -57,6 +55,5 @@ class Command:
         self.url = url
         self.input = input
         self.options = options
-        self.checks = checks
         self.metadata = Metadata(user, tags)
-        self.hooks = Hooks(**hooks)
+        self.hooks = Hooks()

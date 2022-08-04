@@ -17,6 +17,7 @@ class RequestTypes:
     HTTP2='HTTP2'
     WEBSOCKET='WEBSOCKET'
     GRAPHQL='GRAPHQL'
+    GRAPHQL_HTTP2="GRAPHQL_HTTP2"
     GRPC='GRPC'
     PLAYWRIGHT='PLAYWRIGHT'
 
@@ -29,6 +30,7 @@ class ProtocolMap:
             RequestTypes.HTTP2: SocketTypes.HTTP2,
             RequestTypes.WEBSOCKET: SocketTypes.DEFAULT,
             RequestTypes.GRAPHQL: SocketTypes.DEFAULT,
+            RequestTypes.GRAPHQL_HTTP2: SocketTypes.HTTP2,
             RequestTypes.GRPC: SocketTypes.HTTP2,
             RequestTypes.PLAYWRIGHT: SocketTypes.NONE
         }
@@ -38,6 +40,7 @@ class ProtocolMap:
             RequestTypes.HTTP2: SocketProtocols.HTTP2,
             RequestTypes.WEBSOCKET: SocketProtocols.DEFAULT,
             RequestTypes.GRAPHQL: SocketProtocols.DEFAULT,
+            RequestTypes.GRAPHQL_HTTP2: SocketTypes.HTTP2,
             RequestTypes.GRPC: SocketProtocols.HTTP2,
             RequestTypes.PLAYWRIGHT: SocketProtocols.NONE
         }

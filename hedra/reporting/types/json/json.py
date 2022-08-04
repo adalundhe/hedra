@@ -69,6 +69,9 @@ class JSON:
                 )
             )
 
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
+        pass
+
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
         pass
 

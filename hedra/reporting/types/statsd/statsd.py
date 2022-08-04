@@ -79,7 +79,7 @@ class StatsD:
                 update_function = self._update_map.get(update_type)
 
                 update_function(
-                    f'{metrics_set.name}_{field}', value
+                    f'{metrics_set.name}_common_{field}', value
                 )
 
     async def submit_metrics(self, metrics: List[MetricsSet]):
@@ -96,7 +96,8 @@ class StatsD:
                     update_function = self._update_map.get(update_type)
                     
                     update_function(
-                        f'{metrics_set.name}_{group_name}_{metric_field}', metric_value
+                        f'{metrics_set.name}_{group_name}_{metric_field}',
+                        metric_value
                     )
 
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
@@ -132,7 +133,7 @@ class StatsD:
                 )
 
                 update_function = self._update_map.get('count')
-                update_function(f'{metrics_set.name}_{error_message}', error.get('count'))
+                update_function(f'{metrics_set.name}_errors_{error_message}', error.get('count'))
 
 
     async def close(self):

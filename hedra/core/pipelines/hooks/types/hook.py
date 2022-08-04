@@ -28,6 +28,7 @@ class Hook:
         name: str, 
         shortname: str,
         call: Coroutine, 
+        stage: str = None,
         hook_type=HookType.ACTION,
         names: List[str] = [], 
         metadata: Metadata = Metadata(), 
@@ -37,8 +38,9 @@ class Hook:
         self.name = name
         self.shortname = shortname
         self.call = call
-        self.names = list(set(names))
+        self.stage = stage
         self.hook_type = hook_type
+        self.names = list(set(names))
         self.config = metadata
         self.checks = checks
         self.session = None

@@ -1,28 +1,29 @@
 import traceback
-from hedra.core.engines.types.common.response import Response
+from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.reporting.tags import Tag
 
 
 class BaseEvent:
 
-    def __init__(self, response: Response) -> None:
+    def __init__(self, result: BaseResult) -> None:
         self.name = None
-        self.shortname = response.name
-        self.checks = response.checks
-        self.error = response.error
-        self.time = response.read_end - response.start
-        self.time_waiting = response.start - response.wait_start
-        self.time_connecting = response.connect_end - response.start
-        self.time_writing = response.write_end - response.connect_end
-        self.time_reading = response.read_end - response.write_end
-        self.type = response.type
-        self.source = response.hostname
+        self.shortname = result.name
+        self.checks = result.checks
+        self.error = result.error
+        self.time = result.read_end - result.start
+        self.time_waiting = result.start - result.wait_start
+        self.time_connecting = result.connect_end - result.start
+        self.time_writing = result.write_end - result.connect_end
+        self.time_reading = result.read_end - result.write_end
+        self.type = result.type
+        self.source = result.source
+        self.type = result.type
 
         self.tags = [
             Tag(
                 tag.get('name'),
                 tag.get('value')
-            ) for tag in response.tags
+            ) for tag in result.tags
         ]
         self.stage = None
 

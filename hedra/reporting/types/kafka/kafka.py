@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import datetime
 import json
 from typing import List
@@ -26,14 +27,13 @@ class Kafka:
         self.events_topic = config.events_topic
         self.metrics_topic = config.metrics_topic
         self.custom_metrics_topics = {}
-        self.group_metrics_topic = f'{self.metrics_topic}_group_metrics'
-        self.errors_topic = f'{self.metrics_topic}_errors'
+        self.stage_metrics_topic = 'stage_metrics'
+        self.errors_topic = 'stage_errors'
 
         self.events_partition = config.events_partition
         self.metrics_partition = config.metrics_partition
-        self.group_metrics_partition = f'{self.metrics_partition}_group_metrics'
-        self.errors_partition = f'{self.metrics_partition}_errors'
-        self.custom_metrics_partitions = {}
+        self.stage_metrics_partition = 'stage_metrics'
+        self.errors_partition = 'stage_errors'
 
         self.compression_type = config.compression_type
         self.timeout = config.timeout
@@ -88,8 +88,8 @@ class Kafka:
 
         await self._producer.send_batch(
             batch,
-            self.group_metrics_topic,
-            partition=self.group_metrics_partition
+            self.stage_metrics_topic,
+            partition=self.stage_metrics_partition
         )
 
     async def submit_metrics(self, metrics: List[MetricsSet]):
@@ -107,7 +107,7 @@ class Kafka:
                         }
                     ).encode('utf-8'),
                     timestamp=None, 
-                    key=bytes(metrics_set.name, 'utf')
+                    key=bytes(f'{metrics_set.name}_{group_name}', 'utf')
                 )
 
         await self._producer.send_batch(
@@ -120,12 +120,12 @@ class Kafka:
 
         for metrics_set in metrics_sets:
             for custom_group_name, group in metrics_set.custom_metrics.items():
+                custom_topic_name = f'{custom_group_name}_metrics'
 
-                if self.custom_metrics_topics.get(custom_group_name) is None:
-                    self.custom_metrics_topics[custom_group_name] = self._producer.create_batch()
-                    self.custom_metrics_partitions[custom_group_name] = f'{self.metrics_partition}_{custom_group_name}'
+                if self.custom_metrics_topics.get(custom_topic_name) is None:
+                    self.custom_metrics_topics[custom_topic_name] = self._producer.create_batch()
                 
-                self.custom_metrics_topics[custom_group_name].append(
+                self.custom_metrics_topics[custom_topic_name].append(
                     value=json.dumps({
                         'name': metrics_set.name,
                         'stage': metrics_set.stage,
@@ -140,7 +140,7 @@ class Kafka:
             await self._producer.send_batch(
                 batch,
                 topic_name,
-                partition=self.custom_metrics_partitions.get(topic_name)
+                partition=topic_name
             )
 
     async def submit_errors(self, metrics_sets: List[MetricsSet]):

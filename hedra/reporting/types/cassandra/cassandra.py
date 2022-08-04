@@ -42,11 +42,11 @@ class Cassandra:
         self.password = config.password
         self.keyspace = config.keyspace
         self.custom_fields = config.custom_fields
-        self._events_table_name: str = config.events_table
-        self._metrics_table_name: str = config.metrics_table
-        self._group_metrics_table_name = f'{self._metrics_table_name}_group_metrics'
-        self._custom_metrics_table_names = {}
-        self._errors_table_name = f'{self._metrics_table_name}_errors'
+        self.events_table_name: str = config.events_table
+        self.metrics_table_name: str = config.metrics_table
+        self.stage_metrics_table_name = 'stage_metrics'
+        self.custom_metrics_table_names = {}
+        self.errors_table_name = 'stage_errors'
         self.replication_strategy = config.replication_strategy
         self.replication = config.replication       
         self.ssl = config.ssl
@@ -55,7 +55,7 @@ class Cassandra:
         self._metrics_table = None
         self._errors_table = None
         self._events_table = None
-        self._group_metrics_table = None
+        self._stage_metrics_table = None
         self._custom_metrics_tables = {}
 
         self._executor =ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
@@ -115,7 +115,7 @@ class Cassandra:
         if self._events_table is None:
 
             self._events_table = type(
-                self._events_table_name.capitalize(), 
+                self.events_table_name.capitalize(), 
                 (Model, ), 
                 {
                     'id': columns.UUID(primary_key=True, default=uuid.uuid4),
@@ -148,7 +148,7 @@ class Cassandra:
 
     async def submit_common(self, metrics_sets: List[MetricsSet]):
         
-        if self._group_metrics_table is None:
+        if self._stage_metrics_table is None:
 
             fields = {
                 'id': columns.UUID(primary_key=True, default=uuid.uuid4),
@@ -161,8 +161,8 @@ class Cassandra:
                 'actions_per_second': columns.Float()
             }
 
-            self._group_metrics_table = type(
-                self._group_metrics_table_name.capitalize(), 
+            self._stage_metrics_table = type(
+                self.stage_metrics_table_name.capitalize(), 
                 (Model, ), 
                 fields
             )
@@ -171,7 +171,7 @@ class Cassandra:
                 self._executor,
                 functools.partial(
                     sync_table,
-                    self._group_metrics_table,
+                    self._stage_metrics_table,
                     keyspaces=[self.keyspace]
                 )
             )
@@ -220,7 +220,7 @@ class Cassandra:
 
 
                 self._metrics_table = type(
-                    self._metrics_table_name.capitalize(), 
+                    self.metrics_table_name.capitalize(), 
                     (Model, ), 
                     fields
                 )
@@ -253,7 +253,7 @@ class Cassandra:
             
             for custom_group_name, group in metrics_set.custom_metrics.items():
 
-                custom_metrics_table_name = f'{self._metrics_table_name}_{custom_group_name}_metrics'
+                custom_metrics_table_name = f'{custom_group_name}_metrics'
                 if self._custom_metrics_tables.get(custom_metrics_table_name):
                     
                     custom_table = {
@@ -317,7 +317,7 @@ class Cassandra:
             }
 
             self._errors_table = type(
-                self._errors_table_name.capitalize()
+                self.errors_table_name.capitalize()
                 (Model, ),
                 errors_table_fields
             )

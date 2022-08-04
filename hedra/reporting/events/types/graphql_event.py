@@ -1,7 +1,8 @@
-from hedra.core.engines.types.common.response import Response
+from hedra.core.engines.types.graphql import GraphQLResult
+from .http_event import HTTPEvent
 
 
-class GraphQLEvent:
+class GraphQLEvent(HTTPEvent):
 
-    def __init__(self, response: Response) -> None:
-        pass
+    def __init__(self, result: GraphQLResult) -> None:
+        super(GraphQLEvent, self).__init__(result)

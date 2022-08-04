@@ -48,6 +48,11 @@ class Pipeline:
 
     def validate(self):
 
+        # If we havent specified a Validate stage for save aggregated results,
+        # append one.
+        if len(self.instances.get(StageTypes.VALIDATE)) < 1:
+            self._prepend_stage(StageTypes.VALIDATE)
+
         # A user will never specify an Idle stage. Instead, we prepend one to 
         # serve as the source node for a graphs, ensuring graphs have a 
         # valid starting point and preventing the user from forgetting things

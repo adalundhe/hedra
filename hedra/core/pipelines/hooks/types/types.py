@@ -10,3 +10,4 @@ class HookType(Enum):
     CHECK='CHECK'
     METRIC='METRIC'
     VALIDATE='VALIDATE'
+    INTERNAL='INTERNAL'

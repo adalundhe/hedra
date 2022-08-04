@@ -20,7 +20,7 @@ class CSV:
 
         self._events_csv_writer = None
         self._metrics_csv_writer = None
-        self._group_metrics_csv_writer = None
+        self._stage_metrics_csv_writer = None
         self._errors_csv_writer = None
         self._custom_metrics_csv_writers = {}
 
@@ -47,7 +47,7 @@ class CSV:
                     event.record
                 )
 
-    async def submt_common(self, metrics_sets: List[MetricsSet]):
+    async def submit_common(self, metrics_sets: List[MetricsSet]):
 
         headers = [
             'name',
@@ -58,21 +58,21 @@ class CSV:
             'failed'
         ]
 
-        group_metrics_filepath = Path(self.metrics_filepath).stem
-        with open(f'{group_metrics_filepath}_group_metrics.csv', 'a') as group_metrics_file:
+        base_filepath = Path(self.metrics_filepath).parent
+        with open(f'{base_filepath}/stage_metrics.csv', 'a') as stage_metrics_file:
 
-            if self._group_metrics_csv_writer is None:
-                self._group_metrics_csv_writer = csv.DictWriter(group_metrics_filepath, fieldnames=headers)
+            if self._stage_metrics_csv_writer is None:
+                self._stage_metrics_csv_writer = csv.DictWriter(stage_metrics_file, fieldnames=headers)
 
                 await self._loop.run_in_executor(
                     self._executor,
-                    self._group_metrics_csv_writer.writeheader
+                    self._stage_metrics_csv_writer.writeheader
                 )
 
             for metrics_set in metrics_sets:
                 await self._loop.run_in_executor(
                     self._executor,
-                    self._group_metrics_csv_writer.writerow,
+                    self._stage_metrics_csv_writer.writerow,
                     {
                         'name': metrics_set.name,
                         'stage': metrics_set.stage,
@@ -113,8 +113,8 @@ class CSV:
         for metrics_set in metrics_sets:
             for custom_group_name, group in metrics_set.custom_metrics.items():
 
-                base_filepath = Path(self.metrics_filepath).stem
-                with open(f'{base_filepath}_{custom_group_name}.csv', 'a') as custom_metrics_file:
+                base_filepath = Path(self.metrics_filepath).parent
+                with open(f'{base_filepath}/{custom_group_name}.csv', 'a') as custom_metrics_file:
 
                     headers = [
                         'name',
@@ -153,8 +153,8 @@ class CSV:
             'error_count'
         ]
 
-        errors_file_path = Path(self.metrics_filepath).stem
-        with open (f'{errors_file_path}_errors.csv', 'a') as errors_file:
+        base_filepath = Path(self.metrics_filepath).parent
+        with open (f'{base_filepath}/stage_errors.csv', 'a') as errors_file:
             
             if self._errors_csv_writer is None:
                 error_csv_writer = csv.DictWriter(errors_file, fieldnames=error_csv_headers)

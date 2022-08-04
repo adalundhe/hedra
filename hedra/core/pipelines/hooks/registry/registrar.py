@@ -60,7 +60,7 @@ class Registrar:
                 
                 return wrapped_method
 
-        elif hook_type in [HookType.BEFORE, HookType.AFTER, HookType.CHECK, HookType.VALIDATE]:
+        elif hook_type in [HookType.BEFORE, HookType.AFTER, HookType.CHECK]:
             
             def wrap_hook(*names):
                 def wrapped_method(func):
@@ -73,6 +73,28 @@ class Registrar:
                         func, 
                         hook_type=hook_type,
                         names=names
+                    )
+
+                    return func
+                
+                return wrapped_method
+
+        elif hook_type == HookType.VALIDATE:
+
+            def wrap_hook(stage: str, *names):
+                def wrapped_method(func):
+                    hook_name = func.__qualname__
+                    hook_shortname = func.__name__
+
+                    target_hook_names = [f'{stage}.{name}' for name in names]
+
+                    self.all[hook_name] = Hook(
+                        hook_name, 
+                        hook_shortname,
+                        func, 
+                        stage=stage,
+                        hook_type=hook_type,
+                        names=target_hook_names
                     )
 
                     return func
@@ -112,4 +134,4 @@ def makeRegistrar():
     return Registrar
 
 
-registar = makeRegistrar()
+registrar = makeRegistrar()

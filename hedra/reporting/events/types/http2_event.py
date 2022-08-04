@@ -1,26 +1,27 @@
 import json
-from hedra.core.engines.types.common.response import Response
+from typing import Dict
+from hedra.core.engines.types.http2 import HTTP2Result
 from .base_event import BaseEvent
 
 
 class HTTP2Event(BaseEvent):
 
-    def __init__(self, response: Response) -> None:
-        super(HTTP2Event, self).__init__(response)
+    def __init__(self, result: HTTP2Result) -> None:
+        super(HTTP2Event, self).__init__(result)
 
-        self.url = response.url
-        self.ip_addr = response.ip_addr
-        self.method = response.method
-        self.path = response.path
-        self.params = response.params
-        self.hostname = response.hostname
+        self.url = result.url
+        self.ip_addr = result.ip_addr
+        self.method = result.method
+        self.path = result.path
+        self.params = result.params
+        self.hostname = result.hostname
         self.status = None
-        self.headers = {}
-        self.data = response.body
+        self.headers: Dict[bytes, bytes] = {}
+        self.data = result.data
         
-        if response.error is None:
+        if result.error is None:
             try:
-                status, headers = response.deferred_headers.parse()
+                status, headers = result.deferred_headers.parse()
                 self.status = status
                 self.headers = headers
 

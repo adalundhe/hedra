@@ -29,8 +29,8 @@ class S3:
         self.buckets_namespace = config.buckets_namespace
         self.events_bucket_name = config.events_bucket
         self.metrics_bucket_name = config.metrics_bucket
-        self.group_metrics_bucket_name = f'{self.metrics_bucket_name}-group-metrics'
-        self.errors_bucket_name = f'{self.metrics_bucket_name}-errors'
+        self.stage_metrics_bucket_name = 'stage-metrics'
+        self.errors_bucket_name = 'stage-errors'
 
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self.client = None
@@ -82,14 +82,14 @@ class S3:
 
     async def submit_common(self, metrics_sets: List[MetricsSet]):
 
-        group_metrics_bucket_name = f'{self.buckets_namespace}-{self.group_metrics_bucket_name}'
+        stage_metrics_bucket_name = f'{self.buckets_namespace}-{self.stage_metrics_bucket_name}'
 
         try:
             await self._loop.run_in_executor(
                 self._executor,
                 functools.partial(
                     self.client.create_bucket,
-                    Bucket=group_metrics_bucket_name,
+                    Bucket=stage_metrics_bucket_name,
                     CreateBucketConfiguration={
                         'LocationConstraint': self.region_name
                     }
@@ -105,7 +105,7 @@ class S3:
                 self._executor,
                 functools.partial(
                     self.client.put_object,
-                    Bucket=group_metrics_bucket_name,
+                    Bucket=stage_metrics_bucket_name,
                     Key=f'{metrics_set.name}-{timestamp}',
                     Body=json.dumps({
                         'name': metrics_set.name,
@@ -155,7 +155,7 @@ class S3:
         for metrics_set in metrics_sets:
             for custom_group_name, group in metrics_set.custom_metrics.items():
 
-                custom_bucket_name = f'{self.buckets_namespace}-{self.metrics_bucket_name}-{custom_group_name}'
+                custom_bucket_name = f'{self.buckets_namespace}-{custom_group_name}-metrics'
                 
                 try:
                     await self._loop.run_in_executor(

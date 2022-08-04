@@ -16,16 +16,16 @@ except Exception:
     boto3 = None
     has_connector=False
 
+
 class AWSLambda:
 
     def __init__(self, config: AWSLambdaConfig) -> None:
         self.aws_access_key_id = config.aws_access_key_id
         self.aws_secret_access_key = config.aws_secret_access_key
         self.region_name = config.region_name
+
         self.events_lambda_name = config.events_lambda
         self.metrics_lambda_name = config.metrics_lambda 
-        self.group_metrics_lambda_name = f'{self.metrics_lambda_name}_group_metrics'
-        self.errors_lambda_name = f'{self.metrics_lambda_name}_errors'   
 
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._client = None
@@ -60,7 +60,7 @@ class AWSLambda:
                 self._executor,
                 functools.partial(
                     self._client.invoke,
-                    FunctionName=self.group_metrics_lambda_name,
+                    FunctionName=self.metrics_lambda_name,
                         Payload=json.dumps({
                             'name': metrics_set.name,
                             'stage': metrics_set.stage,
@@ -114,7 +114,7 @@ class AWSLambda:
                     self._executor,
                     functools.partial(
                         self._client.invoke,
-                        FunctionName=self.errors_lambda_name,
+                        FunctionName=self.metrics_lambda_name,
                         Payload=json.dumps({
                             'name': metrics_set.name,
                             'stage': metrics_set.stage,

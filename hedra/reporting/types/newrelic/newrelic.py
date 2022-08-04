@@ -81,19 +81,13 @@ class NewRelic:
     async def submit_metrics(self, metrics: List[MetricsSet]):
 
         for metrics_set in metrics:
-            for group in metrics_set.groups.values():
-
-                metric_record = {
-                    **group.stats, 
-                    **group.custom
-                }
-                
-                for field, value in metric_record.items():
+            for group_name, group in metrics_set.groups.items():
+                for field, value in group.stats.items():
                     await self._loop.run_in_executor(
                         self._executor,
                         functools.partial(
                             self.client.record_custom_metric,
-                            f'{metrics_set.name}_{field}',
+                            f'{metrics_set.name}_{group_name}_{field}',
                             value
                         )
                     )
@@ -127,7 +121,7 @@ class NewRelic:
                     self._executor,
                     functools.partial(
                         self.client.record_custom_metric,
-                        f'{metrics_set.name}_{error_message}',
+                        f'{metrics_set.name}_errors_{error_message}',
                         error.get('count')
                     )
                 )            

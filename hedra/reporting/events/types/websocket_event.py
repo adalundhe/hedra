@@ -1,7 +1,11 @@
-from hedra.core.engines.types.common.response import Response
+from hedra.core.engines.types.websocket import WebsocketResult
+from .http_event import HTTPEvent
 
 
-class WebsocketEvent:
+class WebsocketEvent(HTTPEvent):
 
-    def __init__(self, response: Response) -> None:
-        pass
+    def __init__(self, result: WebsocketResult) -> None:
+        super(
+            WebsocketEvent,
+            self
+        ).__init__(result)
