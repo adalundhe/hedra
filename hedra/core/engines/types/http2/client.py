@@ -132,7 +132,6 @@ class MercuryHTTP2Client:
                 return response
                 
             except Exception as e:
-                print(traceback.format_exc())
                 response.response_code = 500
                 response.error = str(e)
 
