@@ -1,4 +1,5 @@
 import json
+import traceback
 from typing import Dict, List, Union
 from gzip import decompress as gzip_decompress
 from zlib import decompress as zlib_decompress
@@ -31,11 +32,17 @@ class HTTP2Result(BaseResult):
         self.params = action.url.params
         self.query = action.url.query
         self.hostname = action.url.hostname
-        self._headers: Dict[bytes, bytes] = None
+        self.headers: Dict[bytes, bytes] = {}
         self.body = bytearray()
         
         self.response_code: str = None
         self.deferred_headers: DeferredHeaders = None
+        self._compression = None
+        self._content_type = None
+        self._size = None
+        self._version = None
+        self._reason = None
+        self._status = None
 
     def to_dict(self):
 
@@ -65,82 +72,114 @@ class HTTP2Result(BaseResult):
 
     @property
     def content_type(self):
-        if self._headers is None:
-            return self.headers.get(b'content-type')
+        if len(self.headers) == 0 and self.deferred_headers:
+            self.headers = self._parse_headers()
+            self._content_type = self.headers.get(b'content-type')
+        
+        return self._content_type
 
-        return self._headers.get(b'content-type')
+    @content_type.setter
+    def content_type(self, value: str):
+        self._content_type = value
 
     @property
     def compression(self):
-        if self._headers is None:
-            return self.headers.get(b'content-encoding')
+        if len(self.headers) == 0 and self.deferred_headers:
+            self.headers = self._parse_headers()
+            self._compression = self.headers.get(b'content-encoding')
 
-        return self._headers.get(b'content-encoding')
+        return self._compression
+
+    @compression.setter
+    def compression(self, value: str):
+        self._compression = value
 
     @property
-    def headers(self):
-        if self._headers is None:
-            self._headers = self.deferred_headers.parse()
-            
+    def version(self) -> Union[str, None]:
+        if len(self.headers) == 0 and self.deferred_headers:
+            self.headers = self._parse_headers()
+            self._version = self.headers.get(b'version')
 
-        return self._headers
+        return self._version
+
+    @version.setter
+    def version(self, value: str):
+        self._version = value
+
+    @property
+    def status(self) -> Union[int, None]:
+        if len(self.headers) == 0 and self.deferred_headers:
+            self.headers = self._parse_headers()
+            self._status = int(self.headers.get(b'status'))
+        
+        return self._status
+
+    @status.setter
+    def status(self, value: int):
+        self._status = value
+
+    @property
+    def reason(self) -> Union[str, None]:
+        if len(self.headers) == 0 and self.deferred_headers:
+            self.headers = self._parse_headers()
+            self._reason = self.headers.get(b'reason')
+
+        return self._reason
+
+    @reason.setter
+    def reason(self, value: str):
+        self._reason = value
 
     @property
     def size(self):
-        if self._headers is None:
-            return int(self.headers.get(b'content-length', 0))
+        
+        if len(self.headers) == 0 and self.deferred_headers:
+            self.headers = self._parse_headers()
+            content_length = self.headers.get(b'content-length')
+            if content_length:
+                self._size = int(content_length)
 
-        return int(self._headers.get(b"content-length", 0))
+            elif len(self.body) > 0:
+                self._size = len(self.body)
+            
+            else:
+                self._size = 0
+
+        return self._size
+
+    @size.setter
+    def size(self, value: int):
+        self._size = value
         
     @property
     def data(self) -> Union[str, dict, None]:
 
+        if len(self.headers) == 0 and self.deferred_headers:
+            self.headers = self._parse_headers()
+
         data = self.body
         try:
-            if self.compressed == b"gzip":
+            if self.headers.get(b'content-encoding') == b"gzip":
                 data = gzip_decompress(self.body)
-            elif self.compressed == b"deflate":
+            elif self.headers.get(b'content-encoding') == b"deflate":
                 data = zlib_decompress(self.body)
 
-            if self.content_type == b"application/json":
+            if self.headers.get(b'content-type') == b"application/json":
                 data = json.loads(self.body)
             
-            elif isinstance(self.body, bytes):
-                data = data.decode()
+            elif isinstance(self.body, (bytes, bytearray)):
+                data = str(self.body.decode())
 
         except Exception:
             pass
 
         return data
 
-    @property
-    def version(self) -> Union[str, None]:
+    def _parse_headers(self):
         try:
-            status_string: List[bytes] = self.response_code.split()
-            return status_string[0].decode()
-        except Exception:
-            return None
-
-    @property
-    def status(self) -> Union[int, None]:
-        try: 
-            if isinstance(self.response_code, bytes) or isinstance(self.response_code, str):
-                status_string: List[bytes] = self.response_code.split()
-                return int(status_string[1])
-            else:
-                return self.response_code
-
-        except Exception as e:
-            return None
-
-    @property
-    def reason(self) -> Union[str, None]:
-        try:
-            if isinstance(self.response_code, bytes) or isinstance(self.response_code, str):
-                status_string: List[bytes] = self.response_code.split()
-                return status_string[2].decode()
-            
-            return None
+            status, decoded_headers = self.deferred_headers.parse()
+            decoded_headers['status'] = status
+            return decoded_headers
 
         except Exception:
-            return None
+            return {}

@@ -107,7 +107,6 @@ class ConnectionFactory:
             self.transport, _ = await self.loop.create_connection(
                 lambda: protocol, 
                 sock=sock,
-                happy_eyeballs_delay=0.1,
                 family=socket.AF_INET
             )
             

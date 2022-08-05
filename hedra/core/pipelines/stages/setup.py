@@ -1,13 +1,10 @@
 import asyncio
 import psutil
-import inspect
-from typing import Dict, List
-from hedra.core.pipelines.hooks.types.hook import Hook
+from typing import Dict
 from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.engines.client.client import Client
 from hedra.core.engines.client.config import Config
-from hedra.core.pipelines.hooks.registry.registrar import registrar
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.personas import get_persona
 from .execute import Execute
@@ -31,8 +28,9 @@ class Setup(Stage):
     
     def __init__(self) -> None:
         super().__init__()
-        self.stages = {}
+        self.stages: Dict[str, Execute] = {}
         self.actions = []
+        self.accepted_hook_types = [ HookType.SETUP ]
 
     @Internal
     async def run(self):
@@ -62,7 +60,7 @@ class Setup(Stage):
             execute_stage.client = client
 
             execute_stage.client._config = config
-            
+
             for hook in execute_stage.hooks.get(HookType.ACTION):
                 execute_stage.client.next_name = hook.name
                 execute_stage.client.intercept = True

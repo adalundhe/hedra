@@ -1,6 +1,16 @@
 import asyncio
 from collections import defaultdict
-from typing import Any
+from hedra.core.engines.types.common.base_action import BaseAction
+from hedra.core.engines.types import (
+    MercuryGraphQLClient,
+    MercuryGraphQLHTTP2Client,
+    MercuryGRPCClient,
+    MercuryHTTP2Client,
+    MercuryHTTPClient,
+    MercuryPlaywrightClient,
+    MercuryWebsocketClient
+)
+from typing import Any, Tuple, Union
 
 
 class ActionsStore:
@@ -33,7 +43,7 @@ class ActionsStore:
         except asyncio.exceptions.CancelledError:
             pass
 
-    def get(self, stage: str, action_name: str):
+    def get(self, stage: str, action_name: str) -> Tuple[BaseAction, Union[MercuryGraphQLClient, MercuryGraphQLHTTP2Client, MercuryGRPCClient, MercuryHTTP2Client, MercuryHTTPClient, MercuryPlaywrightClient, MercuryWebsocketClient]]:
         action = self.actions.get(
             stage
         ).get(action_name)

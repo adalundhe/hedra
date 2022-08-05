@@ -86,9 +86,9 @@ class MercuryWebsocketClient(MercuryHTTPClient):
         except Exception as e:
             raise e
 
-    async def execute_prepared_request(self, request: WebsocketAction) -> WebsocketResponseFuture:
+    async def execute_prepared_request(self, action: WebsocketAction) -> WebsocketResponseFuture:
 
-        response = WebsocketResult(request)
+        response = WebsocketResult(action)
 
         async with self.sem:
 
@@ -96,26 +96,26 @@ class MercuryWebsocketClient(MercuryHTTPClient):
 
             try:
 
-                if request.hooks.before:
-                    request = await request.hooks.before(request) 
-                    request.setup()
+                if action.hooks.before:
+                    action = await action.hooks.before(action, response)
+                    action.setup()
 
                 start = time.time()
                 await connection.make_connection(
-                    request.name,
-                    request.url.ip_addr,
-                    request.url.port,
-                    ssl=request.ssl_context
+                    action.name,
+                    action.url.ip_addr,
+                    action.url.port,
+                    ssl=action.ssl_context
                 )
 
-                connection.write(request.encoded_headers)
+                connection.write(action.encoded_headers)
                 
-                if request.encoded_data is not None:
-                    if request.is_stream:
-                        request.write_chunks(connection)
+                if action.encoded_data is not None:
+                    if action.is_stream:
+                        action.write_chunks(connection)
 
                     else:
-                        connection.write(request.encoded_data)
+                        connection.write(action.encoded_data)
 
                 line = await asyncio.wait_for(connection.readuntil(), self.timeouts.socket_read_timeout)
 
@@ -125,19 +125,20 @@ class MercuryWebsocketClient(MercuryHTTPClient):
                     response.headers[key] = value
                     raw_headers += header_line
 
-                if request.encoded_data is not None:
+                if action.encoded_data is not None:
                     header_bits = get_header_bits(raw_headers)
                     header_content_length = get_message_buffer_size(header_bits)
                     
-                if request.method == 'GET':
+                if action.method == 'GET':
                     response.body = await asyncio.wait_for(connection.readexactly(min(16384, header_content_length)), self.timeouts.total_timeout)
                 
                 elapsed = time.time() - start
 
                 response.time = elapsed
 
-                if request.hooks.after:
-                    response = await request.hooks.after(response)
+                if action.hooks.after:
+                    action = await action.hooks.after(action, response)
+                    action.setup()
 
                 self.pool.connections.append(connection)
 

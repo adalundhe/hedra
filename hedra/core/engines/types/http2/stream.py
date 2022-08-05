@@ -6,7 +6,7 @@ from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common.connection_factory import ConnectionFactory
 from .reader_writer import ReaderWriter
 from .frames import FrameBuffer
-
+from .frames.types import HeadersFrame, WindowUpdateFrame
 
 class AsyncStream:
 
@@ -27,6 +27,8 @@ class AsyncStream:
         self._connection_factory = ConnectionFactory(stream_type)
         self.lock = asyncio.Lock()
         self.reader_writer = None
+
+        
 
     async def connect(self, 
         hostname: str, 
@@ -49,6 +51,8 @@ class AsyncStream:
             reader, writer = stream
 
             self.reader_writer = ReaderWriter(self.stream_id, reader, writer, self.timeouts)
+            self.reader_writer.headers_frame = HeadersFrame(self.init_id)
+            self.reader_writer.window_frame = WindowUpdateFrame(self.init_id, window_increment=65536)
 
         else:
 
@@ -57,6 +61,8 @@ class AsyncStream:
                 self.stream_id += 1
 
             self.reader_writer.stream_id = self.stream_id
+            self.reader_writer.headers_frame.stream_id = self.stream_id
+            self.reader_writer.window_frame.stream_id = self.stream_id
 
         self.reader_writer.frame_buffer = FrameBuffer()
         return self.reader_writer

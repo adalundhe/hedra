@@ -1,7 +1,9 @@
 from datetime import datetime
 import json
-from typing import Optional
+from typing import List, Optional
+from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.hooks.types.internal import Internal
+from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from .stage import Stage
 
@@ -13,6 +15,7 @@ class Checkpoint(Stage):
         super().__init__()
         self.data = {}
         self.previous_stage = ''
+        self.accepted_hook_types = [ HookType.SAVE ]
 
     @Internal
     async def run(self):

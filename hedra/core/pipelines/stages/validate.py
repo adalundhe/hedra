@@ -33,6 +33,8 @@ class Validate(Stage):
         for hook_type in HookType:
             self.hooks[hook_type] = []
 
+        self.accepted_hook_types = [ HookType.VALIDATE ]
+
     @Internal
     async def run(self):
 
@@ -73,10 +75,13 @@ class Validate(Stage):
                     hook: Hook = registrar.all.get(method_name)
                     
                     if hook:
+
+                        valid_hook_types_string = ', '.join([hook_type.name for hook_type in stage.accepted_hook_types])
                         assert isinstance(hook.name, str), "Hook name must be string."
                         assert isinstance(hook.shortname, str), f"Hook shortname for hook {hook.name} must be a valid string."
                         assert isinstance(hook.call, MethodType), f"Hook {hook.name} call is not a vaid method. All hooks must be a method."
                         assert iscoroutinefunction(hook.call), f"Hook {hook.name} call is not a vaid coroutine. All hook methods must be a async."
+                        assert hook.hook_type in stage.accepted_hook_types, f"Hook {hook.name} is not a valid hook type for stage {stage.name}. Valid hook types are {valid_hook_types_string}."
 
                         hook.stage = stage.name
                         stage.hooks[hook.hook_type].append(hook)
@@ -103,8 +108,8 @@ class Validate(Stage):
             assert hook.hook_type is HookType.BEFORE, f"Hook type mismatch - hook {hook.name} is a {hook.hook_type.name} hook, but Hedra expected a {HookType.BEFORE.name} hook."
             assert hook.shortname in hook.name, f"Shortname {hook.shortname} must be contained in full Hook name {hook.name} for @before hook {hook.name}."
             assert hook.call is not None, f"Method is not not found on stage or was not supplied to hook - {hook.name}"
-            assert hook.call.__code__.co_argcount > 1, f"Missing required argument 'action' for @before hook {hook.name}"
-            assert hook.call.__code__.co_argcount < 3, f"Too many args. - @before hook {hook.name} only requires 'action' as additional arg."
+            assert hook.call.__code__.co_argcount > 2, f"Missing required argument 'action' for @before hook {hook.name}"
+            assert hook.call.__code__.co_argcount < 4, f"Too many args. - @before hook {hook.name} only requires 'action' as additional arg."
             assert len(hook.names) > 0, f"No target hook names provided for @before hook {hook.name}. Please specify at least one hook to validate."
             assert 'self' in hook.call.__code__.co_varnames
 
@@ -126,8 +131,8 @@ class Validate(Stage):
             assert hook.hook_type is HookType.AFTER, f"Hook type mismatch - hook {hook.name} is a {hook.hook_type.name} hook, but Hedra expected a {HookType.AFTER.name} hook."
             assert hook.shortname in hook.name, f"Shortname {hook.shortname} must be contained in full Hook name {hook.name} for @after hook {hook.name}."
             assert hook.call is not None, f"Method is not not found on stage or was not supplied to @after hook - {hook.name}"
-            assert hook.call.__code__.co_argcount > 1, f"Missing required argument 'result' for @after hook {hook.name}"
-            assert hook.call.__code__.co_argcount < 3, f"Too many args. - @after hook {hook.name} only requires 'result' as additional arg."
+            assert hook.call.__code__.co_argcount > 2, f"Missing required argument 'result' for @after hook {hook.name}"
+            assert hook.call.__code__.co_argcount < 4, f"Too many args. - @after hook {hook.name} only requires 'action' and 'result' as additional args."
             assert len(hook.names) > 0, f"No target hook names provided for @after hook {hook.name}. Please specify at least one hook to validate."
             assert 'self' in hook.call.__code__.co_varnames
 
@@ -153,6 +158,13 @@ class Validate(Stage):
             assert hook.call.__code__.co_argcount > 1, f"Missing required argument 'event' for @check hook {hook.name}"
             assert hook.call.__code__.co_argcount < 3, f"Too many args. - @check hook {hook.name} only requires 'event' as additional arg."
             assert 'self' in hook.call.__code__.co_varnames
+
+            for name in hook.names:
+                hook_for_validation = hooks_by_name.get(
+                    f'{hook.stage}.{name}'
+                )
+
+                assert hook_for_validation is not None, f"Specified hook {name} for stage {hook.stage} not found for @check hook {hook.name}"
 
         for hook in self.hooks.get(HookType.METRIC):
             assert hook.hook_type is HookType.METRIC, f"Hook type mismatch - hook {hook.name} is a {hook.hook_type.name} hook, but Hedra expected a {HookType.METRIC.name} hook."

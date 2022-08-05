@@ -6,6 +6,7 @@ from .core.pipelines.hooks import (
     after,
     depends,
     check,
+    save,
     metric,
     validate
 )

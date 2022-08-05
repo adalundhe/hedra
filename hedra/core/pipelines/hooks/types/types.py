@@ -11,3 +11,4 @@ class HookType(Enum):
     METRIC='METRIC'
     VALIDATE='VALIDATE'
     INTERNAL='INTERNAL'
+    SAVE='SAVE'

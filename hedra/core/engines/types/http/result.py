@@ -1,3 +1,4 @@
+from ensurepip import version
 import json
 from gzip import decompress as gzip_decompress
 from typing import List, Union
@@ -34,6 +35,8 @@ class HTTPResult(BaseResult):
         self.headers = {}
         self.body = bytearray()
         self.response_code = None
+        self._version = None
+        self._reason = None
 
     @property
     def content_type(self):
@@ -66,8 +69,8 @@ class HTTPResult(BaseResult):
             if self.content_type == b"application/json":
                 data = json.loads(self.body)
             
-            elif isinstance(self.body, bytes):
-                data = data.decode()
+            elif isinstance(self.body, (bytes, bytearray)):
+                data = str(data.decode())
 
         except Exception:
             pass
@@ -76,32 +79,36 @@ class HTTPResult(BaseResult):
 
     @property
     def version(self) -> Union[str, None]:
-        try:
+        if self._version is None and isinstance(self.response_code, (bytes, bytearray)):
             status_string: List[bytes] = self.response_code.split()
-            return status_string[0].decode()
-        except Exception:
-            return None
+            self._version = status_string[0].decode()
+        
+        return self._version
+
+    @version.setter
+    def version(self, new_version: str):
+        self._version = new_version
 
     @property
     def status(self) -> Union[int, None]:
-        try: 
-            if isinstance(self.response_code, bytes) or isinstance(self.response_code, str):
-                status_string: List[bytes] = self.response_code.split()
-                return int(status_string[1])
-            else:
-                return self.response_code
+        if self._status is None and isinstance(self.response_code, (bytes, bytearray)):
+            status_string: List[bytes] = self.response_code.split()
+            self._status = int(status_string[1])
 
-        except Exception as e:
-            return None
+        return self._status
+
+    @status.setter
+    def status(self, new_status: int):
+        self._status = new_status
 
     @property
     def reason(self) -> Union[str, None]:
-        try:
-            if isinstance(self.response_code, bytes) or isinstance(self.response_code, str):
-                status_string: List[bytes] = self.response_code.split()
-                return status_string[2].decode()
-            
-            return None
+        if self._reason is None and isinstance(self.response_code, (bytes, bytearray)):
+            status_string: List[bytes] = self.response_code.split()
+            self._reason = status_string[2].decode()
+        
+        return self._reason
 
-        except Exception:
-            return None
+    @reason.setter
+    def reason(self, new_reason):
+        self._reason = new_reason

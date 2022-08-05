@@ -56,6 +56,7 @@ class Analyze(Stage):
 
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._loop = asyncio.get_event_loop()
+        self.accepted_hook_types = [ HookType.METRIC ]
 
     @Internal
     async def run(self):
@@ -65,15 +66,6 @@ class Analyze(Stage):
             'stages': {}
         }
         start = time.time()
-
-        methods = inspect.getmembers(self, predicate=inspect.ismethod) 
-        for _, method in methods:
-
-            method_name = method.__qualname__
-            hook: Hook = registrar.all.get(method_name)
-
-            if hook:
-                self.hooks[hook.hook_type].append(hook)
         
         for stage_name, stage_results in self.raw_results.items():
     

@@ -1,4 +1,5 @@
-import asyncio
+
+import h2.settings
 from hedra.core.engines.types.common.encoder import Encoder
 from hedra.core.engines.types.common.fast_streams import FastReader, FastWriter
 from hedra.core.engines.types.common.timeouts import Timeouts
@@ -25,6 +26,15 @@ class ReaderWriter:
         self._authority = None
         self.frame_buffer = None
         self.encoder: Encoder = None
+        self._remote_settings = h2.settings.Settings(
+            client=False
+        )
+        self._remote_settings_dict = {
+            setting_name: setting_value for setting_name, setting_value in self._remote_settings.items()
+        }
+
+        self.headers_frame = None
+        self.window_frame = None
 
     def write(self, data: bytes):
         self.writer._transport.write(data)

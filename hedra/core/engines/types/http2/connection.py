@@ -1,5 +1,4 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 import h2.stream
 import h2.config
 import h2.connection
@@ -8,7 +7,6 @@ import h2.exceptions
 import h2.settings
 import h2.errors
 from hyperframe.frame import SettingsFrame
-import psutil
 from hedra.core.engines.types.http2.reader_writer import ReaderWriter
 from hedra.core.engines.types.common.encoder import Encoder
 from hedra.core.engines.types.common.decoder import Decoder
@@ -24,8 +22,6 @@ class HTTP2Connection:
     )
 
     def __init__(self, concurrency):
-        self.loop = asyncio.get_event_loop()
-        self.executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._h2_state = h2.connection.H2Connection(config=self.CONFIG)
         self.connected = False
         self.concurrency = concurrency
@@ -109,18 +105,16 @@ class HTTP2Connection:
         self._headers_sent = False
 
         if self._init_sent is False or stream.reset_connection:
-            self._data_to_send = b'PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n'
 
-            f = SettingsFrame(0)
-            f.settings = self.local_settings_dict
-            self._data_to_send += f.serialize()
+            connection_data = bytearray(b'PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n')
+            settings_frame = SettingsFrame(0, settings=self.local_settings_dict)
+            connection_data.extend(settings_frame.serialize())
 
-            self._inbound_flow_control_window_manager.window_opened(65536)
-            f = WindowUpdateFrame(0)
-            f.window_increment = 65536
-            self._data_to_send += f.serialize()
+            window_increment = 65536
 
-            stream.write(self._data_to_send)
+            self._inbound_flow_control_window_manager.window_opened(window_increment)
+
+            stream.write(bytes(connection_data))
             self._data_to_send = b''
             self._init_sent = True
 
@@ -149,25 +143,15 @@ class HTTP2Connection:
                     amount = event.flow_controlled_length
                     frames = []
                     conn_increment = self._inbound_flow_control_window_manager.process_bytes(amount)
+
                     if conn_increment:
-                        f = WindowUpdateFrame(0)
-                        f.window_increment = conn_increment
-                        frames.append(f)
-
-                    increment = stream.inbound.process_bytes(amount)
-      
-                    if increment:
-                        f = WindowUpdateFrame(stream.stream_id)
-                        f.window_increment = increment
-                        frames.append(f)
-
-                    self._data_to_send += b''.join([frame.serialize() for frame in frames])
-                    stream.write(self._data_to_send)
-                    self._data_to_send = b''
+                        window_update_frame = WindowUpdateFrame(0, window_increment=conn_increment)
+                        stream.write(window_update_frame.serialize())
+                        self._data_to_send = b''
 
                     response.body += event.data
 
-                elif event.event_type== 'STREAM_ENDED' or event.event_type == 'STREAM_RESET':
+                elif event.event_type == 'STREAM_ENDED' or event.event_type == 'STREAM_RESET':
                     done = True
                     break
 
@@ -181,34 +165,16 @@ class HTTP2Connection:
             request.hpack_encoder.header_table_size = self._encoder.header_table.maxsize
             request._setup_headers()
 
-        header_blocks = [
-            encoded_headers[i:i+stream.max_outbound_frame_size]
-            for i in range(
-                0, len(encoded_headers), stream.max_outbound_frame_size
-            )
-        ]
-
-        frames = []
-        headers_frame = HeadersFrame(stream.stream_id, data=header_blocks[0])
+    
+        stream.headers_frame.data = encoded_headers[0]
+        headers_frame = stream.headers_frame
+        headers_frame.flags.add('END_HEADERS')
         if end_stream:
             headers_frame.flags.add('END_STREAM')
 
-        frames.append(headers_frame)
-
-        frames.extend([ContinuationFrame(stream.stream_id, data=block) for block in header_blocks[1:]])
-
-        frames[-1].flags.add('END_HEADERS')
-
-        stream._authority = request.url.authority
-
-        self.request_method = request.method
-        window_size = 65536
-        stream.inbound.window_opened(window_size)
-
-        frames.append(
-            WindowUpdateFrame(stream.stream_id, window_increment=window_size)
-        )
-        stream.write(b''.join([frame.serialize() for frame in frames ]))
+        stream.inbound.window_opened(65536) 
+  
+        stream.write(headers_frame.serialize())
 
         self._data_to_send = b''
         self._headers_sent = True

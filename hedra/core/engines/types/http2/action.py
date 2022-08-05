@@ -1,4 +1,5 @@
 import json
+import h2.settings
 from types import FunctionType
 from typing import Coroutine, Dict, Iterator, Union, List
 from urllib.parse import urlencode
@@ -41,6 +42,9 @@ class HTTP2Action(BaseAction):
         self.is_stream = False
         self.ssl_context = None
         self.hpack_encoder = Encoder()
+        self._remote_settings = h2.settings.Settings(
+            client=False
+        )
 
     @property
     def size(self):
@@ -106,14 +110,14 @@ class HTTP2Action(BaseAction):
 
     def _setup_headers(self) -> Union[bytes, Dict[str, str]]:
     
-        self.encoded_headers = [
+        encoded_headers = [
             (b":method", self.method),
             (b":authority", self.url.authority),
             (b":scheme", self.url.scheme),
             (b":path", self.url.path),
         ]
 
-        self.encoded_headers.extend([
+        encoded_headers.extend([
             (
                 k.lower(), 
                 v
@@ -126,6 +130,12 @@ class HTTP2Action(BaseAction):
             )
         ])
         
-        self.encoded_headers = self.hpack_encoder.encode(self.encoded_headers)
+        encoded_headers = self.hpack_encoder.encode(encoded_headers)
+        self.encoded_headers = [
+            encoded_headers[i:i+self._remote_settings.max_frame_size]
+            for i in range(
+                0, len(encoded_headers), self._remote_settings.max_frame_size
+            )
+        ]
 
         

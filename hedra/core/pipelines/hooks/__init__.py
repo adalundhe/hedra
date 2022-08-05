@@ -7,5 +7,6 @@ from .types import (
     depends,
     check,
     metric,
+    save,
     validate
 )

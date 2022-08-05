@@ -92,7 +92,7 @@ class MercuryHTTPClient:
             
             try:
                 if action.hooks.before:
-                    action = await action.hooks.before(action)
+                    action = await action.hooks.before(action, response)
                     action.setup()
 
                 response.start = time.monotonic()
@@ -163,7 +163,8 @@ class MercuryHTTPClient:
                 self.pool.connections.append(connection)
 
                 if action.hooks.after:
-                    response = await action.hooks.after(response)
+                    action = await action.hooks.after(action, response)
+                    action.setup()
                 
                 return response
 

@@ -20,6 +20,7 @@ class Stage:
         self.state = StageStates.INITIALIZED
         self.next_stage: str = None
         self.hooks: Dict[HookType, List[Hook]] = {}
+        self.accepted_hook_types = []
 
     @Internal
     async def run(self):

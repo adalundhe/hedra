@@ -1,5 +1,7 @@
 import asyncio
 from typing import Awaitable, Dict, Set, Tuple, Union
+
+from django import conf
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.types.common.types import RequestTypes
 from .context_config import ContextConfig
@@ -19,9 +21,11 @@ class MercuryPlaywrightClient:
         self.timeouts = timeouts
         self.registered: Dict[str, Command] = {}
         self.sem = asyncio.Semaphore(concurrency)
+        self.config = None
 
     async def setup(self, config: ContextConfig):
-        self.pool.create_pool(config)
+        self.config = config
+        self.pool.create_pool(self.config)
         for context_group in self.pool:
             await context_group.create()
 
@@ -42,14 +46,12 @@ class MercuryPlaywrightClient:
             context = self.pool.contexts.pop()
             try:
                 if command.hooks.before:
-                    command = await command.hooks.before(command)
+                    command = await command.hooks.before(command, result)
 
                 result = await context.execute(command)
 
-                self.context.last[command.name] = result
-
                 if command.hooks.after:
-                    response = await command.hooks.after(response)
+                    command = await command.hooks.after(command, result)
 
                 self.pool.contexts.append(context)
 
@@ -57,7 +59,6 @@ class MercuryPlaywrightClient:
 
             except Exception as e:
                 result.error = e
-                self.context.last[command.name] = response
                 self.pool.contexts.append(context)
 
                 return result

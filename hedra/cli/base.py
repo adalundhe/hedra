@@ -1,8 +1,8 @@
 from typing import List, Union
 import click
 import os
-import uvloop
-uvloop.install()
+# import uvloop
+# uvloop.install()
 
 
 

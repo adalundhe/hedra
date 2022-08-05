@@ -72,6 +72,8 @@ class DefaultPersona:
 
         self.start = start
         self.pending_actions = len(pending)
+
+        print(len(completed))
         
         results = await asyncio.gather(*completed)
         

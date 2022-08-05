@@ -74,7 +74,9 @@ class DeferredHeaders(BaseEvent):
         for k, v in headers:
             if k == b":status":
                 status_code = int(v.decode("ascii", errors="ignore"))
-            elif not k.startswith(b":"):
+            elif k.startswith(b":"):
+                headers_dict[k.strip(b':')] = v
+            else:
                 headers_dict[k] = v
         
         return status_code, headers_dict
