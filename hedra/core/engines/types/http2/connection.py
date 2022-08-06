@@ -76,7 +76,7 @@ class HTTP2Connection:
 
     async def _receive_events(self, stream: ReaderWriter) -> None:
         
-        data = await stream.read()
+        data = await asyncio.wait_for(stream.read(), timeout=10)
 
         stream.frame_buffer.data.extend(data)
         stream.frame_buffer.max_frame_size = stream.max_outbound_frame_size
@@ -132,7 +132,6 @@ class HTTP2Connection:
         while done is False:
             events = await self._receive_events(stream)
             for event in events:
-
                 if event.error_code is not None:
                     raise Exception(f'Connection - {stream.stream_id} err: {str(event)}')
 
@@ -154,7 +153,7 @@ class HTTP2Connection:
                 elif event.event_type == 'STREAM_ENDED' or event.event_type == 'STREAM_RESET':
                     done = True
                     break
-
+        
         return response
 
     def send_request_headers(self, request: HTTP2Action, stream: ReaderWriter) -> None:

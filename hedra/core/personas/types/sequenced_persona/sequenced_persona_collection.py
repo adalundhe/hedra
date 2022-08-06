@@ -1,4 +1,6 @@
+from typing import Dict, List
 from hedra.core.personas.types.default_persona import DefaultPersona
+from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.engines.client.config import Config
 
@@ -20,24 +22,12 @@ class SequencedPersonaCollection(DefaultPersona):
         argument. You may specify a wait between batches (between each step) by specifying an integer number of seconds via the --batch-interval argument.
         '''
 
-    async def setup(self, actions):
+    async def setup(self, hooks: Dict[HookType, List[Hook]]):
+        
+        sequence = sorted(
+            hooks.get(HookType.ACTION),
+            key=lambda action: action.config.order
+        )
 
-        self.session_logger.debug('Setting up persona...')
-
-
-        self.actions = actions
-        self.actions_count = len(self.actions)
-        self._hooks = self.actions
-
-        self.engine.teardown_actions = []
-
-        for action_set in actions:
-
-            setup_hooks = action_set.hooks.get(HookType.SETUP)
-
-            for setup_hook in setup_hooks:
-                await setup_hook.call()
-
-            teardown_hooks = action_set.hooks.get(HookType.TEARDOWN)
-            if teardown_hooks:
-                self.engine.teardown_actions.extend(teardown_hooks)
+        self.actions_count = len(sequence)
+        self._hooks = sequence

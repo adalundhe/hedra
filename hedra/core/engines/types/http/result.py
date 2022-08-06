@@ -37,6 +37,7 @@ class HTTPResult(BaseResult):
         self.response_code = None
         self._version = None
         self._reason = None
+        self._status = None
 
     @property
     def content_type(self):
@@ -79,10 +80,13 @@ class HTTPResult(BaseResult):
 
     @property
     def version(self) -> Union[str, None]:
-        if self._version is None and isinstance(self.response_code, (bytes, bytearray)):
-            status_string: List[bytes] = self.response_code.split()
-            self._version = status_string[0].decode()
-        
+        try:
+            if self._version is None and isinstance(self.response_code, (bytes, bytearray)):
+                status_string: List[bytes] = self.response_code.split()
+                self._version = status_string[0].decode()
+        except Exception:
+            pass
+            
         return self._version
 
     @version.setter
@@ -91,9 +95,14 @@ class HTTPResult(BaseResult):
 
     @property
     def status(self) -> Union[int, None]:
-        if self._status is None and isinstance(self.response_code, (bytes, bytearray)):
-            status_string: List[bytes] = self.response_code.split()
-            self._status = int(status_string[1])
+        try:
+
+            if self._status is None and isinstance(self.response_code, (bytes, bytearray)):
+                status_string: List[bytes] = self.response_code.split()
+                self._status = int(status_string[1])
+
+        except Exception:
+            pass
 
         return self._status
 
@@ -103,9 +112,15 @@ class HTTPResult(BaseResult):
 
     @property
     def reason(self) -> Union[str, None]:
-        if self._reason is None and isinstance(self.response_code, (bytes, bytearray)):
-            status_string: List[bytes] = self.response_code.split()
-            self._reason = status_string[2].decode()
+
+        try:
+
+            if self._reason is None and isinstance(self.response_code, (bytes, bytearray)):
+                status_string: List[bytes] = self.response_code.split()
+                self._reason = status_string[2].decode()
+
+        except Exception:
+            pass
         
         return self._reason
 

@@ -18,16 +18,8 @@ class HTTP2Event(BaseEvent):
         self.status = None
         self.headers: Dict[bytes, bytes] = {}
         self.data = result.data
-        
-        if result.error is None:
-            try:
-                status, headers = result.deferred_headers.parse()
-                self.status = status
-                self.headers = headers
-
-            except Exception:
-                pass
-
+        self.status = result.status
+        self.headers = result.headers
         
         self.name = f'{self.method}_{self.shortname}'
 

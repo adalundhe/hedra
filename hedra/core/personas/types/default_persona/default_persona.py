@@ -12,12 +12,7 @@ from hedra.core.personas.batching.batch_interval import BatchInterval
 from hedra.core.engines.client.config import Config
 
 async def cancel_pending(pend: Task):
-    try:
-        pend.cancel()
-        await pend
-    except asyncio.CancelledError:
-        pass
-
+    pend.cancel()
 
 class DefaultPersona:
 
@@ -47,8 +42,8 @@ class DefaultPersona:
         self.loop = None
         self.current_action_idx = 0
 
-    def setup(self, actions: Dict[str, List[Hook]]):
-        self._hooks = list(actions.get(HookType.ACTION))
+    def setup(self, hooks: Dict[HookType, List[Hook]]):
+        self._hooks = hooks.get(HookType.ACTION)
         self.actions_count = len(self._hooks)
         
             
@@ -73,12 +68,14 @@ class DefaultPersona:
         self.start = start
         self.pending_actions = len(pending)
 
-        print(len(completed))
-        
         results = await asyncio.gather(*completed)
         
         await self.stop_updates()
-        await asyncio.gather(*[cancel_pending(pend) for pend in pending])
+        await asyncio.gather(*[
+            asyncio.create_task(
+                cancel_pending(pend)
+            ) for pend in pending
+        ])
         
         self.total_actions = len(set(results))
         self.total_elapsed = self.end - self.start

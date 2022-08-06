@@ -39,7 +39,7 @@ class URL:
                 address, 
                 self.port, 
                 family=self.family, 
-                type=self.protocol, 
+                type=socket.SOL_SOCKET, 
                 proto=0, 
                 flags=0
             )

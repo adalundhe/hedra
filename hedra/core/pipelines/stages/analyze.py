@@ -73,11 +73,16 @@ class Analyze(Stage):
             stage_total = 0
             stage_total_time = stage_results.get('total_elapsed')
 
+            tasks = []
             for stage_result in stage_results.get('results'):
-                await events[stage_result.name].add(
-                    stage_result,
-                    stage_name
+                tasks.append(
+                    asyncio.create_task(events[stage_result.name].add(
+                        stage_result,
+                        stage_name
+                    ))
                 )
+
+            await asyncio.gather(*tasks)
 
             grouped_stats = {}
             

@@ -2,7 +2,7 @@ import socket
 
 
 class SocketTypes:
-    DEFAULT=0
+    DEFAULT=socket.AF_INET
     HTTP2=socket.AF_INET
     NONE=None
 

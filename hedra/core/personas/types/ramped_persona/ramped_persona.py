@@ -41,6 +41,12 @@ class RampedPersona(DefaultPersona):
             idx += 1
 
             if idx >= generation_batch_size:
-                generation_batch_size = generation_batch_size * (self.batch.gradient + 1)
+
+                if elapsed < total_time/2:
+                    generation_batch_size = generation_batch_size * (self.batch.gradient + 1)
+                else:
+                    generation_batch_size = generation_batch_size * (1 - self.batch.gradient)
+
+                
                 action_idx = (action_idx + 1) % self.actions_count
                 await asyncio.sleep(self.batch.interval.period)

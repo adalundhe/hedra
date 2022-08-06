@@ -119,15 +119,13 @@ class MercuryHTTPClient:
 
                 response.write_end = time.monotonic()
 
-                chunk = await connection._connection._reader.readline_fast()
-
-                response.response_code = chunk
-
+                response.response_code = await connection._connection._reader.readline_fast()
+    
                 headers = await connection.read_headers()
 
                 content_length = headers.get(b'content-length')
                 transfer_encoding = headers.get(b'transfer-encoding')
-    
+
                 # We require Content-Length or Transfer-Encoding headers to read a
                 # request body, otherwise it's anyone's guess as to how big the body
                 # is, and we ain't playing that game.
@@ -142,6 +140,7 @@ class MercuryHTTPClient:
                     while True and not all_chunks_read:
 
                         chunk_size = int((await connection.readuntil()).rstrip(), 16)
+    
                         if not chunk_size:
                             # read last CRLF
                             body.extend(
@@ -155,7 +154,7 @@ class MercuryHTTPClient:
                         )
 
                     all_chunks_read = True
-
+         
                 response.read_end = time.monotonic()
                 response.headers = headers
                 response.body = body

@@ -1,8 +1,9 @@
 import random
 import time
 import asyncio
-from typing import List
+from typing import Dict, List
 from hedra.core.personas.types.default_persona import DefaultPersona
+from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.engines.client.config import Config
 
@@ -26,19 +27,14 @@ class WeightedSelectionPersona(DefaultPersona):
         argument. You may specify a wait between batches (between each step) by specifying an integer number of seconds via the --batch-interval argument.
         '''
 
-    async def setup(self, actions):
+    async def setup(self, hooks: Dict[HookType, List[Hook]]):
         self.session_logger.debug('Setting up persona...')
         
-        actions.weights()
+        actions = hooks.get(HookType.ACTION)
+        self.actions_count = len(actions)
 
-        self.indexes = []
-        self.actions = []
-        self.weights = []
-
-        for idx, action, weight in actions:
-            self.indexes.append(idx)
-            self.actions.append(action)
-            self.weights.append(weight)
+        self.weights = [action.config.weight for action in actions]
+        self.indexes = [idx for idx in range(self.actions_count)]
 
         self.sample = random.choices(
             self.indexes,
@@ -47,20 +43,8 @@ class WeightedSelectionPersona(DefaultPersona):
         )
 
         self.actions_count = len(self.actions)
-        self._hooks = self.actions
+        self._hooks = actions
 
-        self.engine.teardown_actions = []
-
-        for action_set in actions:
-
-            setup_hooks = action_set.hooks.get(HookType.SETUP)
-
-            for setup_hook in setup_hooks:
-                await setup_hook.call()
-
-            teardown_hooks = action_set.hooks.get(HookType.TEARDOWN)
-            if teardown_hooks:
-                self.engine.teardown_actions.extend(teardown_hooks)
 
     async def generator(self, total_time):
         elapsed = 0
