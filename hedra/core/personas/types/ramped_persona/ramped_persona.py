@@ -13,24 +13,13 @@ class RampedPersona(DefaultPersona):
         super(RampedPersona, self).__init__(config)
         self._initial_actions = AsyncList()
         self._current_batch = 1
-
-    @classmethod
-    def about(cls):
-        return '''
-        Ramped Persona - (ramped)
-
-        Executes actions in increasing batch sizes over the time specified via the --total-time argument. Initial 
-        batch size is set as the percentage specified by --batch-gradient argument (for example, 0.1 is 10% percent
-        of specified batch size). For each subsequent batch, batch size in increased by the batch gradient amount 
-        until the total time is up. You may also specify a wait between batches for an integere number of seconds
-        via the --batch-interval argument.
-        '''
-            
+        
     async def generator(self, total_time):
         elapsed = 0
         idx = 0
         action_idx = 0
-        generation_batch_size = self.batch.size
+        generation_batch_size = int(self.batch.size * self.batch.gradient)
+        self._hooks[action_idx].session.shrink_pool(self.batch.size - generation_batch_size)
 
         start = time.time()
         while elapsed < total_time:
@@ -40,13 +29,21 @@ class RampedPersona(DefaultPersona):
             elapsed = time.time() - start
             idx += 1
 
-            if idx >= generation_batch_size:
+            if idx%generation_batch_size == 0:
+                increase_amount = int(self.batch.gradient  * self.batch.size)
+                next_batch_size = generation_batch_size + increase_amount
 
-                if elapsed < total_time/2:
-                    generation_batch_size = generation_batch_size * (self.batch.gradient + 1)
-                else:
-                    generation_batch_size = generation_batch_size * (1 - self.batch.gradient)
+                if next_batch_size < self.batch.size:
+                    self._hooks[action_idx].session.extend_pool(increase_amount)
+                    generation_batch_size = next_batch_size
 
+                elif next_batch_size > self.batch.size:
+                    increase_amount = self.batch.size - generation_batch_size
+
+                    next_batch_size = generation_batch_size + increase_amount
+
+                    self._hooks[action_idx].session.extend_pool(increase_amount)
+                    generation_batch_size = next_batch_size
                 
                 action_idx = (action_idx + 1) % self.actions_count
                 await asyncio.sleep(self.batch.interval.period)

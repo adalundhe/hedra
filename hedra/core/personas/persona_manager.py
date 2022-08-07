@@ -5,6 +5,7 @@ from .types.sequenced_persona import SequencedPersonaCollection
 from .types.ramped_persona import RampedPersona
 from .types.ramped_interval_persona import RampedIntervalPersona
 from .types.weighted_selection_persona import WeightedSelectionPersona
+from .types.constant_arrival_rate import ConstantArrivalPersona
 from .types.cyclic_nowait_persona import CyclicNoWaitPersona
 from hedra.core.engines.client.config import Config
 
@@ -14,6 +15,7 @@ registered_personas = {
     'batched': lambda config: BatchedPersona(config),
     'ramped': lambda config: RampedPersona(config),
     'ramped-interval': lambda config: RampedIntervalPersona(config),
+    'constant-arrival': lambda config: ConstantArrivalPersona(config),
     'sequence': lambda config: SequencedPersonaCollection(config),
     'weighted': lambda config: WeightedSelectionPersona(config),
     'no-wait': lambda config: CyclicNoWaitPersona(config)

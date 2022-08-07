@@ -13,7 +13,7 @@ class RampedIntervalPersona(DefaultPersona):
     async def generator(self, total_time):
         elapsed = 0
         idx = 0
-        generation_batch_interval = self.batch.time
+        generation_batch_interval = self.batch.interval.period * self.batch.gradient
 
         start = time.time()
         batch_start = time.time()
@@ -26,12 +26,13 @@ class RampedIntervalPersona(DefaultPersona):
             idx += 1
 
             if batch_elapsed >= generation_batch_interval:
+                increase_amount = (self.batch.interval.period * self.batch.gradient)
+                next_batch_time = generation_batch_interval + increase_amount
 
-                if elapsed < total_time/2:
-                    generation_batch_interval = generation_batch_interval * (self.batch.gradient + 1)
+                if next_batch_time < self.batch.interval.period:
+                    generation_batch_interval = next_batch_time
                 else:
-
-                    generation_batch_interval = generation_batch_interval * (1 - self.batch.gradient)
+                    generation_batch_interval = self.batch.interval.period
                 
                 await asyncio.sleep(self.batch.interval.period)
                 batch_start = time.time()

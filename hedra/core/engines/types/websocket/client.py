@@ -86,6 +86,21 @@ class MercuryWebsocketClient(MercuryHTTPClient):
         except Exception as e:
             raise e
 
+    def extend_pool(self, increased_capacity: int):
+        self.pool.size += increased_capacity
+        for _ in range(increased_capacity):
+            self.pool.connections.append(
+                WebsocketConnection(self.pool.reset_connections)
+            )
+        
+        self.sem = asyncio.Semaphore(self.pool.size)
+
+    def shrink_pool(self, decrease_capacity: int):
+        self.pool.size -= decrease_capacity
+        self.pool.connections = self.pool.connections[:self.pool.size]
+        self.sem = asyncio.Semaphore(self.pool.size)
+
+
     async def execute_prepared_request(self, action: WebsocketAction) -> WebsocketResponseFuture:
 
         response = WebsocketResult(action)

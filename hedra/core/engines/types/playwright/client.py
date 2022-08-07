@@ -1,10 +1,11 @@
 import asyncio
-from typing import Awaitable, Dict, Set, Tuple, Union
+from typing import Awaitable, Dict, List, Set, Tuple, Union
 
 from django import conf
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.types.common.types import RequestTypes
 from .context_config import ContextConfig
+from .context_group import ContextGroup
 from .pool import ContextPool
 from .command import Command
 from .result import PlaywrightResult
@@ -22,6 +23,9 @@ class MercuryPlaywrightClient:
         self.registered: Dict[str, Command] = {}
         self.sem = asyncio.Semaphore(concurrency)
         self.config = None
+        self._discarded_context_groups: List[ContextGroup] = []
+        self._discarded_contexts = []
+        self._pending_context_groups: List[ContextGroup] = []
 
     async def setup(self, config: ContextConfig):
         self.config = config
@@ -38,7 +42,44 @@ class MercuryPlaywrightClient:
 
         self.registered[command.name] = command
 
+    def extend_pool(self, increased_capacity: int):
+        self.pool.size += increased_capacity
+        for _ in range(increased_capacity):
+            context_group = ContextGroup(
+                **self.config,
+                concurrency=int(self.pool.size/self.pool.group_size)
+            )
+
+            self._pending_context_groups.append(context_group)
+
+            self.pool.contexts.append(context_group)
+        
+        self.sem = asyncio.Semaphore(self.pool.size)
+
+    def shrink_pool(self, decrease_capacity: int):
+        self.pool.size -= decrease_capacity
+
+        for context_group in self.pool.contexts[self.pool.size:]:
+            self._discarded_context_groups.append(context_group)
+
+        self.pool.contexts = self.pool.contexts[:self.pool.size]
+
+        for context_group in self.pool.contexts:
+            group_size = int(self.pool.size/self.pool.group_size)
+
+            for context in context_group.contexts[group_size:]:
+                self._discarded_contexts.append(context)
+
+            context_group.contexts = context_group.contexts[:group_size]
+            context_group.librarians = context_group.librarians[:group_size]
+
+        self.sem = asyncio.Semaphore(self.pool.size)
+
+
     async def execute_prepared_command(self, command: Command) -> PlaywrightResponseFuture:
+
+        for pending_context in self._pending_context_groups:
+            await pending_context.create()
 
         result = PlaywrightResult(command, type=RequestTypes.PLAYWRIGHT)
         
@@ -62,4 +103,11 @@ class MercuryPlaywrightClient:
                 self.pool.contexts.append(context)
 
                 return result
+
+    async def close(self):
+        for context_group in self._discarded_context_groups:
+            await context_group.close()
+
+        for context in self._discarded_contexts:
+            await context.close()
                 

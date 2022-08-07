@@ -3,6 +3,7 @@ import time
 import traceback
 from typing import Awaitable, Dict, Set, Tuple
 from hedra.core.engines.types.common.timeouts import Timeouts
+from hedra.core.engines.types.http2.connection import HTTP2Connection
 from hedra.core.engines.types.http2.stream import AsyncStream
 from hedra.core.engines.types.common.ssl import get_http2_ssl_context
 from .pool import HTTP2Pool
@@ -79,6 +80,20 @@ class MercuryHTTP2Client:
         except Exception as e:
             return e
 
+    def extend_pool(self, increased_capacity: int):
+        self.pool.size += increased_capacity
+        for _ in range(increased_capacity):
+            self.pool.connections.append(
+                HTTP2Connection(self.pool.reset_connections)
+            )
+        
+        self.sem = asyncio.Semaphore(self.pool.size)
+
+    def shrink_pool(self, decrease_capacity: int):
+        self.pool.size -= decrease_capacity
+        self.pool.connections = self.pool.connections[:self.pool.size]
+        self.sem = asyncio.Semaphore(self.pool.size)
+
     async def execute_prepared_request(self, action: HTTP2Action) -> HTTP2ResponseFuture:
         
         response = HTTP2Result(action)
@@ -138,3 +153,6 @@ class MercuryHTTP2Client:
                 self.pool.reset()
 
                 return response
+
+    async def close(self):
+        pass
