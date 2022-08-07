@@ -1,3 +1,4 @@
+import math
 import time
 import asyncio
 from asyncio import Task
@@ -74,22 +75,24 @@ class ConstantArrivalPersona(DefaultPersona):
                 if self.completed_counter.completed_count  > 0:
 
                     if self.completed_counter.completed_count < self.batch.size:
-
-                        increase_amount = int(((self.batch.size/self.completed_counter.completed_count) - 1) * self.completed_counter.last_batch_size)
+                        increase_percentage = (self.batch.size - self.completed_counter.completed_count)/self.batch.size
+                        increase_amount = math.ceil(increase_percentage * self.completed_counter.last_batch_size)
 
                         self.completed_counter.last_completed = self.completed_counter.completed_count
                         self.completed_counter.last_batch_size = self.completed_counter.last_batch_size + increase_amount
 
                         self._hooks[action_idx].session.extend_pool(increase_amount)
+                        await asyncio.sleep(0)
 
                     elif self.completed_counter.completed_count > self.batch.size:
-
-                        decrease_amount = int((1 - (self.batch.size/self.completed_counter.completed_count)) * self.completed_counter.last_batch_size)
+                        decrease_percentage = (self.completed_counter.completed_count - self.batch.size)/self.completed_counter.completed_count
+                        decrease_amount = math.ceil(decrease_percentage * self.completed_counter.last_batch_size)
 
                         self.completed_counter.last_completed = self.completed_counter.completed_count
                         self.completed_counter.last_batch_size = self.completed_counter.last_batch_size - decrease_amount
 
                         self._hooks[action_idx].session.shrink_pool(decrease_amount)
+                        await asyncio.sleep(0)
             
                     self.completed_counter.completed_count = 0
 
