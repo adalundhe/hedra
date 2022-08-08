@@ -4,7 +4,7 @@ from hedra.core.pipelines.hooks.registry.registrar import registrar
 
 
 @registrar(HookType.SAVE)
-def save():
+def save(checkpoint_filepath: str):
     
     def wrapper(func):
 

@@ -1,5 +1,7 @@
 import inspect
 from inspect import iscoroutinefunction
+import os
+from pathlib import Path
 from types import MethodType
 from typing import Dict
 from collections import defaultdict
@@ -149,6 +151,19 @@ class Validate(Stage):
             assert hook.shortname in hook.name, "Shortname must be contained in full Hook name."
             assert hook.call is not None, f"Method is not not found on stage or was not supplied to @teardown hook - {hook.name}"
             assert hook.call.__code__.co_argcount == 1, f"Too many args. - @teardown hook {hook.name} requires no additional args."
+            assert 'self' in hook.call.__code__.co_varnames
+
+        for hook in self.hooks.get(HookType.SAVE):
+
+            hook_path_dir = str(Path(hook.config.path).parent.resolve())
+         
+            assert hook.hook_type is HookType.SAVE, f"Hook type mismatch - hook {hook.name} is a {hook.hook_type.name} hook, but Hedra expected a {HookType.SAVE.name} hook."
+            assert hook.shortname in hook.name, f"Shortname {hook.shortname} must be contained in full Hook name {hook.name} for @save hook {hook.name}."
+            assert isinstance(hook.config.path, str), f"Invalid path type - @save hook {hook.name} path must be a valid string."
+            assert os.path.exists(hook_path_dir), f"Invalid path - @save hook {hook.name} path must exist."
+            assert hook.call is not None, f"Method is not not found on stage or was not supplied to @save hook - {hook.name}"
+            assert hook.call.__code__.co_argcount > 1, f"Missing required argument 'data' for @save hook {hook.name}"
+            assert hook.call.__code__.co_argcount < 3, f"Too many args. - @save hook {hook.name} only requires 'data' as additional args."
             assert 'self' in hook.call.__code__.co_varnames
 
         for hook in self.hooks.get(HookType.CHECK):

@@ -127,3 +127,32 @@ class HTTPResult(BaseResult):
     @reason.setter
     def reason(self, new_reason):
         self._reason = new_reason
+
+    def to_dict(self):
+
+        encoded_headers = {
+            str(k.decode()): str(v.decode()) for k, v in self.headers.items()
+        }
+
+        base_result_dict = super().to_dict()
+
+        data = self.data
+        if isinstance(data, bytes) or isinstance(data, bytearray):
+            data = str(data.decode())
+        
+        return {
+            'url': self.url,
+            'method': self.method,
+            'path': self.path,
+            'params': self.params,
+            'query': self.query,
+            'type': self.type,
+            'headers': encoded_headers,
+            'data': data,
+            'tags': self.tags,
+            'user': self.user,
+            'error': str(self.error),
+            'status': self.status,
+            'reason': self.reason,
+            **base_result_dict
+        }

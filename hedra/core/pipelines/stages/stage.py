@@ -1,11 +1,11 @@
 from __future__ import annotations
-import asyncio
 from typing import Any, Dict, List
 from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.stages.types.stage_states import StageStates
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
+from hedra.core.engines.client.time_parser import TimeParser
 
 
 class Stage:
@@ -14,6 +14,7 @@ class Stage:
     all_dependencies: List[Stage]=[]
     next_context: Any = None
     context: Any = None
+    stage_timeout=None
 
     def __init__(self) -> None:
         self.name = self.__class__.__name__
@@ -21,6 +22,14 @@ class Stage:
         self.next_stage: str = None
         self.hooks: Dict[HookType, List[Hook]] = {}
         self.accepted_hook_types = []
+
+        if self.stage_timeout:
+            time_parser = TimeParser(self.stage_timeout)
+
+            self.timeout = time_parser.time
+        
+        else:
+            self.timeout = None
 
     @Internal
     async def run(self):

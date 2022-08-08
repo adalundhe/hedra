@@ -11,14 +11,14 @@ class Metadata:
         order: int = 1, 
         env: str = None, 
         user: str = None, 
-        action_type: str = None, 
+        path: str = None,
         tags: List[str] = []
     ) -> None:
         self.weight = weight
         self.order = order
         self.env = env
         self.user = user
-        self.type = action_type
+        self.path = path
         self.tags = tags
 
 class Hook:

@@ -1,3 +1,4 @@
+import asyncio
 from hedra.core.pipelines.simple_context import SimpleContext
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_states import StageStates
@@ -5,7 +6,12 @@ from hedra.core.pipelines.stages.types.stage_types import StageTypes
 
 
 async def execute_transition(current_stage: Stage, next_stage: Stage):
-    results = await current_stage.run()
+
+    if current_stage.timeout:
+        results = await asyncio.wait_for(current_stage.run(), current_stage.timeout)
+
+    else:
+        results = await current_stage.run()
 
     current_stage.context.results[current_stage.name] = {
         'results': results,
@@ -121,9 +127,7 @@ async def execute_to_checkpoint_transition(current_stage: Stage, next_stage: Sta
         current_stage.state = StageStates.EXECUTING
 
         current_stage, next_stage = await execute_transition(current_stage, next_stage)
-        next_stage.data = [
-            result.to_dict() for result in current_stage.context.results[current_stage.name]
-        ]
+        next_stage.data = current_stage.context.results[current_stage.name]
 
         next_stage.previous_stage = current_stage.name
 

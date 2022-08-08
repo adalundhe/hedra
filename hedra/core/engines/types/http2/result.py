@@ -47,19 +47,21 @@ class HTTP2Result(BaseResult):
     def to_dict(self):
 
         encoded_headers = {
-            header_name.decode(): header_value.decode() for header_name, header_value in self.headers.items()
+            str(header_name.decode()): str(header_value.decode()) for header_name, header_value in self.headers.items()
         }
 
         data = self.data
         if isinstance(data, bytes) or isinstance(data, bytearray):
-            data = data.decode()
+            data = str(data.decode())
+
+        base_result_dict = super().to_dict()
 
         return {
-            'name': self.name,
             'url': self.url,
             'method': self.method,
             'path': self.path,
             'params': self.params,
+            'query': self.query,
             'type': self.type,
             'headers': encoded_headers,
             'data': data,
@@ -67,7 +69,8 @@ class HTTP2Result(BaseResult):
             'user': self.user,
             'error': str(self.error),
             'status': self.status,
-            'reason': self.reason
+            'reason': self.reason,
+            **base_result_dict
         }
 
     @property

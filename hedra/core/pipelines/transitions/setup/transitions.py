@@ -1,3 +1,4 @@
+import asyncio
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_states import StageStates
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
@@ -21,7 +22,13 @@ async def setup_transition(current_stage: Stage, next_stage: Stage):
   
     current_stage.stages = setup_stages
 
-    setup_stages = await current_stage.run()
+    if current_stage.timeout:
+
+        setup_stages = await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
+
+    else:
+
+        setup_stages = await current_stage.run()
 
     for execute_stage in setup_stages.values():
         execute_stage.state = StageStates.SETUP
@@ -53,7 +60,7 @@ async def setup_to_execute_transition(current_stage: Stage, next_stage: Stage):
 async def setup_to_checkpoint_transition(current_stage: Stage, next_stage: Stage):
     await setup_transition(current_stage, next_stage)
 
-    current_stage.data = {
+    next_stage.data = {
         'stages': current_stage.context.stages[StageTypes.EXECUTE],
         'reporter_config': current_stage.context.reporting_config
     }

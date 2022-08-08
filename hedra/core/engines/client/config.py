@@ -1,6 +1,5 @@
 import psutil
-import re
-from datetime import timedelta
+from .time_parser import TimeParser
 
 
 class Config:
@@ -12,12 +11,13 @@ class Config:
                 del kwargs[config_option_name]
 
 
-        self.UNITS = {'s':'seconds', 'm':'minutes', 'h':'hours', 'd':'days', 'w':'weeks'}
-        self.log_level=kwargs.get('log_level', 'info')
-        self.persona_type=kwargs.get('persona_type', 'simple')
-        self.total_time=self.convert_to_seconds(
+        time_parser = TimeParser(
             kwargs.get('total_time', '1m')
         )
+
+        self.log_level=kwargs.get('log_level', 'info')
+        self.persona_type=kwargs.get('persona_type', 'simple')
+        self.total_time=time_parser.time
         self.batch_size=kwargs.get('batch_size', 1000)
         self.batch_interval=kwargs.get('batch_interval')
         self.optimize_iterations=kwargs.get('optimize_iterations', 0)
@@ -30,24 +30,3 @@ class Config:
         self.options={
             **kwargs.get('options', {})
         }
-
-
-    def convert_to_seconds(self, seconds):
-        return int(
-            timedelta(
-                **{
-                    self.UNITS.get(
-                        m.group(
-                            'unit'
-                        ).lower(), 
-                        'seconds'
-                    ): float(m.group('val')
-                )
-                    for m in re.finditer(
-                        r'(?P<val>\d+(\.\d+)?)(?P<unit>[smhdw]?)', 
-                        seconds, 
-                        flags=re.I
-                    )
-                }
-            ).total_seconds()
-        )

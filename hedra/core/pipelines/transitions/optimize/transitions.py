@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_states import StageStates
@@ -21,7 +22,12 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
         
         current_stage.persona = execute_stage.persona
 
-        optimized_persona = await current_stage.run()
+        if current_stage.timeout:
+            optimized_persona = await asyncio.wait_for(current_stage.run(), current_stage.timeout)
+
+        else:
+            optimized_persona = await current_stage.run()
+
         next_stage.persona = optimized_persona
         next_stage.context.optimized_params = current_stage.results
 

@@ -1,3 +1,4 @@
+import asyncio
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_states import StageStates
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
@@ -28,7 +29,13 @@ async def analyze_transition(current_stage: Stage, next_stage: Stage):
                 results_to_calculate[stage_name] = raw_results.get(stage_name)
         
         current_stage.raw_results = results_to_calculate
-        summary = await current_stage.run()
+
+        if current_stage.timeout:
+            summary = await asyncio.wait_for(current_stage.run(), current_stage.timeout)
+
+        else:
+            summary = await current_stage.run()
+
         current_stage.context.summaries.update(summary)
 
         current_stage.state = StageStates.ANALYZED

@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.stages.stage import Stage
@@ -30,7 +31,12 @@ async def teardown_to_analyze_transition(current_stage: Stage, next_stage: Stage
                     teardown_hooks.extend(stage_teardown_hooks)
 
         current_stage.hooks[HookType.ACTION] = teardown_hooks
-        await current_stage.run()
+
+        if current_stage.timeout:
+            await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
+
+        else:
+            await current_stage.run()
 
         for stage in execute_stages:
             in_path = current_stage.name in paths.get(stage.name)

@@ -1,5 +1,6 @@
 from datetime import datetime
 import json
+import os
 from typing import List, Optional
 from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.hooks.types.internal import Internal
@@ -9,7 +10,6 @@ from .stage import Stage
 
 class Checkpoint(Stage):
     stage_type=StageTypes.CHECKPOINT
-    checkpoint_path: Optional[str]=None
 
     def __init__(self) -> None:
         super().__init__()
@@ -20,11 +20,8 @@ class Checkpoint(Stage):
     @Internal
     async def run(self):
         
-        if self.checkpoint_path is None:
-            current_time = datetime.now()
-            time_as_string = current_time.strftime('%Y-%m-%dT%H:%M:%S.Z')
+        for save_hook in self.hooks.get(HookType.SAVE):
+            checkpoint_data = await save_hook.call(self.data)
 
-            self.checkpoint_path = f'checkpoint_{self.previous_stage.lower()}_{time_as_string}.json'
-
-            with open(self.checkpoint_path, 'w') as checkpoint_file:
-                json.dump(self.data, checkpoint_file, indent=4)
+            with open(save_hook.config.path, 'w') as checkpoint_file:
+                json.dump(checkpoint_data, checkpoint_file, indent=4)
