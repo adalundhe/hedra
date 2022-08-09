@@ -2,8 +2,8 @@ import asyncio
 import networkx
 import inspect
 from typing import Dict, List
-from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.pipelines.stages.stage import Stage
+from hedra.core.pipelines.stages.error import Error
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.pipelines.simple_context import SimpleContext
 from hedra.core.pipelines.hooks.registry.registrar import registrar
@@ -142,4 +142,22 @@ class TransitionAssembler:
                         stage_paths.extend(path)
                     
                     idle_stage.context.paths[stage_name] = stage_paths
+
+    def create_error_transition(self, error: Exception):
+
+        from_stage = error.from_stage
+            
+        error_transition = self.transition_types.get((
+            from_stage.stage_type,
+            StageTypes.ERROR
+        ))
+
+        error_stage = Error()
+        error_stage.error = error
+
+        return Transition(
+            error_transition,
+            from_stage,
+            error_stage
+        )
                     

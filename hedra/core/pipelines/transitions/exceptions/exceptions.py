@@ -34,3 +34,25 @@ class IsolatedStageError(Exception):
         super().__init__(
             f'Error - {stage_type} stage {stage_name} has no dependencies and is thus unreachable by the execution graph.'
         )
+
+
+class StageTimeoutError(Exception):
+
+    def __init__(self, from_stage: Stage) -> None:
+        self.from_stage = from_stage
+
+        super().__init__(
+            f'Stage Timeout Exception - Stage {from_stage.name} of type {from_stage.stage_type.name}:\nStage exceeded provided timeout of {from_stage.timeout} seconds.'
+        )
+
+
+class StageExecutionError(Exception):
+
+    def __init__(self, from_stage: Stage, to_stage: Stage, message: str) -> None:
+
+        self.from_stage = from_stage
+        self.to_stage = to_stage
+
+        super().__init__(
+            f'Stage Execution Exception - Stage {from_stage.name} of type {from_stage.stage_type.name}:\n Encountered error - {message} - while transitioning to {to_stage.stage_type.name} stage - {self.to_stage.name}.'
+        )

@@ -21,8 +21,11 @@ class MercuryPlaywrightClient:
         self.pool = ContextPool(concurrency, group_size)
         self.timeouts = timeouts
         self.registered: Dict[str, Command] = {}
-        self.sem = asyncio.Semaphore(concurrency)
+        self.closed = False
         self.config = None
+
+
+        self.sem = asyncio.Semaphore(concurrency)
         self._discarded_context_groups: List[ContextGroup] = []
         self._discarded_contexts = []
         self._pending_context_groups: List[ContextGroup] = []
@@ -105,9 +108,12 @@ class MercuryPlaywrightClient:
                 return result
 
     async def close(self):
-        for context_group in self._discarded_context_groups:
-            await context_group.close()
+        if self.closed is False:
+            for context_group in self._discarded_context_groups:
+                await context_group.close()
 
-        for context in self._discarded_contexts:
-            await context.close()
-                
+            for context in self._discarded_contexts:
+                await context.close()
+
+            self.closed = True
+                    

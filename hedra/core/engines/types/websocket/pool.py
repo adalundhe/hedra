@@ -15,3 +15,7 @@ class Pool:
             self.connections.append(
                 WebsocketConnection(self.reset_connections)
             )
+
+    async def close(self):
+        for connection in self.connections:
+            await connection.close()

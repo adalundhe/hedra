@@ -6,7 +6,7 @@ import importlib
 import ntpath
 from pathlib import Path
 from hedra.core.pipelines.stages.stage import Stage
-
+from hedra.core.pipelines.status import PipelineStatus
 from hedra.core.pipelines import Pipeline
 
 
@@ -45,6 +45,15 @@ def run(path: str):
 
     pipeline.validate()
     
-    loop.run_until_complete(pipeline.run())
+    pipeine_status = loop.run_until_complete(pipeline.run())
+
+    if pipeine_status == PipelineStatus.COMPLETE:
+        print('Complete!')
+    
+    else:
+        print('Failed!')
+
+    return pipeine_status
+
 
     

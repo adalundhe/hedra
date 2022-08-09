@@ -1,5 +1,7 @@
 from .exceptions import (
     InvalidTransitionError, 
     IsolatedStageError,
-    IdleTranstionError
+    IdleTranstionError,
+    StageExecutionError,
+    StageTimeoutError
 )

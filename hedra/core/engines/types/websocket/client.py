@@ -15,7 +15,7 @@ WebsocketResponseFuture = Awaitable[Union[WebsocketAction, Exception]]
 WebsocketBatchResponseFuture = Awaitable[Tuple[Set[WebsocketResponseFuture], Set[WebsocketResponseFuture]]]
 
 
-class MercuryWebsocketClient(MercuryHTTPClient):
+class MercuryWebsocketClient:
 
 
     def __init__(self, concurrency: int = 10 ** 3, timeouts: Timeouts = Timeouts(), reset_connections: bool=False) -> None:
@@ -24,6 +24,7 @@ class MercuryWebsocketClient(MercuryHTTPClient):
 
         self.registered: Dict[str, WebsocketAction] = {}
         self._hosts = {}
+        self.closed = False
 
         self.sem = asyncio.Semaphore(concurrency)
         self.pool = Pool(concurrency, reset_connections=reset_connections)
@@ -166,3 +167,9 @@ class MercuryWebsocketClient(MercuryHTTPClient):
                 ) 
 
                 return response
+
+    async def close(self):
+        if self.closed is False:
+            await self.pool.close()
+            self.closed = True
+

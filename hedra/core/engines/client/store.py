@@ -21,6 +21,7 @@ class ActionsStore:
         self._loop = None
         self.current_stage: str = None
         self.waiter = None
+        self.setup_call = None
 
     def set_waiter(self, stage: str):
 
@@ -30,7 +31,8 @@ class ActionsStore:
         self.waiter = self._loop.create_future()
         self.current_stage = stage
 
-    async def wait_for_ready(self):
+    async def wait_for_ready(self, setup_call):
+        self.setup_call = setup_call
         await self.waiter
 
     def store(self, request: str, action: Any, session: Any):

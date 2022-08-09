@@ -6,12 +6,16 @@ from hedra.core.pipelines.transitions.exceptions.exceptions import IsolatedStage
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from .transitions import TransitionAssembler, local_transitions
+from .status import PipelineStatus
 
 
 
 class Pipeline:
+    status = PipelineStatus.IDLE
 
     def __init__(self, stages: List[Stage]) -> None:
+        
+        self.status = PipelineStatus.INITIALIZING
         
         self.graph = networkx.DiGraph()
         self.transitions_graph = []
@@ -48,6 +52,7 @@ class Pipeline:
 
     def validate(self):
 
+        self.status = PipelineStatus.VALIDATING
         # If we havent specified a Validate stage for save aggregated results,
         # append one.
         if len(self.instances.get(StageTypes.VALIDATE)) < 1:
@@ -83,6 +88,7 @@ class Pipeline:
                 self.stages.get(isolate_stage_name)
             )
 
+        self.status = PipelineStatus.ASSEMBLING
         for transition_group in self.transitions_graph:
             
             transtions = []
@@ -93,28 +99,64 @@ class Pipeline:
             self._transitions.append(transtions)
 
     async def run(self):
+        
+        self.status = PipelineStatus.RUNNING
 
         for transition_group in self._transitions:
             
+            transition_results = []
+
             if len(transition_group) == 1:
                 print(f'Executing - {transition_group[0].from_stage}')
-                await transition_group[0].transition(
+                result = await transition_group[0].transition(
                     transition_group[0].from_stage,
                     transition_group[0].to_stage
                 )
+
+                transition_results.append(result)
 
             else:
                 for transtition in transition_group:
                     print(f'Executing {transtition.from_stage}')
                     
-                await asyncio.gather(*[
+                results = await asyncio.gather(*[
                     asyncio.create_task(transition.transition(
                         transition.from_stage, 
                         transition.to_stage
                     )) for transition in transition_group
                 ])
 
-        print('DONE!')
+                transition_results.extend(results)
+
+            for error, next_stage in transition_results:
+                
+                if next_stage == StageTypes.ERROR:
+
+                    self.status = PipelineStatus.FAILED
+
+                    print(f'Executing error transition -  {error.from_stage}')
+
+                    error_transtiton = self.runner.create_error_transition(error)
+
+                    result = await error_transtiton.transition(
+                        error_transtiton.from_stage,
+                        error_transtiton.to_stage
+                    )
+                    
+                    return self.status
+
+        self.status = PipelineStatus.COMPLETE
+
+        pending = asyncio.all_tasks()
+
+        for pend in pending:
+            try:
+                pend.cancel()
+                await pend
+            except asyncio.CancelledError:
+                pass
+
+        return self.status
 
     def _append_stage(self, stage_type: StageTypes):
 

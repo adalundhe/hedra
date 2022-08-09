@@ -23,6 +23,7 @@ class MercuryHTTP2Client:
 
         self._hosts = {}
         self.registered: Dict[str, HTTP2Action] = {}
+        self.closed = False
 
         self.ssl_context = get_http2_ssl_context()
         
@@ -155,4 +156,6 @@ class MercuryHTTP2Client:
                 return response
 
     async def close(self):
-        pass
+        if self.closed is False:
+            await self.pool.close()
+            self.closed = True

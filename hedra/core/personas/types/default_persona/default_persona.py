@@ -8,11 +8,21 @@ from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.personas.batching.batch import Batch
 from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.personas.batching import Batch
-from hedra.core.personas.batching.batch_interval import BatchInterval
 from hedra.core.engines.client.config import Config
 
 async def cancel_pending(pend: Task):
-    pend.cancel()
+    try:
+        pend.cancel()
+        if not pend.cancelled():
+            await asyncio.wait_for(pend, timeout=0)
+
+        return pend
+    
+    except asyncio.CancelledError as cancelled_error:
+        return cancelled_error
+
+    except asyncio.TimeoutError as timeout_error:
+        return timeout_error
 
 class DefaultPersona:
 
@@ -76,6 +86,9 @@ class DefaultPersona:
                 cancel_pending(pend)
             ) for pend in pending
         ])
+
+        for hook in hooks:
+            await hook.session.close()
         
         self.total_actions = len(set(results))
         self.total_elapsed = self.end - self.start

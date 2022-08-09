@@ -12,11 +12,4 @@ class Complete(Stage):
 
     @Internal
     async def run(self):
-        pending = asyncio.all_tasks()
-
-        for pend in pending:
-            try:
-                pend.cancel()
-                await pend
-            except Exception:
-                pass
+        pass

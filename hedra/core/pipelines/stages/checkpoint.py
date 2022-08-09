@@ -1,12 +1,15 @@
-from datetime import datetime
+import functools
 import json
-import os
-from typing import List, Optional
+import psutil
+import asyncio
+from typing import TextIO
+from concurrent.futures import ThreadPoolExecutor
 from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from .stage import Stage
+
 
 class Checkpoint(Stage):
     stage_type=StageTypes.CHECKPOINT
@@ -16,6 +19,9 @@ class Checkpoint(Stage):
         self.data = {}
         self.previous_stage = ''
         self.accepted_hook_types = [ HookType.SAVE ]
+        self._loop = asyncio.get_event_loop()
+        self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
+        self._save_file: TextIO = None
 
     @Internal
     async def run(self):
@@ -23,5 +29,21 @@ class Checkpoint(Stage):
         for save_hook in self.hooks.get(HookType.SAVE):
             checkpoint_data = await save_hook.call(self.data)
 
-            with open(save_hook.config.path, 'w') as checkpoint_file:
-                json.dump(checkpoint_data, checkpoint_file, indent=4)
+            self._save_file = open(save_hook.config.path, 'w')
+
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    json.dump,
+                    checkpoint_data,
+                    self._save_file,
+                    indent=4
+                )
+            )
+
+            await self._loop.run_in_executor(
+                self._executor,
+                self._save_file.close
+            )
+
+        self._executor.shutdown(wait=True)

@@ -49,7 +49,10 @@ class ConstantArrivalPersona(DefaultPersona):
                 cancel_pending(pend)
             ) for pend in pending
         ])
-        
+
+        for hook in self._hooks:
+            await hook.session.close()
+  
         self.total_actions = len(set(results))
         self.total_elapsed = self.end - self.start
         self.optimized_params = None

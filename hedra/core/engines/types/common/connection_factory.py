@@ -136,7 +136,6 @@ class ConnectionFactory:
             protocol.connection_made(self.transport) # update transport
             writer = FastWriter(self.transport, ssl_protocol, reader, self.loop) # update writer
 
-
             return reader, writer
 
         else:
@@ -151,7 +150,19 @@ class ConnectionFactory:
                 server_hostname=hostname,
                 ssl=ssl
             )
-
+            
             writer = FastWriter(self.transport, reader_protocol, reader, self.loop)
 
             return reader, writer
+
+    async def close(self):
+        self.transport.close()
+
+        try:
+            self.transport.close()
+            
+            while not self.transport.is_closing():
+                await asyncio.sleep(0)
+
+        except Exception:
+            pass

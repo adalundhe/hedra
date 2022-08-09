@@ -2,6 +2,10 @@ import asyncio
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_states import StageStates
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
+from hedra.core.pipelines.transitions.exceptions import (
+    StageExecutionError,
+    StageTimeoutError
+)
 
 
 async def setup_transition(current_stage: Stage, next_stage: Stage):
@@ -40,31 +44,67 @@ async def setup_transition(current_stage: Stage, next_stage: Stage):
 
 
 async def setup_to_validate_transition(current_stage: Stage, next_stage: Stage):
-    await setup_transition(current_stage, next_stage)
+    
+    try:
+
+        await setup_transition(current_stage, next_stage)
+            
+    except asyncio.TimeoutError:
+        return StageTimeoutError(current_stage), StageTypes.ERROR
+
+    except Exception as stage_execution_error:
+        return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     return None, StageTypes.VALIDATE
 
 
 async def setup_to_optimize_transition(current_stage: Stage, next_stage: Stage):
-    await setup_transition(current_stage, next_stage)
+
+    try:
+
+        await setup_transition(current_stage, next_stage)
+            
+    except asyncio.TimeoutError:
+        return StageTimeoutError(current_stage), StageTypes.ERROR
+    
+    except Exception as stage_execution_error:
+        return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     return None, StageTypes.OPTIMIZE
 
 
 async def setup_to_execute_transition(current_stage: Stage, next_stage: Stage):
-    await setup_transition(current_stage, next_stage)
+
+    try:
+
+        await setup_transition(current_stage, next_stage)
+            
+    except asyncio.TimeoutError:
+        return StageTimeoutError(current_stage), StageTypes.ERROR
+    
+    except Exception as stage_execution_error:
+        return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     return None, StageTypes.EXECUTE
 
 
 async def setup_to_checkpoint_transition(current_stage: Stage, next_stage: Stage):
-    await setup_transition(current_stage, next_stage)
 
-    next_stage.data = {
-        'stages': current_stage.context.stages[StageTypes.EXECUTE],
-        'reporter_config': current_stage.context.reporting_config
-    }
-    
-    next_stage.previous_stage = current_stage.name
+    try:
+
+        await setup_transition(current_stage, next_stage)
+
+        next_stage.data = {
+            'stages': current_stage.context.stages[StageTypes.EXECUTE],
+            'reporter_config': current_stage.context.reporting_config
+        }
+        
+        next_stage.previous_stage = current_stage.name
+            
+    except asyncio.TimeoutError:
+        return StageTimeoutError(current_stage), StageTypes.ERROR
+
+    except Exception as stage_execution_error:
+        return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
     
     return None, StageTypes.CHECKPOINT

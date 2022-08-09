@@ -2,7 +2,8 @@ from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from .common import (
     idle_transition,
     invalid_transition,
-    exit_transition
+    exit_transition,
+    error_transition
 )
 
 from .validate import (
@@ -77,7 +78,7 @@ local_transitions = {
         (StageTypes.IDLE, StageTypes.CHECKPOINT): invalid_idle_transition,
         (StageTypes.IDLE, StageTypes.SUBMIT): invalid_idle_transition,
         (StageTypes.IDLE, StageTypes.COMPLETE): invalid_idle_transition,
-        (StageTypes.IDLE, StageTypes.ERROR): invalid_idle_transition,
+        (StageTypes.IDLE, StageTypes.ERROR): error_transition,
 
         # State: Setup
         (StageTypes.SETUP, StageTypes.SETUP): invalid_transition,
@@ -90,7 +91,7 @@ local_transitions = {
         (StageTypes.SETUP, StageTypes.CHECKPOINT): setup_to_checkpoint_transition,
         (StageTypes.SETUP, StageTypes.SUBMIT): invalid_transition,
         (StageTypes.SETUP, StageTypes.COMPLETE): invalid_transition,
-        (StageTypes.SETUP, StageTypes.ERROR): invalid_transition,
+        (StageTypes.SETUP, StageTypes.ERROR): error_transition,
 
         # State: Validate
         (StageTypes.VALIDATE, StageTypes.VALIDATE): invalid_transition,
@@ -103,7 +104,7 @@ local_transitions = {
         (StageTypes.VALIDATE, StageTypes.CHECKPOINT): invalid_transition,
         (StageTypes.VALIDATE, StageTypes.SUBMIT): invalid_transition,
         (StageTypes.VALIDATE, StageTypes.COMPLETE): invalid_transition,
-        (StageTypes.VALIDATE, StageTypes.ERROR): invalid_transition,
+        (StageTypes.VALIDATE, StageTypes.ERROR): error_transition,
 
         # State: Optimize
         (StageTypes.OPTIMIZE, StageTypes.OPTIMIZE): invalid_transition,
@@ -116,7 +117,7 @@ local_transitions = {
         (StageTypes.OPTIMIZE, StageTypes.CHECKPOINT): optimize_to_checkpoint_transition,
         (StageTypes.OPTIMIZE, StageTypes.COMPLETE): invalid_transition,
         (StageTypes.OPTIMIZE, StageTypes.SUBMIT): invalid_transition,
-        (StageTypes.OPTIMIZE, StageTypes.ERROR): invalid_transition,
+        (StageTypes.OPTIMIZE, StageTypes.ERROR): error_transition,
 
         # State: Execute
         (StageTypes.EXECUTE, StageTypes.EXECUTE): execute_to_execute_transition,
@@ -129,7 +130,7 @@ local_transitions = {
         (StageTypes.EXECUTE, StageTypes.CHECKPOINT): execute_to_checkpoint_transition,
         (StageTypes.EXECUTE, StageTypes.SUBMIT): invalid_transition,
         (StageTypes.EXECUTE, StageTypes.COMPLETE): invalid_transition,
-        (StageTypes.EXECUTE, StageTypes.ERROR): invalid_transition,
+        (StageTypes.EXECUTE, StageTypes.ERROR): error_transition,
 
         # State: Teardown
         (StageTypes.TEARDOWN, StageTypes.TEARDOWN): invalid_transition,
@@ -142,7 +143,7 @@ local_transitions = {
         (StageTypes.TEARDOWN, StageTypes.CHECKPOINT): teardown_to_checkpoint_transition,
         (StageTypes.TEARDOWN, StageTypes.SUBMIT): invalid_transition,
         (StageTypes.TEARDOWN, StageTypes.COMPLETE): invalid_transition,
-        (StageTypes.TEARDOWN, StageTypes.ERROR): invalid_transition,
+        (StageTypes.TEARDOWN, StageTypes.ERROR): error_transition,
 
         # State: Analyze
         (StageTypes.ANALYZE, StageTypes.ANALYZE): invalid_transition,
@@ -155,7 +156,7 @@ local_transitions = {
         (StageTypes.ANALYZE, StageTypes.CHECKPOINT): analyze_to_checkpoint_transition,
         (StageTypes.ANALYZE, StageTypes.SUBMIT): analyze_to_submit_transition,
         (StageTypes.ANALYZE, StageTypes.COMPLETE): invalid_transition,
-        (StageTypes.ANALYZE, StageTypes.ERROR): invalid_transition,
+        (StageTypes.ANALYZE, StageTypes.ERROR): error_transition,
 
         # State: Checkpoint
         (StageTypes.CHECKPOINT, StageTypes.CHECKPOINT): invalid_transition,
@@ -168,7 +169,7 @@ local_transitions = {
         (StageTypes.CHECKPOINT, StageTypes.ANALYZE): checkpoint_to_analyze_transition,
         (StageTypes.CHECKPOINT, StageTypes.SUBMIT): checkpoint_to_submit_transition,
         (StageTypes.CHECKPOINT, StageTypes.COMPLETE): checkpoint_to_complete_transition,
-        (StageTypes.CHECKPOINT, StageTypes.ERROR): invalid_transition,
+        (StageTypes.CHECKPOINT, StageTypes.ERROR): error_transition,
 
 
         # State: Submit
@@ -182,7 +183,7 @@ local_transitions = {
         (StageTypes.SUBMIT, StageTypes.ANALYZE): invalid_transition,
         (StageTypes.SUBMIT, StageTypes.CHECKPOINT): submit_to_checkpoint_transition,
         (StageTypes.SUBMIT, StageTypes.COMPLETE): submit_to_complete_transition,
-        (StageTypes.SUBMIT, StageTypes.ERROR): invalid_transition,
+        (StageTypes.SUBMIT, StageTypes.ERROR): error_transition,
 
         # State: Complete
         (StageTypes.COMPLETE, StageTypes.COMPLETE): exit_transition,
@@ -195,18 +196,18 @@ local_transitions = {
         (StageTypes.COMPLETE, StageTypes.ANALYZE): exit_transition,
         (StageTypes.COMPLETE, StageTypes.CHECKPOINT): exit_transition,
         (StageTypes.COMPLETE, StageTypes.SUBMIT): exit_transition,
-        (StageTypes.COMPLETE, StageTypes.ERROR): exit_transition,
+        (StageTypes.COMPLETE, StageTypes.ERROR): error_transition,
 
         # State: Error
-        (StageTypes.ERROR, StageTypes.ERROR): exit_transition,
-        (StageTypes.ERROR, StageTypes.IDLE): exit_transition,
-        (StageTypes.ERROR, StageTypes.SETUP): exit_transition,
-        (StageTypes.ERROR, StageTypes.VALIDATE): exit_transition,
-        (StageTypes.ERROR, StageTypes.OPTIMIZE): exit_transition,
-        (StageTypes.ERROR, StageTypes.EXECUTE): exit_transition,
-        (StageTypes.ERROR, StageTypes.TEARDOWN): exit_transition,
-        (StageTypes.ERROR, StageTypes.ANALYZE): exit_transition,
-        (StageTypes.ERROR, StageTypes.CHECKPOINT): exit_transition,
-        (StageTypes.ERROR, StageTypes.SUBMIT): exit_transition,
-        (StageTypes.ERROR, StageTypes.COMPLETE): exit_transition
+        (StageTypes.ERROR, StageTypes.ERROR): invalid_transition,
+        (StageTypes.ERROR, StageTypes.IDLE): invalid_transition,
+        (StageTypes.ERROR, StageTypes.SETUP): invalid_transition,
+        (StageTypes.ERROR, StageTypes.VALIDATE): invalid_transition,
+        (StageTypes.ERROR, StageTypes.OPTIMIZE): invalid_transition,
+        (StageTypes.ERROR, StageTypes.EXECUTE): invalid_transition,
+        (StageTypes.ERROR, StageTypes.TEARDOWN): invalid_transition,
+        (StageTypes.ERROR, StageTypes.ANALYZE): invalid_transition,
+        (StageTypes.ERROR, StageTypes.CHECKPOINT): invalid_transition,
+        (StageTypes.ERROR, StageTypes.SUBMIT): invalid_transition,
+        (StageTypes.ERROR, StageTypes.COMPLETE): invalid_transition
     }

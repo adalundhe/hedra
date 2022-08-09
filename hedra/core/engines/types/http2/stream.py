@@ -66,3 +66,6 @@ class AsyncStream:
 
         self.reader_writer.frame_buffer = FrameBuffer()
         return self.reader_writer
+
+    async def close(self):
+        await self._connection_factory.close()

@@ -21,6 +21,7 @@ class MercuryHTTPClient:
         self.timeouts = timeouts
         self.registered: Dict[str, HTTPAction] = {}
         self._hosts = {}
+        self.closed = False
 
         self.sem = asyncio.Semaphore(concurrency)
         self.pool = Pool(concurrency, reset_connections=reset_connections)
@@ -35,7 +36,7 @@ class MercuryHTTPClient:
 
             if self._hosts.get(action.url.hostname) is None:
 
-                    socket_configs = await action.url.lookup()
+                    socket_configs = await asyncio.wait_for(action.url.lookup(), timeout=self.timeouts.connect_timeout)
                     for ip_addr, configs in socket_configs.items():
                         for config in configs:
                             try:
@@ -188,4 +189,6 @@ class MercuryHTTPClient:
                 return response
 
     async def close(self):
-        pass
+        if self.closed is False:
+            await self.pool.close()
+            self.closed = True

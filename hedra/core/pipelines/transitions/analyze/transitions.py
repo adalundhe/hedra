@@ -2,6 +2,10 @@ import asyncio
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_states import StageStates
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
+from hedra.core.pipelines.transitions.exceptions import (
+    StageExecutionError,
+    StageTimeoutError
+)
 
 
 async def analyze_transition(current_stage: Stage, next_stage: Stage):
@@ -31,7 +35,7 @@ async def analyze_transition(current_stage: Stage, next_stage: Stage):
         current_stage.raw_results = results_to_calculate
 
         if current_stage.timeout:
-            summary = await asyncio.wait_for(current_stage.run(), current_stage.timeout)
+            summary = await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
 
         else:
             summary = await current_stage.run()
@@ -45,7 +49,15 @@ async def analyze_transition(current_stage: Stage, next_stage: Stage):
 
 async def analyze_to_checkpoint_transition(current_stage: Stage, next_stage: Stage):
 
-    await analyze_transition(current_stage, next_stage)
+    try:
+
+        await analyze_transition(current_stage, next_stage)
+
+    except asyncio.TimeoutError:
+        return StageTimeoutError(current_stage), StageTypes.ERROR
+    
+    except Exception as stage_runtime_error:
+        return StageExecutionError(current_stage, next_stage, str(stage_runtime_error)), StageTypes.ERROR
 
     next_stage.data = current_stage.context.summaries
     next_stage.previous_stage = current_stage.name
@@ -55,6 +67,14 @@ async def analyze_to_checkpoint_transition(current_stage: Stage, next_stage: Sta
 
 async def analyze_to_submit_transition(current_stage: Stage, next_stage: Stage):
 
-    await analyze_transition(current_stage, next_stage)
+    try:
+
+        await analyze_transition(current_stage, next_stage)
+
+    except asyncio.TimeoutError:
+        return StageTimeoutError(current_stage), StageTypes.ERROR
+    
+    except Exception as stage_runtime_error:
+        return StageExecutionError(current_stage, next_stage, str(stage_runtime_error)), StageTypes.ERROR
 
     return None, StageTypes.SUBMIT

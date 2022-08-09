@@ -1,6 +1,7 @@
 import asyncio
 import psutil
 from typing import Dict
+from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.engines.client.client import Client
@@ -9,6 +10,26 @@ from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.personas import get_persona
 from .execute import Execute
 from .stage import Stage
+from .exceptions import (
+    HookSetupException
+)
+
+
+class SetupCall:
+
+    def __init__(self, hook: Hook) -> None:
+        self.hook = hook
+        self.exception = None
+        self.action_store = None
+
+    async def setup(self):
+        try:
+            await self.hook.call()
+
+        except Exception as setup_exception:
+            self.exception = setup_exception
+            self.action_store.waiter.set_result(None)
+
 
 
 class Setup(Stage):
@@ -66,12 +87,33 @@ class Setup(Stage):
                 execute_stage.client.intercept = True
 
                 execute_stage.client.actions.set_waiter(execute_stage.name)
-                task = asyncio.create_task(hook.call())
 
-                await execute_stage.client.actions.wait_for_ready()
+                setup_call = SetupCall(hook)
+                setup_call.action_store = execute_stage.client.actions
+
+                task = asyncio.create_task(setup_call.setup())
+
+                await execute_stage.client.actions.wait_for_ready(setup_call)
+
                 try:
+                    
+                    if setup_call.exception:
+                        raise HookSetupException(hook, HookType.ACTION, str(setup_call.exception))
+
                     task.cancel()
-                except Exception:
+                    if task.cancelled() is False:
+                        await asyncio.wait_for(task, timeout=0)
+
+                except HookSetupException as hook_setup_exception:
+                    raise hook_setup_exception
+
+                except asyncio.InvalidStateError:
+                    pass
+
+                except asyncio.CancelledError:
+                    pass
+
+                except asyncio.TimeoutError:
                     pass
                      
                 action, session = execute_stage.client.actions.get(

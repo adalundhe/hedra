@@ -2,6 +2,7 @@ from typing import Any
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.pipelines.transitions.exceptions import IdleTranstionError
+from hedra.core.pipelines.transitions.exceptions import StageExecutionError
 
 
 async def invalid_idle_transition(current_stage: Stage, next_stage: Stage):
@@ -9,5 +10,12 @@ async def invalid_idle_transition(current_stage: Stage, next_stage: Stage):
 
 
 async def idle_to_validate_transition(current_stage: Stage, next_stage: Stage):
-    next_stage.context = current_stage.context
-    return None, StageTypes.VALIDATE
+
+    try:
+        next_stage.context = current_stage.context
+
+    except Exception as stage_execution_error:
+        return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
+
+    else:
+        return None, StageTypes.VALIDATE

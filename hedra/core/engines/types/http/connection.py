@@ -70,11 +70,4 @@ class HTTPConnection:
         return self._connection.read_headers()
 
     async def close(self):
-        try:
-            self._connection_factory.transport.close()
-            
-            while not self._connection_factory.transport.is_closing():
-                await asyncio.sleep(0.1)
-
-        except Exception:
-            pass
+        await self._connection_factory.close()
