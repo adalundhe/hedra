@@ -2,6 +2,7 @@ import asyncio
 import os
 import click
 import inspect
+import psutil
 import uvloop
 uvloop.install()
 import sys
@@ -14,7 +15,7 @@ from hedra.core.pipelines import Pipeline
 
 @click.command("Run a specified test file.")
 @click.argument('path')
-@click.option('--cpus', default=1, help='Number of CPUs to use. Default is the number of physical processesors available to the system.')
+@click.option('--cpus', default=psutil.cpu_count(logical=False), help='Number of CPUs to use. Default is the number of physical processesors available to the system.')
 def run(path: str, cpus: int):
     
     package_dir = Path(path).resolve().parent

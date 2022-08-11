@@ -30,6 +30,7 @@ class DefaultPersona:
     def __init__(self, config: Config):
         
         self.type = PersonaTypes.DEFAULT
+        self.workers = 1
 
         self.actions = []
         self._hooks: List[Hook] = []
@@ -103,7 +104,7 @@ class DefaultPersona:
     async def generator(self, total_time):
         elapsed = 0
         idx = 0
-        max_pool_size = self.batch.size * psutil.cpu_count(logical=False)
+        max_pool_size = self.batch.size * (psutil.cpu_count(logical=False) + self.workers)
         action_idx = 0
 
         start = time.monotonic()

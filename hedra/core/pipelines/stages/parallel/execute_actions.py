@@ -35,8 +35,17 @@ def execute_actions(parallel_config: str):
         
         parallel_config = dill.loads(parallel_config)
         persona_config = parallel_config.get('config')
+        workers = parallel_config.get('workers')
+        worker_id = parallel_config.get('worker_id')
+
+        if workers == worker_id:
+            persona_config.batch_size = int(persona_config.batch_size/workers) + (persona_config.batch_size%workers)
+        
+        else:
+            persona_config.batch_size = int(persona_config.batch_size/workers)
 
         persona = get_persona(persona_config)
+        persona.workers = workers
 
         hooks = {
             HookType.ACTION: []
