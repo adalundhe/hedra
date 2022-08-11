@@ -24,7 +24,7 @@ class HTTP2Client(BaseClient):
                 connect_timeout=config.connect_timeout,
                 total_timeout=config.request_timeout
             ),
-            reset_connections=config.options.get('reset_connections')
+            reset_connections=config.reset_connections
         )
         self.request_type = RequestTypes.HTTP2
         self.actions: ActionsStore = None

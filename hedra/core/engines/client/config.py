@@ -27,6 +27,7 @@ class Config:
         self.no_run_visuals=kwargs.get('no_run_visuals', False)
         self.connect_timeout=kwargs.get('connect_timeout', 15)
         self.request_timeout=kwargs.get('request_timeout', 60)
+        self.reset_connections=kwargs.get('reset_connections')
         self.options={
             **kwargs.get('options', {})
         }

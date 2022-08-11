@@ -33,6 +33,7 @@ class MercuryGraphQLClient(MercuryHTTPClient):
    
         response = GraphQLResult(action)
         response.wait_start = time.monotonic()
+        self.active += 1
 
         async with self.sem:
             connection = self.pool.connections.pop()
@@ -116,7 +117,6 @@ class MercuryGraphQLClient(MercuryHTTPClient):
             except Exception as e:
                 response.read_end = time.monotonic()
                 response.error = str(e)
-                await connection.close()
                 
                 self.pool.connections.append(HTTPConnection(reset_connection=self.pool.reset_connections))
 

@@ -38,39 +38,47 @@ class AsyncStream:
         ssl: Optional[SSLContext]=None,
         timeout: Optional[float] = None
     ) -> Union[ReaderWriter, Exception]:
-        if self.connected is False or self.dns_address != dns_address or self.reset_connection:
-            stream = await asyncio.wait_for(
-                self._connection_factory.create_http2(
-                    hostname,
-                    socket_config=socket_config,
-                    ssl=ssl
-                ),
-                timeout=timeout
-            )
+        
+            try:
+                if self.connected is False or self.dns_address != dns_address or self.reset_connection:
+                    stream = await asyncio.wait_for(
+                        self._connection_factory.create_http2(
+                            hostname,
+                            socket_config=socket_config,
+                            ssl=ssl
+                        ),
+                        timeout=timeout
+                    )
 
-            self.connected = True
-            self.stream_id = self.init_id
-            self.dns_address = dns_address
-            self.port = port
+                    self.connected = True
+                    self.stream_id = self.init_id
+                    self.dns_address = dns_address
+                    self.port = port
 
-            reader, writer = stream
+                    reader, writer = stream
 
-            self.reader_writer = ReaderWriter(self.stream_id, reader, writer, self.timeouts)
-            self.reader_writer.headers_frame = HeadersFrame(self.init_id)
-            self.reader_writer.window_frame = WindowUpdateFrame(self.init_id, window_increment=65536)
+                    self.reader_writer = ReaderWriter(self.stream_id, reader, writer, self.timeouts)
+                    self.reader_writer.headers_frame = HeadersFrame(self.init_id)
+                    self.reader_writer.window_frame = WindowUpdateFrame(self.init_id, window_increment=65536)
 
-        else:
+                else:
 
-            self.stream_id += 2# self.concurrency
-            if self.stream_id%2 == 0:
-                self.stream_id += 1
+                    self.stream_id += 2# self.concurrency
+                    if self.stream_id%2 == 0:
+                        self.stream_id += 1
 
-            self.reader_writer.stream_id = self.stream_id
-            self.reader_writer.headers_frame.stream_id = self.stream_id
-            self.reader_writer.window_frame.stream_id = self.stream_id
+                    self.reader_writer.stream_id = self.stream_id
+                    self.reader_writer.headers_frame.stream_id = self.stream_id
+                    self.reader_writer.window_frame.stream_id = self.stream_id
 
-        self.reader_writer.frame_buffer = FrameBuffer()
-        return self.reader_writer
+                self.reader_writer.frame_buffer = FrameBuffer()
+                return self.reader_writer
+            
+            except asyncio.TimeoutError:
+                raise Exception('Connection timed out.')
+
+            except Exception as e:
+                raise e
 
     async def close(self):
         await self._connection_factory.close()

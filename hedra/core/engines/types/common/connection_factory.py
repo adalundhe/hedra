@@ -96,6 +96,8 @@ class ConnectionFactory:
             self.loop = asyncio.get_event_loop()
 
         family, type_, proto, _, address = socket_config
+        
+        socket_family = socket.AF_INET6 if family == 2 else socket.AF_INET
         self.socket = socket.socket(family=family, type=type_, proto=proto)
         self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         await self.loop.run_in_executor(None, self.socket.connect, address)
@@ -103,59 +105,41 @@ class ConnectionFactory:
 
         reader = FastReader(limit=_HTTP2_LIMIT, loop=self.loop)
 
-        if self.factory_type == RequestTypes.GRPC:
-            protocol = TLSStreamReaderProtocol(reader, loop=self.loop)
+        protocol = TLSStreamReaderProtocol(reader, loop=self.loop)
 
-            self.transport, _ = await self.loop.create_connection(
-                lambda: protocol, 
-                sock=self.socket,
-                family=socket.AF_INET
-            )
-            
-            ssl_protocol = SSLProtocol(
-                self.loop, 
-                protocol, 
-                ssl, 
-                None,
-                False, 
-                hostname,
-                ssl_handshake_timeout=ssl_timeout,
-                call_connection_made=False
-            )
+        self.transport, _ = await self.loop.create_connection(
+            lambda: protocol, 
+            sock=self.socket,
+            family=socket_family
+        )
+        
+        ssl_protocol = SSLProtocol(
+            self.loop, 
+            protocol, 
+            ssl, 
+            None,
+            False, 
+            hostname,
+            ssl_handshake_timeout=ssl_timeout,
+            call_connection_made=False
+        )
 
-            # Pause early so that "ssl_protocol.data_received()" doesn't
-            # have a chance to get called before "ssl_protocol.connection_made()".
-            self.transport.pause_reading()
+        # Pause early so that "ssl_protocol.data_received()" doesn't
+        # have a chance to get called before "ssl_protocol.connection_made()".
+        self.transport.pause_reading()
 
-            self.transport.set_protocol(ssl_protocol)
-            await self.loop.run_in_executor(None, ssl_protocol.connection_made, self.transport)
-            self.transport.resume_reading()
+        self.transport.set_protocol(ssl_protocol)
+        await self.loop.run_in_executor(None, ssl_protocol.connection_made, self.transport)
+        self.transport.resume_reading()
 
-            self.transport = ssl_protocol._app_transport
+        self.transport = ssl_protocol._app_transport
 
-            reader = FastReader(limit=_HTTP2_LIMIT, loop=self.loop)
-            protocol.upgrade_reader(reader) # update reader
-            protocol.connection_made(self.transport) # update transport
-            self._writer = FastWriter(self.transport, ssl_protocol, reader, self.loop) # update writer
+        reader = FastReader(limit=_HTTP2_LIMIT, loop=self.loop)
+        protocol.upgrade_reader(reader) # update reader
+        protocol.connection_made(self.transport) # update transport
+        self._writer = FastWriter(self.transport, ssl_protocol, reader, self.loop) # update writer
 
-            return reader, self._writer
-
-        else:
-            reader_protocol = FastReaderProtocol(reader, loop=self.loop)
-
-            if ssl is None:
-                hostname = None
-
-            self.transport, _ = await self.loop.create_connection(
-                lambda: reader_protocol, 
-                sock=self.socket,
-                server_hostname=hostname,
-                ssl=ssl
-            )
-            
-            self._writer = FastWriter(self.transport, reader_protocol, reader, self.loop)
-
-            return reader, self._writer
+        return reader, self._writer
 
     async def close(self):
 

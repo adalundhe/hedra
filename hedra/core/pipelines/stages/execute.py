@@ -40,37 +40,32 @@ class Execute(Stage):
             loop = asyncio.get_running_loop()
 
             executor = ProcessPoolExecutor(
-                max_workers=psutil.cpu_count(logical=False),
-                mp_context=get_context('spawn')
+                max_workers=self.workers
             )
-
-            jobs = []
-            for idx in range(self.workers):
-                job_config = dill.dumps({
-                    'workers': self.workers,
-                    'worker_id': idx + 1,
-                    'config': self.client._config,
-                    'hooks': [
-                        {
-                            'timeouts': hook.session.timeouts,
-                            'reset_connections': hook.session.pool.reset_connections,
-                            'hook_name': hook.name,
-                            'stage': hook.stage,
-                            'weight': hook.config.weight,
-                            'order': hook.config.order,
-                            **hook.action.to_serializable()
-                        } for hook in self.hooks.get(HookType.ACTION)
-                    ]
-                })
-
-                jobs.append(loop.run_in_executor(
+                
+            
+            results_sets = await asyncio.gather(*[
+                loop.run_in_executor(
                     executor,
                     execute_actions,
-                    job_config
-                ))
-
-            results_sets = await asyncio.gather(*jobs)
-            executor.shutdown(cancel_futures=True, wait=True)
+                    dill.dumps({
+                        'workers': self.workers,
+                        'worker_id': idx + 1,
+                        'config': self.client._config,
+                        'hooks': [
+                            {
+                                'timeouts': hook.session.timeouts,
+                                'reset_connections': hook.session.pool.reset_connections,
+                                'hook_name': hook.name,
+                                'stage': hook.stage,
+                                'weight': hook.config.weight,
+                                'order': hook.config.order,
+                                **hook.action.to_serializable()
+                            } for hook in self.hooks.get(HookType.ACTION)
+                        ]
+                    })
+                ) for idx in range(self.workers)
+            ])
             
             results = []
             elapsed_times = []
@@ -86,6 +81,7 @@ class Execute(Stage):
 
             results = await persona.execute()
             total_elapsed = persona.total_elapsed
+            
 
         return {
             'results': results,

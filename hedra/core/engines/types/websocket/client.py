@@ -108,6 +108,7 @@ class MercuryWebsocketClient:
 
         response = WebsocketResult(action)
         response.wait_start = time.monotonic()
+        self.active += 1
 
         async with self.sem:
 
@@ -167,8 +168,6 @@ class MercuryWebsocketClient:
             except Exception as e:
                 response.read_end = time.monotonic()
                 response.error = str(e)
-
-                await connection.close()
 
                 self.pool.connections.append(
                     WebsocketConnection(reset_connection=self.pool.reset_connections) 

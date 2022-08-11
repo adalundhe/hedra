@@ -22,7 +22,7 @@ class EventsGroup:
 
         self.events.append(event)
         self.tags.update(event.tags_to_dict())
-
+    
         await event.check_result()
 
         if event.error is None:

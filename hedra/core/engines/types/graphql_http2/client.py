@@ -31,6 +31,7 @@ class MercuryGraphQLHTTP2Client(MercuryHTTP2Client):
         
         response = GraphQLHTTP2Result(action)
         response.wait_start = time.monotonic()
+        self.active += 1
 
         async with self.sem:
             stream = self.pool.streams.pop()
@@ -79,7 +80,6 @@ class MercuryGraphQLHTTP2Client(MercuryHTTP2Client):
                 response.response_code = 500
                 response.error = str(e)
 
-                await stream.close()
                 self.pool.reset()
 
             self.active -= 1

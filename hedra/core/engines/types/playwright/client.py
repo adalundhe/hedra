@@ -88,6 +88,7 @@ class MercuryPlaywrightClient:
             await pending_context.create()
 
         result = PlaywrightResult(command, type=RequestTypes.PLAYWRIGHT)
+        self.active += 1
         
         async with self.sem:
             context = self.pool.contexts.pop()

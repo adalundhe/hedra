@@ -19,7 +19,7 @@ class HTTPClient(BaseClient):
             timeouts=Timeouts(
                 total_timeout=config.request_timeout
             ),
-            reset_connections=config.options.get('reset_connections')
+            reset_connections=config.reset_connections
         )
         self.request_type = RequestTypes.HTTP
         self.next_name = None

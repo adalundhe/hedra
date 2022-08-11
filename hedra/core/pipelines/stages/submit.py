@@ -64,7 +64,6 @@ class Submit(Stage):
 
         stage_summaries = self.summaries.get('stages', {})
         for stage in stage_summaries.values():
-
             metrics.extend(list(
                 stage.get('actions', {}).values()
             ))

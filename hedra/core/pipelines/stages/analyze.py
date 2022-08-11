@@ -1,5 +1,5 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 import time
 import numpy
 import inspect
@@ -54,7 +54,7 @@ class Analyze(Stage):
             .99 
         ]
 
-        self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
+        self._executor = ProcessPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._loop = asyncio.get_event_loop()
         self.accepted_hook_types = [ HookType.METRIC ]
 
@@ -73,16 +73,12 @@ class Analyze(Stage):
             stage_total = 0
             stage_total_time = stage_results.get('total_elapsed')
 
-            tasks = []
-            for stage_result in stage_results.get('results'):
-                tasks.append(
-                    asyncio.create_task(events[stage_result.name].add(
+            await asyncio.gather(*[
+                asyncio.create_task(events[stage_result.name].add(
                         stage_result,
                         stage_name
-                    ))
-                )
-
-            await asyncio.gather(*tasks)
+                    )) for stage_result in stage_results.get('results')
+            ])
 
             grouped_stats = {}
             

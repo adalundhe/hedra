@@ -46,6 +46,7 @@ class Setup(Stage):
     connect_timeout=10
     request_timeout=60
     reporting_config={}
+    reset_connections=False
     options={}
     
     def __init__(self) -> None:
@@ -69,7 +70,8 @@ class Setup(Stage):
             no_run_visuals=self.no_run_visuals,
             connect_timeout=self.connect_timeout,
             request_timeout=self.request_timeout,
-            options=self.options
+            options=self.options,
+            reset_connections=self.reset_connections
 
         )
         

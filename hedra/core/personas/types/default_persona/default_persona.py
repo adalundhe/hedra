@@ -17,15 +17,13 @@ async def cancel_pending(pend: Task):
     try:
         pend.cancel()
         if not pend.cancelled():
-            await asyncio.wait_for(pend, timeout=0)
+            await pend
 
         return pend
     
     except asyncio.CancelledError as cancelled_error:
         return cancelled_error
 
-    except asyncio.TimeoutError as timeout_error:
-        return timeout_error
 
 class DefaultPersona:
 
@@ -86,14 +84,14 @@ class DefaultPersona:
         results = await asyncio.gather(*completed)
         
         await self.stop_updates()
+
+        for hook in hooks:
+            await hook.session.close()
+
         await asyncio.gather(*[
             asyncio.create_task(
                 cancel_pending(pend)
             ) for pend in pending
-        ])
-
-        await asyncio.gather(*[
-            hook.session.close() for hook in hooks
         ])
         
         self.total_actions = len(set(results))
@@ -127,7 +125,6 @@ class DefaultPersona:
                     )
                 except asyncio.TimeoutError:
                     pass
-
 
     async def start_updates(self):
         if self._live_updates:

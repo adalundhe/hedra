@@ -22,7 +22,7 @@ class PersonaTypesMap:
             'constant-arrival': PersonaTypes.CONSTANT_ARRIVAL,
             'sequence': PersonaTypes.SEQUENCE,
             'weighted': PersonaTypes.WEIGHTED,
-            'no-wait': PersonaTypes.WEIGHTED
+            'no-wait': PersonaTypes.NO_WAIT
         }
 
     def __getitem__(self, persona_type: str):

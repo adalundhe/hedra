@@ -22,7 +22,7 @@ class GraphQLHTTP2Client(BaseClient):
             timeouts=Timeouts(
                 total_timeout=config.request_timeout
             ),
-            reset_connections=config.options.get('reset_connections')
+            reset_connections=config.reset_connections
         )
         self.request_type = RequestTypes.GRAPHQL_HTTP2
         self.actions: ActionsStore = None

@@ -27,6 +27,7 @@ class MercuryGRPCClient(MercuryHTTP2Client):
         
         response = GRPCResult(action)
         response.wait_start = time.monotonic()
+        self.active += 1
 
         async with self.sem:
             stream = self.pool.streams.pop()
@@ -74,8 +75,6 @@ class MercuryGRPCClient(MercuryHTTP2Client):
             except Exception as e:
                 response.response_code = 500
                 response.error = e
-
-                await stream.close()
 
                 self.pool.reset()
 

@@ -75,8 +75,6 @@ class MercuryHTTP2Client:
                                 pass
 
                         if request.url.socket_config:
-                            await stream.close()
-
                             break
 
                 self._hosts[request.url.hostname] = request.url.ip_addr
@@ -93,7 +91,7 @@ class MercuryHTTP2Client:
             self.registered[request.name] = request
 
         except Exception as e:
-            return e
+            raise e
 
     def extend_pool(self, increased_capacity: int):
         self.pool.size += increased_capacity
@@ -110,9 +108,9 @@ class MercuryHTTP2Client:
         self.sem = asyncio.Semaphore(self.pool.size)
 
     async def execute_prepared_request(self, action: HTTP2Action) -> HTTP2ResponseFuture:
-        
         response = HTTP2Result(action)
         response.wait_start = time.monotonic()
+        self.active += 1
 
         async with self.sem:
 
@@ -127,13 +125,13 @@ class MercuryHTTP2Client:
 
                 response.start = time.monotonic()
 
-                reader_writer = await asyncio.wait_for(stream.connect(
+                reader_writer = await stream.connect(
                     action.url.hostname,
                     action.url.ip_addr,
                     action.url.port,
                     action.url.socket_config,
                     ssl=action.ssl_context
-                ), self.timeouts.connect_timeout)
+                )
 
                 reader_writer.encoder = action.hpack_encoder
 
@@ -160,9 +158,9 @@ class MercuryHTTP2Client:
                 self.pool.connections.append(connection)
                 
             except Exception as e:
-                response.response_code = 500
+                response.read_end = time.monotonic()
+                response.response_code = 400
                 response.error = str(e)
-                await stream.close()
 
                 self.pool.reset()
 

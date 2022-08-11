@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_states import StageStates
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
@@ -187,6 +188,7 @@ async def execute_to_checkpoint_transition(current_stage: Stage, next_stage: Sta
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
+        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     return None, StageTypes.CHECKPOINT

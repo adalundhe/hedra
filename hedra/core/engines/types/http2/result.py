@@ -43,7 +43,7 @@ class HTTP2Result(BaseResult):
         self._version = None
         self._reason = None
         self._status = None
-
+        
     def to_dict(self):
 
         encoded_headers = {
@@ -113,7 +113,7 @@ class HTTP2Result(BaseResult):
     def status(self) -> Union[int, None]:
         if len(self.headers) == 0 and self.deferred_headers:
             self.headers = self._parse_headers()
-            self._status = int(self.headers.get(b'status'))
+            self._status = int(self.headers.get(b'status', 400))
         
         return self._status
 

@@ -90,7 +90,6 @@ class Frame:
         """
         frame, length = Frame.parse_frame_header(data[:9])
         frame.parse_body(data[9:9 + length])
-        print(frame)
         return frame, length
 
     def parse_flags(self, flag_byte: int) -> Flags:
