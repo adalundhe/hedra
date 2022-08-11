@@ -1,17 +1,18 @@
 import asyncio
 import psutil
 from typing import Dict
+from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.engines.client.client import Client
 from hedra.core.engines.client.config import Config
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
-from hedra.core.personas import get_persona
+from hedra.core.personas.types import PersonaTypesMap
 from .execute import Execute
 from .stage import Stage
 from .exceptions import (
-    HookSetupException
+    HookSetupError
 )
 
 
@@ -52,13 +53,14 @@ class Setup(Stage):
         self.stages: Dict[str, Execute] = {}
         self.actions = []
         self.accepted_hook_types = [ HookType.SETUP ]
+        self.persona_types = PersonaTypesMap()
 
     @Internal
     async def run(self):
 
         config = Config(
             log_level=self.log_level,
-            persona_type=self.persona_type,
+            persona_type=self.persona_types[self.persona_type],
             total_time=self.total_time,
             batch_size=self.batch_size,
             batch_interval=self.batch_interval,
@@ -75,7 +77,6 @@ class Setup(Stage):
 
         
         for execute_stage_name, execute_stage in self.stages.items():
-            persona = get_persona(config)
    
             client = Client()
             execute_stage.client = client
@@ -93,18 +94,17 @@ class Setup(Stage):
 
                 task = asyncio.create_task(setup_call.setup())
 
-                await execute_stage.client.actions.wait_for_ready(setup_call)
+                await execute_stage.client.actions.wait_for_ready(setup_call)            
 
                 try:
-                    
                     if setup_call.exception:
-                        raise HookSetupException(hook, HookType.ACTION, str(setup_call.exception))
+                        raise HookSetupError(hook, HookType.ACTION, str(setup_call.exception))
 
                     task.cancel()
                     if task.cancelled() is False:
-                        await asyncio.wait_for(task, timeout=0)
+                        await asyncio.wait_for(task, timeout=0.1)
 
-                except HookSetupException as hook_setup_exception:
+                except HookSetupError as hook_setup_exception:
                     raise hook_setup_exception
 
                 except asyncio.InvalidStateError:
@@ -126,14 +126,11 @@ class Setup(Stage):
                 action.hooks.checks = self.get_checks(execute_stage, hook.shortname)
 
                 hook.session = session
-                hook.action = action          
+                hook.action = action       
 
             execute_stage.client.intercept = False
             for setup_hook in execute_stage.hooks.get(HookType.SETUP):
                 await setup_hook.call()
-
-            persona.setup(execute_stage.hooks)
-            execute_stage.persona = persona    
 
             self.stages[execute_stage_name] = execute_stage
 

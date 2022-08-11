@@ -1,6 +1,6 @@
 import json
-from types import FunctionType
-from typing import Coroutine, Dict, Iterator, Union, List
+import dill
+from typing import Dict, Iterator, Union, List
 from urllib.parse import urlencode
 from hedra.core.engines.types.common.base_action import BaseAction
 from hedra.core.engines.types.common.constants import NEW_LINE
@@ -60,7 +60,7 @@ class HTTPAction(BaseAction):
 
     @property
     def headers(self):
-        return self.headers
+        return self._headers
 
     @headers.setter
     def headers(self, value):
@@ -132,4 +132,32 @@ class HTTPAction(BaseAction):
             writer.write(chunk)
 
         writer.write(("0" + NEW_LINE * 2).encode())
+
+    def to_serializable(self):
+        return {
+            'name': self.name,
+            'type': self.type,
+            'method': self.method,
+            'url': {
+                'ip_addr': self.url.ip_addr,
+                'port': self.url.port,
+                'url': self.url.full,
+                'socket_config': self.url.socket_config,
+                'is_ssl': self.url.is_ssl
+            },
+            'headers': {
+                'headers': self._headers,
+                'encoded_headers': self.encoded_headers
+            },
+            'data': {
+                'data': self._data,
+                'encoded_data': self.encoded_data
+            },
+
+            'metadata': {
+                'user': self.metadata.user,
+                'tags': self.metadata.tags
+            },
+            'hooks': self.hooks
+        }
         

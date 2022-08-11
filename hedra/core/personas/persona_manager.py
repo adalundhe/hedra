@@ -7,18 +7,19 @@ from .types.ramped_interval_persona import RampedIntervalPersona
 from .types.weighted_selection_persona import WeightedSelectionPersona
 from .types.constant_arrival_rate import ConstantArrivalPersona
 from .types.cyclic_nowait_persona import CyclicNoWaitPersona
+from .types import PersonaTypes
 from hedra.core.engines.client.config import Config
 
 
 registered_personas = {
-    'default': lambda config: DefaultPersona(config),
-    'batched': lambda config: BatchedPersona(config),
-    'ramped': lambda config: RampedPersona(config),
-    'ramped-interval': lambda config: RampedIntervalPersona(config),
-    'constant-arrival': lambda config: ConstantArrivalPersona(config),
-    'sequence': lambda config: SequencedPersonaCollection(config),
-    'weighted': lambda config: WeightedSelectionPersona(config),
-    'no-wait': lambda config: CyclicNoWaitPersona(config)
+    PersonaTypes.DEFAULT: lambda config: DefaultPersona(config),
+    PersonaTypes.BATCHED: lambda config: BatchedPersona(config),
+    PersonaTypes.RAMPED: lambda config: RampedPersona(config),
+    PersonaTypes.RAMPED_INTERVAL: lambda config: RampedIntervalPersona(config),
+    PersonaTypes.CONSTANT_ARRIVAL: lambda config: ConstantArrivalPersona(config),
+    PersonaTypes.SEQUENCE: lambda config: SequencedPersonaCollection(config),
+    PersonaTypes.WEIGHTED: lambda config: WeightedSelectionPersona(config),
+    PersonaTypes.NO_WAIT: lambda config: CyclicNoWaitPersona(config)
 }
 
 def get_persona(config: Config):

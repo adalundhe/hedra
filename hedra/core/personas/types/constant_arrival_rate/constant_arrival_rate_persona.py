@@ -4,6 +4,7 @@ import asyncio
 from asyncio import Task
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.types.default_persona.default_persona import DefaultPersona
+from hedra.core.personas.types.types import PersonaTypes
 from .completed_counter import CompletedCounter
 
 
@@ -20,6 +21,7 @@ class ConstantArrivalPersona(DefaultPersona):
     def __init__(self, config: Config):
         super(ConstantArrivalPersona, self).__init__(config)
         self.completed_counter = CompletedCounter()
+        self.type = PersonaTypes.CONSTANT_ARRIVAL
             
     async def execute(self):
         total_time = self.total_time

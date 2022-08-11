@@ -1,4 +1,5 @@
 import time
+import asyncio
 from hedra.core.engines.types.http import MercuryHTTPClient
 from hedra.core.engines.types.http.connection import HTTPConnection
 from hedra.core.engines.types.common import Timeouts
@@ -111,11 +112,22 @@ class MercuryGraphQLClient(MercuryHTTPClient):
                 if action.hooks.after:
                     action = await action.hooks.after(action, response)
                     action.setup()
-                
-                return response
 
             except Exception as e:
                 response.read_end = time.monotonic()
                 response.error = str(e)
+                await connection.close()
+                
                 self.pool.connections.append(HTTPConnection(reset_connection=self.pool.reset_connections))
-                return response
+
+            self.active -= 1
+            if self.waiter and self.active <= self.pool.size:
+
+                try:
+                    self.waiter.set_result(None)
+                    self.waiter = None
+
+                except asyncio.InvalidStateError:
+                    self.waiter = None
+
+            return response

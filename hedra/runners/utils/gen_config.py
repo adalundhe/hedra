@@ -1,5 +1,5 @@
 from hedra.command_line import CommandLine
-from hedra.core.personas.utils import calculate_total_actions
+from hedra.core.personas.parallel import calculate_total_actions
 
 
 def generate_configs(pool_size, cli):

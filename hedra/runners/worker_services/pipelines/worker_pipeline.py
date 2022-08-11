@@ -7,7 +7,7 @@ from hedra.reporting import Handler
 from hedra.runners.leader_services.proto import PipelineStageRequest
 from hedra.runners.utils.connect_timeout import connect_or_return_none
 from easy_logger import Logger
-from hedra.core.personas.utils import parse_time
+from hedra.core.personas.parallel import parse_time
 from .worker_pipeline_config import WorkerPipelineConfig
 
 

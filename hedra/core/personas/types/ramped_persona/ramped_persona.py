@@ -5,14 +5,14 @@ from async_tools.functions import awaitable
 from async_tools.datatypes.async_list import AsyncList
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.engines.client.config import Config
+from hedra.core.personas.types.types import PersonaTypes
 
 
 class RampedPersona(DefaultPersona):
 
     def __init__(self, config: Config):
         super(RampedPersona, self).__init__(config)
-        self._initial_actions = AsyncList()
-        self._current_batch = 1
+        self.type = PersonaTypes.RAMPED
         
     async def generator(self, total_time):
         elapsed = 0

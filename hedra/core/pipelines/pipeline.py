@@ -1,10 +1,12 @@
 
 import asyncio
+from turtle import pen
 import networkx
 from typing import Dict, List
 from hedra.core.pipelines.transitions.exceptions.exceptions import IsolatedStageError
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
+from hedra.core.pipelines.transitions.transition import Transition
 from .transitions import TransitionAssembler, local_transitions
 from .status import PipelineStatus
 
@@ -13,13 +15,13 @@ from .status import PipelineStatus
 class Pipeline:
     status = PipelineStatus.IDLE
 
-    def __init__(self, stages: List[Stage]) -> None:
+    def __init__(self, stages: List[Stage], cpus: int=None, worker_id: int=None) -> None:
         
         self.status = PipelineStatus.INITIALIZING
-        
         self.graph = networkx.DiGraph()
         self.transitions_graph = []
-        self._transitions = []
+        self._transitions: List[List[Transition]] = []
+        self._results = None
 
         self.stage_types = {
             subclass.stage_type: subclass for subclass in Stage.__subclasses__()
@@ -48,7 +50,11 @@ class Pipeline:
             generation for generation in networkx.topological_generations(self.graph)
         ]
 
-        self.runner = TransitionAssembler(local_transitions)
+        self.runner = TransitionAssembler(
+            local_transitions,
+            cpus=cpus,
+            worker_id=worker_id
+        )
 
     def validate(self):
 
@@ -104,31 +110,17 @@ class Pipeline:
 
         for transition_group in self._transitions:
             
-            transition_results = []
+            for transtition in transition_group:
+                print(f'Executing {transtition.from_stage}')
+                
+            results = await asyncio.gather(*[
+                asyncio.create_task(transition.transition(
+                    transition.from_stage, 
+                    transition.to_stage
+                )) for transition in transition_group
+            ])
 
-            if len(transition_group) == 1:
-                print(f'Executing - {transition_group[0].from_stage}')
-                result = await transition_group[0].transition(
-                    transition_group[0].from_stage,
-                    transition_group[0].to_stage
-                )
-
-                transition_results.append(result)
-
-            else:
-                for transtition in transition_group:
-                    print(f'Executing {transtition.from_stage}')
-                    
-                results = await asyncio.gather(*[
-                    asyncio.create_task(transition.transition(
-                        transition.from_stage, 
-                        transition.to_stage
-                    )) for transition in transition_group
-                ])
-
-                transition_results.extend(results)
-
-            for error, next_stage in transition_results:
+            for error, next_stage in results:
                 
                 if next_stage == StageTypes.ERROR:
 
@@ -138,25 +130,38 @@ class Pipeline:
 
                     error_transtiton = self.runner.create_error_transition(error)
 
-                    result = await error_transtiton.transition(
+                    await error_transtiton.transition(
                         error_transtiton.from_stage,
                         error_transtiton.to_stage
-                    )
+                    ) 
                     
-                    return self.status
+            if self.status == PipelineStatus.FAILED:
+                break
+        
+        if self.status == PipelineStatus.RUNNING:
+            self.status = PipelineStatus.COMPLETE
 
-        self.status = PipelineStatus.COMPLETE
+            completion_stages = self.runner.instances_by_type.get(StageTypes.COMPLETE)
+            serialized_results = {}
 
-        pending = asyncio.all_tasks()
+            for completion_stage in completion_stages:
+                results = completion_stage.context.summaries
 
-        for pend in pending:
-            try:
-                pend.cancel()
-                await pend
-            except asyncio.CancelledError:
-                pass
+                stages = results.get('stages')
+                
+                for stage_name, stage in stages.items():
+                    serialized_results[stage_name] = {}
 
-        return self.status
+                    actions = stage.get('actions')
+                    for action_name, action in actions.items():
+                        serialized_results[stage_name][action_name] = action.serialize()
+
+            self._results = serialized_results
+
+        return self._results
+
+    async def cleanup(self):
+        pass
 
     def _append_stage(self, stage_type: StageTypes):
 

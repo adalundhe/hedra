@@ -26,6 +26,9 @@ class MercuryPlaywrightClient:
 
 
         self.sem = asyncio.Semaphore(concurrency)
+        self.active = 0
+        self.waiter = None
+
         self._discarded_context_groups: List[ContextGroup] = []
         self._discarded_contexts = []
         self._pending_context_groups: List[ContextGroup] = []
@@ -99,13 +102,21 @@ class MercuryPlaywrightClient:
 
                 self.pool.contexts.append(context)
 
-                return result
-
             except Exception as e:
                 result.error = e
                 self.pool.contexts.append(context)
 
-                return result
+            self.active -= 1
+            if self.waiter and self.active <= self.pool.size:
+
+                try:
+                    self.waiter.set_result(None)
+                    self.waiter = None
+
+                except asyncio.InvalidStateError:
+                    self.waiter = None 
+
+            return result
 
     async def close(self):
         if self.closed is False:

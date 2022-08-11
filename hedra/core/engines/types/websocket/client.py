@@ -29,6 +29,8 @@ class MercuryWebsocketClient:
         self.sem = asyncio.Semaphore(concurrency)
         self.pool = Pool(concurrency, reset_connections=reset_connections)
         self.pool.create_pool()
+        self.active = 0
+        self.waiter = None
 
         self.ssl_context = get_default_ssl_context()
 
@@ -105,6 +107,7 @@ class MercuryWebsocketClient:
     async def execute_prepared_request(self, action: WebsocketAction) -> WebsocketResponseFuture:
 
         response = WebsocketResult(action)
+        response.wait_start = time.monotonic()
 
         async with self.sem:
 
@@ -116,13 +119,16 @@ class MercuryWebsocketClient:
                     action = await action.hooks.before(action, response)
                     action.setup()
 
-                start = time.time()
+                response.start = time.monotonic()
+
                 await connection.make_connection(
                     action.name,
                     action.url.ip_addr,
                     action.url.port,
                     ssl=action.ssl_context
                 )
+
+                response.connect_end = time.monotonic()
 
                 connection.write(action.encoded_headers)
                 
@@ -132,6 +138,8 @@ class MercuryWebsocketClient:
 
                     else:
                         connection.write(action.encoded_data)
+
+                response.write_end = time.monotonic()
 
                 line = await asyncio.wait_for(connection.readuntil(), self.timeouts.socket_read_timeout)
 
@@ -148,9 +156,7 @@ class MercuryWebsocketClient:
                 if action.method == 'GET':
                     response.body = await asyncio.wait_for(connection.readexactly(min(16384, header_content_length)), self.timeouts.total_timeout)
                 
-                elapsed = time.time() - start
-
-                response.time = elapsed
+                response.read_end = time.monotonic()
 
                 if action.hooks.after:
                     action = await action.hooks.after(action, response)
@@ -158,15 +164,27 @@ class MercuryWebsocketClient:
 
                 self.pool.connections.append(connection)
 
-                return response
-
             except Exception as e:
-                response.error = e
+                response.read_end = time.monotonic()
+                response.error = str(e)
+
+                await connection.close()
+
                 self.pool.connections.append(
                     WebsocketConnection(reset_connection=self.pool.reset_connections) 
-                ) 
+                )
 
-                return response
+            self.active -= 1
+            if self.waiter and self.active <= self.pool.size:
+
+                try:
+                    self.waiter.set_result(None)
+                    self.waiter = None
+
+                except asyncio.InvalidStateError:
+                    self.waiter = None 
+
+            return response
 
     async def close(self):
         if self.closed is False:

@@ -68,7 +68,7 @@ class Submit(Stage):
             metrics.extend(list(
                 stage.get('actions', {}).values()
             ))
-
+    
         await self.reporter.submit_common(metrics)
         await self.reporter.submit_metrics(metrics)
         await self.reporter.submit_errors(metrics)

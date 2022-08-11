@@ -1,18 +1,22 @@
 import asyncio
+import os
 import click
 import inspect
+import uvloop
+uvloop.install()
 import sys
 import importlib
 import ntpath
 from pathlib import Path
 from hedra.core.pipelines.stages.stage import Stage
-from hedra.core.pipelines.status import PipelineStatus
 from hedra.core.pipelines import Pipeline
 
 
 @click.command("Run a specified test file.")
 @click.argument('path')
-def run(path: str):
+@click.option('--cpus', default=1, help='Number of CPUs to use. Default is the number of physical processesors available to the system.')
+def run(path: str, cpus: int):
+    
     package_dir = Path(path).resolve().parent
     package_dir_path = str(package_dir)
     package_dir_module = package_dir_path.split('/')[-1]
@@ -40,20 +44,12 @@ def run(path: str):
     asyncio.set_event_loop(loop)
 
     pipeline = Pipeline(
-        list(discovered.values())
+        list(discovered.values()),
+        cpus=cpus
     )
 
     pipeline.validate()
     
-    pipeine_status = loop.run_until_complete(pipeline.run())
+    loop.run_until_complete(pipeline.run())
 
-    if pipeine_status == PipelineStatus.COMPLETE:
-        print('Complete!')
-    
-    else:
-        print('Failed!')
-
-    return pipeine_status
-
-
-    
+    os._exit(0)

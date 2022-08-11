@@ -22,6 +22,8 @@ class Stage:
         self.next_stage: str = None
         self.hooks: Dict[HookType, List[Hook]] = {}
         self.accepted_hook_types = []
+        self.workers: int = None
+        self.worker_id: int = 1
 
         if self.stage_timeout:
             time_parser = TimeParser(self.stage_timeout)

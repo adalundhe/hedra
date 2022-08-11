@@ -16,7 +16,11 @@ class MetricsSet:
         self.groups: Dict[str, MetricsGroup] = {}
 
         self.name = name
+        self.source = source
         self.stage = stage
+        self._raw_metrics = metrics_data
+        self._raw_tags = tags
+
         self.fields = [
             'name',
             'stage'
@@ -81,3 +85,11 @@ class MetricsSet:
 
         
 
+    def serialize(self):
+        return {
+            'name': self.name,
+            'source': self.source,
+            'stage': self.stage,
+            'metrics_data': self._raw_metrics,
+            'tags': self._raw_tags
+        }

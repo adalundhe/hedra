@@ -12,7 +12,6 @@ from .fast_streams import (
 from asyncio.sslproto import SSLProtocol
 from .types import RequestTypes
 
-_SSL_CONNECT_TIMEOUT = 30
 _DEFAULT_LIMIT= 65536
 _HTTP2_LIMIT = _DEFAULT_LIMIT * 1024
 
@@ -57,16 +56,19 @@ class ConnectionFactory:
         self.transport = None
         self.factory_type = factory_type
         self._connection = None
+        self.socket: socket.socket = None
+        self._writer = None
 
     async def create(self, hostname=None, socket_config=None, *, limit=_DEFAULT_LIMIT, ssl=None):
 
         family, type_, proto, _, address = socket_config
 
-        sock = socket.socket(family=family, type=type_, proto=proto)
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        await self.loop.run_in_executor(None, sock.connect, address)
+        self.socket = socket.socket(family=family, type=type_, proto=proto)
+        self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        
+        await self.loop.run_in_executor(None, self.socket.connect, address)
 
-        sock.setblocking(False)
+        self.socket.setblocking(False)
 
         reader = FastReader(limit=limit, loop=self.loop)
         reader_protocol = FastReaderProtocol(reader, loop=self.loop)
@@ -76,14 +78,14 @@ class ConnectionFactory:
 
         self.transport, _ = await self.loop.create_connection(
             lambda: reader_protocol, 
-            sock=sock,
+            sock=self.socket,
             server_hostname=hostname,
             ssl=ssl
         )
 
-        writer = FastWriter(self.transport, reader_protocol, reader, self.loop)
+        self._writer = FastWriter(self.transport, reader_protocol, reader, self.loop)
 
-        self._connection = Connection(reader, writer)
+        self._connection = Connection(reader, self._writer)
         
         return self._connection
 
@@ -94,10 +96,10 @@ class ConnectionFactory:
             self.loop = asyncio.get_event_loop()
 
         family, type_, proto, _, address = socket_config
-        sock = socket.socket(family=family, type=type_, proto=proto)
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        await self.loop.run_in_executor(None, sock.connect, address)
-        sock.setblocking(False)
+        self.socket = socket.socket(family=family, type=type_, proto=proto)
+        self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        await self.loop.run_in_executor(None, self.socket.connect, address)
+        self.socket.setblocking(False)
 
         reader = FastReader(limit=_HTTP2_LIMIT, loop=self.loop)
 
@@ -106,7 +108,7 @@ class ConnectionFactory:
 
             self.transport, _ = await self.loop.create_connection(
                 lambda: protocol, 
-                sock=sock,
+                sock=self.socket,
                 family=socket.AF_INET
             )
             
@@ -134,9 +136,9 @@ class ConnectionFactory:
             reader = FastReader(limit=_HTTP2_LIMIT, loop=self.loop)
             protocol.upgrade_reader(reader) # update reader
             protocol.connection_made(self.transport) # update transport
-            writer = FastWriter(self.transport, ssl_protocol, reader, self.loop) # update writer
+            self._writer = FastWriter(self.transport, ssl_protocol, reader, self.loop) # update writer
 
-            return reader, writer
+            return reader, self._writer
 
         else:
             reader_protocol = FastReaderProtocol(reader, loop=self.loop)
@@ -146,22 +148,20 @@ class ConnectionFactory:
 
             self.transport, _ = await self.loop.create_connection(
                 lambda: reader_protocol, 
-                sock=sock,
+                sock=self.socket,
                 server_hostname=hostname,
                 ssl=ssl
             )
             
-            writer = FastWriter(self.transport, reader_protocol, reader, self.loop)
+            self._writer = FastWriter(self.transport, reader_protocol, reader, self.loop)
 
-            return reader, writer
+            return reader, self._writer
 
     async def close(self):
-        self.transport.close()
 
         try:
             self.transport.close()
-            
-            while not self.transport.is_closing():
+            while not self.transport._closed:
                 await asyncio.sleep(0)
 
         except Exception:

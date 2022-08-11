@@ -36,11 +36,21 @@ class MissingReservedMethodError(Exception):
         )
 
 
-class HookSetupException(Exception):
+class HookSetupError(Exception):
 
     def __init__(self, hook: Hook, hook_type: HookType, message: str) -> None:
 
         hook_type = hook_type.name.lower()
         super().__init__(
             f'Hook Error - @{hook_type} hook {hook.shortname} from stage {hook.stage}\nEncountered exception - {message} - while attempting to setup hook.'
+        )
+
+
+class HookSetupTimeoutError(Exception):
+
+    def __init__(self, hook: Hook, hook_type: HookType, timeout: float) -> None:
+
+        hook_type = hook_type.name.lower()
+        super().__init__(
+            f'Hook Error - @{hook_type} hook {hook.shortname} from stage {hook.stage}\nHook failed to complete setup in specified connection timeout of - {timeout} - seconds.'
         )

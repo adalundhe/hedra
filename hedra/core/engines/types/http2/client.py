@@ -19,17 +19,25 @@ class MercuryHTTP2Client:
 
     def __init__(self, concurrency: int = 10**3, timeouts: Timeouts = Timeouts(), reset_connections: bool=False) -> None:
 
+        self.loop = asyncio.get_event_loop()
         self.timeouts = timeouts
 
         self._hosts = {}
         self.registered: Dict[str, HTTP2Action] = {}
         self.closed = False
-
-        self.ssl_context = get_http2_ssl_context()
         
         self.sem = asyncio.Semaphore(concurrency)
         self.pool: HTTP2Pool = HTTP2Pool(concurrency, self.timeouts, reset_connections=reset_connections)
         self.pool.create_pool()
+        self.active = 0
+        self.waiter = None
+
+        self.ssl_context = get_http2_ssl_context()
+
+    async def wait_for_active_threshold(self):
+        if self.waiter is None:
+            self.waiter = self.loop.create_future()
+            await self.waiter
 
     async def prepare(self, request: HTTP2Action) -> Awaitable[None]:
         try:
@@ -40,20 +48,24 @@ class MercuryHTTP2Client:
 
                 for ip_addr, configs in socket_configs.items():
                         for config in configs:
+
+                            stream = AsyncStream(
+                                0, 
+                                self.timeouts, 
+                                1,
+                                self.pool.reset_connections,
+                                self.pool.pool_type
+                            )
+
                             try:
-                                stream = AsyncStream(
-                                    0, 
-                                    self.timeouts, 
-                                    1,
-                                    self.pool.reset_connections,
-                                    self.pool.pool_type
-                                )
+                                
                                 await stream.connect(
                                     request.url.hostname,
                                     ip_addr,
                                     request.url.port,
                                     config,
-                                    ssl=self.ssl_context
+                                    ssl=self.ssl_context,
+                                    timeout=self.timeouts.connect_timeout
                                 )
 
                                 request.url.socket_config = config
@@ -63,6 +75,8 @@ class MercuryHTTP2Client:
                                 pass
 
                         if request.url.socket_config:
+                            await stream.close()
+
                             break
 
                 self._hosts[request.url.hostname] = request.url.ip_addr
@@ -101,12 +115,12 @@ class MercuryHTTP2Client:
         response.wait_start = time.monotonic()
 
         async with self.sem:
+
+            stream = self.pool.streams.pop()
+            connection = self.pool.connections.pop()
         
             try:
 
-                stream = self.pool.streams.pop()
-                connection = self.pool.connections.pop()
-                
                 if action.hooks.before:
                     action = await action.hooks.before(action, response)
                     action.setup()
@@ -145,15 +159,24 @@ class MercuryHTTP2Client:
                 self.pool.streams.append(stream)
                 self.pool.connections.append(connection)
                 
-                return response
-                
             except Exception as e:
                 response.response_code = 500
                 response.error = str(e)
+                await stream.close()
 
                 self.pool.reset()
 
-                return response
+            self.active -= 1
+            if self.waiter and self.active <= self.pool.size:
+
+                try:
+                    self.waiter.set_result(None)
+                    self.waiter = None
+
+                except asyncio.InvalidStateError:
+                    self.waiter = None
+
+            return response
 
     async def close(self):
         if self.closed is False:

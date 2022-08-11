@@ -11,15 +11,23 @@ from hedra.core.pipelines.transitions.exceptions import (
 async def execute_transition(current_stage: Stage, next_stage: Stage):
     
     if current_stage.timeout:
-        results = await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
+        execution_results = await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
 
     else:
-        results = await current_stage.run()
+        execution_results = await current_stage.run()
 
-    current_stage.context.results[current_stage.name] = {
-        'results': results,
-        'total_elapsed': current_stage.persona.total_elapsed
-    }
+    if current_stage.context.results.get(current_stage.name) is None:
+        current_stage.context.results[current_stage.name] = {
+            'results': execution_results.get('results'),
+            'total_elapsed': execution_results.get('total_elapsed')
+        }
+    
+    else:
+        current_stage.context.results[current_stage.name].update({
+            'results': execution_results.get('results'),
+            'total_elapsed': execution_results.get('total_elapsed')
+        })
+
     current_stage.context.results_stages.append(current_stage)
     current_stage.context.visited.append(current_stage.name)
     

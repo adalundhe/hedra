@@ -2,7 +2,7 @@ import asyncio
 import time
 from hedra.core.engines.types.http2.client import MercuryHTTP2Client
 from hedra.core.engines.types.common.timeouts import Timeouts
-from typing import Awaitable, Union, Tuple, Set
+from typing import Awaitable, Union
 from .action import GraphQLHTTP2Action
 from .result import GraphQLHTTP2Result
 
@@ -33,15 +33,16 @@ class MercuryGraphQLHTTP2Client(MercuryHTTP2Client):
         response.wait_start = time.monotonic()
 
         async with self.sem:
+            stream = self.pool.streams.pop()
+            connection = self.pool.connections.pop()
         
             try:
-
-                stream = self.pool.streams.pop()
-                connection = self.pool.connections.pop()
                 
                 if action.hooks.before:
                     action = await action.hooks.before(action, response)
                     action.setup()
+
+                response.start = time.monotonic()
 
                 reader_writer = await asyncio.wait_for(stream.connect(
                     action.url.hostname,
@@ -56,12 +57,7 @@ class MercuryGraphQLHTTP2Client(MercuryHTTP2Client):
 
                 response.connect_end = time.monotonic()
 
-                await connection.loop.run_in_executor(
-                    connection.executor,
-                    connection.send_request_headers,
-                    action, 
-                    reader_writer
-                )
+                connection.send_request_headers(action, reader_writer)
 
                 if action.encoded_data is not None:
                     await connection.submit_request_body(action, reader_writer)
@@ -79,12 +75,21 @@ class MercuryGraphQLHTTP2Client(MercuryHTTP2Client):
                 self.pool.streams.append(stream)
                 self.pool.connections.append(connection)
                 
-                return response
-                
             except Exception as e:
                 response.response_code = 500
                 response.error = str(e)
 
+                await stream.close()
                 self.pool.reset()
 
-                return response
+            self.active -= 1
+            if self.waiter and self.active <= self.pool.size:
+
+                try:
+                    self.waiter.set_result(None)
+                    self.waiter = None
+
+                except asyncio.InvalidStateError:
+                    self.waiter = None
+
+            return response

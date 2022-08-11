@@ -40,6 +40,7 @@ class HTTPClient(BaseClient):
     ):
 
         if self.session.registered.get(self.next_name) is None:
+
             request = HTTPAction(
                 self.next_name,
                 url,
@@ -50,10 +51,7 @@ class HTTPClient(BaseClient):
                 tags=tags             
             )
 
-            result = await self.session.prepare(request)
-            if isinstance(result, Exception):
-                print(result)
-                raise result
+            await self.session.prepare(request)
 
             if self.intercept:
                 self.actions.store(self.next_name, request, self.session)

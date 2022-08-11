@@ -35,14 +35,19 @@ class AsyncStream:
         dns_address: str,
         port: int, 
         socket_config: Tuple[int, int, int, int, Tuple[int, int]], 
-        ssl: Optional[SSLContext]=None
+        ssl: Optional[SSLContext]=None,
+        timeout: Optional[float] = None
     ) -> Union[ReaderWriter, Exception]:
         if self.connected is False or self.dns_address != dns_address or self.reset_connection:
-            stream = await self._connection_factory.create_http2(
-                hostname,
-                socket_config=socket_config,
-                ssl=ssl
+            stream = await asyncio.wait_for(
+                self._connection_factory.create_http2(
+                    hostname,
+                    socket_config=socket_config,
+                    ssl=ssl
+                ),
+                timeout=timeout
             )
+
             self.connected = True
             self.stream_id = self.init_id
             self.dns_address = dns_address

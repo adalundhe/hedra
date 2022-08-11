@@ -19,13 +19,14 @@ class Checkpoint(Stage):
         self.data = {}
         self.previous_stage = ''
         self.accepted_hook_types = [ HookType.SAVE ]
-        self._loop = asyncio.get_event_loop()
+        self._loop = None
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._save_file: TextIO = None
 
     @Internal
     async def run(self):
         
+        self._loop = asyncio.get_event_loop()
         for save_hook in self.hooks.get(HookType.SAVE):
             checkpoint_data = await save_hook.call(self.data)
 

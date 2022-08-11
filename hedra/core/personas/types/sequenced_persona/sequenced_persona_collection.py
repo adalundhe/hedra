@@ -3,12 +3,14 @@ from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.engines.client.config import Config
+from hedra.core.personas.types.types import PersonaTypes
 
 
 class SequencedPersonaCollection(DefaultPersona):
 
     def __init__(self, config: Config):
         super(SequencedPersonaCollection, self).__init__(config)
+        self.type = PersonaTypes.SEQUENCE
 
     async def setup(self, hooks: Dict[HookType, List[Hook]]):
         

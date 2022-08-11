@@ -6,6 +6,7 @@ from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.engines.client.config import Config
+from hedra.core.personas.types.types import PersonaTypes
 
 
 class WeightedSelectionPersona(DefaultPersona):
@@ -16,6 +17,7 @@ class WeightedSelectionPersona(DefaultPersona):
         self.weights: List[int] = []
         self.indexes: List[int] = []
         self.sample: List[int] = []
+        self.type = PersonaTypes.WEIGHTED
         
     @classmethod
     def about(cls):

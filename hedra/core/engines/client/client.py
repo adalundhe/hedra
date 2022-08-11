@@ -1,5 +1,6 @@
+from asyncio import Future
 from inspect import isclass
-from typing import Any
+from typing import Any, Iterable
 
 from hedra.core.engines.types.common.types import RequestTypes
 from .store import ActionsStore
@@ -38,6 +39,11 @@ class Client:
 
     def __setitem__(self, key, value):
         self.clients[key] = value
+
+    def get_waiters(self) -> Iterable[Future]:
+        for session in self.clients.values():
+            if session.waiter:
+                yield session.waiter
 
     @property
     def http(self):

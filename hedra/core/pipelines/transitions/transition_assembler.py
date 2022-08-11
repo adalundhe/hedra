@@ -1,7 +1,7 @@
 import asyncio
 import networkx
 import inspect
-from typing import Dict, List
+from typing import Coroutine, Dict, List, Tuple
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.error import Error
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
@@ -19,11 +19,13 @@ from .idle import (
 
 class TransitionAssembler:
 
-    def __init__(self, transition_types) -> None:
-        self.transition_types = transition_types
+    def __init__(self, transition_types, cpus: int=None, worker_id: int=None) -> None:
+        self.transition_types: Dict[Tuple[StageTypes, StageTypes], Coroutine] = transition_types
         self.generated_stages = {}
         self.transitions = {}
-        self.instances_by_type = {}
+        self.instances_by_type: Dict[str, List[Stage]] = {}
+        self.cpus = cpus
+        self.worker_id = worker_id
         self.loop = asyncio.get_event_loop()
 
     def generate_stages(self, stages: Dict[str, Stage]):
@@ -32,9 +34,14 @@ class TransitionAssembler:
         for stage in stages.values():
             self.instances_by_type[stage.stage_type] = []
 
-        self.generated_stages = {stage_name: stage() for stage_name, stage in stages.items()}
+        self.generated_stages: Dict[str, Stage] = {
+            stage_name: stage() for stage_name, stage in stages.items()
+        }
 
         for stage in self.generated_stages.values():
+
+            stage.workers = self.cpus
+            stage.worker_id = self.worker_id
 
             methods = inspect.getmembers(stage, predicate=inspect.ismethod) 
 
@@ -57,7 +64,7 @@ class TransitionAssembler:
         reversed_topological_generations = topological_generations[::-1]
         for generation in reversed_topological_generations[:-1]:
          
-            transition_group = {}
+            transition_group: Dict[str, List[Transition]] = {}
             for stage_name in generation:
 
                 stage_instance = self.generated_stages.get(stage_name)

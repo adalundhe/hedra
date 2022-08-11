@@ -1,7 +1,6 @@
 import json
 import h2.settings
-from types import FunctionType
-from typing import Coroutine, Dict, Iterator, Union, List
+from typing import Dict, Iterator, Union, List
 from urllib.parse import urlencode
 from hedra.core.engines.types.common.base_action import BaseAction
 from hedra.core.engines.types.common.constants import NEW_LINE
@@ -138,4 +137,32 @@ class HTTP2Action(BaseAction):
             )
         ]
 
+    def to_serializable(self):
+        return {
+            'name': self.name,
+            'type': self.type,
+            'method': self.method,
+            'url': {
+                'ip_addr': self.url.ip_addr,
+                'port': self.url.port,
+                'url': self.url.full,
+                'socket_config': self.url.socket_config,
+                'is_ssl': self.url.is_ssl
+            },
+            'headers': {
+                'headers': self._headers,
+                'encoded_headers': self.encoded_headers
+            },
+            'data': {
+                'data': self._data,
+                'encoded_data': self.encoded_data
+            },
+
+            'metadata': {
+                'user': self.metadata.user,
+                'tags': self.metadata.tags
+            },
+            'hooks': self.hooks
+        }
+        
         

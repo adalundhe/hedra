@@ -1,5 +1,6 @@
 import time
 import asyncio
+import psutil
 from typing import Dict, List
 from easy_logger import Logger
 from async_tools.functions.awaitable import awaitable
@@ -9,6 +10,8 @@ from hedra.core.personas.batching.batch import Batch
 from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.personas.batching import Batch
 from hedra.core.engines.client.config import Config
+from hedra.core.personas.types.types import PersonaTypes
+
 
 async def cancel_pending(pend: Task):
     try:
@@ -27,6 +30,9 @@ async def cancel_pending(pend: Task):
 class DefaultPersona:
 
     def __init__(self, config: Config):
+        
+        self.type = PersonaTypes.DEFAULT
+
         self.actions = []
         self._hooks: List[Hook] = []
         self.batch = Batch(config)
@@ -74,7 +80,6 @@ class DefaultPersona:
         ], timeout=1)
 
         self.end = time.monotonic()
-
         self.start = start
         self.pending_actions = len(pending)
 
@@ -87,8 +92,9 @@ class DefaultPersona:
             ) for pend in pending
         ])
 
-        for hook in hooks:
-            await hook.session.close()
+        await asyncio.gather(*[
+            hook.session.close() for hook in hooks
+        ])
         
         self.total_actions = len(set(results))
         self.total_elapsed = self.end - self.start
@@ -99,6 +105,7 @@ class DefaultPersona:
     async def generator(self, total_time):
         elapsed = 0
         idx = 0
+        max_pool_size = self.batch.size * psutil.cpu_count(logical=False)
         action_idx = 0
 
         start = time.monotonic()
@@ -110,6 +117,17 @@ class DefaultPersona:
 
             if idx%self.batch.size == 0:
                 action_idx = (action_idx + 1)%self.actions_count
+
+            if self._hooks[action_idx].session.active%max_pool_size == 0:
+                try:
+                    max_wait = total_time - elapsed
+                    await asyncio.wait_for(
+                        self._hooks[action_idx].session.wait_for_active_threshold(),
+                        timeout=max_wait
+                    )
+                except asyncio.TimeoutError:
+                    pass
+
 
     async def start_updates(self):
         if self._live_updates:

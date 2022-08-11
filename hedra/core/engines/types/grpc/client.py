@@ -38,6 +38,8 @@ class MercuryGRPCClient(MercuryHTTP2Client):
                     action = await action.hooks.before(action, response)
                     action.setup()
 
+                response.start = time.monotonic()
+
                 reader_writer = await asyncio.wait_for(stream.connect(
                     action.url.hostname,
                     action.url.ip_addr,
@@ -52,7 +54,9 @@ class MercuryGRPCClient(MercuryHTTP2Client):
                 response.connect_end = time.monotonic()
 
                 connection.send_request_headers(action, reader_writer)
-                await connection.submit_request_body(action, reader_writer)
+
+                if action.encoded_data is not None:
+                    await connection.submit_request_body(action, reader_writer)
 
                 response.write_end = time.monotonic()
 
@@ -66,13 +70,23 @@ class MercuryGRPCClient(MercuryHTTP2Client):
                 
                 self.pool.streams.append(stream)
                 self.pool.connections.append(connection)
-
-                return response
                 
             except Exception as e:
                 response.response_code = 500
                 response.error = e
 
+                await stream.close()
+
                 self.pool.reset()
 
-                return response
+            self.active -= 1
+            if self.waiter and self.active <= self.pool.size:
+
+                try:
+                    self.waiter.set_result(None)
+                    self.waiter = None
+
+                except asyncio.InvalidStateError:
+                    self.waiter = None
+
+            return response

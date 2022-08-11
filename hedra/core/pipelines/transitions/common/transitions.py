@@ -20,8 +20,6 @@ async def exit_transition(current_stage: Stage, next_stage: Stage):
     return None, None
 
 async def error_transition(current_stage: Stage, next_stage: Stage):
-
-    print(next_stage)
     await next_stage.run()
     next_stage.context = None
     current_stage.context = None

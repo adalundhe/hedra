@@ -29,12 +29,12 @@ class HTTPConnection:
         dns_address: str,
         port: int, 
         socket_config: Tuple[int, int, int, int, Tuple[int, int]],
-        timeout: int=None, 
-        ssl: Optional[SSLContext]=None
+        ssl: Optional[SSLContext]=None,
+        timeout: Optional[float]=None
     ) -> Connection:
         if self.connected is False or self.dns_address != dns_address or self.reset_connection:
             try:
-                self._connection = await asyncio.wait_for(self._connection_factory.create(hostname, socket_config, ssl=ssl), timeout)
+                self._connection = await asyncio.wait_for(self._connection_factory.create(hostname, socket_config, ssl=ssl), timeout=timeout)
                 self.connected = True
 
                 self.dns_address = dns_address
@@ -70,4 +70,7 @@ class HTTPConnection:
         return self._connection.read_headers()
 
     async def close(self):
-        await self._connection_factory.close()
+        try:
+            await self._connection_factory.close()
+        except Exception:
+            pass

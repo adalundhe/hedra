@@ -1,5 +1,6 @@
 import asyncio
 import time
+import psutil
 import traceback
 from typing import Awaitable, Dict, Set, Tuple, Union
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
@@ -18,7 +19,9 @@ class MercuryHTTPClient:
 
     def __init__(self, concurrency: int=10**3, timeouts: Timeouts = Timeouts(), reset_connections: bool=False) -> None:
 
+        self.loop = asyncio.get_event_loop()
         self.timeouts = timeouts
+
         self.registered: Dict[str, HTTPAction] = {}
         self._hosts = {}
         self.closed = False
@@ -26,8 +29,16 @@ class MercuryHTTPClient:
         self.sem = asyncio.Semaphore(concurrency)
         self.pool = Pool(concurrency, reset_connections=reset_connections)
         self.pool.create_pool()
+        self.active = 0
+        self.waiter = None
 
         self.ssl_context = get_default_ssl_context()
+
+    async def wait_for_active_threshold(self):
+        if self.waiter is None:
+            self.waiter = self.loop.create_future()
+            await self.waiter
+
 
     async def prepare(self, action: HTTPAction) -> Awaitable[Union[HTTPAction, Exception]]:
         try:
@@ -37,16 +48,20 @@ class MercuryHTTPClient:
             if self._hosts.get(action.url.hostname) is None:
 
                     socket_configs = await asyncio.wait_for(action.url.lookup(), timeout=self.timeouts.connect_timeout)
+              
                     for ip_addr, configs in socket_configs.items():
                         for config in configs:
+
+                            connection = HTTPConnection()
+                            
                             try:
-                                connection = HTTPConnection()
                                 await connection.make_connection(
                                     action.url.hostname,
                                     ip_addr,
                                     action.url.port,
                                     config,
-                                    ssl=action.ssl_context
+                                    ssl=action.ssl_context,
+                                    timeout=self.timeouts.connect_timeout
                                 )
 
                                 action.url.socket_config = config
@@ -55,6 +70,7 @@ class MercuryHTTPClient:
                                 break
 
                             except Exception as e:
+                                print(traceback.format_exc())
                                 pass
 
                         if action.url.socket_config:
@@ -78,9 +94,7 @@ class MercuryHTTPClient:
 
             self.registered[action.name] = action
 
-            return action
-        
-        except Exception as e:
+        except Exception as e:       
             raise e
 
     def extend_pool(self, increased_capacity: int):
@@ -101,6 +115,7 @@ class MercuryHTTPClient:
  
         response = HTTPResult(action)
         response.wait_start = time.monotonic()
+        self.active += 1
  
         async with self.sem:
             connection = self.pool.connections.pop()
@@ -179,14 +194,24 @@ class MercuryHTTPClient:
                 if action.hooks.after:
                     action = await action.hooks.after(action, response)
                     action.setup()
-                
-                return response
 
             except Exception as e:
                 response.read_end = time.monotonic()
                 response.error = str(e)
+
                 self.pool.connections.append(HTTPConnection(reset_connection=self.pool.reset_connections))
-                return response
+
+            self.active -= 1
+            if self.waiter and self.active <= self.pool.size:
+
+                try:
+                    self.waiter.set_result(None)
+                    self.waiter = None
+
+                except asyncio.InvalidStateError:
+                    self.waiter = None
+
+            return response
 
     async def close(self):
         if self.closed is False:
