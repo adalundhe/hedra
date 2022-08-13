@@ -77,6 +77,9 @@ class AsyncStream:
             except asyncio.TimeoutError:
                 raise Exception('Connection timed out.')
 
+            except ConnectionResetError:
+                raise Exception('Connection reset.')
+
             except Exception as e:
                 raise e
 

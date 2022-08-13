@@ -1,7 +1,6 @@
 from __future__ import annotations
 import asyncio
 from ssl import SSLContext
-import traceback
 from typing import Optional, Tuple, Union
 from hedra.core.engines.types.common.connection_factory import (
     ConnectionFactory, 
@@ -43,6 +42,9 @@ class HTTPConnection:
 
             except asyncio.TimeoutError:
                 raise Exception('Connection timed out.')
+
+            except ConnectionResetError:
+                raise Exception('Connection reset.')
 
             except Exception as e:
                 raise e

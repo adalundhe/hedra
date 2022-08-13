@@ -63,12 +63,16 @@ class TransitionAssembler:
 
         reversed_topological_generations = topological_generations[::-1]
         for generation in reversed_topological_generations[:-1]:
+
+            generation_stages = [self.generated_stages.get(stage_name) for stage_name in generation]
+            generatiton_stage_names = list(sorted([stage.name for stage in generation_stages]))
          
             transition_group: Dict[str, List[Transition]] = {}
-            for stage_name in generation:
+            for generation_idx, stage_instance in enumerate(generation_stages):
 
-                stage_instance = self.generated_stages.get(stage_name)
-             
+                stage_instance.generation_stage_names = generatiton_stage_names
+                stage_instance.generation_id = generation_idx + 1
+
                 dependencies = stage_instance.dependencies
 
                 for dependency in dependencies:

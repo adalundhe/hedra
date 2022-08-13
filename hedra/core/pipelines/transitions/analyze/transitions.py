@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_states import StageStates
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
@@ -75,6 +76,22 @@ async def analyze_to_submit_transition(current_stage: Stage, next_stage: Stage):
         return StageTimeoutError(current_stage), StageTypes.ERROR
     
     except Exception as stage_runtime_error:
+        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_runtime_error)), StageTypes.ERROR
 
     return None, StageTypes.SUBMIT
+
+
+async def analyze_to_wait_transition(current_stage: Stage, next_stage: Stage):
+
+    try:
+
+        await analyze_transition(current_stage, next_stage)
+
+    except asyncio.TimeoutError:
+        return StageTimeoutError(current_stage), StageTypes.ERROR
+    
+    except Exception as stage_runtime_error:
+        return StageExecutionError(current_stage, next_stage, str(stage_runtime_error)), StageTypes.ERROR
+
+    return None, StageTypes.WAIT

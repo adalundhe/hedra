@@ -138,6 +138,7 @@ class HTTP2Action(BaseAction):
         ]
 
     def to_serializable(self):
+
         return {
             'name': self.name,
             'type': self.type,
@@ -162,7 +163,7 @@ class HTTP2Action(BaseAction):
                 'user': self.metadata.user,
                 'tags': self.metadata.tags
             },
-            'hooks': self.hooks
+            'hooks': self.hooks.to_names()
         }
         
         

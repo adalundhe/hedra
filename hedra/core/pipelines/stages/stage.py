@@ -24,6 +24,8 @@ class Stage:
         self.accepted_hook_types = []
         self.workers: int = None
         self.worker_id: int = 1
+        self.generation_stage_names = []
+        self.generation_id = 1
 
         if self.stage_timeout:
             time_parser = TimeParser(self.stage_timeout)

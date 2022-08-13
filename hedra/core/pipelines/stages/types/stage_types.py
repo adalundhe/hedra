@@ -13,4 +13,5 @@ class StageTypes(Enum):
     COMPLETE='Complete'
     SUBMIT='Submit'
     ERROR='Error'
+    WAIT='Wait'
 

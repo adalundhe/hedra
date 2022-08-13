@@ -9,3 +9,4 @@ from .complete import Complete
 from .submit import Submit
 from .error import Error
 from .idle import Idle
+from .wait import Wait

@@ -1,7 +1,5 @@
-import asyncio
 from collections import defaultdict
 from typing import Any
-from .types.base_event import BaseEvent
 from .results import results_types
 
 

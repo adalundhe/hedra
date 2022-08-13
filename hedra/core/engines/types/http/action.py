@@ -134,6 +134,7 @@ class HTTPAction(BaseAction):
         writer.write(("0" + NEW_LINE * 2).encode())
 
     def to_serializable(self):
+
         return {
             'name': self.name,
             'type': self.type,
@@ -158,6 +159,5 @@ class HTTPAction(BaseAction):
                 'user': self.metadata.user,
                 'tags': self.metadata.tags
             },
-            'hooks': self.hooks
+            'hooks': self.hooks.to_names()
         }
-        

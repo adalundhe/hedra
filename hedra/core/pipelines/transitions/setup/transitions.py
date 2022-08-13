@@ -38,7 +38,6 @@ async def setup_transition(current_stage: Stage, next_stage: Stage):
         execute_stage.state = StageStates.SETUP
 
     current_stage.context.stages[StageTypes.EXECUTE].update(setup_stages)
-    current_stage.context.reporting_config = current_stage.reporting_config
 
     next_stage.context = current_stage.context
 
@@ -108,3 +107,18 @@ async def setup_to_checkpoint_transition(current_stage: Stage, next_stage: Stage
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
     
     return None, StageTypes.CHECKPOINT
+
+
+async def setup_to_wait_transition(current_stage: Stage, next_stage: Stage):
+
+    try:
+
+        await setup_transition(current_stage, next_stage)
+            
+    except asyncio.TimeoutError:
+        return StageTimeoutError(current_stage), StageTypes.ERROR
+    
+    except Exception as stage_execution_error:
+        return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
+
+    return None, StageTypes.WAIT

@@ -7,5 +7,6 @@ from .stages import (
     Setup,
     Teardown,
     Submit,
-    Validate
+    Validate,
+    Wait
 )

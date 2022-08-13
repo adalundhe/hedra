@@ -1,5 +1,6 @@
 import traceback
 from hedra.core.engines.types.common.base_result import BaseResult
+from hedra.core.pipelines.hooks.registry.registrar import registrar
 from hedra.reporting.tags import Tag
 
 
@@ -8,7 +9,6 @@ class BaseEvent:
     def __init__(self, result: BaseResult) -> None:
         self.name = None
         self.shortname = result.name
-        self.checks = result.checks
         self.error = result.error
         self.time = result.read_end - result.start
         self.time_waiting = result.start - result.wait_start
@@ -18,6 +18,12 @@ class BaseEvent:
         self.type = result.type
         self.source = result.source
         self.type = result.type
+
+        self.checks = []
+
+        for check_hook_name in result.checks:
+            check_hook = registrar.all.get(check_hook_name)
+            self.checks.append(check_hook.call)
 
         self.tags = [
             Tag(

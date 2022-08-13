@@ -21,6 +21,7 @@ from hedra.core.engines.types.playwright import PlaywrightResult
 from hedra.core.engines.types.websocket import WebsocketAction
 from hedra.core.engines.types.common.types import RequestTypes
 
+from hedra.core.pipelines.hooks.registry.registrar import registrar
 from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.hooks.types.types import HookType
 
@@ -63,6 +64,11 @@ def execute_actions(parallel_config: str):
 
             )
 
+            action_hooks = hook_action.get('hooks', {})
+            before_hook_name = action_hooks.get('before')
+            after_hook_name = action_hooks.get('after')
+            check_hook_names = action_hooks.get('checks')
+
             action_type = hook_action.get('type')
 
             if action_type == RequestTypes.HTTP:
@@ -88,6 +94,18 @@ def execute_actions(parallel_config: str):
                     tags=action_metadata.get('tags')
                 )
 
+                if before_hook_name:
+                    before_hook = registrar.all.get(before_hook_name)
+                    hook.action.hooks.before = before_hook.call
+
+                if after_hook_name:
+                    after_hook = registrar.all.get(after_hook_name)
+                    hook.action.hooks.after = after_hook.call
+
+                hook.action.hooks.checks = []
+                for check_hook_name in check_hook_names:
+                    hook.action.hooks.checks.append(check_hook_name)
+
                 hook.action.url.ip_addr = action_url.get('ip_addr')
                 hook.action.url.port = action_url.get('port')
                 hook.action.url.socket_config = action_url.get('socket_config')
@@ -98,7 +116,6 @@ def execute_actions(parallel_config: str):
 
                 hook.action.encoded_headers = action_headers.get('encoded_headers')
                 hook.action.encoded_data = action_data.get('encoded_data')
-                hook.action.hooks = hook_action.get('hooks')
 
                 hooks[HookType.ACTION].append(hook)
 
@@ -125,6 +142,18 @@ def execute_actions(parallel_config: str):
                     tags=action_metadata.get('tags')
                 )
 
+                if before_hook_name:
+                    before_hook = registrar.all.get(before_hook_name)
+                    hook.action.hooks.before = before_hook.call
+
+                if after_hook_name:
+                    after_hook = registrar.all.get(after_hook_name)
+                    hook.action.hooks.after = after_hook.call
+
+                hook.action.hooks.checks = []
+                for check_hook_name in check_hook_names:
+                    hook.action.hooks.checks.append(check_hook_name)
+
                 hook.action.url.ip_addr = action_url.get('ip_addr')
                 hook.action.url.port = action_url.get('port')
                 hook.action.url.socket_config = action_url.get('socket_config')
@@ -135,7 +164,6 @@ def execute_actions(parallel_config: str):
 
                 hook.action.encoded_headers = action_headers.get('encoded_headers')
                 hook.action.encoded_data = action_data.get('encoded_data')
-                hook.action.hooks = hook_action.get('hooks')
 
                 hooks[HookType.ACTION].append(hook)
 

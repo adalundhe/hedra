@@ -48,6 +48,7 @@ class DefaultPersona:
         self.completed_time = 0
         self.run_timer = False
         self.actions_count = 0
+        self.graceful_stop = config.graceful_stop
 
         self.is_timed = True
         self.timer_thread = None
@@ -76,7 +77,7 @@ class DefaultPersona:
                     hooks[action_idx].action
                 )
             ) async for action_idx in self.generator(total_time)
-        ], timeout=1)
+        ], timeout=self.graceful_stop)
 
         self.end = time.monotonic()
         self.start = start
@@ -104,7 +105,7 @@ class DefaultPersona:
     async def generator(self, total_time):
         elapsed = 0
         idx = 0
-        max_pool_size = self.batch.size * (psutil.cpu_count(logical=False) + self.workers)
+        max_pool_size = int(self.batch.size * (psutil.cpu_count(logical=False) * 2)/self.workers)
         action_idx = 0
 
         start = time.monotonic()

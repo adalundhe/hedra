@@ -6,7 +6,7 @@ from hedra.core.pipelines.hooks.types.types import HookType
 
 
 class Registrar:
-    all = {}
+    all: Dict[str, Hook] = {}
 
     def __init__(self, hook_type) -> None:
 

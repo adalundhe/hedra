@@ -141,6 +141,8 @@ class Analyze(Stage):
         return summaries
 
     def calculate_group_stats(self, group_name: str, data: List[Union[int, float]]):
+        if len(data) == 0:
+            data = [0]
 
         quantiles = {
             f'quantile_{int(quantile_range * 100)}th': quantile for quantile, quantile_range in zip(

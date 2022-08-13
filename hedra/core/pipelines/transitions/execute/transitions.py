@@ -10,6 +10,17 @@ from hedra.core.pipelines.transitions.exceptions import (
 
 
 async def execute_transition(current_stage: Stage, next_stage: Stage):
+
+    execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE)
+
+    for generation_stage_name in current_stage.generation_stage_names:
+        stage = execute_stages.get(generation_stage_name)
+        
+        if stage is not None:
+            current_stage.concurrent_execution_stages.append(stage)
+
+    for execution_stage_idx, exeuction_stage in enumerate(current_stage.concurrent_execution_stages):
+        exeuction_stage.execution_stage_id = execution_stage_idx + 1
     
     if current_stage.timeout:
         execution_results = await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
@@ -192,3 +203,31 @@ async def execute_to_checkpoint_transition(current_stage: Stage, next_stage: Sta
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     return None, StageTypes.CHECKPOINT
+
+
+async def execute_to_wait_transition(current_stage: Stage, next_stage: Stage):
+
+    try:
+
+        valid_states = [
+            StageStates.SETUP,
+            StageStates.OPTIMIZED
+        ]
+
+        if current_stage.state in valid_states:
+            current_stage.state = StageStates.EXECUTING
+
+            current_stage, next_stage = await execute_transition(current_stage, next_stage)
+            next_stage.data = current_stage.context.results[current_stage.name]
+
+            next_stage.previous_stage = current_stage.name
+
+            current_stage.state = StageStates.EXECUTED
+            
+    except asyncio.TimeoutError:
+        return StageTimeoutError(current_stage), StageTypes.ERROR
+
+    except Exception as stage_execution_error:
+        return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
+
+    return None, StageTypes.WAIT

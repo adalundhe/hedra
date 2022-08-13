@@ -2,8 +2,6 @@ import asyncio
 import time
 from typing import Any, Dict
 from easy_logger import Logger
-from alive_progress import alive_bar
-from async_tools.functions import awaitable
 from async_tools.datatypes import AsyncList
 from .types import (
     SHGOptimizer,

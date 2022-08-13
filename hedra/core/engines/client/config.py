@@ -9,8 +9,7 @@ class Config:
         for config_option_name, config_option_value in dict(kwargs).items():
             if config_option_value is None:
                 del kwargs[config_option_name]
-
-
+    
         time_parser = TimeParser(
             kwargs.get('total_time', '1m')
         )
@@ -28,6 +27,4 @@ class Config:
         self.connect_timeout=kwargs.get('connect_timeout', 15)
         self.request_timeout=kwargs.get('request_timeout', 60)
         self.reset_connections=kwargs.get('reset_connections')
-        self.options={
-            **kwargs.get('options', {})
-        }
+        self.graceful_stop=kwargs.get('graceful_stop', 1)

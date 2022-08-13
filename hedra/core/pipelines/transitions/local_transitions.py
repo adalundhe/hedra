@@ -1,3 +1,4 @@
+from ..stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from .common import (
     idle_transition,
@@ -7,12 +8,14 @@ from .common import (
 )
 
 from .validate import (
-    validate_to_setup_transition
+    validate_to_setup_transition,
+    validate_to_wait_transition
 )
 
 from .idle import (
     invalid_idle_transition,
-    idle_to_validate_transition
+    idle_to_validate_transition,
+    idle_to_wait_transition
 )
 
 from .setup import (
@@ -20,11 +23,13 @@ from .setup import (
     setup_to_optimize_transition,
     setup_to_execute_transition,
     setup_to_checkpoint_transition,
+    setup_to_wait_transition
 )
 
 from .optimize import (
     optimize_to_execute_transition,
     optimize_to_checkpoint_transition,
+    optimize_to_wait_transition
 )
 
 from .execute import (
@@ -34,16 +39,19 @@ from .execute import (
     execute_to_teardown_transition,
     execute_to_analyze_transition,
     execute_to_checkpoint_transition,
+    execute_to_wait_transition
 )
 
 from .teardown import (
     teardown_to_analyze_transition,
-    teardown_to_checkpoint_transition
+    teardown_to_checkpoint_transition,
+    teardown_to_wait_transition
 )
 
 from .analyze import (
     analyze_to_checkpoint_transition,
-    analyze_to_submit_transition
+    analyze_to_submit_transition,
+    analyze_to_wait_transition
 )
 
 from .checkpoint import (
@@ -53,7 +61,8 @@ from .checkpoint import (
     checkpoint_to_teardown_transition,
     checkpoint_to_analyze_transition,
     checkpoint_to_complete_transition,
-    checkpoint_to_submit_transition
+    checkpoint_to_submit_transition,
+    checkpoint_to_wait_transition
 )
 
 from .submit import (
@@ -61,7 +70,24 @@ from .submit import (
     submit_to_optimize_transition,
     submit_to_execute_transition,
     submit_to_checkpoint_transition,
-    submit_to_complete_transition
+    submit_to_submit_transition,
+    submit_to_complete_transition,
+    submit_to_wait_transition
+)
+
+
+from .wait import (
+    wait_to_wait_transition,
+    wait_to_analyze_transition,
+    wait_to_checkpoint_transition,
+    wait_to_complete_transition,
+    wait_to_error_transition,
+    wait_to_execute_transition,
+    wait_to_optimize_transition,
+    wait_to_setup_transition,
+    wait_to_submit_transition,
+    wait_to_teardown_transition,
+    wait_to_validate_transition
 )
 
 
@@ -69,6 +95,7 @@ local_transitions = {
 
         # State: Idle
         (StageTypes.IDLE, StageTypes.IDLE): idle_transition,
+        (StageTypes.IDLE, StageTypes.WAIT): idle_to_wait_transition,
         (StageTypes.IDLE, StageTypes.SETUP): invalid_idle_transition,
         (StageTypes.IDLE, StageTypes.VALIDATE): idle_to_validate_transition,
         (StageTypes.IDLE, StageTypes.OPTIMIZE): invalid_idle_transition,
@@ -80,9 +107,24 @@ local_transitions = {
         (StageTypes.IDLE, StageTypes.COMPLETE): invalid_idle_transition,
         (StageTypes.IDLE, StageTypes.ERROR): error_transition,
 
+        # State: Wait
+        (StageTypes.WAIT, StageTypes.WAIT): wait_to_wait_transition,
+        (StageTypes.WAIT, StageTypes.IDLE): invalid_transition,
+        (StageTypes.WAIT, StageTypes.SETUP): wait_to_setup_transition,
+        (StageTypes.WAIT, StageTypes.VALIDATE): wait_to_validate_transition,
+        (StageTypes.WAIT, StageTypes.OPTIMIZE): wait_to_optimize_transition,
+        (StageTypes.WAIT, StageTypes.EXECUTE): wait_to_execute_transition,
+        (StageTypes.WAIT, StageTypes.TEARDOWN): wait_to_teardown_transition,
+        (StageTypes.WAIT, StageTypes.ANALYZE): wait_to_analyze_transition,
+        (StageTypes.WAIT, StageTypes.CHECKPOINT): wait_to_checkpoint_transition,
+        (StageTypes.WAIT, StageTypes.SUBMIT): wait_to_submit_transition,
+        (StageTypes.WAIT, StageTypes.COMPLETE): wait_to_complete_transition,
+        (StageTypes.WAIT, StageTypes.ERROR): wait_to_error_transition,
+
         # State: Setup
         (StageTypes.SETUP, StageTypes.SETUP): invalid_transition,
         (StageTypes.SETUP, StageTypes.IDLE): invalid_transition,
+        (StageTypes.SETUP, StageTypes.WAIT): setup_to_wait_transition,
         (StageTypes.SETUP, StageTypes.VALIDATE): setup_to_validate_transition,
         (StageTypes.SETUP, StageTypes.OPTIMIZE): setup_to_optimize_transition,
         (StageTypes.SETUP, StageTypes.EXECUTE): setup_to_execute_transition,
@@ -96,6 +138,7 @@ local_transitions = {
         # State: Validate
         (StageTypes.VALIDATE, StageTypes.VALIDATE): invalid_transition,
         (StageTypes.VALIDATE, StageTypes.IDLE): invalid_transition,
+        (StageTypes.VALIDATE, StageTypes.WAIT): validate_to_wait_transition,
         (StageTypes.VALIDATE, StageTypes.SETUP): validate_to_setup_transition,
         (StageTypes.VALIDATE, StageTypes.OPTIMIZE): invalid_transition,
         (StageTypes.VALIDATE, StageTypes.EXECUTE): invalid_transition,
@@ -109,6 +152,7 @@ local_transitions = {
         # State: Optimize
         (StageTypes.OPTIMIZE, StageTypes.OPTIMIZE): invalid_transition,
         (StageTypes.OPTIMIZE, StageTypes.IDLE): invalid_transition,
+        (StageTypes.OPTIMIZE, StageTypes.WAIT): optimize_to_wait_transition,
         (StageTypes.OPTIMIZE, StageTypes.SETUP): invalid_transition,
         (StageTypes.OPTIMIZE, StageTypes.VALIDATE): invalid_transition,
         (StageTypes.OPTIMIZE, StageTypes.EXECUTE): optimize_to_execute_transition,
@@ -122,6 +166,7 @@ local_transitions = {
         # State: Execute
         (StageTypes.EXECUTE, StageTypes.EXECUTE): execute_to_execute_transition,
         (StageTypes.EXECUTE, StageTypes.IDLE): invalid_transition,
+        (StageTypes.EXECUTE, StageTypes.WAIT): execute_to_wait_transition,
         (StageTypes.EXECUTE, StageTypes.SETUP): execute_to_setup_transition,
         (StageTypes.EXECUTE, StageTypes.VALIDATE): invalid_transition,
         (StageTypes.EXECUTE, StageTypes.OPTIMIZE): execute_to_optimize_transition,
@@ -135,6 +180,7 @@ local_transitions = {
         # State: Teardown
         (StageTypes.TEARDOWN, StageTypes.TEARDOWN): invalid_transition,
         (StageTypes.TEARDOWN, StageTypes.IDLE): invalid_transition,
+        (StageTypes.TEARDOWN, StageTypes.WAIT): teardown_to_wait_transition,
         (StageTypes.TEARDOWN, StageTypes.SETUP): invalid_transition,
         (StageTypes.TEARDOWN, StageTypes.VALIDATE): invalid_transition,
         (StageTypes.TEARDOWN, StageTypes.OPTIMIZE): invalid_transition,
@@ -148,6 +194,7 @@ local_transitions = {
         # State: Analyze
         (StageTypes.ANALYZE, StageTypes.ANALYZE): invalid_transition,
         (StageTypes.ANALYZE, StageTypes.IDLE): invalid_transition,
+        (StageTypes.ANALYZE, StageTypes.WAIT): analyze_to_wait_transition,
         (StageTypes.ANALYZE, StageTypes.SETUP): invalid_transition,
         (StageTypes.ANALYZE, StageTypes.VALIDATE): invalid_transition,
         (StageTypes.ANALYZE, StageTypes.OPTIMIZE): invalid_transition,
@@ -161,6 +208,7 @@ local_transitions = {
         # State: Checkpoint
         (StageTypes.CHECKPOINT, StageTypes.CHECKPOINT): invalid_transition,
         (StageTypes.CHECKPOINT, StageTypes.IDLE): invalid_transition,
+        (StageTypes.CHECKPOINT, StageTypes.WAIT): checkpoint_to_wait_transition,
         (StageTypes.CHECKPOINT, StageTypes.SETUP): checkpoint_to_setup_transition,
         (StageTypes.CHECKPOINT, StageTypes.VALIDATE): invalid_transition,
         (StageTypes.CHECKPOINT, StageTypes.OPTIMIZE): checkpoint_to_optimize_transition,
@@ -173,8 +221,9 @@ local_transitions = {
 
 
         # State: Submit
-        (StageTypes.SUBMIT, StageTypes.SUBMIT): invalid_transition,
+        (StageTypes.SUBMIT, StageTypes.SUBMIT): submit_to_submit_transition,
         (StageTypes.SUBMIT, StageTypes.IDLE): invalid_transition,
+        (StageTypes.SUBMIT, StageTypes.WAIT): submit_to_wait_transition,
         (StageTypes.SUBMIT, StageTypes.SETUP): submit_to_setup_transition,
         (StageTypes.SUBMIT, StageTypes.VALIDATE): invalid_transition,
         (StageTypes.SUBMIT, StageTypes.OPTIMIZE): submit_to_optimize_transition,
@@ -188,6 +237,7 @@ local_transitions = {
         # State: Complete
         (StageTypes.COMPLETE, StageTypes.COMPLETE): exit_transition,
         (StageTypes.COMPLETE, StageTypes.IDLE): exit_transition,
+        (StageTypes.COMPLETE, StageTypes.WAIT): exit_transition,
         (StageTypes.COMPLETE, StageTypes.SETUP): exit_transition,
         (StageTypes.COMPLETE, StageTypes.VALIDATE): exit_transition,
         (StageTypes.COMPLETE, StageTypes.OPTIMIZE): exit_transition,
@@ -201,6 +251,7 @@ local_transitions = {
         # State: Error
         (StageTypes.ERROR, StageTypes.ERROR): invalid_transition,
         (StageTypes.ERROR, StageTypes.IDLE): invalid_transition,
+        (StageTypes.ERROR, StageTypes.WAIT): invalid_transition,
         (StageTypes.ERROR, StageTypes.SETUP): invalid_transition,
         (StageTypes.ERROR, StageTypes.VALIDATE): invalid_transition,
         (StageTypes.ERROR, StageTypes.OPTIMIZE): invalid_transition,

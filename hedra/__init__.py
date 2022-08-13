@@ -19,7 +19,8 @@ from .core.pipelines import (
     Setup,
     Teardown,
     Validate,
-    Submit
+    Submit,
+    Wait
 )
 
 

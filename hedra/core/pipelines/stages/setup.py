@@ -36,18 +36,17 @@ class SetupCall:
 class Setup(Stage):
     stage_type=StageTypes.SETUP
     log_level='info'
-    persona_type='simple'
+    persona_type='default'
     total_time='1m'
     batch_size=1000
     batch_interval=0
     batch_gradient=0.1
-    cpus=psutil.cpu_count(logical=False)
+    cpus=int(psutil.cpu_count(logical=False))
     no_run_visuals=False
+    graceful_stop=1
     connect_timeout=10
     request_timeout=60
-    reporting_config={}
     reset_connections=False
-    options={}
     
     def __init__(self) -> None:
         super().__init__()
@@ -58,27 +57,27 @@ class Setup(Stage):
 
     @Internal
     async def run(self):
-
-        config = Config(
-            log_level=self.log_level,
-            persona_type=self.persona_types[self.persona_type],
-            total_time=self.total_time,
-            batch_size=self.batch_size,
-            batch_interval=self.batch_interval,
-            batch_gradient=self.batch_gradient,
-            cpus=self.cpus,
-            no_run_visuals=self.no_run_visuals,
-            connect_timeout=self.connect_timeout,
-            request_timeout=self.request_timeout,
-            options=self.options,
-            reset_connections=self.reset_connections
-
-        )
         
         await asyncio.gather(*[hook.call() for hook in self.hooks.get(HookType.SETUP)])
 
         
         for execute_stage_name, execute_stage in self.stages.items():
+
+            config = Config(
+                log_level=self.log_level,
+                persona_type=self.persona_types[self.persona_type],
+                total_time=self.total_time,
+                batch_size=self.batch_size,
+                batch_interval=self.batch_interval,
+                batch_gradient=self.batch_gradient,
+                cpus=self.cpus,
+                no_run_visuals=self.no_run_visuals,
+                connect_timeout=self.connect_timeout,
+                request_timeout=self.request_timeout,
+                graceful_stop=self.graceful_stop,
+                reset_connections=self.reset_connections
+
+            )
    
             client = Client()
             execute_stage.client = client
@@ -122,7 +121,7 @@ class Setup(Stage):
                     execute_stage.name,
                     hook.name
                 )
-
+                
                 action.hooks.before = self.get_hook(execute_stage, hook.shortname, HookType.BEFORE)
                 action.hooks.after = self.get_hook(execute_stage, hook.shortname, HookType.AFTER)
                 action.hooks.checks = self.get_checks(execute_stage, hook.shortname)

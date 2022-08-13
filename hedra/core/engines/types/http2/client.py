@@ -72,6 +72,7 @@ class MercuryHTTP2Client:
                                 break
 
                             except Exception as e:
+                                print(traceback.format_exc())
                                 pass
 
                         if request.url.socket_config:

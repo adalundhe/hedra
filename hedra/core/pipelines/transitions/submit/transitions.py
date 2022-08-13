@@ -98,7 +98,36 @@ async def submit_to_complete_transition(current_stage: Stage, next_stage: Stage)
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
-        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     return None, StageTypes.COMPLETE
+
+
+async def submit_to_submit_transition(current_stage: Stage, next_stage: Stage):
+
+    try:
+
+        await submit_transition(current_stage, next_stage)
+            
+    except asyncio.TimeoutError:
+        return StageTimeoutError(current_stage), StageTypes.ERROR
+
+    except Exception as stage_execution_error:
+        return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
+
+    return None, StageTypes.SUBMIT
+
+
+async def submit_to_wait_transition(current_stage: Stage, next_stage: Stage):
+
+    try:
+
+        await submit_transition(current_stage, next_stage)
+            
+    except asyncio.TimeoutError:
+        return StageTimeoutError(current_stage), StageTypes.ERROR
+
+    except Exception as stage_execution_error:
+        return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
+
+    return None, StageTypes.WAIT

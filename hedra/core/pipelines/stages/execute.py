@@ -32,8 +32,27 @@ class Execute(Stage):
             HookType.CHECK
         ]
 
+        self.concurrent_execution_stages = []
+        self.execution_stage_id = 0
+        self.optimized = False
+
     @Internal
     async def run(self):
+        
+        if self.optimized is False:
+
+            batch_size = self.client._config.batch_size
+            stages_count = len(self.concurrent_execution_stages)
+
+            if stages_count > 1 and self.execution_stage_id == stages_count:
+                batch_size = int(batch_size/stages_count) + batch_size%stages_count
+
+            else:
+                batch_size = int(batch_size/stages_count)
+
+            self.client._config.batch_size = batch_size
+
+        print(self.name, self.client._config.batch_size)
 
         if self.workers > 1:
 

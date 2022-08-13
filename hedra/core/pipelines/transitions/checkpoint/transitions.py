@@ -246,3 +246,34 @@ async def checkpoint_to_complete_transition(current_stage: Stage, next_stage: St
     else:
         return None, StageTypes.COMPLETE
 
+
+async def checkpoint_to_wait_transition(current_stage: Stage, next_stage: Stage):
+
+    try:
+
+        await checkpoint_transition(current_stage, next_stage), StageTypes.ERROR
+        
+    except asyncio.TimeoutError:
+        if current_stage._save_file.closed is False:
+            current_stage._loop.run_in_executor(
+                current_stage._executor,
+                current_stage._save_file.close
+            )
+
+            current_stage._executor.shutdown(wait=True)
+
+        return StageTimeoutError(current_stage), StageTypes.ERROR
+
+    except Exception as stage_execution_error:
+        if current_stage._save_file.closed is False:
+            current_stage._loop.run_in_executor(
+                current_stage._executor,
+                current_stage._save_file.close
+            )
+
+            current_stage._executor.shutdown(wait=True)
+
+        return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
+
+    else:
+        return None, StageTypes.WAIT
