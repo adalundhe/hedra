@@ -214,7 +214,7 @@ class Decoder:
         """
         log.debug("Decoding %s", data)
 
-        data_mem = memoryview(data)
+        data_mem = bytearray(data)
         headers = []
         data_len = len(data)
         inflated_size = 0

@@ -26,6 +26,7 @@ from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.hooks.types.types import HookType
 
 from hedra.core.personas import get_persona
+from .types import PartitionMethod
 
 
 def execute_actions(parallel_config: str):
@@ -35,15 +36,18 @@ def execute_actions(parallel_config: str):
         asyncio.set_event_loop(loop)
         
         parallel_config = dill.loads(parallel_config)
+        partition_method = parallel_config.get('partition_method')
         persona_config = parallel_config.get('config')
         workers = parallel_config.get('workers')
         worker_id = parallel_config.get('worker_id')
 
-        if workers == worker_id:
-            persona_config.batch_size = int(persona_config.batch_size/workers) + (persona_config.batch_size%workers)
-        
-        else:
-            persona_config.batch_size = int(persona_config.batch_size/workers)
+        if partition_method == PartitionMethod.BATCHES:
+
+            if workers == worker_id:
+                persona_config.batch_size = int(persona_config.batch_size/workers) + (persona_config.batch_size%workers)
+            
+            else:
+                persona_config.batch_size = int(persona_config.batch_size/workers)
 
         persona = get_persona(persona_config)
         persona.workers = workers

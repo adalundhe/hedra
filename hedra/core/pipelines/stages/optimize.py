@@ -35,13 +35,16 @@ class Optimize(Stage):
         config = self.execute_stage_config
         
         batch_size = config.batch_size
-        stages_count = len(self.concurrent_execution_stages)
-        
-        if stages_count > 0 and self.execution_stage_id == stages_count:
-            batch_size = int(batch_size/stages_count) + batch_size%stages_count
 
-        elif stages_count > 0:
-            batch_size = int(batch_size/stages_count)
+        if self.concurrent_execution_stages > 1:
+            
+            stages_count = len(self.concurrent_execution_stages)
+            
+            if stages_count > 0 and self.execution_stage_id == stages_count:
+                batch_size = int(batch_size/stages_count) + batch_size%stages_count
+
+            elif stages_count > 0:
+                batch_size = int(batch_size/stages_count)
 
         config.batch_size = batch_size
 
