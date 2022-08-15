@@ -13,14 +13,14 @@ async def execute_transition(current_stage: Stage, next_stage: Stage):
 
     execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE)
 
+    total_concurrent_execute_stages = []
     for generation_stage_name in current_stage.generation_stage_names:
         stage = execute_stages.get(generation_stage_name)
         
         if stage is not None:
-            current_stage.concurrent_execution_stages.append(stage)
+            total_concurrent_execute_stages.append(stage)
 
-    for execution_stage_idx, exeuction_stage in enumerate(current_stage.concurrent_execution_stages):
-        exeuction_stage.execution_stage_id = execution_stage_idx + 1
+    current_stage.total_concurrent_execute_stages = len(total_concurrent_execute_stages)
     
     if current_stage.timeout:
         execution_results = await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
@@ -75,6 +75,8 @@ async def execute_to_setup_transition(current_stage: Stage, next_stage: Stage):
     except Exception as stage_execution_error:
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
+    current_stage = None
+
     return None, StageTypes.SETUP
 
 
@@ -99,6 +101,8 @@ async def execute_to_execute_transition(current_stage: Stage, next_stage: Stage)
     except Exception as stage_execution_error:
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
+    current_stage = None
+
     return None, StageTypes.EXECUTE
 
 
@@ -122,6 +126,8 @@ async def execute_to_optimize_transition(current_stage: Stage, next_stage: Stage
     
     except Exception as stage_execution_error:
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
+
+    current_stage = None
 
     return None, StageTypes.OPTIMIZE
 
@@ -148,6 +154,8 @@ async def execute_to_teardown_transition(current_stage: Stage, next_stage: Stage
     except Exception as stage_execution_error:
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
+    current_stage = None
+
     return None, StageTypes.TEARDOWN
 
 
@@ -173,6 +181,8 @@ async def execute_to_analyze_transition(current_stage: Stage, next_stage: Stage)
     except Exception as stage_execution_error:
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
+    current_stage = None
+
     return None, StageTypes.ANALYZE
 
 
@@ -189,7 +199,7 @@ async def execute_to_checkpoint_transition(current_stage: Stage, next_stage: Sta
             current_stage.state = StageStates.EXECUTING
 
             current_stage, next_stage = await execute_transition(current_stage, next_stage)
-            next_stage.data = current_stage.context.results[current_stage.name]
+            next_stage.data = current_stage.context.results
 
             next_stage.previous_stage = current_stage.name
 
@@ -199,8 +209,9 @@ async def execute_to_checkpoint_transition(current_stage: Stage, next_stage: Sta
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
-        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
+
+    current_stage = None
 
     return None, StageTypes.CHECKPOINT
 
@@ -229,5 +240,7 @@ async def execute_to_wait_transition(current_stage: Stage, next_stage: Stage):
 
     except Exception as stage_execution_error:
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
+
+    current_stage = None
 
     return None, StageTypes.WAIT

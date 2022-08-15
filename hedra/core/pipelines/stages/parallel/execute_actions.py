@@ -175,6 +175,9 @@ def execute_actions(parallel_config: str):
 
         results = loop.run_until_complete(persona.execute())
 
+        loop.stop()
+        loop.close()
+
         return {
             'results': results,
             'total_elapsed': persona.total_elapsed

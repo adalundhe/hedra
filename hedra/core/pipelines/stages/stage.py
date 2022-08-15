@@ -26,6 +26,8 @@ class Stage:
         self.worker_id: int = 1
         self.generation_stage_names = []
         self.generation_id = 1
+        self._shutdown_task = None
+        self.requires_shutdown = False
 
         if self.stage_timeout:
             time_parser = TimeParser(self.stage_timeout)

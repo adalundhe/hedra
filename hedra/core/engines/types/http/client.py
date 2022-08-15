@@ -19,7 +19,6 @@ class MercuryHTTPClient:
 
     def __init__(self, concurrency: int=10**3, timeouts: Timeouts = Timeouts(), reset_connections: bool=False) -> None:
 
-        self.loop = asyncio.get_event_loop()
         self.timeouts = timeouts
 
         self.registered: Dict[str, HTTPAction] = {}
@@ -36,7 +35,7 @@ class MercuryHTTPClient:
 
     async def wait_for_active_threshold(self):
         if self.waiter is None:
-            self.waiter = self.loop.create_future()
+            self.waiter = asyncio.get_event_loop().create_future()
             await self.waiter
 
 

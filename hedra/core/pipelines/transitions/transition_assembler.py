@@ -125,6 +125,7 @@ class TransitionAssembler:
             idle_stage.context.results_stages = []
             idle_stage.context.summaries = {}
             idle_stage.context.paths = {}
+            idle_stage.context.path_lengths = {}
             
         idle_stage_name = idle_stage.__class__.__name__
 
@@ -147,13 +148,23 @@ class TransitionAssembler:
                 if has_path:
                     idle_stage.context.stages[stage_type][stage_name] = stage
                     paths = networkx.all_shortest_paths(graph, stage_name, complete_stage.name)
-
+                
                     stage_paths = []
                     for path in paths:
                         stage_paths.extend(path)
                     
                     idle_stage.context.paths[stage_name] = stage_paths
 
+                    path_lengths = networkx.all_pairs_shortest_path_length(graph)
+
+                    stage_path_lengths = {}
+                    for path_stage_name, path_lengths_set in path_lengths:
+
+                        del path_lengths_set[path_stage_name]
+                        stage_path_lengths[path_stage_name] = path_lengths_set
+
+                    idle_stage.context.path_lengths[stage_name] = stage_path_lengths.get(stage_name)
+    
     def create_error_transition(self, error: Exception):
 
         from_stage = error.from_stage

@@ -16,11 +16,16 @@ def analyze_stage_results(
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    return loop.run_until_complete(calculate_results(
+    results = loop.run_until_complete(calculate_results(
         stage_name,
         custom_metric_hook_names,
         stage_results
     ))
+
+    loop.stop()
+    loop.close()
+
+    return results
 
 
 

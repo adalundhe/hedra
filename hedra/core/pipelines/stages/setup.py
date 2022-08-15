@@ -47,11 +47,12 @@ class Setup(Stage):
     connect_timeout=10
     request_timeout=60
     reset_connections=False
+    apply_to_stages=[]
     
     def __init__(self) -> None:
         super().__init__()
+        self.generation_setup_candidates = 0
         self.stages: Dict[str, Execute] = {}
-        self.actions = []
         self.accepted_hook_types = [ HookType.SETUP ]
         self.persona_types = PersonaTypesMap()
 
@@ -59,9 +60,15 @@ class Setup(Stage):
     async def run(self):
         
         await asyncio.gather(*[hook.call() for hook in self.hooks.get(HookType.SETUP)])
-
+        execute_stage_id = 1
         
         for execute_stage_name, execute_stage in self.stages.items():
+
+            execute_stage.total_concurrent_execute_stages = len(self.stages.values())
+            execute_stage.execution_stage_id = execute_stage_id
+            execute_stage.execute_setup_stage = self.name
+
+            execute_stage_id += 1
 
             config = Config(
                 log_level=self.log_level,

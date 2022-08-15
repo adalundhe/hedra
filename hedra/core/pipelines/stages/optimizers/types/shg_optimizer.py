@@ -24,9 +24,8 @@ class SHGOptimizer:
     def callback(self, x):
         return True
 
-    async def optimize(self, func):
-        return await awaitable(
-            shgo,
+    def optimize(self, func):
+        return shgo(
             func,
             self.bounds,
             options={

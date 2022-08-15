@@ -158,6 +158,15 @@ class Pipeline:
 
             self._results = serialized_results
 
+        stages_for_shutdown = []
+        for stage in self.runner.generated_stages.values():
+            if stage.requires_shutdown:
+                stages_for_shutdown.append(stage._shutdown_task)
+
+        print('Shutting down!')
+        await asyncio.gather(*stages_for_shutdown)
+        print('Done!')
+
         return self._results
 
     async def cleanup(self):

@@ -22,14 +22,14 @@ class Checkpoint(Stage):
         self.data = {}
         self.previous_stage = None
         self.accepted_hook_types = [ HookType.SAVE ]
-        self._loop = None
-        self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._save_file: TextIO = None
+        self.requires_shutdown = True
 
     @Internal
     async def run(self):
         
-        self._loop = asyncio.get_event_loop()
+        loop = asyncio.get_event_loop()
+        executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         timestamp = datetime.now().timestamp()
         
         for save_hook in self.hooks.get(HookType.SAVE):
@@ -48,8 +48,8 @@ class Checkpoint(Stage):
 
             self._save_file = open(save_hook.config.path, 'w')
 
-            await self._loop.run_in_executor(
-                self._executor,
+            await loop.run_in_executor(
+                executor,
                 functools.partial(
                     json.dump,
                     checkpoint_data,
@@ -58,7 +58,9 @@ class Checkpoint(Stage):
                 )
             )
 
-            await self._loop.run_in_executor(
+            await loop.run_in_executor(
                 self._executor,
                 self._save_file.close
             )
+
+        self._shutdown_task = loop.run_in_executor(None, executor.shutdown)

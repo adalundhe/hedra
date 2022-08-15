@@ -20,9 +20,8 @@ class DifferentialEvolutionOptimizer:
         amount of iterations to find optimal parameters.
         '''
 
-    async def optimize(self, func):
-        return await awaitable(
-            differential_evolution,
+    def optimize(self, func):
+        return differential_evolution(
             func,
             self.bounds,
             maxiter=self.max_iter

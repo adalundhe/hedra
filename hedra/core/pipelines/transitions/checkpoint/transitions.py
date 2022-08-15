@@ -36,8 +36,6 @@ async def checkpoint_to_setup_transition(current_stage: Stage, next_stage: Stage
                 current_stage._save_file.close
             )
 
-            current_stage._executor.shutdown(wait=True)
-
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
@@ -46,8 +44,6 @@ async def checkpoint_to_setup_transition(current_stage: Stage, next_stage: Stage
                 current_stage._executor,
                 current_stage._save_file.close
             )
-
-            current_stage._executor.shutdown(wait=True)
 
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
@@ -68,7 +64,7 @@ async def checkpoint_to_optimize_transition(current_stage: Stage, next_stage: St
                 current_stage._save_file.close
             )
 
-            current_stage._executor.shutdown(wait=True)
+            
 
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
@@ -79,7 +75,7 @@ async def checkpoint_to_optimize_transition(current_stage: Stage, next_stage: St
                 current_stage._save_file.close
             )
 
-            current_stage._executor.shutdown(wait=True)
+            
 
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
@@ -100,7 +96,7 @@ async def checkpoint_to_execute_transition(current_stage: Stage, next_stage: Sta
                 current_stage._save_file.close
             )
 
-            current_stage._executor.shutdown(wait=True)
+            
 
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
@@ -111,7 +107,7 @@ async def checkpoint_to_execute_transition(current_stage: Stage, next_stage: Sta
                 current_stage._save_file.close
             )
 
-            current_stage._executor.shutdown(wait=True)
+            
 
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
@@ -132,7 +128,7 @@ async def checkpoint_to_teardown_transition(current_stage: Stage, next_stage: St
                 current_stage._save_file.close
             )
 
-            current_stage._executor.shutdown(wait=True)
+            
 
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
@@ -143,7 +139,7 @@ async def checkpoint_to_teardown_transition(current_stage: Stage, next_stage: St
                 current_stage._save_file.close
             )
 
-            current_stage._executor.shutdown(wait=True)
+            
 
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
@@ -164,7 +160,7 @@ async def checkpoint_to_analyze_transition(current_stage: Stage, next_stage: Sta
                 current_stage._save_file.close
             )
 
-            current_stage._executor.shutdown(wait=True)
+            
 
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
@@ -175,7 +171,7 @@ async def checkpoint_to_analyze_transition(current_stage: Stage, next_stage: Sta
                 current_stage._save_file.close
             )
 
-            current_stage._executor.shutdown(wait=True)
+            
 
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
@@ -196,7 +192,7 @@ async def checkpoint_to_submit_transition(current_stage: Stage, next_stage: Stag
                 current_stage._save_file.close
             )
 
-            current_stage._executor.shutdown(wait=True)
+            
 
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
@@ -207,7 +203,7 @@ async def checkpoint_to_submit_transition(current_stage: Stage, next_stage: Stag
                 current_stage._save_file.close
             )
 
-            current_stage._executor.shutdown(wait=True)
+            
 
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
@@ -228,7 +224,7 @@ async def checkpoint_to_complete_transition(current_stage: Stage, next_stage: St
                 current_stage._save_file.close
             )
 
-            current_stage._executor.shutdown(wait=True)
+            
 
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
@@ -239,7 +235,7 @@ async def checkpoint_to_complete_transition(current_stage: Stage, next_stage: St
                 current_stage._save_file.close
             )
 
-            current_stage._executor.shutdown(wait=True)
+            
 
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
@@ -260,7 +256,7 @@ async def checkpoint_to_wait_transition(current_stage: Stage, next_stage: Stage)
                 current_stage._save_file.close
             )
 
-            current_stage._executor.shutdown(wait=True)
+            
 
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
@@ -271,7 +267,7 @@ async def checkpoint_to_wait_transition(current_stage: Stage, next_stage: Stage)
                 current_stage._save_file.close
             )
 
-            current_stage._executor.shutdown(wait=True)
+            
 
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 

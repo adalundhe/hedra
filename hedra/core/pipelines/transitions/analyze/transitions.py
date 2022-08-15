@@ -60,9 +60,11 @@ async def analyze_to_checkpoint_transition(current_stage: Stage, next_stage: Sta
     except Exception as stage_runtime_error:
         return StageExecutionError(current_stage, next_stage, str(stage_runtime_error)), StageTypes.ERROR
 
-    next_stage.data = current_stage.context.summaries
+    next_stage.data = dict(current_stage.context.summaries)
     next_stage.previous_stage = current_stage.name
 
+    current_stage = None
+    
     return None, StageTypes.CHECKPOINT
 
 
@@ -76,8 +78,9 @@ async def analyze_to_submit_transition(current_stage: Stage, next_stage: Stage):
         return StageTimeoutError(current_stage), StageTypes.ERROR
     
     except Exception as stage_runtime_error:
-        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_runtime_error)), StageTypes.ERROR
+
+    current_stage = None
 
     return None, StageTypes.SUBMIT
 
@@ -93,5 +96,7 @@ async def analyze_to_wait_transition(current_stage: Stage, next_stage: Stage):
     
     except Exception as stage_runtime_error:
         return StageExecutionError(current_stage, next_stage, str(stage_runtime_error)), StageTypes.ERROR
+
+    current_stage = None
 
     return None, StageTypes.WAIT

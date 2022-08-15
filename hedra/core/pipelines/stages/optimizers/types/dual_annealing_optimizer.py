@@ -23,12 +23,11 @@ class DualAnnealingOptimizer:
 
         '''
 
-    async def optimize(self, func):
-        return await awaitable(
-                dual_annealing,
-                func,
-                self.bounds,
-                maxiter=self.max_iter,
-                maxfun=self.max_iter,
-                no_local_search=True
-            )
+    def optimize(self, func):
+        return dual_annealing(
+            func,
+            self.bounds,
+            maxiter=self.max_iter,
+            maxfun=self.max_iter,
+            no_local_search=True
+        )

@@ -51,6 +51,7 @@ class Analyze(Stage):
         ]
 
         self.accepted_hook_types = [ HookType.METRIC ]
+        self.requires_shutdown = True
 
     @Internal
     async def run(self):
@@ -83,5 +84,10 @@ class Analyze(Stage):
         
         stop = time.time()
         print('TOOK: ', stop-start)
+
+        self._shutdown_task = loop.run_in_executor(
+            None,
+            executor.shutdown
+        )
                     
         return summaries

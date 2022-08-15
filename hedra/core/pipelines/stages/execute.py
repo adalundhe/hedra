@@ -34,9 +34,11 @@ class Execute(Stage):
             HookType.CHECK
         ]
 
-        self.concurrent_execution_stages = []
+        self.total_concurrent_execute_stages = 0
         self.execution_stage_id = 0
         self.optimized = False
+        self.execute_setup_stage = None
+        self.requires_shutdown = True
 
     @Internal
     async def run(self):
@@ -47,8 +49,8 @@ class Execute(Stage):
             max_workers=self.workers
         )
 
-        if self.workers > 1 and len(self.concurrent_execution_stages) == 1:                
-            
+        if self.workers > 1 and self.total_concurrent_execute_stages == 1:                
+    
             results_sets = await asyncio.gather(*[
                 loop.run_in_executor(
                     executor,
@@ -81,12 +83,12 @@ class Execute(Stage):
 
             total_elapsed = statistics.median(elapsed_times)
 
-        elif self.workers > 1 and len(self.concurrent_execution_stages) > 1:
+        elif self.workers > 1 and self.total_concurrent_execute_stages > 1:
 
             if self.optimized is False:
 
                 batch_size = self.client._config.batch_size
-                stages_count = len(self.concurrent_execution_stages)
+                stages_count = self.total_concurrent_execute_stages
 
                 if stages_count > 1 and self.execution_stage_id == stages_count:
                     batch_size = int(batch_size/stages_count) + batch_size%stages_count
@@ -129,6 +131,7 @@ class Execute(Stage):
             results = await persona.execute()
             total_elapsed = persona.total_elapsed
             
+        self._shutdown_task = loop.run_in_executor(None, executor.shutdown)
 
         return {
             'results': results,

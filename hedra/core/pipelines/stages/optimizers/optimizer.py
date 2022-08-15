@@ -24,7 +24,7 @@ class Optimizer:
         self.actions = AsyncList()
         self.iterations = config.get('iterations')
 
-        self.algorithm = config.get('algorithm')
+        self.algorithm = config.get('algoritshm')
         if self.algorithm is None:
             self.algorithm = 'shg'
 
@@ -36,9 +36,6 @@ class Optimizer:
         self.batch_time = self.persona.total_time/self.iterations
         self.persona_total_time = self.persona.total_time
         self.persona.total_time = self.batch_time
-
-        self._target_aps = []
-        self._actual_aps = []
 
         self.initial_batch_size = self.persona.batch.size
         self.batch_max_size = int(self.persona.batch.size * 2)
@@ -55,15 +52,16 @@ class Optimizer:
         self._current_iter = 0
         self.optimized_results = {}
         self._max_aps = 0
+        self._event_loop: asyncio.AbstractEventLoop = None
 
-    async def optimize(self):
-        self._event_loop = asyncio.get_event_loop()
+    def optimize(self, loop):
+        self._event_loop = loop
 
         results = None
 
         start = time.time()
         
-        results = await self.optimizer.optimize(self._run_optimize)
+        results = self.optimizer.optimize(self._run_optimize)
 
         self.total_optimization_time = time.time() - start
 
@@ -102,8 +100,9 @@ class Optimizer:
     def _run_optimize(self, xargs):
         batch_size = xargs
 
-        optimization = asyncio.run_coroutine_threadsafe(self._optimize(int(batch_size)), self._event_loop)
-        inverse_actions_per_second = optimization.result()
+        inverse_actions_per_second = self._event_loop.run_until_complete(
+            self._optimize(int(batch_size))
+        )
 
         self._current_iter += 1
 

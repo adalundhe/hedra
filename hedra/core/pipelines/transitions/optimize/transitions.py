@@ -1,4 +1,5 @@
 import asyncio
+from sys import path
 import traceback
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_states import StageStates
@@ -11,50 +12,65 @@ from hedra.core.pipelines.transitions.exceptions import (
 
 async def optimize_transition(current_stage: Stage, next_stage: Stage):
 
+    execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE).items()
+    paths = current_stage.context.paths.get(current_stage.name)
+
+    path_lengths = current_stage.context.path_lengths.get(current_stage.name)
+
+    visited = current_stage.context.visited
+
+    execute_stages = {
+        stage_name: stage for stage_name, stage in execute_stages if stage_name in paths and stage_name not in visited
+    }
+
+    optimization_candidates = {}
+    
+    setup_stages = current_stage.context.stages.get(StageTypes.SETUP)
+    optimize_stages = current_stage.context.stages.get(StageTypes.OPTIMIZE)
+
+    for stage_name in path_lengths.keys():
+
+        execute_stage = execute_stages.get(stage_name)
+
+        if execute_stage:
+            execute_stage_paths = current_stage.context.paths.get(stage_name)
+            
+            for decendant_stage_name in execute_stage_paths:
+                if decendant_stage_name in setup_stages or decendant_stage_name in optimize_stages:
+                    optimization_candidates[stage_name] = execute_stage
+
+    current_stage.generation_optimization_candidates = len(optimization_candidates)
+
     valid_states = [
         StageStates.INITIALIZED,
-        StageStates.SETUP
+        StageStates.SETUP,
     ]
 
-    if next_stage.state in valid_states:
-        next_stage.state = StageStates.OPTIMIZING
+    stages = {}
 
-        next_stage_name = next_stage.name
-        execute_stage = current_stage.context.stages.get(
-            StageTypes.EXECUTE
-        ).get(next_stage_name)
+    next_stage_decendants = current_stage.context.paths.get(next_stage.name)
+    path_decendants = [
+        next_stage.name,
+        *next_stage_decendants
+    ]
 
-        execute_stages = execute_stage.context.stages.get(StageTypes.EXECUTE)
+    for execute_stage_name, execute_stage in optimization_candidates.items():
 
-        for generation_stage_name in execute_stage.generation_stage_names:
-            stage = execute_stages.get(generation_stage_name)
-            
-            if stage is not None:
-                execute_stage.concurrent_execution_stages.append(stage)
+        if execute_stage.state in valid_states and execute_stage.name in path_decendants:
+            execute_stage.state = StageStates.OPTIMIZING
+            stages[execute_stage_name] = execute_stage
 
-        for execution_stage_idx, exeuction_stage in enumerate(execute_stage.concurrent_execution_stages):
-            exeuction_stage.execution_stage_id = execution_stage_idx + 1
-        
-        current_stage.concurrent_execution_stages = list(execute_stage.concurrent_execution_stages)
-        current_stage.execution_stage_id = execute_stage.execution_stage_id
-        current_stage.execute_stage_config = execute_stage.client._config
-        current_stage.execute_stage_hooks = execute_stage.hooks
+    if current_stage.timeout:
+        optimization_results = await asyncio.wait_for(current_stage.run(stages), timeout=current_stage.timeout)
 
-        if current_stage.timeout:
-            optimized_config, optimized_hooks = await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
+    else:
+        optimization_results = await current_stage.run(stages)
 
-        else:
-            optimized_config, optimized_hooks = await current_stage.run()
+    next_stage.context.optimized_params = optimization_results
+    next_stage.state = StageStates.OPTIMIZED
 
-        execute_stage.client._config = optimized_config
-        execute_stage.hooks = optimized_hooks
-        execute_stage.optimized = True
-
-        next_stage.context.optimized_params = current_stage.results
-
-        next_stage.state = StageStates.OPTIMIZED
-
-        next_stage.context = current_stage.context
+    next_stage.context = current_stage.context
+    current_stage = None
 
 
 async def optimize_to_execute_transition(current_stage: Stage, next_stage: Stage):
@@ -67,6 +83,7 @@ async def optimize_to_execute_transition(current_stage: Stage, next_stage: Stage
         return StageTimeoutError(current_stage), StageTypes.ERROR
     
     except Exception as stage_execution_error:
+        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     return None, StageTypes.EXECUTE
@@ -76,10 +93,11 @@ async def optimize_to_checkpoint_transition(current_stage: Stage, next_stage: St
 
     try:
 
+        next_stage.previous_stage = current_stage.name
+
         await optimize_transition(current_stage, next_stage)
 
         next_stage.data = next_stage.context.optimized_params
-        next_stage.previous_stage = current_stage.name
             
     except asyncio.TimeoutError:
         return StageTimeoutError(current_stage), StageTypes.ERROR
@@ -94,10 +112,11 @@ async def optimize_to_wait_transition(current_stage: Stage, next_stage: Stage):
 
     try:
 
+        next_stage.previous_stage = current_stage.name
+        
         await optimize_transition(current_stage, next_stage)
 
         next_stage.data = next_stage.context.optimized_params
-        next_stage.previous_stage = current_stage.name
             
     except asyncio.TimeoutError:
         return StageTimeoutError(current_stage), StageTypes.ERROR
