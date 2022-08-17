@@ -1,9 +1,9 @@
+import struct
 from typing import Any
 from hedra.core.engines.types.http2.errors.exceptions import StreamClosedError
 from hedra.core.engines.types.http2.events.data_received_event import DataReceived
 from hedra.core.engines.types.http2.events.stream_ended_event import StreamEnded
 from hedra.core.engines.types.http2.frames.types.reset_stream_frame import RstStreamFrame
-from hedra.core.engines.types.http2.frames.types.window_update_frame import WindowUpdateFrame
 from hedra.core.engines.types.http2.reader_writer import ReaderWriter
 from .attributes import (
     Flag,
@@ -13,7 +13,7 @@ from .attributes import (
 from .base_frame import Frame
 
 
-class DataFrame(Padding, Frame):
+class DataFrame(Frame):
     frame_type='DATA'
     """
     DATA frames convey arbitrary, variable-length sequences of octets
@@ -36,6 +36,7 @@ class DataFrame(Padding, Frame):
 
         #: The data contained on this frame.
         self.data = data
+        self.pad_length = kwargs.get('pad_length', 0)
 
     def serialize_body(self) -> bytes:
         padding_data = self.serialize_padding_data()
@@ -43,11 +44,18 @@ class DataFrame(Padding, Frame):
         return padding_data + self.data + padding
 
     def parse_body(self, data: bytearray) -> None:
-        padding_data_length = self.parse_padding_data(data)
+
+        padding_data_length = 0
+
+        if 'PADDED' in self.flags:  # type: ignore
+            self.pad_length = struct.unpack('!B', data[:1])[0]
+            padding_data_length = 1
+
+        data_length = len(data)
         self.data = (
-            data[padding_data_length:len(data)-self.pad_length]
+            data[padding_data_length:data_length-self.pad_length]
         )
-        self.body_len = len(data)
+        self.body_len = data_length
 
     @property
     def flow_controlled_length(self) -> int:
@@ -102,7 +110,7 @@ class DataFrame(Padding, Frame):
             )
 
             if conn_increment:
-                f = WindowUpdateFrame(0)
+                f = Frame(0)
                 f.window_increment = conn_increment
                 frames.append(f)
 

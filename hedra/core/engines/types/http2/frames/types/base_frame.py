@@ -51,22 +51,6 @@ class Frame:
         for flag in flags:
             self.flags.add(flag)
 
-        if (not self.stream_id and
-           self.stream_association == _STREAM_ASSOC_HAS_STREAM):
-            raise Exception(
-                'Stream ID must be non-zero for {}'.format(
-                    type(self).__name__,
-                )
-            )
-        if (self.stream_id and
-           self.stream_association == _STREAM_ASSOC_NO_STREAM):
-            raise Exception(
-                'Stream ID must be zero for {} with stream_id={}'.format(
-                    type(self).__name__,
-                    self.stream_id,
-                )
-            )
-
     def __repr__(self) -> str:
         body_repr = self._body_repr(),
         return f"{type(self).__name__}(stream_id={self.stream_id}, flags={repr(self.flags)}): {body_repr}"

@@ -66,13 +66,12 @@ class DefaultPersona:
     async def execute(self):
         hooks = self._hooks
         total_time = self.total_time
+        loop = asyncio.get_running_loop()
 
         await self.start_updates()
-        
-        start = time.monotonic()
 
         completed, pending = await asyncio.wait([
-            asyncio.create_task(
+            loop.create_task(
                 hooks[action_idx].session.execute_prepared_request(
                     hooks[action_idx].action
                 )
@@ -80,8 +79,9 @@ class DefaultPersona:
         ], timeout=self.graceful_stop)
 
         self.end = time.monotonic()
-        self.start = start
         self.pending_actions = len(pending)
+
+        print('GOT: ', self.end - self.start)
 
         results = await asyncio.gather(*completed)
         
@@ -127,6 +127,8 @@ class DefaultPersona:
                     )
                 except asyncio.TimeoutError:
                     pass
+        
+        self.start = start
 
     async def start_updates(self):
         if self._live_updates:

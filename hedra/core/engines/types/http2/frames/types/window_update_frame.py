@@ -42,9 +42,7 @@ class WindowUpdateFrame(Frame):
         self.window_increment = window_increment
 
     def _body_repr(self) -> str:
-        return "window_increment={}".format(
-            self.window_increment,
-        )
+        return f"window_increment={self.window_increment}"
 
     def serialize_body(self) -> bytes:
         return _STRUCT_L.pack(self.window_increment & 0x7FFFFFFF)

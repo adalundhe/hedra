@@ -19,7 +19,7 @@ class Optimizer:
     }
 
     def __init__(self, config: Dict[str, Any]) -> None:
-        
+        self.stage_name = config.get('stage_name')
         self.persona = config.get('persona')
         self.actions = AsyncList()
         self.iterations = config.get('iterations')
@@ -86,8 +86,12 @@ class Optimizer:
                 hook.session.pool.connections = []
                 hook.session.pool.create_pool()
 
-            completed = await self.persona.execute()
-            completed_count = len([complete for complete in completed if complete.error is None])
+            try:
+                completed = await asyncio.wait_for(self.persona.execute(), timeout=self.batch_time * 2)
+                completed_count = len([complete for complete in completed if complete.error is None])
+            except asyncio.TimeoutError:
+                completed_count = 1
+
             elapsed = self.persona.end - self.persona.start
        
             if completed_count < 1:

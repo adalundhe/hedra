@@ -6,7 +6,6 @@ import h2.events
 import h2.exceptions
 import h2.settings
 import h2.errors
-from hyperframe.frame import SettingsFrame
 from hedra.core.engines.types.http2.reader_writer import ReaderWriter
 from hedra.core.engines.types.common.encoder import Encoder
 from hedra.core.engines.types.common.decoder import Decoder
@@ -74,48 +73,17 @@ class HTTP2Connection:
 
         return LARGEST_FLOW_CONTROL_WINDOW - current
 
-    async def _receive_events(self, stream: ReaderWriter) -> None:
-        
-        data = await asyncio.wait_for(stream.read(), timeout=10)
-
-        stream.frame_buffer.data.extend(data)
-        stream.frame_buffer.max_frame_size = stream.max_outbound_frame_size
-
-        events = []
-
-        for frame in stream.frame_buffer:
-            try:
-                frames, stream_events = frame.get_events_and_frames(stream, self)
-                if stream_events:
-                    events.extend(stream_events)
-
-            except Exception as e:
-                raise Exception(f'Connection {stream.stream_id} err- {str(e)}')
-
-            if frames:        
-                self._data_to_send += b''.join(f.serialize() for f in frames)
-
-        stream.write(self._data_to_send)
-        self._data_to_send = b''
-
-        return events
-
-    def connect(self, stream: ReaderWriter):
+    def send_request_headers(self, request: HTTP2Action, stream: ReaderWriter):
 
         self._headers_sent = False
 
         if self._init_sent is False or stream.reset_connection:
 
-            connection_data = bytearray(b'PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n')
-            settings_frame = SettingsFrame(0, settings=self.local_settings_dict)
-            connection_data.extend(settings_frame.serialize())
-
             window_increment = 65536
 
             self._inbound_flow_control_window_manager.window_opened(window_increment)
 
-            stream.write(bytes(connection_data))
-            self._data_to_send = b''
+            stream.write(bytes(stream.connection_data))
             self._init_sent = True
 
             self.outbound_flow_control_window = self.remote_settings.initial_window_size
@@ -126,11 +94,50 @@ class HTTP2Connection:
         stream.max_outbound_frame_size = self.remote_settings.max_frame_size
         stream.current_outbound_window_size = self.remote_settings.initial_window_size
 
+        end_stream = request.encoded_data is None
+        encoded_headers = request.encoded_headers
+
+        if request.hpack_encoder.header_table.maxsize != self._encoder.header_table.maxsize:
+            request.hpack_encoder.header_table_size = self._encoder.header_table.maxsize
+            request._setup_headers()
+    
+        stream.headers_frame.data = encoded_headers[0]
+        headers_frame = stream.headers_frame
+        if end_stream:
+            headers_frame.flags.add('END_STREAM')
+
+        stream.inbound.window_opened(65536) 
+  
+        stream.write(headers_frame.serialize())
+        self._headers_sent = True
+
     async def receive_response(self, response: HTTP2Result, stream: ReaderWriter):
        
         done = False
         while done is False:
-            events = await self._receive_events(stream)
+            # events = await self._receive_events(stream)
+            data = await asyncio.wait_for(stream.read(), timeout=10)
+
+            stream.frame_buffer.data.extend(data)
+            stream.frame_buffer.max_frame_size = stream.max_outbound_frame_size
+
+            events = []
+            write_data = bytearray()
+            for frame in stream.frame_buffer:
+                try:
+                    frames, stream_events = frame.get_events_and_frames(stream, self)
+                    if stream_events:
+                        events.extend(stream_events)
+
+                except Exception as e:
+                    raise Exception(f'Connection {stream.stream_id} err- {str(e)}')
+
+                if frames:
+                    for f in frames:
+                        write_data.extend(f.serialize())
+
+                    stream.write(write_data)
+
             for event in events:
                 if event.error_code is not None:
                     raise Exception(f'Connection - {stream.stream_id} err: {str(event)}')
@@ -140,43 +147,19 @@ class HTTP2Connection:
 
                 elif event.event_type == 'DATA_RECEIVED':
                     amount = event.flow_controlled_length
-                    frames = []
+    
                     conn_increment = self._inbound_flow_control_window_manager.process_bytes(amount)
 
                     if conn_increment:
-                        window_update_frame = WindowUpdateFrame(0, window_increment=conn_increment)
-                        stream.write(window_update_frame.serialize())
-                        self._data_to_send = b''
+                        stream.write_window_update_frame(0, conn_increment)
 
-                    response.body += event.data
+                    response.body.extend(event.data)
 
                 elif event.event_type == 'STREAM_ENDED' or event.event_type == 'STREAM_RESET':
                     done = True
                     break
         
         return response
-
-    def send_request_headers(self, request: HTTP2Action, stream: ReaderWriter) -> None:
-        end_stream = request.encoded_data is None
-        encoded_headers = request.encoded_headers
-
-        if request.hpack_encoder.header_table.maxsize != self._encoder.header_table.maxsize:
-            request.hpack_encoder.header_table_size = self._encoder.header_table.maxsize
-            request._setup_headers()
-
-    
-        stream.headers_frame.data = encoded_headers[0]
-        headers_frame = stream.headers_frame
-        headers_frame.flags.add('END_HEADERS')
-        if end_stream:
-            headers_frame.flags.add('END_STREAM')
-
-        stream.inbound.window_opened(65536) 
-  
-        stream.write(headers_frame.serialize())
-
-        self._data_to_send = b''
-        self._headers_sent = True
 
     async def submit_request_body(self, request: HTTP2Action, stream: ReaderWriter) -> None:
         data = request.encoded_data
@@ -203,10 +186,8 @@ class HTTP2Connection:
             assert self.outbound_flow_control_window >= 0
 
             stream.write(df.serialize())
-            self._data_to_send = b''
 
         df = DataFrame(stream.stream_id)
         df.flags.add('END_STREAM')
 
         stream.write(df.serialize())
-        self._data_to_send = b''

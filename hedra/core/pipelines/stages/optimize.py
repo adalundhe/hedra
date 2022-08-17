@@ -100,7 +100,6 @@ class Optimize(Stage):
 
             stage.optimized = True
 
-        
         self._shutdown_task = loop.run_in_executor(None, executor.shutdown)
         return [
             result.get('params') for result in results

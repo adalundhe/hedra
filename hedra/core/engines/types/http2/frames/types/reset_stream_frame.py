@@ -37,9 +37,7 @@ class RstStreamFrame(Frame):
         self.error_code = error_code
 
     def _body_repr(self) -> str:
-        return "error_code={}".format(
-            self.error_code,
-        )
+        return f"error_code={self.error_code}"
 
     def serialize_body(self) -> bytes:
         return _STRUCT_L.pack(self.error_code)

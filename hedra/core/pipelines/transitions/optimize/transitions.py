@@ -56,6 +56,7 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
 
     for execute_stage_name, execute_stage in optimization_candidates.items():
 
+
         if execute_stage.state in valid_states and execute_stage.name in path_decendants:
             execute_stage.state = StageStates.OPTIMIZING
             stages[execute_stage_name] = execute_stage
@@ -70,7 +71,6 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
     next_stage.state = StageStates.OPTIMIZED
 
     next_stage.context = current_stage.context
-    current_stage = None
 
 
 async def optimize_to_execute_transition(current_stage: Stage, next_stage: Stage):
@@ -83,8 +83,10 @@ async def optimize_to_execute_transition(current_stage: Stage, next_stage: Stage
         return StageTimeoutError(current_stage), StageTypes.ERROR
     
     except Exception as stage_execution_error:
-        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
+
+    
+    current_stage = None
 
     return None, StageTypes.EXECUTE
 
@@ -105,6 +107,8 @@ async def optimize_to_checkpoint_transition(current_stage: Stage, next_stage: St
     except Exception as stage_execution_error:
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
+    current_stage = None
+
     return None, StageTypes.CHECKPOINT
 
 
@@ -123,5 +127,7 @@ async def optimize_to_wait_transition(current_stage: Stage, next_stage: Stage):
     
     except Exception as stage_execution_error:
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
+
+    current_stage = None
 
     return None, StageTypes.WAIT

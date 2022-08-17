@@ -134,8 +134,6 @@ class MercuryHTTP2Client:
                 )
 
                 reader_writer.encoder = action.hpack_encoder
-
-                connection.connect(reader_writer)
      
                 response.connect_end = time.monotonic()
 

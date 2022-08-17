@@ -16,10 +16,12 @@ class CyclicNoWaitPersona(DefaultPersona):
         elapsed = 0
         idx = 0
 
-        start = time.time()
+        start = time.monotonic()
         while elapsed < total_time:
             yield idx%self.actions_count
             
             await asyncio.sleep(0)
-            elapsed = time.time() - start
+            elapsed = time.monotonic() - start
             idx += 1
+
+        self.start = start

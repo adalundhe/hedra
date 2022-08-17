@@ -1,3 +1,5 @@
+import struct
+import numpy
 from typing import Any
 from hedra.core.engines.types.http2.events.deferred_headers_event import DeferredHeaders
 from hedra.core.engines.types.http2.events.stream_ended_event import StreamEnded
@@ -7,12 +9,14 @@ from .attributes import (
     Padding,
     Priority,
     Flag,
-    _STREAM_ASSOC_HAS_STREAM
+    _STREAM_ASSOC_HAS_STREAM,
+    _STRUCT_B,
+    _STRUCT_LB
 )
 from .utils import raw_data_repr
 
 
-class HeadersFrame(Padding, Priority, Frame):
+class HeadersFrame(Frame):
     frame_type='HEADERS'
     """
     The HEADERS frame carries name-value pairs. It is used to open a stream.
@@ -43,6 +47,10 @@ class HeadersFrame(Padding, Priority, Frame):
 
         #: The HPACK-encoded header block.
         self.data = data
+        self.pad_length = kwargs.get('pad_length', 0)
+        self.depends_on = kwargs.get('depends_on', 0x0)
+        self.stream_weight = kwargs.get('stream_weight', 0x0)
+        self.exclusive = kwargs.get('exclusive', False)
 
     def _body_repr(self) -> str:
         return "exclusive={}, depends_on={}, stream_weight={}, data={}".format(
@@ -53,27 +61,42 @@ class HeadersFrame(Padding, Priority, Frame):
         )
 
     def serialize_body(self) -> bytes:
-        padding_data = self.serialize_padding_data()
+        padding_data = b''
+        if 'PADDED' in self.flags:  # type: ignore
+            padding_data = _STRUCT_B.pack(self.pad_length)
+
         padding = b'\0' * self.pad_length
 
         if 'PRIORITY' in self.flags:
-            priority_data = self.serialize_priority_data()
+            priority_data = _STRUCT_LB.pack(
+                self.depends_on + (0x80000000 if self.exclusive else 0),
+                self.stream_weight
+            )
         else:
             priority_data = b''
 
         return padding_data + priority_data + self.data + padding
 
     def parse_body(self, data: bytearray) -> None:
-        padding_data_length = self.parse_padding_data(data)
+        padding_data_length = 0
+        if 'PADDED' in self.flags:  # type: ignore
+            self.pad_length = struct.unpack('!B', data[:1])[0]
+            padding_data_length = 1
+   
         data = data[padding_data_length:]
 
         if 'PRIORITY' in self.flags:
-            priority_data_length = self.parse_priority_data(data)
+            self.depends_on, self.stream_weight = _STRUCT_LB.unpack(data[:5])
+            self.exclusive = True if self.depends_on >> 31 else False
+            self.depends_on &= 0x7FFFFFFF
+            priority_data_length = 5
+
         else:
             priority_data_length = 0
 
-        self.body_len = len(data)
-        self.data = data[priority_data_length:len(data)-self.pad_length]
+        data_length = len(data)
+        self.body_len = data_length
+        self.data = data[priority_data_length:data_length-self.pad_length]
 
     def get_events_and_frames(self, stream: ReaderWriter, connection):
         

@@ -1,4 +1,5 @@
 import asyncio
+import h2.settings
 from ssl import SSLContext
 from typing import Tuple, Optional, Union
 from hedra.core.engines.types.common.timeouts import Timeouts
@@ -6,7 +7,7 @@ from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common.connection_factory import ConnectionFactory
 from .reader_writer import ReaderWriter
 from .frames import FrameBuffer
-from .frames.types import HeadersFrame, WindowUpdateFrame
+from .frames.types import HeadersFrame, WindowUpdateFrame, SettingsFrame
 
 class AsyncStream:
 
@@ -26,9 +27,36 @@ class AsyncStream:
         self.port = None
         self._connection_factory = ConnectionFactory(stream_type)
         self.lock = asyncio.Lock()
-        self.reader_writer = None
+        self.reader_writer = ReaderWriter(self.stream_id, self.timeouts)
 
+        self.local_settings = h2.settings.Settings(
+            client=True,
+            initial_values={
+                h2.settings.SettingCodes.ENABLE_PUSH: 0,
+                h2.settings.SettingCodes.MAX_CONCURRENT_STREAMS: concurrency,
+                h2.settings.SettingCodes.MAX_HEADER_LIST_SIZE: 65535,
+            }
+        )
+        self.remote_settings = h2.settings.Settings(
+            client=False
+        )
+
+        self.outbound_flow_control_window = self.remote_settings.initial_window_size
+
+        del self.local_settings[h2.settings.SettingCodes.ENABLE_CONNECT_PROTOCOL]
+
+        self.local_settings_dict = {setting_name: setting_value for setting_name, setting_value in self.local_settings.items()}
+        self.remote_settings_dict = {setting_name: setting_value for setting_name, setting_value in self.remote_settings.items()}
+
+        self.settings_frame = SettingsFrame(0, settings=self.local_settings_dict)
+        self.headers_frame = HeadersFrame(self.init_id)
+        self.headers_frame.flags.add('END_HEADERS')
         
+        self.window_update_frame = WindowUpdateFrame(self.init_id, window_increment=65536)
+
+        self.reader_writer.connection_data.extend(self.settings_frame.serialize()
+        
+)
 
     async def connect(self, 
         hostname: str, 
@@ -56,10 +84,11 @@ class AsyncStream:
                     self.port = port
 
                     reader, writer = stream
-
-                    self.reader_writer = ReaderWriter(self.stream_id, reader, writer, self.timeouts)
-                    self.reader_writer.headers_frame = HeadersFrame(self.init_id)
-                    self.reader_writer.window_frame = WindowUpdateFrame(self.init_id, window_increment=65536)
+                    self.reader_writer.reader = reader
+                    self.reader_writer.writer = writer
+                  
+                    self.reader_writer.headers_frame = self.headers_frame
+                    self.reader_writer.window_frame = self.window_update_frame
 
                 else:
 

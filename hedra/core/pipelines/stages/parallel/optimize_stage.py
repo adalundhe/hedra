@@ -45,6 +45,7 @@ def optimize_stage(serialized_config: str):
 
     
     optimizer = Optimizer({
+        'stage_name': execute_stage_name,
         'iterations': optimize_iterations,
         'algorithm': optimizer_type,
         'persona': persona,
@@ -55,7 +56,6 @@ def optimize_stage(serialized_config: str):
     optimized_batch_size = results.get('optimized_batch_size')
 
     execute_stage_config.batch_size = optimized_batch_size
-
     loop.stop()
     loop.close()
 
