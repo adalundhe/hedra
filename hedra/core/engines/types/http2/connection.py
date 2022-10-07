@@ -1,36 +1,36 @@
 import asyncio
-import h2.stream
-import h2.config
-import h2.connection
-import h2.events
-import h2.exceptions
 import h2.settings
-import h2.errors
-from hedra.core.engines.types.http2.reader_writer import ReaderWriter
-from hedra.core.engines.types.common.encoder import Encoder
-from hedra.core.engines.types.common.decoder import Decoder
-from .action import HTTP2Action
-from .result import HTTP2Result
-from .windows import WindowManager
-from .frames.types import *
-
+from ssl import SSLContext
+from typing import Tuple, Optional, Union
+from hedra.core.engines.types.common.timeouts import Timeouts
+from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core.engines.types.common.protocols.tcp import (
+    TCPConnection
+)
+from .stream import Stream
+from .frames import FrameBuffer
+from .frames.types import HeadersFrame, WindowUpdateFrame, SettingsFrame
 
 class HTTP2Connection:
-    CONFIG = h2.config.H2Configuration(
-        validate_inbound_headers=False,
-    )
 
-    def __init__(self, concurrency):
-        self._h2_state = h2.connection.H2Connection(config=self.CONFIG)
+    def __init__(self, stream_id: int, timeouts: Timeouts, concurrency: int, reset_connection: bool, stream_type: RequestTypes) -> None:
+        self.timeouts = timeouts
         self.connected = False
+        self.init_id = stream_id
+        self.reset_connection = reset_connection
+        self.stream_type = stream_type
+
+        if self.init_id%2 == 0:
+            self.init_id += 1
+
+        self.stream_id = 0
         self.concurrency = concurrency
-        self._encoder = Encoder()
-        self._decoder = Decoder()
-        self._init_sent = False
-        self.stream_id = None
-        self._data_to_send = b''
-        self._headers_sent = False
+        self.dns_address = None
+        self.port = None
+
+        self.connection = TCPConnection(stream_type)
         self.lock = asyncio.Lock()
+        self.stream = Stream(self.stream_id, self.timeouts)
 
         self.local_settings = h2.settings.Settings(
             client=True,
@@ -48,146 +48,69 @@ class HTTP2Connection:
 
         del self.local_settings[h2.settings.SettingCodes.ENABLE_CONNECT_PROTOCOL]
 
-        self._inbound_flow_control_window_manager = WindowManager(
-            max_window_size=self.local_settings.initial_window_size
-        )
-
         self.local_settings_dict = {setting_name: setting_value for setting_name, setting_value in self.local_settings.items()}
         self.remote_settings_dict = {setting_name: setting_value for setting_name, setting_value in self.remote_settings.items()}
 
-
-    def _guard_increment_window(self, current, increment):
-        # The largest value the flow control window may take.
-        LARGEST_FLOW_CONTROL_WINDOW = 2**31 - 1
-
-        new_size = current + increment
-
-        if new_size > LARGEST_FLOW_CONTROL_WINDOW:
-            self.outbound_flow_control_window = (
-                self.remote_settings.initial_window_size
-            )
-
-            self._inbound_flow_control_window_manager = WindowManager(
-                max_window_size=self.local_settings.initial_window_size
-            )
-
-        return LARGEST_FLOW_CONTROL_WINDOW - current
-
-    def send_request_headers(self, request: HTTP2Action, stream: ReaderWriter):
-
-        self._headers_sent = False
-
-        if self._init_sent is False or stream.reset_connection:
-
-            window_increment = 65536
-
-            self._inbound_flow_control_window_manager.window_opened(window_increment)
-
-            stream.write(bytes(stream.connection_data))
-            self._init_sent = True
-
-            self.outbound_flow_control_window = self.remote_settings.initial_window_size
-
-        stream.inbound = WindowManager(self.local_settings.initial_window_size)
-        stream.outbound = WindowManager(self.remote_settings.initial_window_size)
-        stream.max_inbound_frame_size = self.local_settings.max_frame_size
-        stream.max_outbound_frame_size = self.remote_settings.max_frame_size
-        stream.current_outbound_window_size = self.remote_settings.initial_window_size
-
-        end_stream = request.encoded_data is None
-        encoded_headers = request.encoded_headers
-
-        if request.hpack_encoder.header_table.maxsize != self._encoder.header_table.maxsize:
-            request.hpack_encoder.header_table_size = self._encoder.header_table.maxsize
-            request._setup_headers()
-    
-        stream.headers_frame.data = encoded_headers[0]
-        headers_frame = stream.headers_frame
-        if end_stream:
-            headers_frame.flags.add('END_STREAM')
-
-        stream.inbound.window_opened(65536) 
-  
-        stream.write(headers_frame.serialize())
-        self._headers_sent = True
-
-    async def receive_response(self, response: HTTP2Result, stream: ReaderWriter):
-       
-        done = False
-        while done is False:
-            # events = await self._receive_events(stream)
-            data = await asyncio.wait_for(stream.read(), timeout=10)
-
-            stream.frame_buffer.data.extend(data)
-            stream.frame_buffer.max_frame_size = stream.max_outbound_frame_size
-
-            events = []
-            write_data = bytearray()
-            for frame in stream.frame_buffer:
-                try:
-                    frames, stream_events = frame.get_events_and_frames(stream, self)
-                    if stream_events:
-                        events.extend(stream_events)
-
-                except Exception as e:
-                    raise Exception(f'Connection {stream.stream_id} err- {str(e)}')
-
-                if frames:
-                    for f in frames:
-                        write_data.extend(f.serialize())
-
-                    stream.write(write_data)
-
-            for event in events:
-                if event.error_code is not None:
-                    raise Exception(f'Connection - {stream.stream_id} err: {str(event)}')
-
-                elif event.event_type == 'DEFERRED_HEADERS':
-                    response.deferred_headers = event
-
-                elif event.event_type == 'DATA_RECEIVED':
-                    amount = event.flow_controlled_length
-    
-                    conn_increment = self._inbound_flow_control_window_manager.process_bytes(amount)
-
-                    if conn_increment:
-                        stream.write_window_update_frame(0, conn_increment)
-
-                    response.body.extend(event.data)
-
-                elif event.event_type == 'STREAM_ENDED' or event.event_type == 'STREAM_RESET':
-                    done = True
-                    break
+        self.settings_frame = SettingsFrame(0, settings=self.local_settings_dict)
+        self.headers_frame = HeadersFrame(self.init_id)
+        self.headers_frame.flags.add('END_HEADERS')
         
-        return response
+        self.window_update_frame = WindowUpdateFrame(self.init_id, window_increment=65536)
 
-    async def submit_request_body(self, request: HTTP2Action, stream: ReaderWriter) -> None:
-        data = request.encoded_data
+        self.stream.connection_data.extend(self.settings_frame.serialize())
+
+    async def connect(self, 
+        hostname: str, 
+        dns_address: str,
+        port: int, 
+        socket_config: Tuple[int, int, int, int, Tuple[int, int]], 
+        ssl: Optional[SSLContext]=None,
+        timeout: Optional[float] = None
+    ) -> Union[Stream, Exception]:
         
-        while data:
-            local_flow = stream.current_outbound_window_size
-            max_frame_size = stream.max_outbound_frame_size
-            flow = min(local_flow, max_frame_size)
-            while flow == 0:
-                await self._receive_events(stream)
-                local_flow = stream.current_outbound_window_size
-                max_frame_size = stream.max_outbound_frame_size
-                flow = min(local_flow, max_frame_size)
-                
-            max_flow = flow
-            chunk_size = min(len(data), max_flow)
-            chunk, data = data[:chunk_size], data[chunk_size:]
+            try:
+                if self.connected is False or self.dns_address != dns_address or self.reset_connection:
+                    reader, writer = await asyncio.wait_for(
+                        self.connection.create_http2(
+                            hostname,
+                            socket_config=socket_config,
+                            ssl=ssl
+                        ),
+                        timeout=timeout
+                    )
 
-            df = DataFrame(stream.stream_id)
-            df.data = chunk
+                    self.connected = True
+                    self.stream_id = self.init_id
+                    self.dns_address = dns_address
+                    self.port = port
 
-            # Subtract flow_controlled_length to account for possible padding
-            self.outbound_flow_control_window -= df.flow_controlled_length
-            assert self.outbound_flow_control_window >= 0
+                    self.stream.reader = reader
+                    self.stream.writer = writer
+                  
+                    self.stream.headers_frame = self.headers_frame
+                    self.stream.window_frame = self.window_update_frame
 
-            stream.write(df.serialize())
+                else:
 
-        df = DataFrame(stream.stream_id)
-        df.flags.add('END_STREAM')
+                    self.stream_id += 2# self.concurrency
+                    if self.stream_id%2 == 0:
+                        self.stream_id += 1
 
-        stream.write(df.serialize())
+                    self.stream.stream_id = self.stream_id
+                    self.stream.headers_frame.stream_id = self.stream_id
+                    self.stream.window_frame.stream_id = self.stream_id
+
+                self.stream.frame_buffer = FrameBuffer()
+                return self.stream
+            
+            except asyncio.TimeoutError:
+                raise Exception('Connection timed out.')
+
+            except ConnectionResetError:
+                raise Exception('Connection reset.')
+
+            except Exception as e:
+                raise e
+
+    async def close(self):
+        await self.connection.close()

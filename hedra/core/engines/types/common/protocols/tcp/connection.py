@@ -1,55 +1,24 @@
 import asyncio
 from asyncio.constants import SSL_HANDSHAKE_TIMEOUT
+from asyncore import read
 import socket
-from weakref import ref
 from ssl import SSLContext
 from typing import Optional
-from .fast_streams import (
-    FastReader,
-    FastWriter,
-    FastReaderProtocol
-)
 from asyncio.sslproto import SSLProtocol
-from .types import RequestTypes
-
-_DEFAULT_LIMIT= 65536
-_HTTP2_LIMIT = _DEFAULT_LIMIT * 1024
-
-
-class TLSStreamReaderProtocol(asyncio.StreamReaderProtocol):
-
-    def upgrade_reader(self, reader: FastReader):
-
-        if self._stream_reader:
-            self._stream_reader.set_exception(Exception('upgraded connection to TLS, this reader is obsolete now.'))
-
-        self._stream_reader_wr = ref(reader)
-        self._source_traceback = reader._source_traceback
+from hedra.core.engines.types.common.types import RequestTypes
+from .protocol import (
+    TCPProtocol,
+    TCPReader,
+    TCPWriter
+)
+from .tls_protocol import TLSProtocol
+from .constants import (
+    _DEFAULT_LIMIT,
+    _HTTP2_LIMIT
+)
 
 
-class Connection:
-
-    def __init__(self, reader: FastReader, writer: FastWriter) -> None:
-        self._reader = reader
-        self._writer = writer
-
-    def send(self, data: bytes):
-        return self._writer.write(data)
-
-    def read(self, size: int=_DEFAULT_LIMIT):
-        return self._reader.read(size)
-
-    def readuntil(self, sep=b'\n'):
-        return self._reader.readuntil(separator=sep)
-
-    def read_headers(self):
-        return self._reader.read_headers()
-
-    def iter_headers(self):
-        return self._reader.iter_headers()
-
-
-class ConnectionFactory:
+class TCPConnection:
 
     def __init__(self, factory_type: RequestTypes = RequestTypes.HTTP) -> None:
         self.loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
@@ -70,8 +39,8 @@ class ConnectionFactory:
 
         self.socket.setblocking(False)
 
-        reader = FastReader(limit=limit, loop=self.loop)
-        reader_protocol = FastReaderProtocol(reader, loop=self.loop)
+        reader = TCPReader(limit=limit, loop=self.loop)
+        reader_protocol = TCPProtocol(reader, loop=self.loop)
 
         if ssl is None:
             hostname = None
@@ -83,11 +52,9 @@ class ConnectionFactory:
             ssl=ssl
         )
 
-        self._writer = FastWriter(self.transport, reader_protocol, reader, self.loop)
-
-        self._connection = Connection(reader, self._writer)
+        self._writer = TCPWriter(self.transport, reader_protocol, reader, self.loop)
         
-        return self._connection
+        return reader, self._writer
 
     async def create_http2(self, hostname=None, socket_config=None, ssl: Optional[SSLContext] = None, ssl_timeout: int = SSL_HANDSHAKE_TIMEOUT):
         # this does the same as loop.open_connection(), but TLS upgrade is done
@@ -98,14 +65,17 @@ class ConnectionFactory:
         family, type_, proto, _, address = socket_config
         
         socket_family = socket.AF_INET6 if family == 2 else socket.AF_INET
+
         self.socket = socket.socket(family=family, type=type_, proto=proto)
         self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+
         await self.loop.run_in_executor(None, self.socket.connect, address)
+        
         self.socket.setblocking(False)
 
-        reader = FastReader(limit=_HTTP2_LIMIT, loop=self.loop)
+        reader = TCPReader(limit=_HTTP2_LIMIT, loop=self.loop)
 
-        protocol = TLSStreamReaderProtocol(reader, loop=self.loop)
+        protocol = TLSProtocol(reader, loop=self.loop)
 
         self.transport, _ = await self.loop.create_connection(
             lambda: protocol, 
@@ -134,10 +104,12 @@ class ConnectionFactory:
 
         self.transport = ssl_protocol._app_transport
 
-        reader = FastReader(limit=_HTTP2_LIMIT, loop=self.loop)
+        reader = TCPReader(limit=_HTTP2_LIMIT, loop=self.loop)
+
         protocol.upgrade_reader(reader) # update reader
         protocol.connection_made(self.transport) # update transport
-        self._writer = FastWriter(self.transport, ssl_protocol, reader, self.loop) # update writer
+
+        self._writer = TCPWriter(self.transport, ssl_protocol, reader, self.loop) # update writer
 
         return reader, self._writer
 

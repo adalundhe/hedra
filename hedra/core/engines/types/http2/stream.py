@@ -1,116 +1,85 @@
-import asyncio
+
 import h2.settings
-from ssl import SSLContext
-from typing import Tuple, Optional, Union
+import struct
+from hedra.core.engines.types.common.encoder import Encoder
+from hedra.core.engines.types.common.protocols.tcp import (
+    TCPReader,
+    TCPWriter
+)
 from hedra.core.engines.types.common.timeouts import Timeouts
-from hedra.core.engines.types.common.types import RequestTypes
-from hedra.core.engines.types.common.connection_factory import ConnectionFactory
-from .reader_writer import ReaderWriter
-from .frames import FrameBuffer
-from .frames.types import HeadersFrame, WindowUpdateFrame, SettingsFrame
+from hedra.core.engines.types.http2.windows.window_manager import WindowManager
 
-class AsyncStream:
 
-    def __init__(self, stream_id: int, timeouts: Timeouts, concurrency: int, reset_connection: bool, stream_type: RequestTypes) -> None:
+class Stream:
+    READ_NUM_BYTES=65536
+
+    def __init__(self, stream_id: int, timeouts: Timeouts) -> None:
+        self.stream_id = stream_id
+        self.reader: TCPReader= None
+        self.writer: TCPWriter = None
         self.timeouts = timeouts
-        self.connected = False
-        self.init_id = stream_id
-        self.reset_connection = reset_connection
-        self.stream_type = stream_type
-
-        if self.init_id%2 == 0:
-            self.init_id += 1
-
-        self.stream_id = 0
-        self.concurrency = concurrency
-        self.dns_address = None
-        self.port = None
-        self._connection_factory = ConnectionFactory(stream_type)
-        self.lock = asyncio.Lock()
-        self.reader_writer = ReaderWriter(self.stream_id, self.timeouts)
-
-        self.local_settings = h2.settings.Settings(
-            client=True,
-            initial_values={
-                h2.settings.SettingCodes.ENABLE_PUSH: 0,
-                h2.settings.SettingCodes.MAX_CONCURRENT_STREAMS: concurrency,
-                h2.settings.SettingCodes.MAX_HEADER_LIST_SIZE: 65535,
-            }
-        )
-        self.remote_settings = h2.settings.Settings(
+        self.max_inbound_frame_size = 0
+        self.max_outbound_frame_size = 0
+        self.current_outbound_window_size = 0
+        self.content_length = 0
+        self.expected_content_length = 0
+        self.reset_connection = False
+        self.inbound: WindowManager  = None
+        self.outbound: WindowManager = None
+        self.closed_by = None
+        self._authority = None
+        self.frame_buffer = None
+        self.encoder: Encoder = None
+        self._remote_settings = h2.settings.Settings(
             client=False
         )
+        self._remote_settings_dict = {
+            setting_name: setting_value for setting_name, setting_value in self._remote_settings.items()
+        }
 
-        self.outbound_flow_control_window = self.remote_settings.initial_window_size
+        self.settings_frame = None
+        self.headers_frame = None
+        self.window_frame = None
 
-        del self.local_settings[h2.settings.SettingCodes.ENABLE_CONNECT_PROTOCOL]
+        self.connection_data = bytearray(b'PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n')
 
-        self.local_settings_dict = {setting_name: setting_value for setting_name, setting_value in self.local_settings.items()}
-        self.remote_settings_dict = {setting_name: setting_value for setting_name, setting_value in self.remote_settings.items()}
+        self._STRUCT_HBBBL = struct.Struct(">HBBBL")
+        self._STRUCT_LL = struct.Struct(">LL")
+        self._STRUCT_HL = struct.Struct(">HL")
+        self._STRUCT_LB = struct.Struct(">LB")
+        self._STRUCT_L = struct.Struct(">L")
+        self. _STRUCT_H = struct.Struct(">H")
+        self._STRUCT_B = struct.Struct(">B")
 
-        self.settings_frame = SettingsFrame(0, settings=self.local_settings_dict)
-        self.headers_frame = HeadersFrame(self.init_id)
-        self.headers_frame.flags.add('END_HEADERS')
-        
-        self.window_update_frame = WindowUpdateFrame(self.init_id, window_increment=65536)
+    def write(self, data: bytes):
+        self.writer._transport.write(data)
 
-        self.reader_writer.connection_data.extend(self.settings_frame.serialize()
-        
-)
+    def read(self, msg_length: int=READ_NUM_BYTES):
+        return self.reader.read(msg_length)
 
-    async def connect(self, 
-        hostname: str, 
-        dns_address: str,
-        port: int, 
-        socket_config: Tuple[int, int, int, int, Tuple[int, int]], 
-        ssl: Optional[SSLContext]=None,
-        timeout: Optional[float] = None
-    ) -> Union[ReaderWriter, Exception]:
-        
-            try:
-                if self.connected is False or self.dns_address != dns_address or self.reset_connection:
-                    stream = await asyncio.wait_for(
-                        self._connection_factory.create_http2(
-                            hostname,
-                            socket_config=socket_config,
-                            ssl=ssl
-                        ),
-                        timeout=timeout
-                    )
+    def get_raw_buffer(self) -> bytearray:
+        return self.reader._buffer
 
-                    self.connected = True
-                    self.stream_id = self.init_id
-                    self.dns_address = dns_address
-                    self.port = port
+    def write_window_update_frame(self, stream_id: int=None, window_increment: int=None):
 
-                    reader, writer = stream
-                    self.reader_writer.reader = reader
-                    self.reader_writer.writer = writer
-                  
-                    self.reader_writer.headers_frame = self.headers_frame
-                    self.reader_writer.window_frame = self.window_update_frame
+        if stream_id is None:
+            stream_id = self.stream_id
 
-                else:
+        body = self._STRUCT_L.pack(window_increment & 0x7FFFFFFF)
+        body_len = len(body)
 
-                    self.stream_id += 2# self.concurrency
-                    if self.stream_id%2 == 0:
-                        self.stream_id += 1
+        type = 0x08
 
-                    self.reader_writer.stream_id = self.stream_id
-                    self.reader_writer.headers_frame.stream_id = self.stream_id
-                    self.reader_writer.window_frame.stream_id = self.stream_id
+        # Build the common frame header.
+        # First, get the flags.
+        flags = 0
 
-                self.reader_writer.frame_buffer = FrameBuffer()
-                return self.reader_writer
-            
-            except asyncio.TimeoutError:
-                raise Exception('Connection timed out.')
+        header = self._STRUCT_HBBBL.pack(
+            (body_len >> 8) & 0xFFFF,  # Length spread over top 24 bits
+            body_len & 0xFF,
+            type,
+            flags,
+            stream_id & 0x7FFFFFFF  # Stream ID is 32 bits.
+        )
 
-            except ConnectionResetError:
-                raise Exception('Connection reset.')
-
-            except Exception as e:
-                raise e
-
-    async def close(self):
-        await self._connection_factory.close()
+        self.writer.write(header + body)

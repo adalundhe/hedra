@@ -1,6 +1,5 @@
 import asyncio
 import inspect
-from typing import Dict, List
 from hedra.core.pipelines.hooks.registry.registrar import registrar
 from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.pipelines.hooks.types.hook import Hook

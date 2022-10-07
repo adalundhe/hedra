@@ -1,7 +1,5 @@
 import asyncio
 import time
-import psutil
-import traceback
 from typing import Awaitable, Dict, Set, Tuple, Union
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
 from hedra.core.engines.types.common.timeouts import Timeouts
@@ -147,7 +145,7 @@ class MercuryHTTPClient:
 
                 response.write_end = time.monotonic()
 
-                response.response_code = await connection._connection._reader.readline_fast()
+                response.response_code = await connection.reader.readline_fast()
     
                 headers = await connection.read_headers()
 

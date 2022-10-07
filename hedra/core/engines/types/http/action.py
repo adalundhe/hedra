@@ -4,7 +4,7 @@ from typing import Dict, Iterator, Union, List
 from urllib.parse import urlencode
 from hedra.core.engines.types.common.base_action import BaseAction
 from hedra.core.engines.types.common.constants import NEW_LINE
-from hedra.core.engines.types.common.fast_streams import FastWriter
+from hedra.core.engines.types.common.protocols.tcp import TCPWriter
 from hedra.core.engines.types.common import URL
 from hedra.core.engines.types.common.types import RequestTypes
 
@@ -127,7 +127,7 @@ class HTTPAction(BaseAction):
 
             self.encoded_headers = (get_base + NEW_LINE).encode()
 
-    def write_chunks(self, writer: FastWriter):
+    def write_chunks(self, writer: TCPWriter):
         for chunk in self.data:
             writer.write(chunk)
 

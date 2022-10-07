@@ -3,8 +3,8 @@ import time
 import traceback
 from typing import Awaitable, Dict, Set, Tuple
 from hedra.core.engines.types.common.timeouts import Timeouts
+from hedra.core.engines.types.http2.pipe import HTTP2Pipe
 from hedra.core.engines.types.http2.connection import HTTP2Connection
-from hedra.core.engines.types.http2.stream import AsyncStream
 from hedra.core.engines.types.common.ssl import get_http2_ssl_context
 from .pool import HTTP2Pool
 from .action import HTTP2Action
@@ -48,7 +48,7 @@ class MercuryHTTP2Client:
                 for ip_addr, configs in socket_configs.items():
                         for config in configs:
 
-                            stream = AsyncStream(
+                            connection = HTTP2Connection(
                                 0, 
                                 self.timeouts, 
                                 1,
@@ -58,7 +58,7 @@ class MercuryHTTP2Client:
 
                             try:
                                 
-                                await stream.connect(
+                                await connection.connect(
                                     request.url.hostname,
                                     ip_addr,
                                     request.url.port,
@@ -96,15 +96,15 @@ class MercuryHTTP2Client:
     def extend_pool(self, increased_capacity: int):
         self.pool.size += increased_capacity
         for _ in range(increased_capacity):
-            self.pool.connections.append(
-                HTTP2Connection(self.pool.reset_connections)
+            self.pool.pipes.append(
+                HTTP2Pipe(self.pool.reset_connections)
             )
         
         self.sem = asyncio.Semaphore(self.pool.size)
 
     def shrink_pool(self, decrease_capacity: int):
         self.pool.size -= decrease_capacity
-        self.pool.connections = self.pool.connections[:self.pool.size]
+        self.pool.pipes = self.pool.pipes[:self.pool.size]
         self.sem = asyncio.Semaphore(self.pool.size)
 
     async def execute_prepared_request(self, action: HTTP2Action) -> HTTP2ResponseFuture:
@@ -114,7 +114,7 @@ class MercuryHTTP2Client:
 
         async with self.sem:
 
-            stream = self.pool.streams.pop()
+            pipe = self.pool.pipes.pop()
             connection = self.pool.connections.pop()
         
             try:
@@ -125,7 +125,7 @@ class MercuryHTTP2Client:
 
                 response.start = time.monotonic()
 
-                reader_writer = await stream.connect(
+                stream = await connection.connect(
                     action.url.hostname,
                     action.url.ip_addr,
                     action.url.port,
@@ -133,18 +133,18 @@ class MercuryHTTP2Client:
                     ssl=action.ssl_context
                 )
 
-                reader_writer.encoder = action.hpack_encoder
+                stream.encoder = action.hpack_encoder
      
                 response.connect_end = time.monotonic()
 
-                connection.send_request_headers(action, reader_writer)
+                pipe.send_request_headers(action, stream)
   
                 if action.encoded_data is not None:
-                    await connection.submit_request_body(action, reader_writer)
+                    await pipe.submit_request_body(action, stream)
 
                 response.write_end = time.monotonic()
 
-                await connection.receive_response(response, reader_writer)
+                await pipe.receive_response(response, stream)
 
                 response.read_end = time.monotonic()
 
@@ -152,7 +152,7 @@ class MercuryHTTP2Client:
                     action = await action.hooks.after(action, response)
                     action.setup()
 
-                self.pool.streams.append(stream)
+                self.pool.pipes.append(pipe)
                 self.pool.connections.append(connection)
                 
             except Exception as e:

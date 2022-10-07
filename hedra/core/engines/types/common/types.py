@@ -4,11 +4,13 @@ import socket
 class SocketTypes:
     DEFAULT=socket.AF_INET
     HTTP2=socket.AF_INET
+    UDP=socket.AF_INET
     NONE=None
 
 class SocketProtocols:
     DEFAULT=socket.SOCK_STREAM
     HTTP2=socket.SOCK_STREAM
+    UDP=socket.SOCK_DGRAM
     NONE=None
 
 
@@ -20,6 +22,7 @@ class RequestTypes:
     GRAPHQL_HTTP2="GRAPHQL_HTTP2"
     GRPC='GRPC'
     PLAYWRIGHT='PLAYWRIGHT'
+    UDP='UDP'
 
 
 class ProtocolMap:
@@ -32,6 +35,7 @@ class ProtocolMap:
             RequestTypes.GRAPHQL: SocketTypes.DEFAULT,
             RequestTypes.GRAPHQL_HTTP2: SocketTypes.HTTP2,
             RequestTypes.GRPC: SocketTypes.HTTP2,
+            RequestTypes.UDP: SocketTypes.UDP,
             RequestTypes.PLAYWRIGHT: SocketTypes.NONE
         }
 
@@ -42,6 +46,7 @@ class ProtocolMap:
             RequestTypes.GRAPHQL: SocketProtocols.DEFAULT,
             RequestTypes.GRAPHQL_HTTP2: SocketTypes.HTTP2,
             RequestTypes.GRPC: SocketProtocols.HTTP2,
+            RequestTypes.UDP: SocketProtocols.UDP,
             RequestTypes.PLAYWRIGHT: SocketProtocols.NONE
         }
 

@@ -2,7 +2,6 @@ import inspect
 from inspect import iscoroutinefunction
 import os
 from pathlib import Path
-import traceback
 from types import MethodType
 from typing import Dict
 from collections import defaultdict

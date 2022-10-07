@@ -3,7 +3,7 @@ import numpy
 from typing import Any
 from hedra.core.engines.types.http2.events.deferred_headers_event import DeferredHeaders
 from hedra.core.engines.types.http2.events.stream_ended_event import StreamEnded
-from hedra.core.engines.types.http2.reader_writer import ReaderWriter
+from hedra.core.engines.types.http2.stream import Stream
 from .base_frame import Frame
 from .attributes import (
     Padding,
@@ -98,7 +98,7 @@ class HeadersFrame(Frame):
         self.body_len = data_length
         self.data = data[priority_data_length:data_length-self.pad_length]
 
-    def get_events_and_frames(self, stream: ReaderWriter, connection):
+    def get_events_and_frames(self, stream: Stream, connection):
         
         # Hyper H2 would have you immediate unpack the headers,
         # but as with the Encoder, the Decoder blocks the event loop.

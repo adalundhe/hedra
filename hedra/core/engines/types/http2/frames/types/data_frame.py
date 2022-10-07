@@ -4,7 +4,7 @@ from hedra.core.engines.types.http2.errors.exceptions import StreamClosedError
 from hedra.core.engines.types.http2.events.data_received_event import DataReceived
 from hedra.core.engines.types.http2.events.stream_ended_event import StreamEnded
 from hedra.core.engines.types.http2.frames.types.reset_stream_frame import RstStreamFrame
-from hedra.core.engines.types.http2.reader_writer import ReaderWriter
+from hedra.core.engines.types.http2.stream import Stream
 from .attributes import (
     Flag,
     _STREAM_ASSOC_HAS_STREAM,
@@ -70,7 +70,7 @@ class DataFrame(Frame):
             padding_len = self.pad_length + 1
         return len(self.data) + padding_len
 
-    def get_events_and_frames(self, stream: ReaderWriter, connection):
+    def get_events_and_frames(self, stream: Stream, connection):
         end_stream = 'END_STREAM' in self.flags
         flow_controlled_length = self.flow_controlled_length
         frame_data = self.data

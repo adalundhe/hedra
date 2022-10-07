@@ -2,7 +2,7 @@ import struct
 import h2.errors
 from typing import List, Any
 from hedra.core.engines.types.http2.events.stream_reset import StreamReset
-from hedra.core.engines.types.http2.reader_writer import ReaderWriter
+from hedra.core.engines.types.http2.stream import Stream
 from hedra.core.engines.types.http2.streams.stream_closed_by import StreamClosedBy
 from .base_frame import Frame
 from .attributes import (
@@ -46,7 +46,7 @@ class RstStreamFrame(Frame):
         self.error_code = _STRUCT_L.unpack(data)[0]
         self.body_len = 4
     
-    def get_events_and_frames(self, stream: ReaderWriter, connection):
+    def get_events_and_frames(self, stream: Stream, connection):
 
         stream.closed_by = StreamClosedBy.RECV_RST_STREAM
         reset_event = StreamReset()

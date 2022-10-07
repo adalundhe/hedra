@@ -4,7 +4,7 @@ from hedra.core.engines.types.http2.errors.types import ErrorCodes
 from hedra.core.engines.types.http2.events.stream_reset import StreamReset
 from hedra.core.engines.types.http2.events.window_updated_event import WindowUpdated
 from hedra.core.engines.types.http2.frames.types.reset_stream_frame import RstStreamFrame
-from hedra.core.engines.types.http2.reader_writer import ReaderWriter
+from hedra.core.engines.types.http2.stream import Stream
 from .base_frame import Frame
 from .attributes import (
     Flag,
@@ -51,7 +51,7 @@ class WindowUpdateFrame(Frame):
         self.window_increment = _STRUCT_L.unpack(data)[0]
         self.body_len = 4
 
-    def get_events_and_frames(self, stream: ReaderWriter, connection):
+    def get_events_and_frames(self, stream: Stream, connection):
         stream_events = []
         frames = []
         increment = self.window_increment

@@ -1,5 +1,5 @@
 import h2.errors
-from hedra.core.engines.types.http2.reader_writer import ReaderWriter
+from hedra.core.engines.types.http2.stream import Stream
 from hedra.core.engines.types.http2.events.connection_terminated_event import ConnectionTerminated
 from typing import List, Any
 from .base_frame import Frame
@@ -67,7 +67,7 @@ class GoAwayFrame(Frame):
         if len(data) > 8:
             self.additional_data = data[8:]
 
-    def get_events_and_frames(self, stream: ReaderWriter, connection):
+    def get_events_and_frames(self, stream: Stream, connection):
         self._data_to_send = b''
 
         new_event = ConnectionTerminated()

@@ -24,7 +24,7 @@ prometheus-client
 prometheus-api-client
 psycopg2-binary
 motor
-datadog==0.42.0
+datadog
 cassandra-driver
 redis
 aioredis

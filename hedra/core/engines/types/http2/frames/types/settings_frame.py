@@ -1,7 +1,7 @@
 from typing import Optional, Dict, Any
 from hedra.core.engines.types.http2.events.remote_settings_changed_event import RemoteSettingsChanged
 from hedra.core.engines.types.http2.events.settings_acknowledged_event import SettingsAcknowledged
-from hedra.core.engines.types.http2.reader_writer import ReaderWriter
+from hedra.core.engines.types.http2.stream import Stream
 from hedra.core.engines.types.http2.streams.stream_settings import SettingCodes
 from .base_frame import Frame
 from .attributes import (
@@ -66,7 +66,7 @@ class SettingsFrame(Frame):
 
         self.body_len = body_len
 
-    def get_events_and_frames(self, stream: ReaderWriter, connection):
+    def get_events_and_frames(self, stream: Stream, connection):
         events = []
         if 'ACK' in self.flags:
 

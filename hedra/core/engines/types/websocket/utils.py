@@ -2,7 +2,7 @@ import os
 import struct
 from typing import Tuple
 from base64 import encodebytes as base64encode
-from hedra.core.engines.types.http.connection import Connection
+from .connection import WebsocketConnection
 from .constants import HEADER_LENGTH_INDEX
 
 def create_sec_websocket_key():
@@ -34,7 +34,7 @@ def get_header_bits(raw_headers: bytes):
     return header_bits
 
 
-async def get_message_buffer_size(header_bits: Tuple[int], connection: Connection):
+async def get_message_buffer_size(header_bits: Tuple[int], connection: WebsocketConnection):
         bits = header_bits[HEADER_LENGTH_INDEX]
         length_bits = bits & 0x7f
         length = 0
