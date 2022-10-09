@@ -81,9 +81,6 @@ class Analyze(Stage):
         for result in processed_results:
             summaries['stages'].update(result.get('stage_metrics'))
             summaries['session_total'] += result.get('stage_total')
-        
-        stop = time.time()
-        print('TOOK: ', stop-start)
 
         self._shutdown_task = loop.run_in_executor(
             None,

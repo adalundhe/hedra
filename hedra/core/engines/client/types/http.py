@@ -1,5 +1,4 @@
 import asyncio
-from types import FunctionType
 from typing import Dict, Iterator, List, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.http.client import MercuryHTTPClient

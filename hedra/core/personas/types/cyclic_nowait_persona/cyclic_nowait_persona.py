@@ -23,5 +23,4 @@ class CyclicNoWaitPersona(DefaultPersona):
             await asyncio.sleep(0)
             elapsed = time.monotonic() - start
             idx += 1
-
-        self.start = start
+            

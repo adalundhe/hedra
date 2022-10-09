@@ -64,4 +64,3 @@ class WeightedSelectionPersona(DefaultPersona):
                 weights=self.weights,
                 k=self.batch.size
             )
-            

@@ -5,6 +5,12 @@ from .utils import raw_data_repr
 
 
 class ExtensionFrame(Frame):
+    __slots__ = (
+        'type',
+        'flag_byte',
+        'body'
+    )
+
     frame_type='EXTENSION'
     """
     ExtensionFrame is used to wrap frames which are not natively interpretable

@@ -3,6 +3,11 @@ from typing import Dict, List, Optional
 
 class Metadata:
 
+    __slots__ = (
+        'user',
+        'tags'
+    )
+
     def __init__(self, user: Optional[str] = None, tags: List[Dict[str, str]] = []) -> None:
         self.user = user
         self.tags = tags

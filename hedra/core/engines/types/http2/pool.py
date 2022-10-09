@@ -1,4 +1,3 @@
-import math
 from random import randrange
 from typing import List
 from hedra.core.engines.types.common.timeouts import Timeouts
@@ -8,6 +7,15 @@ from .connection import HTTP2Connection
 
 
 class HTTP2Pool:
+
+    __slots__ = (
+        'size',
+        'connections',
+        'pipes',
+        'timeouts',
+        'reset_connections',
+        'pool_type'
+    )
 
     def __init__(self, size: int, timeouts: Timeouts, reset_connections: bool=False) -> None:
         self.size = size

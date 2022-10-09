@@ -13,6 +13,10 @@ from .attributes import (
 
 
 class RstStreamFrame(Frame):
+    __slots__ = (
+        'error_code'
+    )
+
     frame_type='RESET'
     """
     The RST_STREAM frame allows for abnormal termination of a stream. When sent

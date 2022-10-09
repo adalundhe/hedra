@@ -14,6 +14,11 @@ from .base_frame import Frame
 
 
 class DataFrame(Frame):
+    __slots__ = (
+        'data',
+        'pad_length'
+    )
+
     frame_type='DATA'
     """
     DATA frames convey arbitrary, variable-length sequences of octets

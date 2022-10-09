@@ -17,6 +17,13 @@ from .types import FRAMES
 
 
 class FrameBuffer:
+
+    __slots__ = (
+        'data',
+        'max_frame_size',
+        '_headers_buffer'
+    )
+
     """
     This is a data structure that expects to act as a buffer for HTTP/2 data
     that allows iteraton in terms of H2 frames.

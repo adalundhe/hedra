@@ -4,6 +4,7 @@ from .struct_types import _STRUCT_LB
 
 
 class Priority:
+
     """
     Mixin for frames that contain priority data. Defines extra fields that can
     be used and set by frames that contain priority data.

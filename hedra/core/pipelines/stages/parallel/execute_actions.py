@@ -9,7 +9,8 @@ from hedra.core.engines.types import (
     MercuryHTTP2Client,
     MercuryHTTPClient,
     MercuryPlaywrightClient,
-    MercuryWebsocketClient
+    MercuryWebsocketClient,
+    MercuryUDPClient
 )
 
 from hedra.core.engines.types.http import HTTPAction
@@ -19,6 +20,7 @@ from hedra.core.engines.types.graphql_http2 import GraphQLHTTP2Action
 from hedra.core.engines.types.grpc import GRPCAction
 from hedra.core.engines.types.playwright import PlaywrightResult
 from hedra.core.engines.types.websocket import WebsocketAction
+from hedra.core.engines.types.udp import UDPAction
 from hedra.core.engines.types.common.types import RequestTypes
 
 from hedra.core.pipelines.hooks.registry.registrar import registrar
@@ -171,12 +173,55 @@ def execute_actions(parallel_config: str):
 
                 hooks[HookType.ACTION].append(hook)
 
+            elif action_type == RequestTypes.UDP:
+
+                hook.session = MercuryUDPClient(
+                    concurrency=persona.batch.size,
+                    timeouts=hook_action.get('timeouts'),
+                    reset_connections=hook_action.get('reset_connections')
+                )
+
+                action_url = hook_action.get('url')
+                action_data = hook_action.get('data')
+                action_metadata = hook_action.get('metadata')
+
+                hook.action = UDPAction(
+                    action_name,
+                    action_url.get('url'),
+                    wait_for_response=hook_action.get('wait_for_response'),
+                    data=action_data.get('data'),
+                    user=action_metadata.get('user'),
+                    tags=action_metadata.get('tags')
+                )
+
+                if before_hook_name:
+                    before_hook = registrar.all.get(before_hook_name)
+                    hook.action.hooks.before = before_hook.call
+
+                if after_hook_name:
+                    after_hook = registrar.all.get(after_hook_name)
+                    hook.action.hooks.after = after_hook.call
+
+                hook.action.hooks.checks = []
+                for check_hook_name in check_hook_names:
+                    hook.action.hooks.checks.append(check_hook_name)
+
+                hook.action.url.ip_addr = action_url.get('ip_addr')
+                hook.action.url.port = action_url.get('port')
+                hook.action.url.socket_config = action_url.get('socket_config')
+                hook.action.url.is_ssl = action_url.get('is_ssl')
+
+                if hook.action.url.is_ssl:
+                    hook.action.ssl_context = hook.session.ssl_context
+
+                hook.action.encoded_data = action_data.get('encoded_data')
+
+                hooks[HookType.ACTION].append(hook)
+
+
         persona.setup(hooks)
 
         results = loop.run_until_complete(persona.execute())
-
-        loop.stop()
-        loop.close()
 
         return {
             'results': results,

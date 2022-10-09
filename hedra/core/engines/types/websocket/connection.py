@@ -8,4 +8,4 @@ class WebsocketConnection(HTTPConnection):
         super().__init__(reset_connection)
 
     def iter_headers(self):
-        return self._connection.iter_headers()
+        return self.reader.iter_headers()

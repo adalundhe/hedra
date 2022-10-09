@@ -1,7 +1,6 @@
 import time
 import asyncio
 from typing import Awaitable, Dict, Union, Tuple, Set
-from hedra.core.engines.types.http.client import MercuryHTTPClient
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
 from .connection import WebsocketConnection

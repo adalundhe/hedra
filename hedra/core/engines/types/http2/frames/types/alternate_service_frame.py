@@ -23,6 +23,11 @@ class AltSvcFrame(Frame):
 
     stream_association = _STREAM_ASSOC_EITHER
 
+    __slots__ = (
+        'origin', 
+        'field'
+    )
+
     def __init__(self, stream_id: int, origin: bytes = b'', field: bytes = b'', **kwargs: Any) -> None:
         super().__init__(stream_id, **kwargs)
 

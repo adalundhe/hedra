@@ -3,6 +3,7 @@ from .base_event import BaseEvent
 
 class TrailersReceived(BaseEvent):
     event_type='TRAILERS_RECEIVED'
+    __slots__ = ('stream_id', 'headers', 'stream_ended', 'priority_updated')
     """
     The TrailersReceived event is fired whenever trailers are received on a
     stream. Trailers are a set of headers sent after the body of the

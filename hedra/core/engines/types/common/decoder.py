@@ -158,6 +158,13 @@ class Decoder:
         Defaults to 64kB.
     :type max_header_list_size: ``int``
     """
+
+    __slots__ = (
+        'header_table', 
+        'max_header_list_size',
+        'max_allowed_table_size'
+    )
+
     def __init__(self, max_header_list_size=DEFAULT_MAX_HEADER_LIST_SIZE):
         self.header_table = HeaderTable()
 

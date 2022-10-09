@@ -17,6 +17,18 @@ HTTP2BatchResponseFuture = Awaitable[Tuple[Set[HTTP2ResponseFuture], Set[HTTP2Re
 
 class MercuryHTTP2Client:
 
+    __slots__ = (
+        'timeouts',
+        '_hosts',
+        'registered',
+        'closed',
+        'sem',
+        'pool',
+        'active',
+        'waiter',
+        'ssl_context'
+    )
+
     def __init__(self, concurrency: int = 10**3, timeouts: Timeouts = Timeouts(), reset_connections: bool=False) -> None:
 
         self.timeouts = timeouts
@@ -71,7 +83,6 @@ class MercuryHTTP2Client:
                                 break
 
                             except Exception as e:
-                                print(traceback.format_exc())
                                 pass
 
                         if request.url.socket_config:

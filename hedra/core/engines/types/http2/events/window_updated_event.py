@@ -3,6 +3,7 @@ from .base_event import BaseEvent
 
 class WindowUpdated(BaseEvent):
     event_type='WINDOW_UPDATED'
+    __slots__ = ('stream_id', 'delta')
     """
     The WindowUpdated event is fired whenever a flow control window changes
     size. HTTP/2 defines flow control windows for connections and streams: this

@@ -1,6 +1,5 @@
 import json
-import traceback
-from typing import Dict, List, Union
+from typing import Dict, Union
 from gzip import decompress as gzip_decompress
 from zlib import decompress as zlib_decompress
 from hedra.core.engines.types.common.types import RequestTypes
@@ -10,6 +9,26 @@ from .action import HTTP2Action
 
 
 class HTTP2Result(BaseResult):
+
+    __slots__ = (
+        'url',
+        'ip_addr',
+        'method',
+        'path',
+        'params',
+        'query',
+        'hostname',
+        'headers',
+        'body',
+        'response_code',
+        'deferred_headers',
+        '_compression',
+        '_content_type',
+        '_size',
+        '_version',
+        '_reason',
+        '_status'
+    )
 
     def __init__(self, action: HTTP2Action, error: Exception = None) -> None:
         super(

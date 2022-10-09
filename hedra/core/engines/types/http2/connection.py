@@ -1,17 +1,40 @@
 import asyncio
+import traceback
 import h2.settings
 from ssl import SSLContext
 from typing import Tuple, Optional, Union
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.types import RequestTypes
-from hedra.core.engines.types.common.protocols.tcp import (
-    TCPConnection
-)
+from hedra.core.engines.types.common.protocols.tcp import TCPConnection
 from .stream import Stream
 from .frames import FrameBuffer
 from .frames.types import HeadersFrame, WindowUpdateFrame, SettingsFrame
 
 class HTTP2Connection:
+
+    __slots__ = (
+        'timeouts',
+        'connected',
+        'init_id',
+        'reset_connection',
+        'stream_type',
+        'init_id',
+        'stream_id',
+        'concurrency',
+        'dns_address',
+        'port',
+        'connection',
+        'lock',
+        'stream',
+        'local_settings',
+        'remote_settings',
+        'outbound_flow_control_window',
+        'local_settings_dict',
+        'remote_settings_dict',
+        'settings_frame',
+        'headers_frame',
+        'window_update_frame'
+    )
 
     def __init__(self, stream_id: int, timeouts: Timeouts, concurrency: int, reset_connection: bool, stream_type: RequestTypes) -> None:
         self.timeouts = timeouts

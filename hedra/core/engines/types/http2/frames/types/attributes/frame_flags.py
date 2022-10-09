@@ -15,6 +15,11 @@ class Flag(NamedTuple):
 
 
 class Flags(MutableSet):  # type: ignore
+    __slots__ = (
+        '_valid_flags', 
+        '_flags'
+    )
+
     """
     A simple MutableSet implementation that will only accept known flags as
     elements.

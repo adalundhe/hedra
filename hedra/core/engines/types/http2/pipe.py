@@ -16,6 +16,26 @@ from .frames.types import *
 
 
 class HTTP2Pipe:
+    __slots__ = (
+        '_h2_state',
+        'connected',
+        'concurrency',
+        '_encoder',
+        '_decoder',
+        '_init_sent',
+        'stream_id',
+        '_data_to_send',
+        '_headers_sent',
+        'lock',
+        'local_settings',
+        'remote_settings',
+        'outbound_flow_control_window',
+        'local_settings',
+        '_inbound_flow_control_window_manager',
+        'local_settings_dict',
+        'remote_settings_dict'
+    )
+
     CONFIG = h2.config.H2Configuration(
         validate_inbound_headers=False,
     )

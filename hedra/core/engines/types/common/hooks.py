@@ -4,6 +4,12 @@ from typing import Coroutine, List
 
 class Hooks:
 
+    __slots__ = (
+        'before',
+        'after',
+        'checks'
+    )
+
     def __init__(
         self,
         before: Coroutine = None,

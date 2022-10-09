@@ -3,6 +3,11 @@ from .base_event import BaseEvent
 
 class InformationalResponseReceived(BaseEvent):
     event_type='INFORMATIONAL_RESPONSE_RECEIVED'
+    __slots__ = (
+        'stream_id',
+        'headers',
+        'priority_updated'
+    )
     """
     The InformationalResponseReceived event is fired when an informational
     response (that is, one whose status code is a 1XX code) is received from

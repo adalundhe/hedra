@@ -1,5 +1,4 @@
-from types import FunctionType
-from typing import Coroutine, Dict, Iterator, Union, List
+from typing import Dict, Iterator, Union, List
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.http.action import HTTPAction
 from .utils import (

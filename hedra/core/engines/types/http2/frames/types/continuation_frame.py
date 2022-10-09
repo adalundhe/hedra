@@ -6,6 +6,10 @@ from .attributes import _STREAM_ASSOC_HAS_STREAM
 
 
 class ContinuationFrame(Frame):
+    __slots__ = (
+        'data'
+    )
+
     frame_type='CONTINUATION'
     """
     The CONTINUATION frame is used to continue a sequence of header block

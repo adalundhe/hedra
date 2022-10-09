@@ -11,6 +11,11 @@ from .utils import raw_data_repr
 
 
 class PushPromiseFrame(Padding, Frame):
+    __slots__ = (
+        'promised_stream_id',
+        'data'
+    )
+
     frame_type='PUSHPROMISE'
     """
     The PUSH_PROMISE frame is used to notify the peer endpoint in advance of

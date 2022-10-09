@@ -5,3 +5,4 @@ from .graphql import GraphQLClient
 from .graphql_http2 import GraphQLHTTP2Client
 from .websocket import WebsocketClient
 from .playwright import PlaywrightClient
+from .udp import UDPClient

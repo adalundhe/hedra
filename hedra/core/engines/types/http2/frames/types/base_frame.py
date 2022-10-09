@@ -13,8 +13,6 @@ from typing import Optional, Tuple, List, Iterable
 from .attributes import (
     Flag,
     Flags,
-    _STREAM_ASSOC_HAS_STREAM,
-    _STREAM_ASSOC_NO_STREAM,
     _STRUCT_HBBBL
 )
 from .utils import raw_data_repr
@@ -23,6 +21,13 @@ from .utils import raw_data_repr
 
 
 class Frame:
+    __slots__ = (
+        'stream_id', 
+        'flags',
+        'body_len',
+        'flags'
+    )
+    
     FRAMES = {}
     """
     The base class for all HTTP/2 frames.

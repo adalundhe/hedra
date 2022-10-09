@@ -3,6 +3,13 @@ from .base_event import BaseEvent
 
 class RequestReceived(BaseEvent):
     event_type='REQUEST_RECEIVED'
+    __slots__ = (
+        'stream_id',
+        'headers',
+        'stream_ended',
+        'priority_updated'
+    )
+    
     """
     The RequestReceived event is fired whenever request headers are received.
     This event carries the HTTP headers for the given request and the stream ID

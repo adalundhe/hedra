@@ -7,6 +7,7 @@ class PersonaTypes:
     RAMPED='RAMPED'
     RAMPED_INTERVAL='RAMPED_INTERVAL'
     CONSTANT_ARRIVAL='CONSTANT_ARRIVAL'
+    CONSTANT_SPAWN='CONSTANT_SPAWN'
     SEQUENCE='SEQUENCE'
     WEIGHTED='WEIGHTED'
     NO_WAIT='NO-WAIT'
@@ -20,6 +21,7 @@ class PersonaTypesMap:
             'default': PersonaTypes.DEFAULT,
             'ramped': PersonaTypes.RAMPED,
             'constant-arrival': PersonaTypes.CONSTANT_ARRIVAL,
+            'constant-spawn': PersonaTypes.CONSTANT_SPAWN,
             'sequence': PersonaTypes.SEQUENCE,
             'weighted': PersonaTypes.WEIGHTED,
             'no-wait': PersonaTypes.NO_WAIT

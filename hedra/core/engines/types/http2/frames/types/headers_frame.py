@@ -17,6 +17,14 @@ from .utils import raw_data_repr
 
 
 class HeadersFrame(Frame):
+    __slots__ = (
+        'data',
+        'pad_length',
+        'depends_on',
+        'stream_weight',
+        'exclusive'
+    )
+
     frame_type='HEADERS'
     """
     The HEADERS frame carries name-value pairs. It is used to open a stream.

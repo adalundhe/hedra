@@ -1,12 +1,27 @@
-from pydoc import resolve
+import traceback
 import aiodns
 import socket
+from ipaddress import ip_address, IPv4Address
 from urllib.parse import urlparse
 from asyncio.events import get_event_loop
 from .types import SocketProtocols, SocketTypes
 
 
 class URL:
+
+    __slots__ = (
+        'resolver',
+        'ip_addr',
+        'parsed',
+        'is_ssl',
+        'port',
+        'full',
+        'has_ip_addr',
+        'socket_config',
+        'family',
+        'protocol',
+        'loop'
+    )
 
     def __init__(self, url: str, port: int=80, family: SocketTypes=SocketTypes.DEFAULT, protocol: SocketProtocols=SocketProtocols.DEFAULT) -> None:
         self.resolver = aiodns.DNSResolver()
@@ -31,24 +46,63 @@ class URL:
             self.loop = get_event_loop()
 
         infos = {}
-        resolved = await self.resolver.gethostbyname(self.parsed.hostname, self.family)
-   
-        for address in resolved.addresses:
 
-            info = await self.loop.getaddrinfo(
-                address, 
-                self.port, 
-                family=self.family, 
-                type=socket.SOL_SOCKET, 
-                proto=0, 
-                flags=0
-            )
+        if self.parsed.hostname is None:
+            
+            try:
 
-            if infos.get(address) is None:
-                infos[address] = [*info]
+                address = self.full.split(':')
+                assert len(address) == 2
 
-            else:
-                infos[address].extend(info)
+                host, port = address
+                self.port = int(port)
+
+                if isinstance(ip_address(host), IPv4Address):
+                    socket_type = socket.AF_INET
+
+                else:
+                    socket_type = socket.AF_INET6
+                
+                infos[self.full] = [(
+                    socket_type,
+                    self.protocol,
+                    None,
+                    None,
+                    (
+                        host,
+                        self.port
+                    )
+                )]
+            
+            except Exception as parse_error:
+                raise parse_error
+
+        else:
+
+            resolved = await self.resolver.gethostbyname(self.parsed.hostname, self.family)
+    
+            for address in resolved.addresses:
+
+                if isinstance(ip_address(address), IPv4Address):
+                    socket_type = socket.AF_INET
+
+                else:
+                    socket_type = socket.AF_INET6
+
+                info = await self.loop.getaddrinfo(
+                    address, 
+                    self.port, 
+                    family=self.family, 
+                    type=socket.SOL_SOCKET, 
+                    proto=0, 
+                    flags=0
+                )
+
+                if infos.get(address) is None:
+                    infos[address] = [*info]
+
+                else:
+                    infos[address].extend(info)
 
         return infos
 

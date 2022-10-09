@@ -142,6 +142,12 @@ class Encoder:
     HTTP/2 header blocks.
     """
 
+    __slots__ = (
+        'header_table',
+        'huffman_coder',
+        'table_size_changes'
+    )
+
     def __init__(self):
         self.header_table = HeaderTable()
         self.huffman_coder = HuffmanEncoder(

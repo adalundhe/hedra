@@ -1,11 +1,12 @@
 import asyncio
 from weakref import ref
-from .protocol import TCPReader, TCPProtocol
+from hedra.core.engines.types.common.protocols.shared.reader import Reader
+from .protocol import TCPProtocol
 
 
 class TLSProtocol(TCPProtocol):
 
-    def upgrade_reader(self, reader: TCPReader):
+    def upgrade_reader(self, reader: Reader):
 
         if self._stream_reader:
             self._stream_reader.set_exception(Exception('upgraded connection to TLS, this reader is obsolete now.'))

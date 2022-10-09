@@ -14,6 +14,10 @@ from .attributes import (
 
 
 class WindowUpdateFrame(Frame):
+    __slots__ = (
+        'window_increment'
+    )
+
     frame_type='WINDOWUPDATE'
     """
     The WINDOW_UPDATE frame is used to implement flow control.

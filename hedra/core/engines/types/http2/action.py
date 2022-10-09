@@ -10,6 +10,21 @@ from hedra.core.engines.types.common.types import RequestTypes
 
 
 class HTTP2Action(BaseAction):
+
+    __slots__ = (
+        'method',
+        'type',
+        'url',
+        'protocols',
+        '_headers',
+        '_data',
+        'encoded_data',
+        'encoded_headers',
+        'is_stream',
+        'ssl_context',
+        'hpack_encoder',
+        '_remote_settings'
+    )
     
     def __init__(
         self,

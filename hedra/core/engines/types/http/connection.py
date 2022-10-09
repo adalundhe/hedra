@@ -2,16 +2,27 @@ from __future__ import annotations
 import asyncio
 from ssl import SSLContext
 from typing import Optional, Tuple
-from hedra.core.engines.types.common.protocols import (
-    TCPConnection,
-    TCPReader,
-    TCPWriter
-)
-
-from hedra.core.engines.types.common.protocols.tcp.constants import _DEFAULT_LIMIT
+from hedra.core.engines.types.common.protocols import TCPConnection
+from hedra.core.engines.types.common.protocols.shared.reader import Reader
+from hedra.core.engines.types.common.protocols.shared.writer import Writer
+from hedra.core.engines.types.common.protocols.shared.constants import _DEFAULT_LIMIT
 
 
 class HTTPConnection:
+
+    __slots__ = (
+        'dns_address',
+        'port',
+        'ssl',
+        'ip_addr',
+        'lock',
+        'reader',
+        'writer',
+        'connected',
+        'reset_connection',
+        'pending',
+        '_connection_factory'
+    )
 
     def __init__(self, reset_connection: bool=False) -> None:
         self.dns_address: str = None
@@ -20,8 +31,8 @@ class HTTPConnection:
         self.ip_addr = None
         self.lock = asyncio.Lock()
 
-        self.reader: TCPReader = None
-        self.writer: TCPWriter = None
+        self.reader: Reader = None
+        self.writer: Writer = None
 
         self.connected = False
         self.reset_connection = reset_connection

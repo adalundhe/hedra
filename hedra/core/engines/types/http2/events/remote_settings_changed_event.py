@@ -5,6 +5,9 @@ from .base_event import BaseEvent
 
 class RemoteSettingsChanged(BaseEvent):
     event_type='REMOTE_SETTINGS_CHANGED'
+    __slots__ = (
+        'changed_settings'
+    )
     """
     The RemoteSettingsChanged event is fired whenever the remote peer changes
     its settings. It contains a complete inventory of changed settings,

@@ -1,5 +1,11 @@
 class ChangedSetting:
 
+    __slots__ = (
+        'setting',
+        'original_value',
+        'new_value'
+    )
+
     def __init__(self, setting, original_value, new_value):
         #: The setting code given. Either one of :class:`SettingCodes
         #: <h2.settings.SettingCodes>` or ``int``

@@ -1,15 +1,27 @@
 import json
-import dill
 from typing import Dict, Iterator, Union, List
 from urllib.parse import urlencode
 from hedra.core.engines.types.common.base_action import BaseAction
 from hedra.core.engines.types.common.constants import NEW_LINE
-from hedra.core.engines.types.common.protocols.tcp import TCPWriter
+from hedra.core.engines.types.common.protocols.shared.writer import Writer
 from hedra.core.engines.types.common import URL
 from hedra.core.engines.types.common.types import RequestTypes
 
 
 class HTTPAction(BaseAction):
+
+    __slots__ = (
+        'method',
+        'type',
+        'url',
+        'protocols',
+        '_headers',
+        '_data',
+        'encoded_data',
+        'encoded_headers',
+        'is_stream',
+        'ssl_context'
+    )
     
     def __init__(
         self,
@@ -127,7 +139,7 @@ class HTTPAction(BaseAction):
 
             self.encoded_headers = (get_base + NEW_LINE).encode()
 
-    def write_chunks(self, writer: TCPWriter):
+    def write_chunks(self, writer: Writer):
         for chunk in self.data:
             writer.write(chunk)
 

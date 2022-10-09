@@ -38,6 +38,17 @@ def is_informational_response(headers: Tuple[bytes, bytes]):
 class DeferredHeaders(BaseEvent):
     event_type='DEFERRED_HEADERS'
 
+    __slots__ = (
+        'stream_id',
+        'hpack_table',
+        'raw_headers',
+        'stream_ended',
+        'end_stream',
+        'priority',
+        'encoding',
+        'priority_updated'
+    )
+
     def __init__(self, encoder: Encoder, frame, encoding: Union[str, None]) -> None:
         super().__init__()
         self.stream_id = frame.stream_id

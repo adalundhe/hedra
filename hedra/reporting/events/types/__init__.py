@@ -4,3 +4,4 @@ from .http_event import HTTPEvent
 from .http2_event import HTTP2Event
 from .playwright_event import PlaywrightEvent
 from .websocket_event import WebsocketEvent
+from .udp_event import UDPEvent

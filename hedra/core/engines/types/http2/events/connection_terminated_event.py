@@ -6,6 +6,12 @@ from .base_event import BaseEvent
 class ConnectionTerminated(BaseEvent):
     event_type='CONNECTION_TERMINATED'
 
+    __slots__ = (
+        'error_code',
+        'last_stream_id',
+        'additional_data'
+    )
+
     """
     The ConnectionTerminated event is fired when a connection is torn down by
     the remote peer using a GOAWAY frame. Once received, no further action may

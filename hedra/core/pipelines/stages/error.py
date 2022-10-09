@@ -19,6 +19,5 @@ class Error(Stage):
 
     @Internal
     async def run(self):
-        
-        print(self.error)
+        pass
 

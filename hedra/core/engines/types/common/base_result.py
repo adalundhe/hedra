@@ -4,6 +4,22 @@ from .types import RequestTypes
 
 class BaseResult:
 
+    __slots__ = (
+        'name',
+        'checks',
+        'error',
+        'source',
+        'user',
+        'tags',
+        'type',
+        'time',
+        'wait_start',
+        'start',
+        'connect_end',
+        'write_end',
+        'read_end'
+    )
+
     def __init__(
         self, 
         name: str, 

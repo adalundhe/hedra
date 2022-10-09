@@ -11,7 +11,8 @@ from .types import  (
     GraphQLClient,
     GraphQLHTTP2Client,
     WebsocketClient,
-    PlaywrightClient
+    PlaywrightClient,
+    UDPClient
 )
 
 
@@ -29,6 +30,7 @@ class Client:
         self._graphqlh2 = GraphQLHTTP2Client
         self._websocket = WebsocketClient
         self._playwright = PlaywrightClient
+        self._udp = UDPClient
 
         self.clients = {}
         self.actions = ActionsStore()
@@ -125,6 +127,18 @@ class Client:
         self._playwright.next_name = self.next_name
         self._playwright.intercept = self.intercept
         return self._playwright
+
+    @property
+    def udp(self):
+        self._udp.next_name = self.next_name
+        if self._udp.initialized is False:
+            self._udp = self._udp(self._config)
+            self._udp.actions = self.actions
+            self.clients[RequestTypes.UDP] = self._udp
+
+        self._udp.next_name = self.next_name
+        self._udp.intercept = self.intercept
+        return self._udp
 
 
         

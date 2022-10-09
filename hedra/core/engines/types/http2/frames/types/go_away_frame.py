@@ -11,6 +11,12 @@ from .attributes import (
 
 
 class GoAwayFrame(Frame):
+    __slots__ = (
+        'last_stream_id',
+        'error_code',
+        'additional_data'
+    )
+
     frame_type='GOAWAY'
     """
     The GOAWAY frame informs the remote peer to stop creating streams on this

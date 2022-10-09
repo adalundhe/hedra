@@ -3,6 +3,7 @@ from .base_event import BaseEvent
 
 class SettingsAcknowledged(BaseEvent):
     event_type='SETTINGS_ACKNOWLEDGED'
+    __slots__ = ('changed_settings')
     """
     The SettingsAcknowledged event is fired whenever a settings ACK is received
     from the remote peer. The event carries on it the settings that were

@@ -12,6 +12,10 @@ from .attributes import (
 
 
 class SettingsFrame(Frame):
+    __slots__ = (
+        'settings'
+    )
+
     frame_type='SETTINGS'
     """
     The SETTINGS frame conveys configuration parameters that affect how

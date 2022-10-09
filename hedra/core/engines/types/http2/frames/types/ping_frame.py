@@ -7,6 +7,10 @@ from .attributes import (
 
 
 class PingFrame(Frame):
+    __slots__ = (
+        'opaque_data'
+    )
+
     frame_type='PING'
     """
     The PING frame is a mechanism for measuring a minimal round-trip time from

@@ -5,6 +5,13 @@ from .base_event import BaseEvent
 class DataReceived(BaseEvent):
     event_type='DATA_RECEIVED'
 
+    __slots__ = (
+        'stream_id',
+        'data',
+        'flow_controlled_length',
+        'stream_ended'
+    )
+
     def __init__(self):
         #: The Stream ID for the stream this data was received on.
         self.stream_id = None

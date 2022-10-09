@@ -40,6 +40,7 @@ class Setup(Stage):
     total_time='1m'
     batch_size=1000
     batch_interval=0
+    action_interval=0
     batch_gradient=0.1
     cpus=int(psutil.cpu_count(logical=False))
     no_run_visuals=False
@@ -76,6 +77,7 @@ class Setup(Stage):
                 total_time=self.total_time,
                 batch_size=self.batch_size,
                 batch_interval=self.batch_interval,
+                action_interval=self.action_interval,
                 batch_gradient=self.batch_gradient,
                 cpus=self.cpus,
                 no_run_visuals=self.no_run_visuals,
@@ -134,7 +136,7 @@ class Setup(Stage):
                 action.hooks.checks = self.get_checks(execute_stage, hook.shortname)
 
                 hook.session = session
-                hook.action = action       
+                hook.action = action     
 
             execute_stage.client.intercept = False
             for setup_hook in execute_stage.hooks.get(HookType.SETUP):

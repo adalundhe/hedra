@@ -16,6 +16,7 @@ async def cancel_pending(pend: Task):
     except asyncio.CancelledError:
         pass
 
+
 class ConstantArrivalPersona(DefaultPersona):
 
     def __init__(self, config: Config):
@@ -27,9 +28,8 @@ class ConstantArrivalPersona(DefaultPersona):
         total_time = self.total_time
 
         await self.start_updates()
-        
-        start = time.monotonic()
 
+        self.start = time.monotonic()
         completed, pending = await asyncio.wait([
             asyncio.create_task(
                 self.completed_counter.execute_action(
@@ -39,8 +39,6 @@ class ConstantArrivalPersona(DefaultPersona):
         ], timeout=1)
 
         self.end = time.monotonic()
-
-        self.start = start
         self.pending_actions = len(pending)
 
         results = await asyncio.gather(*completed)

@@ -141,32 +141,6 @@ class Pipeline:
         if self.status == PipelineStatus.RUNNING:
             self.status = PipelineStatus.COMPLETE
 
-            completion_stages = self.runner.instances_by_type.get(StageTypes.COMPLETE)
-            serialized_results = {}
-
-            for completion_stage in completion_stages:
-                results = completion_stage.context.summaries
-
-                stages = results.get('stages')
-                
-                for stage_name, stage in stages.items():
-                    serialized_results[stage_name] = {}
-
-                    actions = stage.get('actions')
-                    for action_name, action in actions.items():
-                        serialized_results[stage_name][action_name] = action.serialize()
-
-            self._results = serialized_results
-
-        stages_for_shutdown = []
-        for stage in self.runner.generated_stages.values():
-            if stage.requires_shutdown:
-                stages_for_shutdown.append(stage._shutdown_task)
-
-        print('Shutting down!')
-        await asyncio.gather(*stages_for_shutdown)
-        print('Done!')
-
         return self._results
 
     async def cleanup(self):

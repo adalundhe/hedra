@@ -9,6 +9,22 @@ from .action import HTTPAction
 
 class HTTPResult(BaseResult):
 
+    __slots__ = (
+        'url',
+        'ip_addr',
+        'method',
+        'path',
+        'params',
+        'query',
+        'hostname',
+        'headers',
+        'body',
+        'response_code',
+        '_version',
+        '_reason',
+        '_status'
+    )
+
     def __init__(self, action: HTTPAction, error: Exception=None) -> None:
 
         super(

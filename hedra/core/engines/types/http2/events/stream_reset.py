@@ -2,6 +2,7 @@ from .base_event import BaseEvent
 
 class StreamReset(BaseEvent):
     event_type='STREAM_RESET'
+    __slots__ = ('stream_id', 'error_code', 'remote_reset')
     """
     The StreamReset event is fired in two situations. The first is when the
     remote party forcefully resets the stream. The second is when the remote

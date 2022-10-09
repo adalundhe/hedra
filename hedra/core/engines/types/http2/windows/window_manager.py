@@ -21,6 +21,13 @@ LARGEST_FLOW_CONTROL_WINDOW = 2**31 - 1
 
 
 class WindowManager:
+
+    __slots__ = (
+        'max_window_size',
+        'current_window_size',
+        '_bytes_processed'
+    )
+
     """
     A basic HTTP/2 window manager.
 
