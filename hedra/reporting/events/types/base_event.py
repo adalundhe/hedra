@@ -6,6 +6,22 @@ from hedra.reporting.tags import Tag
 
 class BaseEvent:
 
+    __slots__ = (
+        'name',
+        'shortname',
+        'error',
+        'time',
+        'time_waiting',
+        'time_connecting',
+        'time_writing',
+        'time_reading',
+        'type',
+        'source',
+        'checks',
+        'tags',
+        'stage'
+    )
+
     def __init__(self, result: BaseResult) -> None:
         self.name = None
         self.shortname = result.name
@@ -17,7 +33,6 @@ class BaseEvent:
         self.time_reading = result.read_end - result.write_end
         self.type = result.type
         self.source = result.source
-        self.type = result.type
 
         self.checks = []
 

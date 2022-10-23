@@ -35,7 +35,6 @@ class WindowManager:
     :type max_window_size: ``int``
     """
     def __init__(self, max_window_size):
-        assert max_window_size <= LARGEST_FLOW_CONTROL_WINDOW
         self.max_window_size = max_window_size
         self.current_window_size = max_window_size
         self._bytes_processed = 0
@@ -52,8 +51,6 @@ class WindowManager:
         :rtype: ``None``
         """
         self.current_window_size -= size
-        if self.current_window_size < 0:
-            raise Exception("Flow control window shrunk below 0")
 
     def window_opened(self, size):
         """
@@ -71,12 +68,6 @@ class WindowManager:
         :rtype: ``None``
         """
         self.current_window_size += size
-
-        if self.current_window_size > LARGEST_FLOW_CONTROL_WINDOW:
-            raise Exception(
-                "Flow control window mustn't exceed %d" %
-                LARGEST_FLOW_CONTROL_WINDOW
-            )
 
         if self.current_window_size > self.max_window_size:
             self.max_window_size = self.current_window_size

@@ -6,6 +6,11 @@ from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.http2.pipe import HTTP2Pipe
 from hedra.core.engines.types.http2.connection import HTTP2Connection
 from hedra.core.engines.types.common.ssl import get_http2_ssl_context
+from hedra.core.engines.types.common.concurrency import (
+    Semaphore,
+    NoOpSemaphore,
+    BalancingSemaphore
+)
 from .pool import HTTP2Pool
 from .action import HTTP2Action
 from .result import HTTP2Result
@@ -37,7 +42,7 @@ class MercuryHTTP2Client:
         self.registered: Dict[str, HTTP2Action] = {}
         self.closed = False
         
-        self.sem = asyncio.Semaphore(concurrency)
+        self.sem = Semaphore(concurrency)
         self.pool: HTTP2Pool = HTTP2Pool(concurrency, self.timeouts, reset_connections=reset_connections)
         self.pool.create_pool()
         self.active = 0
@@ -111,12 +116,12 @@ class MercuryHTTP2Client:
                 HTTP2Pipe(self.pool.reset_connections)
             )
         
-        self.sem = asyncio.Semaphore(self.pool.size)
+        self.sem = Semaphore(self.pool.size)
 
     def shrink_pool(self, decrease_capacity: int):
         self.pool.size -= decrease_capacity
         self.pool.pipes = self.pool.pipes[:self.pool.size]
-        self.sem = asyncio.Semaphore(self.pool.size)
+        self.sem = Semaphore(self.pool.size)
 
     async def execute_prepared_request(self, action: HTTP2Action) -> HTTP2ResponseFuture:
         response = HTTP2Result(action)

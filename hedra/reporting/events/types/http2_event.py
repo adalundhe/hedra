@@ -6,6 +6,19 @@ from .base_event import BaseEvent
 
 class HTTP2Event(BaseEvent):
 
+    __slots__ = (
+        'url',
+        'ip_addr',
+        'method',
+        'path',
+        'params',
+        'hostname',
+        'status',
+        'headers',
+        'data',
+        'status'
+    )
+
     def __init__(self, result: HTTP2Result) -> None:
         super(HTTP2Event, self).__init__(result)
 
@@ -16,10 +29,9 @@ class HTTP2Event(BaseEvent):
         self.params = result.params
         self.hostname = result.hostname
         self.status = None
-        self.headers: Dict[bytes, bytes] = {}
+        self.headers: Dict[bytes, bytes] = result.headers
         self.data = result.data
         self.status = result.status
-        self.headers = result.headers
         
         self.name = f'{self.method}_{self.shortname}'
 

@@ -8,7 +8,7 @@ from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common.protocols.tcp import TCPConnection
 from .stream import Stream
 from .frames import FrameBuffer
-from .frames.types import HeadersFrame, WindowUpdateFrame, SettingsFrame
+from .frames.types.base_frame import Frame
 
 class HTTP2Connection:
 
@@ -74,11 +74,11 @@ class HTTP2Connection:
         self.local_settings_dict = {setting_name: setting_value for setting_name, setting_value in self.local_settings.items()}
         self.remote_settings_dict = {setting_name: setting_value for setting_name, setting_value in self.remote_settings.items()}
 
-        self.settings_frame = SettingsFrame(0, settings=self.local_settings_dict)
-        self.headers_frame = HeadersFrame(self.init_id)
+        self.settings_frame = Frame(0, 0x04, settings=self.local_settings_dict)
+        self.headers_frame = Frame(self.init_id, 0x01)
         self.headers_frame.flags.add('END_HEADERS')
         
-        self.window_update_frame = WindowUpdateFrame(self.init_id, window_increment=65536)
+        self.window_update_frame = Frame(self.init_id, 0x08, window_increment=65536)
 
         self.stream.connection_data.extend(self.settings_frame.serialize())
 

@@ -1,5 +1,3 @@
-from .padding import Padding
-from .priority import Priority
 from .struct_types import (
     _STRUCT_B,
     _STRUCT_H,

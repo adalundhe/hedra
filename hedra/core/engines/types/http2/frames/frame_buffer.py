@@ -6,14 +6,26 @@ h2/frame_buffer
 A data structure that provides a way to iterate over a byte buffer in terms of
 frames.
 """
+import h2.errors
+import sys
+import struct
 from .types.attributes import (
     _STRUCT_HBBBL
 )
 from .types import *
 from hyperframe.exceptions import InvalidFrameError, InvalidDataError
-
-from .types import FRAMES
-
+from .types.base_frame import Frame
+from .types.attributes import (
+    Flag,
+    Flags,
+    _STRUCT_HBBBL,
+    _STRUCT_H,
+    _STRUCT_B,
+    _STRUCT_LL,
+    _STRUCT_LB,
+    _STRUCT_L,
+    _STRUCT_HL
+)
 
 
 class FrameBuffer:
@@ -21,7 +33,8 @@ class FrameBuffer:
     __slots__ = (
         'data',
         'max_frame_size',
-        '_headers_buffer'
+        '_headers_buffer',
+        'frames_map'
     )
 
     """
@@ -46,13 +59,8 @@ class FrameBuffer:
                 flags = fields[3]
                 stream_id = fields[4] & 0x7FFFFFFF
 
-                frame = FRAMES.get(
-                    type, 
-                    ExtensionFrame(type=type, stream_id=stream_id)
+                frame = Frame(stream_id, type, parsed_flag_byte=flags)
 
-                )(stream_id)
-
-                frame.parse_flags(flags)
             except (InvalidDataError, InvalidFrameError) as e:  # pragma: no cover
                 raise Exception(
                     "Received frame with invalid header: %s" % str(e)
@@ -63,17 +71,131 @@ class FrameBuffer:
             if len(self.data) < length + 9:
                 break
 
-            # Confirm the frame has an appropriate length.
-            # self._validate_frame_length(length)
-            if length > self.max_frame_size:
-                raise Exception(
-                    "Received overlong frame: length %d, max %d" %
-                    (length, self.max_frame_size)
-                )
+            body_data = self.data[9:9+length]
 
-            # Try to parse the frame body
-            
-            frame.parse_body(self.data[9:9+length])
+            if frame.type == 0xA:
+                # ALTSVC
+
+                origin_len = _STRUCT_H.unpack(body_data[0:2])[0]
+                frame.origin = body_data[2:2+origin_len]
+
+                if len(frame.origin) != origin_len:
+                    raise Exception("Invalid ALTSVC frame body.")
+
+                frame.field = body_data[2+origin_len:]
+                frame.body_len = len(body_data)
+
+            elif frame.type == 0x09:
+                # CONTINUATION
+                frame.data = body_data
+                frame.body_len = len(body_data)
+
+            elif frame.type == 0x0:
+                # DATA
+                padding_data_offset = 0
+                frame.pad_length = 0
+
+                if 'PADDED' in frame.flags:  # type: ignore
+                    frame.pad_length = struct.unpack('!B', body_data[:1])[0]
+                    padding_data_offset = 1
+
+                data_length = len(body_data)
+                frame.data = (
+                    body_data[padding_data_offset:data_length-frame.pad_length]
+                )
+                frame.body_len = data_length
+
+            elif frame.type == 0x07:
+                # GOAWAY
+
+                frame.last_stream_id, frame.error_code = _STRUCT_LL.unpack(body_data[:8])
+                frame.body_len = len(body_data)
+
+                if len(body_data) > 8:
+                    frame.additional_data = body_data[8:]
+
+            elif frame.type == 0x01:
+                # HEADERS
+                padding_data_offset = 0
+
+                if 'PADDED' in frame.flags:  # type: ignore
+                    frame.pad_length = struct.unpack('!B', body_data[:1])[0]
+                    padding_data_offset = 1
+        
+                body_data = body_data[padding_data_offset:]
+
+                if 'PRIORITY' in frame.flags:
+                    frame.depends_on, frame.stream_weight = _STRUCT_LB.unpack(body_data[:5])
+                    frame.exclusive = True if frame.depends_on >> 31 else False
+                    frame.depends_on &= 0x7FFFFFFF
+                    padding_data_offset = 5
+
+                else:
+                    padding_data_offset = 0
+
+                data_length = len(body_data)
+                frame.body_len = data_length
+                frame.data = body_data[padding_data_offset:data_length-frame.pad_length]
+
+            elif frame.type == 0x06:
+                # PING
+                frame.opaque_data = body_data
+                frame.body_len = 8
+
+            elif frame.type == 0x02:
+                # PRIORITY
+
+                try:
+                    frame.depends_on, frame.stream_weight = _STRUCT_LB.unpack(body_data[:5])
+                except struct.error:
+                    raise Exception("Invalid Priority data")
+
+                frame.exclusive = True if frame.depends_on >> 31 else False
+                frame.depends_on &= 0x7FFFFFFF
+
+                frame.body_len = 5
+
+            elif frame.type == 0x05:
+                # PUSH PROMISE
+                padding_data_offset = 0
+                frame.pad_length = 0
+                if 'PADDED' in frame.flags:  # type: ignore
+                    try:
+                        frame.pad_length = struct.unpack('!B', body_data[:1])[0]
+                    except struct.error:
+                        raise Exception("Invalid Padding data")
+                    padding_data_offset = 1
+
+                frame.promised_stream_id = _STRUCT_L.unpack(
+                    body_data[padding_data_offset:padding_data_offset + 4]
+                )[0]
+
+                data_len = len(body_data)
+                frame.data = body_data[padding_data_offset + 4:data_len-frame.pad_length]
+                frame.body_len = data_len
+
+            elif frame.type == 0x03:
+                # RESET
+                frame.error_code = _STRUCT_L.unpack(body_data)[0]
+                frame.body_len = 4
+
+            elif frame.type == 0x04:
+                # SETTINGS
+                body_len = 0
+                for i in range(0, len(body_data), 6):
+
+                    name, value = _STRUCT_HL.unpack(body_data[i:i+6])
+
+                    frame.settings[name] = value
+                    body_len += 6
+
+                frame.body_len = body_len
+
+            elif frame.type == 0x08:
+                # WINDOW UPDATE
+                frame.window_increment = _STRUCT_L.unpack(body_data)[0]
+                frame.body_len = 4
+
             # At this point, as we know we'll use or discard the entire frame, we
             # can update the data.
             del self.data[:9+length]

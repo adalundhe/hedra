@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 import h2.stream
 import h2.config
 import h2.connection
@@ -9,10 +10,22 @@ import h2.errors
 from hedra.core.engines.types.http2.stream import Stream
 from hedra.core.engines.types.common.encoder import Encoder
 from hedra.core.engines.types.common.decoder import Decoder
+from hedra.core.engines.types.http2.events.remote_settings_changed_event import RemoteSettingsChanged
+from hedra.core.engines.types.http2.events.settings_acknowledged_event import SettingsAcknowledged
+from hedra.core.engines.types.http2.streams.stream_settings import SettingCodes
+from hedra.core.engines.types.http2.events.stream_reset import StreamReset
+from hedra.core.engines.types.http2.streams.stream_closed_by import StreamClosedBy
+from hedra.core.engines.types.http2.events.deferred_headers_event import DeferredHeaders
+from hedra.core.engines.types.http2.events.connection_terminated_event import ConnectionTerminated
+from hedra.core.engines.types.http2.errors.exceptions import StreamClosedError
+from hedra.core.engines.types.http2.events.data_received_event import DataReceived
+from hedra.core.engines.types.http2.errors.exceptions import StreamError
+from hedra.core.engines.types.http2.errors.types import ErrorCodes
+from hedra.core.engines.types.http2.events.window_updated_event import WindowUpdated
 from .action import HTTP2Action
 from .result import HTTP2Result
 from .windows import WindowManager
-from .frames.types import *
+from .frames.types.base_frame import Frame
 
 
 class HTTP2Pipe:
@@ -141,13 +154,187 @@ class HTTP2Pipe:
             stream.frame_buffer.data.extend(data)
             stream.frame_buffer.max_frame_size = stream.max_outbound_frame_size
 
-            events = []
             write_data = bytearray()
+            frames = None
+            stream_events = []
+
             for frame in stream.frame_buffer:
                 try:
-                    frames, stream_events = frame.get_events_and_frames(stream, self)
-                    if stream_events:
-                        events.extend(stream_events)
+
+                    if frame.type == 0x0:
+                        # DATA
+                        end_stream = 'END_STREAM' in frame.flags
+                        flow_controlled_length = frame.flow_controlled_length
+                        frame_data = frame.data
+
+                        frames = []
+                        self._inbound_flow_control_window_manager.window_consumed(
+                            flow_controlled_length
+                        )
+
+                        try:
+                            
+                            stream.inbound.window_consumed(flow_controlled_length)
+                    
+                            event = DataReceived()
+                            event.stream_id = stream.stream_id
+
+                            stream_events.append(event)
+
+                            if end_stream:
+                                done = True
+
+                            stream_events[0].data = frame_data
+                            stream_events[0].flow_controlled_length = flow_controlled_length
+
+                        except StreamClosedError as e:
+                            raise Exception(f'Connection - {stream.stream_id} err: {str(e._events[0])}')
+
+                    elif frame.type == 0x07:
+                        # GOAWAY
+                        self._data_to_send = b''
+
+                        new_event = ConnectionTerminated()
+                        new_event.error_code = h2.errors._error_code_from_int(frame.error_code)
+                        new_event.last_stream_id = frame.last_stream_id
+                        
+                        if frame.additional_data:
+                            new_event.additional_data = frame.additional_data
+
+                        frames = []
+                        raise Exception(f'Connection - {stream.stream_id} err: {str(new_event)}')
+
+                    elif frame.type == 0x01:
+                        # HEADERS
+
+                        deferred_headers = DeferredHeaders(
+                            stream.encoder,
+                            frame,
+                            self._h2_state.config.header_encoding
+                        )
+
+                        if deferred_headers.end_stream:
+                            done = True
+
+                        frames = []
+                        response.deferred_headers = deferred_headers
+
+                    elif frame.type == 0x03:
+                        # RESET
+
+                        stream.closed_by = StreamClosedBy.RECV_RST_STREAM
+                        reset_event = StreamReset()
+                        reset_event.stream_id = stream.stream_id
+
+                        reset_event.error_code = h2.errors._error_code_from_int(frame.error_code)
+
+                        raise Exception(f'Connection - {stream.stream_id} err: {str(reset_event)}')
+
+                    elif frame.type == 0x04:
+                        # SETTINGS
+
+                        if 'ACK' in frame.flags:
+
+                            changes = self.local_settings.acknowledge()
+                    
+                            initial_window_size_change = changes.get(SettingCodes.INITIAL_WINDOW_SIZE)
+                            max_header_list_size_change = changes.get(SettingCodes.MAX_HEADER_LIST_SIZE)
+                            max_frame_size_change = changes.get(SettingCodes.MAX_FRAME_SIZE)
+                            header_table_size_change =changes.get(SettingCodes.HEADER_TABLE_SIZE)
+
+                            if initial_window_size_change is not None:
+
+                                window_delta = initial_window_size_change.new_value - initial_window_size_change.original_value
+                                
+                                new_max_window_size = stream.inbound.max_window_size + window_delta
+                                stream.inbound.window_opened(window_delta)
+                                stream.inbound.max_window_size = new_max_window_size
+
+                            if max_header_list_size_change is not None:
+                                self._decoder.max_header_list_size = max_header_list_size_change.new_value
+
+                            if max_frame_size_change is not None:
+                                stream.max_outbound_frame_size =  max_frame_size_change.new_value
+
+                            if header_table_size_change:
+                                # This is safe across all hpack versions: some versions just won't
+                                # respect it.
+                                self._decoder.max_allowed_table_size = header_table_size_change.new_value
+
+                        # Add the new settings.
+                        self.remote_settings.update(frame.settings)
+           
+                        changes = self.remote_settings.acknowledge()
+                        initial_window_size_change = changes.get(SettingCodes.INITIAL_WINDOW_SIZE)
+                        header_table_size_change = changes.get(SettingCodes.HEADER_TABLE_SIZE)
+                        max_frame_size_change = changes.get(SettingCodes.MAX_FRAME_SIZE)
+                    
+                        if initial_window_size_change:
+                            stream.current_outbound_window_size = self._guard_increment_window(
+                                stream.current_outbound_window_size,
+                                initial_window_size_change.new_value - initial_window_size_change.original_value
+                            )
+
+                        # HEADER_TABLE_SIZE changes by the remote part affect our encoder: cf.
+                        # RFC 7540 Section 6.5.2.
+                        if  header_table_size_change:
+                            self._encoder.header_table_size = header_table_size_change.new_value
+
+                        if max_frame_size_change:
+                            stream.max_outbound_frame_size = max_frame_size_change.new_value
+
+                        frame = Frame(0, 0x04)
+                        frame.flags.add('ACK')
+
+                        frames = [frame]
+
+                    elif frame.type == 0x08:
+                        # WINDOW UPDATE
+
+                        frames = []
+                        increment = frame.window_increment
+                        if frame.stream_id:
+                            try:
+
+                                
+                                event = WindowUpdated()
+                                event.stream_id = stream.stream_id
+
+                                # If we encounter a problem with incrementing the flow control window,
+                                # this should be treated as a *stream* error, not a *connection* error.
+                                # That means we need to catch the error and forcibly close the stream.
+                                event.delta = increment
+
+                                try:
+                                    self.outbound_flow_control_window = self._guard_increment_window(
+                                        self.outbound_flow_control_window,
+                                        increment
+                                    )
+                                except StreamError:
+                                    # Ok, this is bad. We're going to need to perform a local
+                                    # reset.
+
+                                    event = StreamReset()
+                                    event.stream_id = stream.stream_id
+                                    event.error_code = ErrorCodes.FLOW_CONTROL_ERROR
+                                    event.remote_reset = False
+
+                                    stream.closed_by = ErrorCodes.FLOW_CONTROL_ERROR    
+                      
+                                    raise Exception(f'Connection - {stream.stream_id} err: {str(event)}')
+                            except Exception:
+                                frames = []
+                        else:
+                            self.outbound_flow_control_window = self._guard_increment_window(
+                                self.outbound_flow_control_window,
+                                increment
+                            )
+                            # FIXME: Should we split this into one event per active stream?
+                            window_updated_event = WindowUpdated()
+                            window_updated_event.stream_id = 0
+                            window_updated_event.delta = increment
+
+                            frames = []
 
                 except Exception as e:
                     raise Exception(f'Connection {stream.stream_id} err- {str(e)}')
@@ -158,26 +345,18 @@ class HTTP2Pipe:
 
                     stream.write(write_data)
 
-            for event in events:
-                if event.error_code is not None:
-                    raise Exception(f'Connection - {stream.stream_id} err: {str(event)}')
+            for event in stream_events:
+                amount = event.flow_controlled_length
 
-                elif event.event_type == 'DEFERRED_HEADERS':
-                    response.deferred_headers = event
+                conn_increment = self._inbound_flow_control_window_manager.process_bytes(amount)
 
-                elif event.event_type == 'DATA_RECEIVED':
-                    amount = event.flow_controlled_length
-    
-                    conn_increment = self._inbound_flow_control_window_manager.process_bytes(amount)
+                if conn_increment:
+                    stream.write_window_update_frame(0, conn_increment)
 
-                    if conn_increment:
-                        stream.write_window_update_frame(0, conn_increment)
+                response.body.extend(event.data)
 
-                    response.body.extend(event.data)
-
-                elif event.event_type == 'STREAM_ENDED' or event.event_type == 'STREAM_RESET':
-                    done = True
-                    break
+            if done:
+                break
         
         return response
 
@@ -198,7 +377,7 @@ class HTTP2Pipe:
             chunk_size = min(len(data), max_flow)
             chunk, data = data[:chunk_size], data[chunk_size:]
 
-            df = DataFrame(stream.stream_id)
+            df = Frame(stream.stream_id, 0x0)
             df.data = chunk
 
             # Subtract flow_controlled_length to account for possible padding
@@ -207,7 +386,7 @@ class HTTP2Pipe:
 
             stream.write(df.serialize())
 
-        df = DataFrame(stream.stream_id)
+        df = Frame(stream.stream_id, 0x0)
         df.flags.add('END_STREAM')
 
         stream.write(df.serialize())

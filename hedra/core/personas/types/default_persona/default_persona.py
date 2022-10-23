@@ -3,6 +3,7 @@ import asyncio
 import psutil
 from typing import Dict, List
 from easy_logger import Logger
+from concurrent.futures import ThreadPoolExecutor
 from async_tools.functions.awaitable import awaitable
 from asyncio import Task
 from hedra.core.pipelines.hooks.types.types import HookType
@@ -27,6 +28,34 @@ async def cancel_pending(pend: Task):
 
 class DefaultPersona:
 
+    __slots__ = (
+        'type',
+        'workers',
+        'actions',
+        '_hooks',
+        'batch',
+        '_live_updates',
+        'total_time',
+        'duration',
+        'total_actions',
+        'total_elapsed',
+        'start',
+        'end',
+        'completed_actions',
+        'pending_actions',
+        'completed_time',
+        'run_timer',
+        'actions_count',
+        'graceful_stop',
+        'is_timed',
+        'timer_thread',
+        'session_logger',
+        'loop',
+        'current_action_idx',
+        'optimized_params',
+        'thread_pool'
+    )    
+
     def __init__(self, config: Config):
         
         self.type = PersonaTypes.DEFAULT
@@ -35,6 +64,7 @@ class DefaultPersona:
         self.actions = []
         self._hooks: List[Hook] = []
         self.batch = Batch(config)
+        self.thread_pool = ThreadPoolExecutor(self.workers)
 
         self._live_updates = False
         self.total_time = config.total_time
@@ -57,6 +87,7 @@ class DefaultPersona:
         self.session_logger = logger.generate_logger('hedra')
         self.loop = None
         self.current_action_idx = 0
+        self.optimized_params = None
 
     def setup(self, hooks: Dict[HookType, List[Hook]]):
         self._hooks = hooks.get(HookType.ACTION)

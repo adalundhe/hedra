@@ -18,9 +18,8 @@ class TCPProtocol(FlowControlMixin, Protocol):
     call inappropriate methods of the protocol.)
     """
 
-    _source_traceback = None
-
     __slots__ = (
+        '_source_traceback',
         '_reject_connection',
         '_stream_writer',
         '_transport',
@@ -30,8 +29,9 @@ class TCPProtocol(FlowControlMixin, Protocol):
         '_stream_reader_wr'
     )
 
-    def __init__(self, stream_reader, client_connected_cb=None, loop=None):
+    def __init__(self, stream_reader: Reader, client_connected_cb=None, loop=None):
         super().__init__(loop=loop)
+        self._source_traceback = None
 
         if stream_reader is not None:
             self._stream_reader_wr: Reader = ref(stream_reader)

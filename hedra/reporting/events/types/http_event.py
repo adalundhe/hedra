@@ -6,6 +6,18 @@ from .base_event import BaseEvent
 
 class HTTPEvent(BaseEvent):
 
+    __slots__ = (
+        'url',
+        'ip_addr',
+        'method',
+        'path',
+        'params',
+        'hostname',
+        'status',
+        'headers',
+        'data'
+    )
+
     def __init__(self, result: HTTPResult) -> None:
         super(HTTPEvent, self).__init__(result)
 

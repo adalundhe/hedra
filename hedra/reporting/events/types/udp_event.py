@@ -5,6 +5,18 @@ from .base_event import BaseEvent
 
 class UDPEvent(BaseEvent):
 
+    __slots__ = (
+        'url',
+        'ip_addr',
+        'path',
+        'method',
+        'headers',
+        'params',
+        'hostname',
+        'status',
+        'data'
+    )
+
     def __init__(self, result: UDPResult) -> None:
         super(UDPEvent, self).__init__(result)
 

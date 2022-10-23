@@ -18,3 +18,7 @@ class GRPCResult(HTTP2Result):
         msg = wire_msg[10:10+int(message_length, 16)*2]
 
         return binascii.a2b_hex(msg)
+
+    def to_protobuf(self, protobuf):
+        protobuf.ParseFromString(self.data)
+        return protobuf

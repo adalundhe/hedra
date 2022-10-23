@@ -4,6 +4,7 @@ import traceback
 from typing import Awaitable, Dict, Set, Tuple, Union
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
 from hedra.core.engines.types.common.timeouts import Timeouts
+from hedra.core.engines.types.common.concurrency import Semaphore
 from .connection import HTTPConnection
 from .action import HTTPAction
 from .result import HTTPResult
@@ -80,6 +81,7 @@ class MercuryHTTPClient:
                                 break
 
                             except Exception as e:
+                                print(traceback.format_exc())
                                 pass
 
                         if action.url.socket_config:
@@ -113,12 +115,12 @@ class MercuryHTTPClient:
                 HTTPConnection(self.pool.reset_connections)
             )
         
-        self.sem = asyncio.Semaphore(self.pool.size)
+        self.sem = Semaphore(self.pool.size)
 
     def shrink_pool(self, decrease_capacity: int):
         self.pool.size -= decrease_capacity
         self.pool.connections = self.pool.connections[:self.pool.size]
-        self.sem = asyncio.Semaphore(self.pool.size)
+        self.sem = Semaphore(self.pool.size)
 
     async def execute_prepared_request(self, action: HTTPAction) -> HTTPResponseFuture:
  

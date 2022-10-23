@@ -4,6 +4,16 @@ from .base_event import BaseEvent
 
 class PlaywrightEvent(BaseEvent):
 
+    __slots__ = (
+        'url',
+        'headers',
+        'command',
+        'selector',
+        'x_coord',
+        'y_coord',
+        'frame'
+    )
+
     def __init__(self, result: PlaywrightResult) -> None:
         super(
             PlaywrightEvent,

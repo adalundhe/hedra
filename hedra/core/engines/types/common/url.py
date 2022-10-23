@@ -89,6 +89,7 @@ class URL:
                 else:
                     socket_type = socket.AF_INET6
 
+
                 info = await self.loop.getaddrinfo(
                     address, 
                     self.port, 

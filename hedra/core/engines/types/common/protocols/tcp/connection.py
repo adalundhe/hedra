@@ -29,6 +29,8 @@ class TCPConnection:
 
         family, type_, proto, _, address = socket_config
 
+        socket_family = socket.AF_INET6 if family == 2 else socket.AF_INET
+
         self.socket = socket.socket(family=family, type=type_, proto=proto)
         self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         
@@ -45,6 +47,7 @@ class TCPConnection:
         self.transport, _ = await self.loop.create_connection(
             lambda: reader_protocol, 
             sock=self.socket,
+            family=socket_family,
             server_hostname=hostname,
             ssl=ssl
         )

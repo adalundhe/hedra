@@ -47,10 +47,10 @@ class Flags(MutableSet):  # type: ignore
         return self._flags.discard(value)
 
     def add(self, value: str) -> None:
-        if value not in self._valid_flags:
-            raise ValueError(
-                "Unexpected flag: {}. Valid flags are: {}".format(
-                    value, self._valid_flags
-                )
-            )
+        # if value not in self._valid_flags:
+        #     raise ValueError(
+        #         "Unexpected flag: {}. Valid flags are: {}".format(
+        #             value, self._valid_flags
+        #         )
+        #     )
         return self._flags.add(value)

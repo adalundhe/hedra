@@ -6,7 +6,3 @@ class GRPCEvent(HTTP2Event):
 
     def __init__(self, result: GRPCResult) -> None:
         super().__init__(result)
-
-    def to_protobuf(self, protobuf):
-        protobuf.ParseFromString(self.data)
-        return protobuf

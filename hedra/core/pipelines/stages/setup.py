@@ -94,6 +94,7 @@ class Setup(Stage):
             execute_stage.client._config = config
 
             for hook in execute_stage.hooks.get(HookType.ACTION):
+
                 execute_stage.client.next_name = hook.name
                 execute_stage.client.intercept = True
 
