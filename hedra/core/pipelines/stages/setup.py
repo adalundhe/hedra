@@ -62,10 +62,11 @@ class Setup(Stage):
         
         await asyncio.gather(*[hook.call() for hook in self.hooks.get(HookType.SETUP)])
         execute_stage_id = 1
-        
-        for execute_stage_name, execute_stage in self.stages.items():
 
-            execute_stage.total_concurrent_execute_stages = len(self.stages.values())
+        stages = dict(self.stages)
+        
+        for execute_stage_name, execute_stage in stages.items():
+
             execute_stage.execution_stage_id = execute_stage_id
             execute_stage.execute_setup_stage = self.name
 

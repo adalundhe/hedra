@@ -1,5 +1,8 @@
 import asyncio
+from concurrent.futures import ProcessPoolExecutor
 import math
+import dill
+from types import FunctionType
 import psutil
 from typing import Any, Coroutine, Dict, List, Tuple, Union
 from hedra.core.engines.types.common.base_result import BaseResult
@@ -7,66 +10,81 @@ from .synchronization import BatchedSemaphore
 
 
 
-class BatchedResults:
+class BatchExecutor:
 
     def __init__(
         self, 
-        stages: List[Any], 
         max_workers: int = psutil.cpu_count(logical=False)
     ) -> None:
         self.max_workers = max_workers
-
+        self.loop = asyncio.get_event_loop()
         self.sem = BatchedSemaphore(max_workers)
-        self.stages = stages
-        
-        self.stages_count = len(stages)
-        self.batch_sets_count = math.ceil(self.stages_count/max_workers)
-        
-        self.more_stages_than_cpus = self.stages_count/max_workers > 1
+        self.pool = ProcessPoolExecutor(max_workers=max_workers)
+        self.shutdown_task = None
 
-    async def execute_batches(self, batched_stages: List[Tuple[str, Any, int]], execution_task: Coroutine, **kwargs: Any):
+    async def execute_batches(self, batched_stages: List[Tuple[int, List[Any]]], execution_task: FunctionType) -> List[Tuple[str, Any]]:
 
         return await asyncio.gather(*[
             asyncio.create_task(
                 self._execute_stage(
                     stage_name,
-                    stage_results,
                     assigned_workers_count,
                     execution_task,
-                    **kwargs
+                    configs
                 )
-            ) for stage_name, stage_results, assigned_workers_count in batched_stages
+            ) for stage_name, assigned_workers_count, configs in batched_stages
         ])
 
 
     async def _execute_stage(
         self, 
-        stage_name: str, 
-        stage_results: Dict[str, Union[int, List[BaseResult]]],
+        stage_name: str,
         assigned_workers_count: int,
-        execution_task: Coroutine,
-        **kwargs
-    ):
+        execution_task: FunctionType,
+        configs: List[List[Any]]
+    ) -> Tuple[str, Any]:
         await self.sem.acquire(assigned_workers_count)
-        stage_result = await execution_task(
-            stage_name,
-            stage_results,
-            assigned_workers_count=assigned_workers_count,
-            **kwargs
+        stage_results = await self.execute_stage_batch(
+            execution_task,
+            configs
         )
 
         self.sem.release(assigned_workers_count)
 
-        return stage_result
+        return (stage_name, stage_results)
 
-    def partion_stage_batches(self) -> List[Tuple[str, Any, int]]:
+    async def execute_stage_batch(
+        self, 
+        execution_task: FunctionType,
+        configs: List[Any]
+    ):
+        results = await asyncio.gather(*[
+            self.loop.run_in_executor(
+                self.pool,
+                execution_task,
+                config
+            ) for config in configs
+        ])
+        
+        return results
+
+    def partion_stage_batches(self, stages: List[Any], ) -> List[Tuple[str, Any, int]]:
 
         # How many batches do we have? For example -> 5 stages over 4
         # CPUs means 2 batches. The first batch will assign one stage to
         # each core. The second will assign all four cores to the remaing
         # one stage.    
 
-        if self.stages_count%self.max_workers > 0 and self.stages_count > self.max_workers:
+        stages_count = len(stages)
+
+
+        self.batch_sets_count = math.ceil(stages_count/self.max_workers)
+        if self.batch_sets_count < 1:
+            self.batch_sets_count = 1
+        
+        self.more_stages_than_cpus = stages_count/self.max_workers > 1
+
+        if stages_count%self.max_workers > 0 and stages_count > self.max_workers:
 
             batch_size = self.max_workers
             workers_per_stage = int(self.max_workers/batch_size)
@@ -77,7 +95,7 @@ class BatchedResults:
             ]
 
         else:
-            batch_size = int(self.stages_count/self.batch_sets_count)
+            batch_size = int(stages_count/self.batch_sets_count)
             workers_per_stage = int(self.max_workers/batch_size)
             batched_stages = [
                 [
@@ -90,7 +108,7 @@ class BatchedResults:
         # If we have a remainder batch - i.e. more stages than cores.
         last_batch = batched_stages[batches_count-1]
 
-        last_batch_size = self.stages_count%self.max_workers
+        last_batch_size = stages_count%self.max_workers
         if last_batch_size > 0 and self.more_stages_than_cpus:
             last_batch_workers = int(self.max_workers/last_batch_size)
             batched_stages.append([
@@ -112,7 +130,7 @@ class BatchedResults:
         for batch in batched_stages:
             for stage_idx, stage_workers_count in enumerate(batch):
 
-                stage_name, stage = self.stages[stage_idx]
+                stage_name, stage = stages[stage_idx]
 
                 batches.append((
                     stage_name,

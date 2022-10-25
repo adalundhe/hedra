@@ -1,14 +1,12 @@
 import asyncio
-from typing import Dict
 import dill
-from concurrent.futures import ProcessPoolExecutor
-from ..hooks.types.types import HookType
+from typing import Dict, List, Tuple
+from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.engines.client.time_parser import TimeParser
-from hedra.core.pipelines.stages.optimizers import Optimizer
-from hedra.core.personas import get_persona
 from .parallel.optimize_stage import optimize_stage
+from .parallel.batch_executor import BatchExecutor
 from .execute import Execute
 from .stage import Stage
 
@@ -29,61 +27,82 @@ class Optimize(Stage):
         time_parser = TimeParser(self.stage_time_limit)
         self.time_limit = time_parser.time
         self.requires_shutdown = True
+        self.allow_parallel = True
 
     @Internal
     async def run(self, stages: Dict[str, Execute]):
 
-        loop = asyncio.get_running_loop()
         optimization_results = []
-        executor = ProcessPoolExecutor(self.workers)
 
+        # We may have less workers available during the optimize stage than assigned
+        # to the execute stage, so store the original workers count for later.
+        stage_workers_map = {
+            stage.name: stage.workers for stage in stages.values()
+        }
 
-        if self.generation_optimization_candidates > 1:
+        optimize_stages = [(
+            stage.name, 
+            stage
+        ) for stage in stages.values()]
 
-            results = await asyncio.gather(*[
-                loop.run_in_executor(
-                    executor,
-                    optimize_stage,
-                    dill.dumps({
-                        'execute_stage_name': stage_name,
-                        'execute_stage_generation_count': stage.total_concurrent_execute_stages,
-                        'execute_stage_id': stage.execution_stage_id,
-                        'execute_stage_config': stage.client._config,
-                        'optimizer_iterations': self.optimize_iterations,
-                        'optimizer_type': self.optimizer_type,
-                        'execute_stage_hooks': [
-                            hook.name for hook in stage.hooks.get(HookType.ACTION)
-                        ],
-                        'time_limit': self.time_limit
-                    })
-                ) for stage_name, stage in stages.items()
-            ])
+        batched_stages: List[Tuple[str, Execute, int]] = list(self.executor.partion_stage_batches(optimize_stages))
+        batched_configs = []
 
-            for result in results:
-                optimization_results.append(result)
+        for stage_name, stage, assigned_workers_count in batched_stages:
 
-        else:
-            for stage_name, stage in stages.items():
-                persona = get_persona(stage.client._config)
-                persona.setup(stage.hooks)
-   
-                optimizer = Optimizer({
-                    'iterations': self.optimize_iterations,
-                    'algorithm': self.optimizer_type,
-                    'persona': persona,
+            configs = []
+            stage_config = stage.client._config
+
+            batch_size = int(stage_config.batch_size/assigned_workers_count)
+
+            for worker_idx in range(assigned_workers_count):
+                configs.append({
+                    'worker_idx': worker_idx,
+                    'execute_stage_name': stage_name,
+                    'execute_stage_generation_count': assigned_workers_count,
+                    'execute_stage_id': stage.execution_stage_id,
+                    'execute_stage_config': stage_config,
+                    'execute_stage_batch_size': batch_size,
+                    'optimizer_iterations': self.optimize_iterations,
+                    'optimizer_type': self.optimizer_type,
+                    'execute_stage_hooks': [
+                        hook.name for hook in stage.hooks.get(HookType.ACTION)
+                    ],
                     'time_limit': self.time_limit
                 })
 
-                results = await loop.run_in_executor(
-                    None,
-                    optimizer.optimize,
-                    loop
-                )
+            configs[assigned_workers_count-1]['execute_stage_batch_size'] += batch_size%assigned_workers_count
 
-                optimization_results.append(result)
+            configs = [
+                dill.dumps(config) for config in configs
+            ]
+
+            batched_configs.append((
+                stage_name,
+                assigned_workers_count,
+                configs
+            ))
+
+
+        results = await self.executor.execute_batches(
+            batched_configs,
+            optimize_stage
+        )
+
+        for _, result in results:
+            optimization_results.extend(result)
+
+        optimized_batch_sizes = []
+        for optimization_result in optimization_results:
+            optimized_config = optimization_result.get('config')
+            optimized_batch_sizes.append(
+                optimized_config.batch_size
+            )
+
+        optimized_batch_size = sum(optimized_batch_sizes)
 
         for optimization_result in optimization_results:
-
+            
             stage_name = optimization_result.get('stage')
             optimized_config = optimization_result.get('config')
 
@@ -92,16 +111,17 @@ class Optimize(Stage):
             stage.client._config = optimized_config
 
             for hook in stage.hooks.get(HookType.ACTION):
-                hook.session.concurrency = optimized_config.batch_size
-                hook.session.pool.size = optimized_config.batch_size
+                hook.session.pool.size = optimized_batch_size
                 hook.session.sem = asyncio.Semaphore(optimized_config.batch_size)
                 hook.session.pool.connections = []
                 hook.session.pool.create_pool()
 
             stage.optimized = True
 
-        self._shutdown_task = loop.run_in_executor(None, executor.shutdown)
+        for stage in stages.values():
+            stage.workers = stage_workers_map.get(stage.name)
+
         return [
-            result.get('params') for result in results
+            result.get('params') for result in optimization_results
         ]
 

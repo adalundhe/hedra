@@ -6,6 +6,7 @@ from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.stages.types.stage_states import StageStates
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.engines.client.time_parser import TimeParser
+from .parallel.batch_executor import BatchExecutor
 
 
 class Stage:
@@ -28,6 +29,8 @@ class Stage:
         self.generation_id = 1
         self._shutdown_task = None
         self.requires_shutdown = False
+        self.allow_parallel = False
+        self.executor: BatchExecutor = None
 
         if self.stage_timeout:
             time_parser = TimeParser(self.stage_timeout)

@@ -1,5 +1,5 @@
 import asyncio
-import traceback
+import psutil
 import dill
 import time
 from hedra.core.engines.types import (

@@ -1,9 +1,13 @@
 from __future__ import annotations
 import numpy
+import statistics
 from collections import defaultdict
 from typing import Any, Dict, List, Union
 from .results import results_types
+numpy.seterr(over='raise')
 
+def trunc(values, decs=0):
+    return numpy.trunc(values*10**decs)/(10**decs)
 
 class EventsGroup:
 
@@ -71,13 +75,13 @@ class EventsGroup:
 
             if len(group_timings) == 0:
                 group_timings = [0]
-            
+
             self.groups[group_name] = {
                 group_name: {
                     'median': float((numpy.median(group_timings))),
-                    'mean': float(numpy.mean(group_timings)),
-                    'variance': float(numpy.var(group_timings)),
-                    'stdev': float(numpy.std(group_timings)),
+                    'mean': float(numpy.mean(group_timings, dtype=numpy.float64)),
+                    'variance': float(numpy.var(group_timings, dtype=numpy.float64, ddof=1)),
+                    'stdev': float(numpy.std(group_timings, dtype=numpy.float64)),
                     'minimum': min(group_timings),
                     'maximum': max(group_timings)
                 }
@@ -109,7 +113,8 @@ class EventsGroup:
 
             quantiles = {
                 f'quantile_{int(quantile_range * 100)}th': quantile for quantile, quantile_range in zip(
-                    numpy.quantile(group_timings, quantile_ranges),
+                    numpy.quantile(
+                        numpy.array(group_timings), quantile_ranges),
                     quantile_ranges
                 )
             }
@@ -152,6 +157,7 @@ class EventsGroup:
                 }
 
             else:
+
                 self.groups[group_name] = {
                     group_name: {
                         'median': float((numpy.median([
@@ -162,10 +168,12 @@ class EventsGroup:
                             merge_group_stats['mean'],
                             stats_group['mean']
                         ])),
-                        'variance': float(numpy.var([
-                            merge_group_stats['variance'],
-                            stats_group['variance']
-                        ])),
+                        'variance': float(numpy.var(
+                            trunc([
+                                merge_group_stats['variance'],
+                                stats_group['variance'],
+                            ], decs=6)
+                        )),
                         'stdev': float(numpy.std([
                             merge_group_stats['stdev'],
                             stats_group['stdev']

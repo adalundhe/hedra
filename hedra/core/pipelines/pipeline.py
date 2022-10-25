@@ -3,7 +3,6 @@ import asyncio
 from turtle import pen
 import networkx
 from typing import Dict, List
-from hedra.core.pipelines.transitions.exceptions.exceptions import IsolatedStageError
 from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.pipelines.transitions.transition import Transition
@@ -86,30 +85,18 @@ class Pipeline:
         self._append_stage(StageTypes.COMPLETE)
 
         self.runner.generate_stages(self.stages)
-        self.transitions_graph = self.runner.build_transitions_graph(self.execution_order)
+
+        self._transitions = self.runner.build_transitions_graph(self.execution_order, self.graph)
+
         self.runner.map_to_setup_stages(self.graph)
 
-        for isolate_stage_name in networkx.isolates(self.graph):
-            raise IsolatedStageError(
-                self.stages.get(isolate_stage_name)
-            )
-
         self.status = PipelineStatus.ASSEMBLING
-        for transition_group in self.transitions_graph:
-            
-            transtions = []
-            
-            for transition_sequence in list(transition_group.values()):
-                transtions.extend(transition_sequence)
-
-            self._transitions.append(transtions)
 
     async def run(self):
         
         self.status = PipelineStatus.RUNNING
 
         for transition_group in self._transitions:
-            
             for transtition in transition_group:
                 print(f'Executing {transtition.from_stage}')
                 

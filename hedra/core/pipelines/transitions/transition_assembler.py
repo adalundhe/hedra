@@ -8,6 +8,8 @@ from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.pipelines.simple_context import SimpleContext
 from hedra.core.pipelines.hooks.registry.registrar import registrar
 from hedra.core.pipelines.hooks.types.hook import Hook
+from hedra.core.pipelines.stages.parallel.batch_executor import BatchExecutor
+from hedra.core.pipelines.transitions.exceptions.exceptions import IsolatedStageError
 from .transition import Transition
 from .common import (
     invalid_transition
@@ -56,63 +58,87 @@ class TransitionAssembler:
 
             self.instances_by_type[stage.stage_type].append(stage)
 
-    def build_transitions_graph(self, topological_generations: List[List[str]]):
+    def build_transitions_graph(self, topological_generations: List[List[str]], graph: networkx.Graph):
 
-        transitions_groups: List[Dict[str, List[Transition]]] = []
+        transitions: List[List[Transition]] = []
+
+        for isolate_stage_name in networkx.isolates(graph):
+            raise IsolatedStageError(
+                self.generated_stages.get(isolate_stage_name)
+            )
         
+        for generation in topological_generations:
 
-        reversed_topological_generations = topological_generations[::-1]
-        for generation in reversed_topological_generations[:-1]:
+            generation_transitions = []
 
-            generation_stages = [self.generated_stages.get(stage_name) for stage_name in generation]
-            generatiton_stage_names = list(sorted([stage.name for stage in generation_stages]))
-         
-            transition_group: Dict[str, List[Transition]] = {}
-            for generation_idx, stage_instance in enumerate(generation_stages):
+            stage_pool_size = self.cpus
 
-                stage_instance.generation_stage_names = generatiton_stage_names
-                stage_instance.generation_id = generation_idx + 1
+            stages = {
+                stage_name: self.generated_stages.get(stage_name) for stage_name in generation
+            }
+            parallel_stages = []
 
-                dependencies = stage_instance.dependencies
+            no_workers_stages = [
+                StageTypes.WAIT, 
+                StageTypes.IDLE
+            ]
 
-                for dependency in dependencies:
-                    
-                    dependency_name = dependency.__name__
-                    dependency_instance = self.generated_stages.get(dependency_name)
+            for stage in stages.values():
 
-                    transition = self.transition_types.get((
-                        dependency_instance.stage_type,
-                        stage_instance.stage_type
+                if stage.allow_parallel is False and stage.stage_type not in no_workers_stages:
+                    stage.workers = 1
+                    stage_pool_size -= 1
+
+                    stage.executor = BatchExecutor(stage.workers)
+
+                else:
+                    parallel_stages.append((
+                        stage.name,
+                        stage
                     ))
 
-                    if transition == invalid_transition or transition == invalid_idle_transition:
-                        invalid_transition_error, _ = self.loop.run_until_complete(transition(dependency, stage_instance))
-                        raise invalid_transition_error
+            if len(parallel_stages) > 0:
+                batch_executor = BatchExecutor(max_workers=stage_pool_size)
 
-                    if transition_group.get(dependency_name) is None:
-                        transition_group[dependency_name] = [
-                            Transition(
-                                transition,
-                                dependency_instance,
-                                stage_instance
-                            )
-                        ]
+                batched_stages: List[Tuple[str, Stage, int]] = batch_executor.partion_stage_batches(parallel_stages)
+                
+                for _, stage, assigned_workers_count in batched_stages:
+                    stage.workers = assigned_workers_count
+                    stage.executor = BatchExecutor(max_workers=assigned_workers_count)
 
-                    else:
-                        transition_group[dependency_name].append(
-                            Transition(
-                                transition,
-                                dependency_instance,
-                                stage_instance
-                            )
+                    stages[stage.name] = stage
+
+            for stage in stages.values():
+
+                neighbors = graph.neighbors(stage.name)
+                
+                for neighbor in neighbors:
+                    neighbor_stage = self.generated_stages.get(neighbor)
+
+                    transition_action = self.transition_types.get((
+                        stage.stage_type,
+                        neighbor_stage.stage_type
+                    ))
+
+                    if transition_action == invalid_transition or transition_action == invalid_idle_transition:
+                        invalid_transition_error, _ = self.loop.run_until_complete(
+                            transition_action(stage, neighbor_stage)
                         )
 
-            transitions_groups.append(transition_group)
+                        raise invalid_transition_error
 
+                    transition = Transition(
+                        transition_action,
+                        stage,
+                        neighbor_stage
+                    )
 
-        transitions_groups = transitions_groups[::-1]
-        
-        return transitions_groups
+                    generation_transitions.append(transition)
+
+            if len(generation_transitions) > 0:
+                transitions.append(generation_transitions)
+
+        return transitions
 
     def map_to_setup_stages(self, graph: networkx.DiGraph):
         
@@ -126,6 +152,7 @@ class TransitionAssembler:
             idle_stage.context.summaries = {}
             idle_stage.context.paths = {}
             idle_stage.context.path_lengths = {}
+            idle_stage.context.sem = asyncio.Semaphore(self.cpus)
             
         idle_stage_name = idle_stage.__class__.__name__
 

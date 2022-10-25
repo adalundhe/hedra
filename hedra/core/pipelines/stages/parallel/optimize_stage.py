@@ -1,11 +1,13 @@
 import asyncio
-from typing import List
 import dill
+import psutil
+from typing import Any, Dict, List, Tuple, Union
+from concurrent.futures import ProcessPoolExecutor
 from hedra.core.engines.client.config import Config
 from hedra.core.pipelines.hooks.registry.registrar import registrar
-from ...hooks.types.hook import Hook
-from ...hooks.types.types import HookType
+from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.stages.optimizers import Optimizer
+from hedra.core.pipelines.stages.stage import Stage
 from hedra.core.personas import get_persona
 
 
@@ -14,27 +16,18 @@ def optimize_stage(serialized_config: str):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    optimization_config = dill.loads(serialized_config)
+    optimization_config: Dict[str, Union[str, int, Any]] = dill.loads(serialized_config)
 
     execute_stage_name = optimization_config.get('execute_stage_name')
-    execute_stage_generation_count = optimization_config.get('execute_stage_generation_count')
-    execute_stage_id = optimization_config.get('execute_stage_id')
     execute_stage_config: Config = optimization_config.get('execute_stage_config')
     optimize_iterations = optimization_config.get('optimizer_iterations')
     optimizer_type = optimization_config.get('optimizer_type')
     time_limit = optimization_config.get('time_limit')
+    batch_size = optimization_config.get('execute_stage_batch_size')
 
     execute_stage_hooks = [
         registrar.all.get(hook_name) for hook_name in optimization_config.get('execute_stage_hooks')
     ]
-
-    batch_size = execute_stage_config.batch_size
-
-    if execute_stage_generation_count > 1 and execute_stage_id == execute_stage_generation_count:
-        batch_size = int(batch_size/execute_stage_generation_count) + batch_size%execute_stage_generation_count
-
-    else:
-        batch_size = int(batch_size/execute_stage_generation_count)
 
     execute_stage_config.batch_size = batch_size
 

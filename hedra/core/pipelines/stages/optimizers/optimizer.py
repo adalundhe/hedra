@@ -80,7 +80,6 @@ class Optimizer:
     async def _optimize(self, batch_size):
         if self._current_iter < self.iterations:
             for hook in self.persona._hooks:
-                hook.session.concurrency = batch_size
                 hook.session.pool.size = batch_size
                 hook.session.sem = asyncio.Semaphore(batch_size)
                 hook.session.pool.connections = []

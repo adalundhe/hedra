@@ -24,48 +24,26 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
     }
 
     optimization_candidates = {}
-    
-    setup_stages = current_stage.context.stages.get(StageTypes.SETUP)
-    optimize_stages = current_stage.context.stages.get(StageTypes.OPTIMIZE)
-
-    for stage_name in path_lengths.keys():
-
-        execute_stage = execute_stages.get(stage_name)
-
-        if execute_stage:
-            execute_stage_paths = current_stage.context.paths.get(stage_name)
-            
-            for decendant_stage_name in execute_stage_paths:
-                if decendant_stage_name in setup_stages or decendant_stage_name in optimize_stages:
-                    optimization_candidates[stage_name] = execute_stage
-
-    current_stage.generation_optimization_candidates = len(optimization_candidates)
 
     valid_states = [
         StageStates.INITIALIZED,
         StageStates.SETUP,
     ]
 
-    stages = {}
+    for stage_name, stage in execute_stages.items():
 
-    next_stage_decendants = current_stage.context.paths.get(next_stage.name)
-    path_decendants = [
-        next_stage.name,
-        *next_stage_decendants
-    ]
+        if stage_name in current_stage.context.paths and stage.state in valid_states:
+            stage.state = StageStates.OPTIMIZING
+            optimization_candidates[stage_name] = stage
 
-    for execute_stage_name, execute_stage in optimization_candidates.items():
+    current_stage.generation_optimization_candidates = len(optimization_candidates)
 
-
-        if execute_stage.state in valid_states and execute_stage.name in path_decendants:
-            execute_stage.state = StageStates.OPTIMIZING
-            stages[execute_stage_name] = execute_stage
 
     if current_stage.timeout:
-        optimization_results = await asyncio.wait_for(current_stage.run(stages), timeout=current_stage.timeout)
+        optimization_results = await asyncio.wait_for(current_stage.run(optimization_candidates), timeout=current_stage.timeout)
 
     else:
-        optimization_results = await current_stage.run(stages)
+        optimization_results = await current_stage.run(optimization_candidates)
 
     next_stage.context.optimized_params = optimization_results
     next_stage.state = StageStates.OPTIMIZED
@@ -83,6 +61,7 @@ async def optimize_to_execute_transition(current_stage: Stage, next_stage: Stage
         return StageTimeoutError(current_stage), StageTypes.ERROR
     
     except Exception as stage_execution_error:
+        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     
