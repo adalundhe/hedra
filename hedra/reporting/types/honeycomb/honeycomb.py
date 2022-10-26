@@ -1,7 +1,6 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import functools
-import re
 from typing import List
 
 import psutil

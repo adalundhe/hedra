@@ -3,7 +3,13 @@ from types import FunctionType
 from typing import Coroutine, Dict, Iterator, Union, List
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.http.action import HTTPAction
-from graphql import Source, parse, print_ast
+try:
+    from graphql import Source, parse, print_ast
+
+except ImportError:
+    Source=None
+    parse=lambda: None
+    print_ast=lambda: None
 
 
 class GraphQLAction(HTTPAction):

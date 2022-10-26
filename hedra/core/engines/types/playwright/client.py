@@ -1,7 +1,5 @@
 import asyncio
 from typing import Awaitable, Dict, List, Set, Tuple, Union
-
-from django import conf
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.types.common.types import RequestTypes
 from .context_config import ContextConfig
@@ -25,7 +23,7 @@ class MercuryPlaywrightClient:
         self.config = None
 
 
-        self.sem = asyncio.Semaphore(concurrency)
+        self.sem = asyncio.Semaphore(value=concurrency)
         self.active = 0
         self.waiter = None
 

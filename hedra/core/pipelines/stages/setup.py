@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 import psutil
 from typing import Dict
 from hedra.core.engines.types.common.types import RequestTypes
@@ -28,6 +29,7 @@ class SetupCall:
             await self.hook.call()
 
         except Exception as setup_exception:
+            print(traceback.format_exc())
             self.exception = setup_exception
             self.action_store.waiter.set_result(None)
 

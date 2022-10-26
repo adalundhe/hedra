@@ -21,7 +21,7 @@ class ContextGroup:
         self.librarians: List[CommandLibrarian] = []
         self.config = {}
         self.contexts = []
-        self.sem = asyncio.Semaphore(concurrency)
+        self.sem = asyncio.Semaphore(value=concurrency)
 
     async def create(self) -> None:
 

@@ -1,11 +1,7 @@
 import asyncio
 import functools
-import re
 from typing import List
-
-from attr import fields
 from numpy import float32, float64, int16, int32, int64
-from sklearn import metrics
 from hedra.reporting.events.types.base_event import BaseEvent
 from hedra.reporting.metric import MetricsSet
 

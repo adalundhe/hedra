@@ -78,6 +78,9 @@ class Execute(Stage):
 
             total_elapsed = statistics.median(elapsed_times)
 
+            print(len(results))
+            print(len(results)/total_elapsed)
+
         else:
 
             persona = get_persona(self.client._config)

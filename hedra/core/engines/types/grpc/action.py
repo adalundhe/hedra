@@ -1,6 +1,5 @@
 import binascii
-from types import FunctionType
-from typing import Coroutine, Dict, Iterator, List, Union
+from typing import Dict, Iterator, List, Union
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.http2.action import HTTP2Action
 

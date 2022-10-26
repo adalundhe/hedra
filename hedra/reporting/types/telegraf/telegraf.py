@@ -13,7 +13,7 @@ try:
 
 except Exception:
     from hedra.reporting.types.empty import Empty as StatsD
-
+    TelegrafConfig=None
     has_connector = False
 
 

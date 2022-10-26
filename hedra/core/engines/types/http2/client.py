@@ -42,7 +42,7 @@ class MercuryHTTP2Client:
         self.registered: Dict[str, HTTP2Action] = {}
         self.closed = False
         
-        self.sem = Semaphore(concurrency)
+        self.sem = Semaphore(value=concurrency)
         self.pool: HTTP2Pool = HTTP2Pool(concurrency, self.timeouts, reset_connections=reset_connections)
         self.pool.create_pool()
         self.active = 0

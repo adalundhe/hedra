@@ -17,11 +17,11 @@ try:
     has_connector=True
 
 except Exception:
-    # sqlalchemy = None
-    # UUID = None
-    # Postgres = None
-    # CreateTable = None
-    # TimescaleDBConfig = None
+    sqlalchemy = None
+    UUID = None
+    from hedra.reporting.types.empty import Empty as Postgres
+    CreateTable = None
+    TimescaleDBConfig = None
     has_connector = False
 
 

@@ -24,7 +24,7 @@ class MercuryUDPClient:
         self._hosts = {}
         self.closed = False
 
-        self.sem = asyncio.Semaphore(concurrency)
+        self.sem = asyncio.Semaphore(value=concurrency)
         self.pool = Pool(concurrency, reset_connections=reset_connections)
         self.pool.create_pool()
         self.active = 0

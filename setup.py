@@ -11,7 +11,7 @@ with open(os.path.join(current_directory, 'README.md'), "r") as readme:
 
 setup(
     name="hedra",
-    version="0.5.5",
+    version="0.5.6",
     description="Powerful performance testing made easy.",
     long_description=package_description,
     long_description_content_type="text/markdown",
@@ -25,42 +25,90 @@ setup(
         "Operating System :: OS Independent"
     ],
     install_requires=[
-        'py3cli-tools',
-        'py3-async-tools',
-        'easy-logger-py',
-        'broadkast',
-        'statstream-py',
-        'statserve',
-        'pytz',
-        'tzlocal',
-        'eventlet',
+        'attr',
+        'networkx',
+        'aiodns',
+        'h2',
+        'click',
         'psutil',
-        'flask',
-        'uwsgi',
+        'fastapi',
         'alive-progress',
         'dill',
         'scipy',
         'art',
         'scikit-learn',
-        'aiopg',
-        'prometheus-client',
-        'prometheus-api-client',
-        'psycopg2-binary',
-        'motor',
-        'datadog==0.42.0',
-        'cassandra-driver',
-        'redis',
-        'aioredis',
-        'aiokafka',
-        'boto3',
-        'google-cloud-storage',
-        'snowflake-connector-python'
+        'uvloop',
+        'tdigest'
     ],
     entry_points = {
         'console_scripts': [
             'hedra=hedra.cli:run',
             'hedra-server=hedra.run_uwsgi:run_uwsgi'
         ],
+    },
+    extras_require = {
+        'playwright': [
+            'playwright',
+        ],
+        'azure': [
+            'azure-cosmos'
+        ],
+        'honeycomb': [
+            'libhoney'
+        ],
+        'influxdb': [
+            'influxdb_client'
+        ],
+        'newrelic': [
+            'newrelic'
+        ],
+        'statsd': [
+            'aio_statsd'
+        ],
+        'prometheus': [
+            'prometheus-client',
+            'prometheus-api-client',
+        ],
+        'cassandra': [
+            'cassandra-driver'
+        ],
+        'datadog': [
+            'datadog'
+        ],
+        'mongodb': [
+            'motor'
+        ],
+        'redis': [
+            'redis',
+            'aioredis'
+        ],
+        'kafka': [
+            'aiokafka'
+        ],
+        'sql': [
+            'aiomysql',
+            'psycopg2-binary',
+            'aiopg',
+            'sqlalchemy',
+        ],
+        'aws': [
+            'boto3'
+        ],
+        'grpc': [
+            'grpcio',
+            'grpcio-tools'
+        ],
+        'graphql': [
+            'graphql'
+        ],
+        'snowflake': [
+            'snowflake-connector-python'
+        ],
+        'google': [
+            'google-cloud-bigquery',
+            'google-cloud-bigtable',
+            'google-cloud-storage',
+        ]
     },
     python_requires='>=3.8'
 )

@@ -1,8 +1,6 @@
 import json
 from typing import Dict, Iterator, Union, List
 from urllib.parse import urlencode
-
-from sqlalchemy import false
 from hedra.core.engines.types.common.base_action import BaseAction
 from hedra.core.engines.types.common.constants import NEW_LINE
 from hedra.core.engines.types.common.protocols.shared.writer import Writer
@@ -16,7 +14,7 @@ class UDPAction(BaseAction):
         self,
         name: str, 
         url: str, 
-        wait_for_response: bool = false, 
+        wait_for_response: bool = False, 
         data: Union[str, dict, Iterator, bytes, None] = None, 
         user: str=None, 
         tags: List[Dict[str, str]] = []

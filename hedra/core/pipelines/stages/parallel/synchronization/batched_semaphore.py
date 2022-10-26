@@ -23,8 +23,8 @@ class BatchedSemaphore(mixins._LoopBoundMixin):
     ValueError is raised.
     """
 
-    def __init__(self, value=1, *, loop=mixins._marker):
-        super().__init__(loop=loop)
+    def __init__(self, value=1, *, loop=None):
+        super().__init__()
         if value < 0:
             raise ValueError("Semaphore initial value must be >= 0")
         self._value = value
