@@ -1,13 +1,16 @@
 from __future__ import annotations
 import numpy
-import statistics
 from collections import defaultdict
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, Union
+from hedra.reporting.stats import (
+    Median,
+    Mean,
+    Variance,
+    StandardDeviation
+)
 from .results import results_types
-numpy.seterr(over='raise')
+from .types.base_event import BaseEvent
 
-def trunc(values, decs=0):
-    return numpy.trunc(values*10**decs)/(10**decs)
 
 class EventsGroup:
 
@@ -20,7 +23,11 @@ class EventsGroup:
         'total',
         'succeeded',
         'failed',
-        'errors'
+        'errors',
+        '_streaming_mean',
+        '_streaming_variance',
+        '_streaming_stdev',
+        '_streaming_median'
     )
 
     def __init__(self) -> None:
@@ -33,9 +40,14 @@ class EventsGroup:
         self.failed = 0
         self.errors = defaultdict(lambda: 0)
 
+        self._streaming_mean = defaultdict(Mean)
+        self._streaming_variance = defaultdict(Variance)
+        self._streaming_stdev = defaultdict(StandardDeviation)
+        self._streaming_median = defaultdict(Median)
+
     async def add(self, result: Any, stage_name: str):
 
-        event = results_types.get(result.type)(result)
+        event: BaseEvent = results_types.get(result.type)(result)
         event.stage = stage_name
 
         if self.source is None:
@@ -51,21 +63,10 @@ class EventsGroup:
         else:
             self.errors[event.error] += 1
             self.failed += 1
-        
-        if event.time > 0:
-            self.timings['total'].append(event.time)
 
-        if event.time_waiting > 0:
-            self.timings['waiting'].append(event.time_waiting)
-
-        if event.time_connecting > 0:
-            self.timings['connecting'].append(event.time_connecting)
-
-        if event.time_writing > 0:
-            self.timings['writing'].append(event.time_writing)
-
-        if event.time_reading > 0:
-            self.timings['reading'].append(event.time_reading)
+        for timing_group, timing in event.timings.items():
+            if timing > 0:
+                self.timings[timing_group].append(timing)
 
     def calculate_partial_group_stats(self):
         self.total = self.succeeded + self.failed
@@ -76,12 +77,23 @@ class EventsGroup:
             if len(group_timings) == 0:
                 group_timings = [0]
 
+            median = float((numpy.median(group_timings)))
+            mean = float(numpy.mean(group_timings, dtype=numpy.float64))
+            variance = float(numpy.var(group_timings, dtype=numpy.float64, ddof=1))
+            stdev = float(numpy.std(group_timings, dtype=numpy.float64))
+
+            self._streaming_median[group_name].update(median)
+            self._streaming_mean[group_name].update(mean)
+            self._streaming_variance[group_name].update(variance)
+            self._streaming_stdev[group_name].update(stdev)
+            
+
             self.groups[group_name] = {
                 group_name: {
-                    'median': float((numpy.median(group_timings))),
-                    'mean': float(numpy.mean(group_timings, dtype=numpy.float64)),
-                    'variance': float(numpy.var(group_timings, dtype=numpy.float64, ddof=1)),
-                    'stdev': float(numpy.std(group_timings, dtype=numpy.float64)),
+                    'median': median,
+                    'mean': mean,
+                    'variance': variance,
+                    'stdev': stdev,
                     'minimum': min(group_timings),
                     'maximum': max(group_timings)
                 }
@@ -132,13 +144,9 @@ class EventsGroup:
         for error, error_count in group.errors.items():
             self.errors[error] += error_count
 
-        self.timings['total'].extend(group.timings['total'])
-        self.timings['waiting'].extend(group.timings['waiting'])
-        self.timings['connecting'].extend(group.timings['connecting'])
-        self.timings['writing'].extend(group.timings['writing'])
-        self.timings['reading'].extend(group.timings['reading'])
+        for group_name in group.timings.keys():
+            self.timings[group_name].extend(group.timings[group_name])
 
-        for group_name in self.timings.keys():
             merge_group_stats = group.groups.get(
                 group_name, 
                 {}
@@ -147,37 +155,39 @@ class EventsGroup:
             stats_group = self.groups.get(
                 group_name,
                 {}
-            ).get(
-                group_name
-            )
+            ).get(group_name)
 
-            if stats_group is None:
+
+            update_median = group._streaming_median[group_name].get()
+            update_mean = group._streaming_mean[group_name].get()
+            update_variance = group._streaming_variance[group_name].get()
+            updated_stdev = group._streaming_stdev[group_name].get()
+
+            if self.groups.get(group_name) is None:
                 self.groups[group_name] = {
-                    group_name: merge_group_stats
+                    group_name: {
+                        'median': update_median,
+                        'mean': update_mean,
+                        'variance': update_variance,
+                        'stdev': updated_stdev,
+                        'minimum': merge_group_stats['minimum'],
+                        'maximum': merge_group_stats['maximum']
+                    }
                 }
 
             else:
+                
+                self._streaming_median[group_name].update(update_median)
+                self._streaming_mean[group_name].update(update_mean)
+                self._streaming_variance[group_name].update(update_variance)
+                self._streaming_stdev[group_name].update(updated_stdev)
 
                 self.groups[group_name] = {
                     group_name: {
-                        'median': float((numpy.median([
-                            merge_group_stats['median'],
-                            stats_group['median']
-                        ]))),
-                        'mean': float(numpy.mean([
-                            merge_group_stats['mean'],
-                            stats_group['mean']
-                        ])),
-                        'variance': float(numpy.var(
-                            trunc([
-                                merge_group_stats['variance'],
-                                stats_group['variance'],
-                            ], decs=6)
-                        )),
-                        'stdev': float(numpy.std([
-                            merge_group_stats['stdev'],
-                            stats_group['stdev']
-                        ])),
+                        'median': self._streaming_median[group_name].get(),
+                        'mean': self._streaming_mean[group_name].get(),
+                        'variance': self._streaming_variance[group_name].get(),
+                        'stdev': self._streaming_stdev[group_name].get(),
                         'minimum': min([
                             merge_group_stats['minimum'],
                             stats_group['minimum']

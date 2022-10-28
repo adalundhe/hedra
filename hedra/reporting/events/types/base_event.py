@@ -10,31 +10,25 @@ class BaseEvent:
         'name',
         'shortname',
         'error',
-        'time',
-        'time_waiting',
-        'time_connecting',
-        'time_writing',
-        'time_reading',
         'type',
         'source',
         'checks',
         'tags',
-        'stage'
+        'stage',
+        'timings',
+        'time'
     )
 
     def __init__(self, result: BaseResult) -> None:
         self.name = None
         self.shortname = result.name
         self.error = result.error
-        self.time = result.read_end - result.start
-        self.time_waiting = result.start - result.wait_start
-        self.time_connecting = result.connect_end - result.start
-        self.time_writing = result.write_end - result.connect_end
-        self.time_reading = result.read_end - result.write_end
+        self.timings = {}
         self.type = result.type
         self.source = result.source
-
         self.checks = []
+
+        self.time = self.timings.get('total', 0)
 
         for check_hook_name in result.checks:
             check_hook = registrar.all.get(check_hook_name)

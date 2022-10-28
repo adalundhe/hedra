@@ -1,3 +1,4 @@
+from typing import List
 from hedra.core.engines.types.common.types import RequestTypes
 from .types import (
     GraphQLEvent,
@@ -6,8 +7,9 @@ from .types import (
     HTTP2Event,
     PlaywrightEvent,
     WebsocketEvent,
-    UDPEvent
+    UDPEvent,
 )
+
 
 
 results_types = {
@@ -19,3 +21,4 @@ results_types = {
     RequestTypes.WEBSOCKET: WebsocketEvent,
     RequestTypes.UDP: UDPEvent
 }
+

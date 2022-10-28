@@ -23,6 +23,7 @@ class RequestTypes:
     GRPC='GRPC'
     PLAYWRIGHT='PLAYWRIGHT'
     UDP='UDP'
+    CUSTOM='CUSTOM'
 
 
 class ProtocolMap:

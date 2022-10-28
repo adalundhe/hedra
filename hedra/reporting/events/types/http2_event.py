@@ -16,7 +16,8 @@ class HTTP2Event(BaseEvent):
         'status',
         'headers',
         'data',
-        'status'
+        'status',
+        'timings'
     )
 
     def __init__(self, result: HTTP2Result) -> None:
@@ -34,6 +35,16 @@ class HTTP2Event(BaseEvent):
         self.status = result.status
         
         self.name = f'{self.method}_{self.shortname}'
+
+        self.time = result.read_end - result.start
+
+        self.timings = {
+            'total': self.time,
+            'waiting': result.start - result.wait_start,
+            'connecting': result.connect_end - result.start,
+            'writing': result.write_end - result.connect_end,
+            'reading': result.read_end - result.write_end
+        }
 
     def serialize(self):
 

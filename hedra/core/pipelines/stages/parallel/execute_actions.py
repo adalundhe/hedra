@@ -1,18 +1,10 @@
 import asyncio
-import psutil
+from distutils.command.config import config
 import dill
-import time
-from hedra.core.engines.types import (
-    MercuryGraphQLClient,
-    MercuryGraphQLHTTP2Client,
-    MercuryGRPCClient,
-    MercuryHTTP2Client,
-    MercuryHTTPClient,
-    MercuryPlaywrightClient,
-    MercuryWebsocketClient,
-    MercuryUDPClient
-)
 
+from hedra.core.engines import engines_registry
+from hedra.core.engines.client.config import Config
+from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.http import HTTPAction
 from hedra.core.engines.types.http2 import HTTP2Action
 from hedra.core.engines.types.graphql import GraphQLAction
@@ -26,6 +18,7 @@ from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.pipelines.hooks.registry.registrar import registrar
 from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.hooks.types.types import HookType
+from hedra.plugins.types.engine.action import Action
 
 from hedra.core.personas import get_persona
 from .types import PartitionMethod
@@ -57,6 +50,8 @@ def execute_actions(parallel_config: str):
         hooks = {
             HookType.ACTION: []
         }
+
+
         for hook_action in parallel_config.get('hooks'):
             
             action_name = hook_action.get('name')
@@ -71,6 +66,7 @@ def execute_actions(parallel_config: str):
             )
 
             action_hooks = hook_action.get('hooks', {})
+
             before_hook_name = action_hooks.get('before')
             after_hook_name = action_hooks.get('after')
             check_hook_names = action_hooks.get('checks')
@@ -79,7 +75,7 @@ def execute_actions(parallel_config: str):
 
             if action_type == RequestTypes.HTTP:
                 
-                hook.session = MercuryHTTPClient(
+                hook.session = engines_registry.get(RequestTypes.HTTP)(
                     concurrency=persona.batch.size,
                     timeouts=hook_action.get('timeouts'),
                     reset_connections=hook_action.get('reset_connections')
@@ -127,7 +123,7 @@ def execute_actions(parallel_config: str):
 
             elif action_type == RequestTypes.HTTP2:
 
-                hook.session = MercuryHTTP2Client(
+                hook.session = engines_registry.get(RequestTypes.HTTP2)(
                     concurrency=persona.batch.size,
                     timeouts=hook_action.get('timeouts'),
                     reset_connections=hook_action.get('reset_connections')
@@ -175,7 +171,7 @@ def execute_actions(parallel_config: str):
 
             elif action_type == RequestTypes.UDP:
 
-                hook.session = MercuryUDPClient(
+                hook.session = engines_registry.get(RequestTypes.UDP)(
                     concurrency=persona.batch.size,
                     timeouts=hook_action.get('timeouts'),
                     reset_connections=hook_action.get('reset_connections')
@@ -218,6 +214,44 @@ def execute_actions(parallel_config: str):
 
                 hooks[HookType.ACTION].append(hook)
 
+            else:
+                plugin_type = hook_action.get('plugin_type')
+                timeouts: Timeouts = hook_action.get('timeouts', {})
+
+
+                config = Config(
+                    batch_size=persona.batch.size,
+                    connect_timeout=timeouts.connect_timeout,
+                    request_timeout=timeouts.total_timeout,
+                    reset_connections=hook_action.get('reset_connections')
+                )
+  
+                plugin = engines_registry.get(plugin_type)(config)
+                hook.session = plugin
+
+                hook.action: Action = plugin.action(**{
+                    'name': hook_action.get('name'),
+                    **hook_action.get('fields', {}),
+                    **hook_action.get('metadata')
+                })
+
+                hook.action.use_security_context = hook_action.get('use_security_context', False)
+                hook.action.security_context = hook_action.get('security_context', False)
+                hook.action.plugin_type = plugin_type
+
+                if before_hook_name:
+                    before_hook = registrar.all.get(before_hook_name)
+                    hook.action.hooks.before = before_hook.call
+
+                if after_hook_name:
+                    after_hook = registrar.all.get(after_hook_name)
+                    hook.action.hooks.after = after_hook.call
+
+                hook.action.hooks.checks = []
+                for check_hook_name in check_hook_names:
+                    hook.action.hooks.checks.append(check_hook_name)
+
+                hooks[HookType.ACTION].append(hook)
 
         persona.setup(hooks)
 

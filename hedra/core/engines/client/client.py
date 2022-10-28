@@ -1,7 +1,19 @@
 from asyncio import Future
-from typing import Iterable
+from types import UnionType
+from typing import Dict, Generic, Iterable, TypeVar, Union
+from typing_extensions import TypeVarTuple, Unpack
+
+from datadog import initialize
 
 from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core.engines.types.graphql.client import MercuryGraphQLClient
+from hedra.core.engines.types.graphql_http2.client import MercuryGraphQLHTTP2Client
+from hedra.core.engines.types.grpc.client import MercuryGRPCClient
+from hedra.core.engines.types.http.client import MercuryHTTPClient
+from hedra.core.engines.types.http2.client import MercuryHTTP2Client
+from hedra.core.engines.types.playwright.client import MercuryPlaywrightClient
+from hedra.core.engines.types.udp.client import MercuryUDPClient
+from hedra.core.engines.types.websocket.client import MercuryWebsocketClient
 from .store import ActionsStore
 from .config import Config
 from .types import  (
@@ -15,9 +27,13 @@ from .types import  (
     UDPClient
 )
 
+from .plugins_store import PluginsStore
 
 
-class Client:
+T = TypeVarTuple('T')
+
+
+class Client(Generic[Unpack[T]]):
 
     def __init__(self) -> None:
         self.next_name = None
@@ -33,6 +49,8 @@ class Client:
         self._udp = UDPClient
 
         self.clients = {}
+        self._plugin = PluginsStore[Unpack[T]]()
+
         self.actions = ActionsStore()
 
     def __getitem__(self, key: str):
@@ -45,6 +63,17 @@ class Client:
         for session in self.clients.values():
             if session.waiter:
                 yield session.waiter
+
+    @property
+    def plugin(self) -> Dict[str, Union[Unpack[T]]]:
+        self._plugin._config = self._config
+        self._plugin.actions = self.actions
+        self._plugin.actions.waiter = self.actions.waiter
+        self._plugin.actions.current_stage = self.actions.current_stage
+        self._plugin.intercept = self.intercept
+        self._plugin.next_name = self.next_name
+
+        return self._plugin
 
     @property
     def http(self):

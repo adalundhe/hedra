@@ -6,7 +6,7 @@ from .types import ProtocolMap
 
 class BaseAction:
 
-    __slots__ = ('name', 'is_setup', 'metadata', 'hooks')
+    __slots__ = ( 'protocols', 'name', 'is_setup', 'metadata', 'hooks')
 
     def __init__(
         self, 

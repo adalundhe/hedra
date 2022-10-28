@@ -11,7 +11,8 @@ class PlaywrightEvent(BaseEvent):
         'selector',
         'x_coord',
         'y_coord',
-        'frame'
+        'frame',
+        'timings'
     )
 
     def __init__(self, result: PlaywrightResult) -> None:
@@ -27,3 +28,13 @@ class PlaywrightEvent(BaseEvent):
         self.x_coord = result.x_coord
         self.y_coord = result.y_coord
         self.frame = result.frame
+
+        self.time = result.read_end - result.start
+
+        self.timings = {
+            'total': self.time,
+            'waiting': result.start - result.wait_start,
+            'connecting': result.connect_end - result.start,
+            'writing': result.write_end - result.connect_end,
+            'reading': result.read_end - result.write_end
+        }

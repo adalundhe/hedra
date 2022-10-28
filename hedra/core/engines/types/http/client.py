@@ -44,6 +44,7 @@ class MercuryHTTPClient:
         self.waiter = None
 
         self.ssl_context = get_default_ssl_context()
+        self.is_plugin = False
 
     async def wait_for_active_threshold(self):
         if self.waiter is None:
@@ -81,7 +82,6 @@ class MercuryHTTPClient:
                                 break
 
                             except Exception as e:
-                                print(traceback.format_exc())
                                 pass
 
                         if action.url.socket_config:

@@ -2,13 +2,12 @@
 
 import asyncio
 import time
+import traceback
 import dill
 import psutil
 from collections import defaultdict
-from concurrent.futures import ProcessPoolExecutor
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List
 from hedra.reporting.events import EventsGroup
-from hedra.reporting.metric import MetricsSet
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.core.pipelines.hooks.registry.registrar import registrar
 
@@ -50,6 +49,7 @@ def group_batched_results(config: Dict[str, Any]):
     stage_name = config.get('analyze_stage_name')
     custom_metric_hook_names = config.get('analyze_stage_metric_hooks', [])
     results_batch = config.get('analyze_stage_batched_results', [])
+    custom_event_types = config.get('analyze_stage_custom_event_types', [])
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -64,6 +64,7 @@ def group_batched_results(config: Dict[str, Any]):
         )
 
     except Exception as e:
+        print(traceback.format_exc())
         raise e
 
 

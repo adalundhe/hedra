@@ -1,4 +1,4 @@
-from typing import Coroutine, Dict, List
+from typing import Coroutine, Dict, List, Union
 from .types import RequestTypes
 
 
@@ -26,7 +26,7 @@ class BaseResult:
         source: str,
         user: str,
         tags: List[Dict[str, str]],
-        type: RequestTypes,
+        type: Union[RequestTypes, str],
         checks: List[Coroutine], 
         error: Exception
     ) -> None:

@@ -1,4 +1,5 @@
 import asyncio
+from ctypes import Union
 import networkx
 import inspect
 from typing import Coroutine, Dict, List, Tuple
@@ -10,6 +11,9 @@ from hedra.core.pipelines.hooks.registry.registrar import registrar
 from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.stages.parallel.batch_executor import BatchExecutor
 from hedra.core.pipelines.transitions.exceptions.exceptions import IsolatedStageError
+from hedra.plugins.types.engine.engine_plugin import EnginePlugin
+from hedra.plugins.types.reporter.reporter_plugin import ReporterPlugin
+from hedra.plugins.types.plugin_types import PluginType
 from .transition import Transition
 from .common import (
     invalid_transition
@@ -61,6 +65,12 @@ class TransitionAssembler:
     def build_transitions_graph(self, topological_generations: List[List[str]], graph: networkx.Graph):
 
         transitions: List[List[Transition]] = []
+        plugins: Dict[PluginType, Dict[str, Union[EnginePlugin, ReporterPlugin]]] = {
+            PluginType.ENGINE: {},
+            PluginType.OPTIMIZER: {},
+            PluginType.PERSONA: {},
+            PluginType.REPORTER: {}
+        }
 
         for isolate_stage_name in networkx.isolates(graph):
             raise IsolatedStageError(
@@ -85,6 +95,9 @@ class TransitionAssembler:
 
             for stage in stages.values():
 
+                for plugin_name, plugin in stage.plugins.items():
+                    plugins[plugin.type][plugin_name] = plugin
+
                 if stage.allow_parallel is False and stage.stage_type not in no_workers_stages:
                     stage.workers = 1
                     stage_pool_size -= 1
@@ -96,7 +109,7 @@ class TransitionAssembler:
                         stage.name,
                         stage
                     ))
-
+            
             if len(parallel_stages) > 0:
                 batch_executor = BatchExecutor(max_workers=stage_pool_size)
 
@@ -109,6 +122,8 @@ class TransitionAssembler:
                     stages[stage.name] = stage
 
             for stage in stages.values():
+
+                stage.plugins_by_type = plugins
 
                 neighbors = graph.neighbors(stage.name)
                 

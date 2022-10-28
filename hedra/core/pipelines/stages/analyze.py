@@ -2,12 +2,15 @@ import dill
 from collections import defaultdict
 from typing import Union, List, Dict
 from easy_logger import Logger
+from hedra.plugins.types.engine import EnginePlugin
+from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.events import EventsGroup
 from hedra.reporting.metric import MetricsSet
 from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.hooks.registry.registrar import registrar
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
+from hedra.reporting.events import results_types
 from hedra.reporting.events.types import (
     HTTPEvent, 
     HTTP2Event, 
@@ -42,6 +45,10 @@ class Analyze(Stage):
     @Internal
     async def run(self):
 
+        engine_plugins = self.plugins_by_type.get(PluginType.ENGINE)
+        for plugin_name, plugin in engine_plugins.items():
+            results_types[plugin_name] = plugin.event
+        
         all_results = list(self.raw_results.items())
         summaries = {
             'session_total': 0,
@@ -52,6 +59,15 @@ class Analyze(Stage):
 
         batches = self.executor.partion_stage_batches(all_results)
 
+        custom_event_types = []
+
+        for plugin in self.plugins:
+            custom_event_types.append({
+                'event_name':  f'{plugin.__name__}Event',
+                'event_type': plugin.__name__,
+                'event_fields': plugin.event_fields
+            })
+        
         custom_metric_hooks = []
         for metric_hook_name in metric_hook_names:
             custom_metric_hook = registrar.all.get(metric_hook_name)
@@ -92,7 +108,8 @@ class Analyze(Stage):
                 batch_configs.append({
                     'analyze_stage_name': stage_name,
                     'analyze_stage_metric_hooks': list(metric_hook_names),
-                    'analyze_stage_batched_results': batch
+                    'analyze_stage_batched_results': batch,
+                    'analyze_stage_custom_event_types': custom_event_types
                 })
 
             stage_configs.append((

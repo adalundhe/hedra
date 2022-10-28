@@ -1,30 +1,30 @@
-import asyncio
-import functools
+from ctypes import Union
+import dill
 import statistics
 from time import sleep
-import psutil
-import dill
-from multiprocessing import get_context
+from typing import Dict, Generic
 from hedra.core.engines.client import Client
-from concurrent.futures import ProcessPoolExecutor
+from typing_extensions import TypeVarTuple, Unpack
+from hedra.core.engines.types.registry import engines_registry
 from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.personas import get_persona
-from .parallel.batch_executor import BatchExecutor
+from hedra.plugins.types.plugin_types import PluginType
+
 from .parallel.types import PartitionMethod
 from .parallel.execute_actions import execute_actions
 from .stage import Stage
 
+T = TypeVarTuple('T')
 
-
-class Execute(Stage):
+class Execute(Stage, Generic[Unpack[T]]):
     stage_type=StageTypes.EXECUTE
 
     def __init__(self) -> None:
         super().__init__()
         self.persona = None
-        self.client = Client()
+        self.client: Client[Unpack[T]] = Client()
         
         self.accepted_hook_types = [ 
             HookType.SETUP, 
@@ -44,6 +44,10 @@ class Execute(Stage):
 
     @Internal
     async def run(self):
+
+        engine_plugins = self.plugins_by_type.get(PluginType.ENGINE)
+        for plugin in engine_plugins.values():
+            engines_registry[plugin.name] = plugin
 
         if self.workers > 1:                
     

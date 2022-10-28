@@ -1,8 +1,8 @@
 import asyncio
 import traceback
+from typing_extensions import TypeVarTuple, Unpack
 import psutil
-from typing import Dict
-from hedra.core.engines.types.common.types import RequestTypes
+from typing import Dict, Generic, List, Union
 from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.hooks.types.internal import Internal
@@ -10,11 +10,15 @@ from hedra.core.engines.client.client import Client
 from hedra.core.engines.client.config import Config
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.personas.types import PersonaTypesMap
+from hedra.plugins.types.engine.engine_plugin import EnginePlugin
+from hedra.plugins.types.plugin_types import PluginType
 from .execute import Execute
 from .stage import Stage
 from .exceptions import (
     HookSetupError
 )
+
+T = TypeVarTuple('T')
 
 
 class SetupCall:
@@ -35,7 +39,7 @@ class SetupCall:
 
 
 
-class Setup(Stage):
+class Setup(Stage, Generic[Unpack[T]]):
     stage_type=StageTypes.SETUP
     log_level='info'
     persona_type='default'
@@ -92,15 +96,22 @@ class Setup(Stage):
             )
    
             client = Client()
-            execute_stage.client = client
 
+            engine_plugins: Dict[str, EnginePlugin] = self.plugins_by_type.get(PluginType.ENGINE)
+
+            for plugin_name, plugin in engine_plugins.items():
+                client.plugin[plugin_name] = plugin(config)
+                plugin.name = plugin_name
+                self.plugins_by_type[plugin_name] = plugin
+
+            execute_stage.client = client
             execute_stage.client._config = config
 
             for hook in execute_stage.hooks.get(HookType.ACTION):
 
                 execute_stage.client.next_name = hook.name
                 execute_stage.client.intercept = True
-
+                
                 execute_stage.client.actions.set_waiter(execute_stage.name)
 
                 setup_call = SetupCall(hook)
@@ -108,7 +119,7 @@ class Setup(Stage):
 
                 task = asyncio.create_task(setup_call.setup())
 
-                await execute_stage.client.actions.wait_for_ready(setup_call)            
+                await execute_stage.client.actions.wait_for_ready(setup_call)   
 
                 try:
                     if setup_call.exception:
@@ -134,7 +145,7 @@ class Setup(Stage):
                     execute_stage.name,
                     hook.name
                 )
-                
+
                 action.hooks.before = self.get_hook(execute_stage, hook.shortname, HookType.BEFORE)
                 action.hooks.after = self.get_hook(execute_stage, hook.shortname, HookType.AFTER)
                 action.hooks.checks = self.get_checks(execute_stage, hook.shortname)
