@@ -85,7 +85,6 @@ class DefaultPersona:
 
         logger = Logger()
         self.session_logger = logger.generate_logger('hedra')
-        self.loop = None
         self.current_action_idx = 0
         self.optimized_params = None
 

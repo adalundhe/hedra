@@ -29,7 +29,6 @@ class CSV:
 
     async def submit_events(self, events: List[BaseEvent]):
 
-
         with open(self.events_filepath, 'a') as events_file:
 
             for event in events:
@@ -80,7 +79,6 @@ class CSV:
                         **metrics_set.common_stats
                     }
                 )
-
 
     async def submit_metrics(self, metrics: List[MetricsSet]):
 
@@ -178,7 +176,6 @@ class CSV:
                         }
                     )
                 
-
     async def close(self):
         pass
 

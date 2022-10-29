@@ -1,11 +1,11 @@
 import functools
 from typing import Coroutine, Dict, List, Union
-from .types import PluginHooks
-from .plugin_hook import PluginHook
-from hedra.plugins.types.engine.hooks.registry.registrar import plugin_registrar
+from hedra.plugins.types.common.plugin_hook import PluginHook
+from hedra.plugins.types.common.types import PluginHooks
+from hedra.plugins.types.common.registrar import plugin_registrar
 
 
-@plugin_registrar(PluginHooks.ON_EXECUTE)
+@plugin_registrar(PluginHooks.ON_ENGINE_EXECUTE)
 def execute(weight: int=1, order: int=1, metadata: Dict[str, Union[str, int]]={}, checks: List[Coroutine]=[]):
 
     def wrapper(func) -> PluginHook:

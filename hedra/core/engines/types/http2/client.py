@@ -49,7 +49,7 @@ class MercuryHTTP2Client:
         self.waiter = None
 
         self.ssl_context = get_http2_ssl_context()
-        self.is_plugin = False
+        
 
     async def wait_for_active_threshold(self):
         if self.waiter is None:

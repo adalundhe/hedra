@@ -1,12 +1,11 @@
 import functools
-from typing import Coroutine, Dict, List, Union
 from hedra.plugins.types.common.plugin_hook import PluginHook
 from hedra.plugins.types.common.types import PluginHooks
 from hedra.plugins.types.common.registrar import plugin_registrar
 
 
-@plugin_registrar(PluginHooks.ON_ENGINE_CLOSE)
-def close(weight: int=1, order: int=1, metadata: Dict[str, Union[str, int]]={}, checks: List[Coroutine]=[]):
+@plugin_registrar(PluginHooks.ON_REPORTER_CONNECT)
+def connect():
 
     def wrapper(func) -> PluginHook:
 

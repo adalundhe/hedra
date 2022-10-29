@@ -32,7 +32,7 @@ class MercuryWebsocketClient:
         self.waiter = None
 
         self.ssl_context = get_default_ssl_context()
-        self.is_plugin = False
+        
 
         
     async def prepare(self, action: WebsocketAction) -> Awaitable[Union[WebsocketAction, Exception]]:

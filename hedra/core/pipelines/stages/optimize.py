@@ -5,8 +5,9 @@ from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.engines.client.time_parser import TimeParser
+from hedra.core.personas.persona_manager import registered_personas
+from hedra.plugins.types.plugin_types import PluginType
 from .parallel.optimize_stage import optimize_stage
-from .parallel.batch_executor import BatchExecutor
 from .execute import Execute
 from .stage import Stage
 
@@ -31,6 +32,10 @@ class Optimize(Stage):
 
     @Internal
     async def run(self, stages: Dict[str, Execute]):
+
+        persona_plugins = self.plugins_by_type.get(PluginType.PERSONA)
+        for plugin_name, plugin in persona_plugins.items():
+            registered_personas[plugin_name] = lambda config: plugin(config)
 
         optimization_results = []
 

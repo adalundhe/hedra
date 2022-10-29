@@ -9,7 +9,7 @@ from hedra.core.engines.types.registry import engines_registry
 from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
-from hedra.core.personas import get_persona
+from hedra.core.personas.persona_manager import get_persona, registered_personas
 from hedra.plugins.types.plugin_types import PluginType
 
 from .parallel.types import PartitionMethod
@@ -48,6 +48,10 @@ class Execute(Stage, Generic[Unpack[T]]):
         engine_plugins = self.plugins_by_type.get(PluginType.ENGINE)
         for plugin in engine_plugins.values():
             engines_registry[plugin.name] = plugin
+
+        persona_plugins = self.plugins_by_type.get(PluginType.PERSONA)
+        for plugin_name, plugin in persona_plugins.items():
+            registered_personas[plugin_name] = lambda config: plugin(config)
 
         if self.workers > 1:                
     

@@ -96,6 +96,7 @@ class TransitionAssembler:
             for stage in stages.values():
 
                 for plugin_name, plugin in stage.plugins.items():
+                    print(plugin_name, plugin.type)
                     plugins[plugin.type][plugin_name] = plugin
 
                 if stage.allow_parallel is False and stage.stage_type not in no_workers_stages:

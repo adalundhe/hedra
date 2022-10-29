@@ -7,7 +7,7 @@ from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.concurrency import Semaphore
 from hedra.plugins.types.engine.action import Action
 from hedra.plugins.types.engine.result import Result
-from hedra.plugins.types.engine.hooks.types import PluginHooks
+from hedra.plugins.types.common.types import PluginHooks
 from .connection import CustomConnection
 from .pool import CustomPool
 
@@ -35,9 +35,9 @@ class MercuryCustomClient(Generic[A, R]):
         self.waiter: asyncio.Future = None
         self.plugin: Any = plugin
 
-        self._on_connect = self.plugin.hooks.get(PluginHooks.ON_CONNECT)
-        self._on_execute = self.plugin.hooks.get(PluginHooks.ON_EXECUTE)
-        self._on_close = self.plugin.hooks.get(PluginHooks.ON_CLOSE)
+        self._on_connect = self.plugin.hooks.get(PluginHooks.ON_ENGINE_CONNECT)
+        self._on_execute = self.plugin.hooks.get(PluginHooks.ON_ENGINE_EXECUTE)
+        self._on_close = self.plugin.hooks.get(PluginHooks.ON_ENGINE_CLOSE)
 
         self.custom_connection: CustomConnection = lambda reset_connection: CustomConnection(
             security_context=self.plugin.security_context,

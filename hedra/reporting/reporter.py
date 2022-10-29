@@ -1,4 +1,5 @@
-from typing import Any, List, TypeVar
+from typing import Any, List, TypeVar, Union
+from hedra.plugins.types.reporter.reporter_config import ReporterConfig
 from .types import ReporterTypes
 from .types import (
     AWSLambda,
@@ -98,9 +99,7 @@ ReporterType = TypeVar(
 )
 
 class Reporter:
-
-    def __init__(self, reporter_config: ReporterType) -> None:
-        self._reporters = {
+    reporters = {
             ReporterTypes.AWSLambda: lambda config: AWSLambda(config),
             ReporterTypes.AWSTimestream: lambda config: AWSTimestream(config),
             ReporterTypes.BigQuery: lambda config: BigQuery(config),
@@ -133,13 +132,15 @@ class Reporter:
             ReporterTypes.TimescaleDB: lambda config: TimescaleDB(config)
         }
 
+    def __init__(self, reporter_config: Union[ReporterConfig, ReporterType]) -> None:
+
         if reporter_config is None:
             reporter_config = JSONConfig()
 
         self.reporter_type = reporter_config.reporter_type
         self.reporter_config = reporter_config
         
-        selected_reporter = self._reporters.get(self.reporter_type)
+        selected_reporter = self.reporters.get(self.reporter_type)
         if selected_reporter is None:
             self.selected_reporter = JSON(reporter_config)
 

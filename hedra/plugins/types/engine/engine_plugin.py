@@ -9,14 +9,16 @@ from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.client.store import ActionsStore
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.common.event import Event
-from .hooks.registry.registrar import plugin_registrar
-from .hooks.types.plugin_hook import PluginHook
-from .hooks.types.types import PluginHooks
+from hedra.plugins.types.common.plugin_hook import PluginHook
+from hedra.plugins.types.common.types import PluginHooks
+from hedra.plugins.types.common.registrar import plugin_registrar
 from .action import Action
 from .result import Result
 
+
 A = TypeVar('A')
 R = TypeVar('R')
+
 
 class EnginePlugin(Generic[A, R]):
     action: Action[A] = None
@@ -28,15 +30,16 @@ class EnginePlugin(Generic[A, R]):
 
     def __init__(self, config: Config) -> None:
         self.hooks = {}
-        self.name = None
+        self.name: str = None
         self.request_type = self.__class__.__name__
         self.next_name = None
         self.intercept = False
         self.waiter = None
         self.actions: ActionsStore = None
         self.registered = {}
-        self.is_plugin = True
+
         self.config = config
+        
 
         self.action_type = A
         self.request_type = R

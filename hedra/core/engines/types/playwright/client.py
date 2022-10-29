@@ -30,7 +30,7 @@ class MercuryPlaywrightClient:
         self._discarded_context_groups: List[ContextGroup] = []
         self._discarded_contexts = []
         self._pending_context_groups: List[ContextGroup] = []
-        self.is_plugin = False
+        
 
     async def setup(self, config: ContextConfig):
         self.config = config

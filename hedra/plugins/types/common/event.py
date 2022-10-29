@@ -18,9 +18,8 @@ class Event(BaseEvent, Generic[T]):
         self.timings = result.as_timings()
         self.time = result.times['complete'] - result.times['start']
 
-    def serialize(self):
-
-        return json.dumps({
+    def to_dict(self):
+        return {
             'name': self.name,
             'stage': self.stage,
             'shortname': self.shortname,
@@ -29,4 +28,7 @@ class Event(BaseEvent, Generic[T]):
             'time': self.time,
             'type': self.type,
             'source': self.source,
-        })
+        }
+
+    def serialize(self):
+        return json.dumps(self.to_dict())

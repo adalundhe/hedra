@@ -15,7 +15,7 @@ class Config:
         )
 
         self.log_level = kwargs.get('log_level', 'info')
-        self.persona_type = kwargs.get('persona_type', 'simple')
+        self.persona_type = kwargs.get('persona_type', 'default')
         self.total_time = time_parser.time
         self.batch_size = kwargs.get('batch_size', 1000)
         self.batch_interval = kwargs.get('batch_interval')

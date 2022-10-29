@@ -1,5 +1,8 @@
+from typing import Generic, TypeVar
 from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.pipelines.stages.types.stage_types import StageTypes
+from hedra.plugins.types.plugin_types import PluginType
+from hedra.plugins.types.reporter.reporter_config import ReporterConfig
 from hedra.reporting import (
     Reporter,
     BigQueryConfig,
@@ -33,8 +36,9 @@ from hedra.reporting import (
 )
 from .stage import Stage
 
+T = TypeVar('T')
 
-class Submit(Stage):
+class Submit(Stage, Generic[T]):
     stage_type=StageTypes.SUBMIT
     config: (
         BigQueryConfig | BigTableConfig | CassandraConfig | CloudwatchConfig | CosmosDBConfig |
@@ -49,10 +53,18 @@ class Submit(Stage):
         super().__init__()
         self.summaries = {}
         self.events = []
-        self.reporter = Reporter(self.config)
+        self.reporter: Reporter = None
 
     @Internal
     async def run(self):
+        reporter_plugins = self.plugins_by_type.get(PluginType.REPORTER)
+        for plugin_name, plugin in reporter_plugins.items():
+            Reporter.reporters[plugin_name] = plugin
+
+            if isinstance(self.config, plugin.config):
+                self.config.reporter_type = plugin_name
+        
+        self.reporter = Reporter(self.config)
         await self.reporter.connect()
 
         if self.submit_events:

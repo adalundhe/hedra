@@ -10,7 +10,7 @@ class PluginHook:
         shortname: str,
         call: Coroutine, 
         plugin: str = None,
-        hook_type=PluginHooks.ON_EXECUTE,
+        hook_type=PluginHooks.CUSTOM,
     ) -> None:
         self.name = name
         self.shortname = shortname

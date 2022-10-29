@@ -78,6 +78,10 @@ class Setup(Stage, Generic[Unpack[T]]):
 
             execute_stage_id += 1
 
+            persona_plugins = self.plugins_by_type.get(PluginType.PERSONA)
+            for plugin_name in persona_plugins.keys():
+                self.persona_types.types[plugin_name] = plugin_name
+
             config = Config(
                 log_level=self.log_level,
                 persona_type=self.persona_types[self.persona_type],
@@ -130,6 +134,7 @@ class Setup(Stage, Generic[Unpack[T]]):
                         await asyncio.wait_for(task, timeout=0.1)
 
                 except HookSetupError as hook_setup_exception:
+                    print(traceback.format_exc())
                     raise hook_setup_exception
 
                 except asyncio.InvalidStateError:

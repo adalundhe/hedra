@@ -1,7 +1,7 @@
 
 from types import FunctionType
 from typing import Any, Dict
-from hedra.plugins.types.engine.hooks.types.plugin_hook import PluginHook
+from .plugin_hook import PluginHook
 
 
 class PluginRegistrar:
