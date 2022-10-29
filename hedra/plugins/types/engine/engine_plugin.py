@@ -1,28 +1,27 @@
 from __future__ import annotations
 import asyncio
+from ctypes import Union
 import inspect
-from typing import Any, Awaitable, Generic, TypeVar
+from typing import Any, Awaitable, Generic, Optional, TypeVar
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.custom.client import MercuryCustomClient as CustomSession
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.client.store import ActionsStore
 from hedra.plugins.types.plugin_types import PluginType
+from hedra.plugins.types.common.event import Event
 from .hooks.registry.registrar import plugin_registrar
 from .hooks.types.plugin_hook import PluginHook
 from .hooks.types.types import PluginHooks
 from .action import Action
 from .result import Result
-from .event import Event
-
 
 A = TypeVar('A')
 R = TypeVar('R')
-E = TypeVar('E')
 
-class EnginePlugin(Generic[A, R, E]):
+class EnginePlugin(Generic[A, R]):
     action: Action[A] = None
     result: Result[R] = None
-    event: Event[E] = None
+    event: Union[Event] = Event
     security_context: Any = None
     initialized: bool = False
     type=PluginType.ENGINE
