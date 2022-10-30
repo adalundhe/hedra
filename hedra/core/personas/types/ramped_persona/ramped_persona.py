@@ -46,4 +46,4 @@ class RampedPersona(DefaultPersona):
                     generation_batch_size = next_batch_size
                 
                 action_idx = (action_idx + 1) % self.actions_count
-                await asyncio.sleep(self.batch.interval.period)
+                await asyncio.sleep(self.batch.interval)

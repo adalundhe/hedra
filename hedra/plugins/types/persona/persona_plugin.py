@@ -40,16 +40,13 @@ class PersonaPlugin(DefaultPersona, Generic[T]):
 
                     self.hooks[hook.hook_type] = hook
 
-    async def setup(self, hooks: Dict[HookType, List[Hook]]):
+    async def execute(self):
+
         setup_hook = self.hooks.get(PluginHooks.ON_PERSONA_SETUP)
 
         if setup_hook:
-            return await setup_hook.call()
+            await setup_hook.call()
 
-        else:
-            return super().setup(hooks)
-
-    async def execute(self):
         hooks = self._hooks
         loop = asyncio.get_running_loop()
 

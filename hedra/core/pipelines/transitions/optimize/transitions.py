@@ -15,8 +15,6 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
     execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE).items()
     paths = current_stage.context.paths.get(current_stage.name)
 
-    path_lengths = current_stage.context.path_lengths.get(current_stage.name)
-
     visited = current_stage.context.visited
 
     execute_stages = {

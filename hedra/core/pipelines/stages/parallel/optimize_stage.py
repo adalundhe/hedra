@@ -1,10 +1,10 @@
 import asyncio
 import dill
-from typing import Any, Dict, Union
+from typing import Any, Dict, List, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.pipelines.hooks.registry.registrar import registrar
 from hedra.core.pipelines.hooks.types.types import HookType
-from hedra.core.pipelines.stages.optimizers import Optimizer
+from hedra.core.pipelines.stages.optimization import Optimizer
 from hedra.core.personas import get_persona
 
 
@@ -15,12 +15,13 @@ def optimize_stage(serialized_config: str):
 
     optimization_config: Dict[str, Union[str, int, Any]] = dill.loads(serialized_config)
 
-    execute_stage_name = optimization_config.get('execute_stage_name')
+    execute_stage_name: str = optimization_config.get('execute_stage_name')
     execute_stage_config: Config = optimization_config.get('execute_stage_config')
-    optimize_iterations = optimization_config.get('optimizer_iterations')
-    optimizer_type = optimization_config.get('optimizer_type')
-    time_limit = optimization_config.get('time_limit')
-    batch_size = optimization_config.get('execute_stage_batch_size')
+    optimize_params: List[str] = optimization_config.get('optimize_params')
+    optimize_iterations: int = optimization_config.get('optimizer_iterations')
+    optimizer_algorithm: str = optimization_config.get('optimizer_algorithm')
+    time_limit: int = optimization_config.get('time_limit')
+    batch_size: int = optimization_config.get('execute_stage_batch_size')
 
     execute_stage_hooks = [
         registrar.all.get(hook_name) for hook_name in optimization_config.get('execute_stage_hooks')
@@ -33,11 +34,11 @@ def optimize_stage(serialized_config: str):
         HookType.ACTION: execute_stage_hooks
     })
 
-    
     optimizer = Optimizer({
+        'params': optimize_params,
         'stage_name': execute_stage_name,
         'iterations': optimize_iterations,
-        'algorithm': optimizer_type,
+        'algorithm': optimizer_algorithm,
         'persona': persona,
         'time_limit': time_limit
     })

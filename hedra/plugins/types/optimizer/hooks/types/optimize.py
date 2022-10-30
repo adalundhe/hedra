@@ -4,8 +4,8 @@ from hedra.plugins.types.common.types import PluginHooks
 from hedra.plugins.types.common.registrar import plugin_registrar
 
 
-@plugin_registrar(PluginHooks.ON_ENGINE_CONNECT)
-def connect():
+@plugin_registrar(PluginHooks.ON_OPTIMIZE)
+def optimize():
 
     def wrapper(func) -> PluginHook:
 

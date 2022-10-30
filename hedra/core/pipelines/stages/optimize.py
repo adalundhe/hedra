@@ -6,6 +6,7 @@ from hedra.core.pipelines.stages.types.stage_types import StageTypes
 from hedra.core.pipelines.hooks.types.internal import Internal
 from hedra.core.engines.client.time_parser import TimeParser
 from hedra.core.personas.persona_manager import registered_personas
+from hedra.core.pipelines.stages.optimization.algorithms import registered_algorithms
 from hedra.plugins.types.plugin_types import PluginType
 from .parallel.optimize_stage import optimize_stage
 from .execute import Execute
@@ -15,8 +16,11 @@ from .stage import Stage
 class Optimize(Stage):
     stage_type=StageTypes.OPTIMIZE
     optimize_iterations=0
-    optimizer_type='shg'
+    algorithm='shg'
     stage_time_limit='1m'
+    optimize_params={
+        'batch_size': (0.5, 2)
+    }
     
     def __init__(self) -> None:
         super().__init__()
@@ -32,6 +36,10 @@ class Optimize(Stage):
 
     @Internal
     async def run(self, stages: Dict[str, Execute]):
+
+        optimizer_plugins = self.plugins_by_type.get(PluginType.OPTIMIZER)
+        for plugin_name, plugin in optimizer_plugins.items():            
+            registered_algorithms[plugin_name] = plugin
 
         persona_plugins = self.plugins_by_type.get(PluginType.PERSONA)
         for plugin_name, plugin in persona_plugins.items():
@@ -62,6 +70,7 @@ class Optimize(Stage):
 
             for worker_idx in range(assigned_workers_count):
                 configs.append({
+                    'optimize_params': self.optimize_params,
                     'worker_idx': worker_idx,
                     'execute_stage_name': stage_name,
                     'execute_stage_generation_count': assigned_workers_count,
@@ -69,7 +78,7 @@ class Optimize(Stage):
                     'execute_stage_config': stage_config,
                     'execute_stage_batch_size': batch_size,
                     'optimizer_iterations': self.optimize_iterations,
-                    'optimizer_type': self.optimizer_type,
+                    'optimizer_algorithm': self.algorithm,
                     'execute_stage_hooks': [
                         hook.name for hook in stage.hooks.get(HookType.ACTION)
                     ],
@@ -121,6 +130,7 @@ class Optimize(Stage):
                 hook.session.pool.connections = []
                 hook.session.pool.create_pool()
 
+            optimized_config.optimized = True
             stage.optimized = True
 
         for stage in stages.values():

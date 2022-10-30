@@ -100,4 +100,4 @@ class ConstantArrivalPersona(DefaultPersona):
                     self.completed_counter.completed_count = 0
 
                 action_idx = (action_idx + 1) % self.actions_count
-                await asyncio.sleep(self.batch.interval.period)
+                await asyncio.sleep(self.batch.interval)

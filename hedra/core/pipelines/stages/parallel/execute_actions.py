@@ -36,7 +36,7 @@ def execute_actions(parallel_config: str):
         workers = parallel_config.get('workers')
         worker_id = parallel_config.get('worker_id')
 
-        if partition_method == PartitionMethod.BATCHES:
+        if partition_method == PartitionMethod.BATCHES and persona_config.optimized is False:
 
             if workers == worker_id:
                 persona_config.batch_size = int(persona_config.batch_size/workers) + (persona_config.batch_size%workers)

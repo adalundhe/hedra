@@ -38,4 +38,4 @@ class ConstantSpawnPersona(DefaultPersona):
 
             if idx%self.batch.size == 0:
                 action_idx = (action_idx + 1)%self.actions_count
-                await asyncio.sleep(self.batch.interval.period)
+                await asyncio.sleep(self.batch.interval)
