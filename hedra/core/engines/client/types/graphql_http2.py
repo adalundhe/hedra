@@ -43,31 +43,29 @@ class GraphQLHTTP2Client(BaseClient):
         user: str = None, 
         tags: List[Dict[str, str]] = []
     ):
-        if self.session.registered.get(self.next_name) is None:
-            request = GraphQLHTTP2Action(
-                self.next_name,
-                url,
-                method='POST',
-                headers=headers,
-                data={
-                    "query": query,
-                    "operation_name": operation_name,
-                    "variables": variables
-                },
-                user=user,
-                tags=tags
-            )
 
-            result = await self.session.prepare(request)
-            if isinstance(result, Exception):
-                raise result
+        request = GraphQLHTTP2Action(
+            self.next_name,
+            url,
+            method='POST',
+            headers=headers,
+            data={
+                "query": query,
+                "operation_name": operation_name,
+                "variables": variables
+            },
+            user=user,
+            tags=tags
+        )
 
-            if self.intercept:
-                self.actions.store(self.next_name, request, self.session)
-                
-                loop = asyncio.get_event_loop()
-                self.waiter = loop.create_future()
-                await self.waiter
+        await self.session.prepare(request)
+
+        if self.intercept:
+            self.actions.store(self.next_name, request, self.session)
+            
+            loop = asyncio.get_event_loop()
+            self.waiter = loop.create_future()
+            await self.waiter
 
         return self.session
         

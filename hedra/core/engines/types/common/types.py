@@ -23,6 +23,7 @@ class RequestTypes:
     GRPC='GRPC'
     PLAYWRIGHT='PLAYWRIGHT'
     UDP='UDP'
+    TASK='TASK'
     CUSTOM='CUSTOM'
 
 

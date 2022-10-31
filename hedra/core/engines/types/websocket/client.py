@@ -157,7 +157,7 @@ class MercuryWebsocketClient:
                 if action.method == 'GET':
                     response.body = await asyncio.wait_for(connection.readexactly(min(16384, header_content_length)), self.timeouts.total_timeout)
                 
-                response.read_end = time.monotonic()
+                response.complete = time.monotonic()
 
                 if action.hooks.after:
                     action = await action.hooks.after(action, response)
@@ -166,7 +166,7 @@ class MercuryWebsocketClient:
                 self.pool.connections.append(connection)
 
             except Exception as e:
-                response.read_end = time.monotonic()
+                response.complete = time.monotonic()
                 response.error = str(e)
 
                 self.pool.connections.append(

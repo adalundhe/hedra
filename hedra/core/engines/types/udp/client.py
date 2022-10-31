@@ -144,7 +144,7 @@ class MercuryUDPClient:
                 if action.wait_for_response:
                     response.body = await connection.readuntil()
          
-                response.read_end = time.monotonic()
+                response.complete = time.monotonic()
 
                 self.pool.connections.append(connection)
 
@@ -153,7 +153,7 @@ class MercuryUDPClient:
                     action.setup()
 
             except Exception as e:
-                response.read_end = time.monotonic()
+                response.complete = time.monotonic()
                 response.error = str(e)
 
                 self.pool.connections.append(UDPConnection(reset_connection=self.pool.reset_connections))

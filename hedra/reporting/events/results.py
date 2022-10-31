@@ -6,8 +6,9 @@ from .types import (
     HTTPEvent,
     HTTP2Event,
     PlaywrightEvent,
-    WebsocketEvent,
+    TaskEvent,
     UDPEvent,
+    WebsocketEvent,
 )
 
 
@@ -18,7 +19,8 @@ results_types = {
     RequestTypes.HTTP: HTTPEvent,
     RequestTypes.HTTP2: HTTP2Event,
     RequestTypes.PLAYWRIGHT: PlaywrightEvent,
-    RequestTypes.WEBSOCKET: WebsocketEvent,
-    RequestTypes.UDP: UDPEvent
+    RequestTypes.TASK: TaskEvent,
+    RequestTypes.UDP: UDPEvent,
+    RequestTypes.WEBSOCKET: WebsocketEvent
 }
 

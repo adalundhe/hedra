@@ -1,4 +1,5 @@
 from .action import action
+from .task import task
 from .setup import setup
 from .teardown import teardown
 from .before import before

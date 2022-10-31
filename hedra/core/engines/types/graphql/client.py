@@ -104,7 +104,7 @@ class MercuryGraphQLClient(MercuryHTTPClient):
 
                     all_chunks_read = True
 
-                response.read_end = time.monotonic()
+                response.complete = time.monotonic()
                 response.headers = headers
                 response.body = body
                 
@@ -115,7 +115,7 @@ class MercuryGraphQLClient(MercuryHTTPClient):
                     action.setup()
 
             except Exception as e:
-                response.read_end = time.monotonic()
+                response.complete = time.monotonic()
                 response.error = str(e)
                 
                 self.pool.connections.append(HTTPConnection(reset_connection=self.pool.reset_connections))

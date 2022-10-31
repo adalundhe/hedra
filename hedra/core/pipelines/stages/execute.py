@@ -30,6 +30,7 @@ class Execute(Stage, Generic[Unpack[T]]):
             HookType.SETUP, 
             HookType.BEFORE, 
             HookType.ACTION,
+            HookType.TASK,
             HookType.AFTER,
             HookType.TEARDOWN,
             HookType.CHECK
@@ -53,7 +54,31 @@ class Execute(Stage, Generic[Unpack[T]]):
         for plugin_name, plugin in persona_plugins.items():
             registered_personas[plugin_name] = lambda config: plugin(config)
 
-        if self.workers > 1:                
+        if self.workers > 1:
+
+            hooks = [
+                {
+                    'timeouts': hook.session.timeouts,
+                    'reset_connections': hook.session.pool.reset_connections,
+                    'hook_name': hook.name,
+                    'stage': hook.stage,
+                    'weight': hook.config.weight,
+                    'order': hook.config.order,
+                    **hook.action.to_serializable()
+                } for hook in self.hooks.get(HookType.ACTION, [])
+            ]
+
+            hooks.extend([
+                {
+                    'timeouts': hook.session.timeouts,
+                    'reset_connections': False,
+                    'hook_name': hook.name,
+                    'stage': hook.stage,
+                    'weight': hook.config.weight,
+                    'order': hook.config.order,
+                    **hook.action.to_serializable()
+                } for hook in self.hooks.get(HookType.TASK, [])
+            ])             
     
             results_sets = await self.executor.execute_stage_batch(
                 execute_actions,
@@ -63,17 +88,7 @@ class Execute(Stage, Generic[Unpack[T]]):
                         'workers': self.workers,
                         'worker_id': idx + 1,
                         'config': self.client._config,
-                        'hooks': [
-                            {
-                                'timeouts': hook.session.timeouts,
-                                'reset_connections': hook.session.pool.reset_connections,
-                                'hook_name': hook.name,
-                                'stage': hook.stage,
-                                'weight': hook.config.weight,
-                                'order': hook.config.order,
-                                **hook.action.to_serializable()
-                            } for hook in self.hooks.get(HookType.ACTION)
-                        ]
+                        'hooks': hooks
                     }) for idx in range(self.executor.max_workers)
                 ]
             )

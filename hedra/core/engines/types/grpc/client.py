@@ -63,7 +63,7 @@ class MercuryGRPCClient(MercuryHTTP2Client):
 
                 await connection.receive_response(response, reader_writer)
 
-                response.read_end = time.monotonic()
+                response.complete = time.monotonic()
 
                 if action.hooks.after:
                     action = await action.hooks.after(action, response)

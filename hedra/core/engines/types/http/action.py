@@ -116,28 +116,28 @@ class HTTPAction(BaseAction):
                     self.encoded_data = self._data.encode()
 
     def _setup_headers(self) -> Union[bytes, Dict[str, str]]:
-     
-            get_base = f"{self.method} {self.url.path} HTTP/1.1{NEW_LINE}"
+    
+        get_base = f"{self.method} {self.url.path} HTTP/1.1{NEW_LINE}"
 
-            port = self.url.port or (443 if self.url.scheme == "https" else 80)
+        port = self.url.port or (443 if self.url.scheme == "https" else 80)
 
-            hostname = self.url.parsed.hostname.encode("idna").decode()
+        hostname = self.url.parsed.hostname.encode("idna").decode()
 
-            if port not in [80, 443]:
-                hostname = f'{hostname}:{port}'
+        if port not in [80, 443]:
+            hostname = f'{hostname}:{port}'
 
-            self._headers = {
-                "HOST": hostname,
-                "User-Agent": "mercury-http",
-                "Keep-Alive": "timeout=60, max=100000",
-                "Content-Lenth": self.size,
-                **self._headers
-            }
+        self._headers = {
+            "HOST": hostname,
+            "User-Agent": "mercury-http",
+            "Keep-Alive": "timeout=60, max=100000",
+            "Content-Lenth": self.size,
+            **self._headers
+        }
 
-            for key, value in self._headers.items():
-                get_base += f"{key}: {value}{NEW_LINE}"
+        for key, value in self._headers.items():
+            get_base += f"{key}: {value}{NEW_LINE}"
 
-            self.encoded_headers = (get_base + NEW_LINE).encode()
+        self.encoded_headers = (get_base + NEW_LINE).encode()
 
     def write_chunks(self, writer: Writer):
         for chunk in self.data:

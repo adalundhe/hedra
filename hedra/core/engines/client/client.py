@@ -6,14 +6,6 @@ from typing_extensions import TypeVarTuple, Unpack
 from datadog import initialize
 
 from hedra.core.engines.types.common.types import RequestTypes
-from hedra.core.engines.types.graphql.client import MercuryGraphQLClient
-from hedra.core.engines.types.graphql_http2.client import MercuryGraphQLHTTP2Client
-from hedra.core.engines.types.grpc.client import MercuryGRPCClient
-from hedra.core.engines.types.http.client import MercuryHTTPClient
-from hedra.core.engines.types.http2.client import MercuryHTTP2Client
-from hedra.core.engines.types.playwright.client import MercuryPlaywrightClient
-from hedra.core.engines.types.udp.client import MercuryUDPClient
-from hedra.core.engines.types.websocket.client import MercuryWebsocketClient
 from .store import ActionsStore
 from .config import Config
 from .types import  (
@@ -24,6 +16,7 @@ from .types import  (
     GraphQLHTTP2Client,
     WebsocketClient,
     PlaywrightClient,
+    TaskClient,
     UDPClient
 )
 
@@ -47,6 +40,7 @@ class Client(Generic[Unpack[T]]):
         self._websocket = WebsocketClient
         self._playwright = PlaywrightClient
         self._udp = UDPClient
+        self._task = TaskClient
 
         self.clients = {}
         self._plugin = PluginsStore[Unpack[T]]()
@@ -99,7 +93,6 @@ class Client(Generic[Unpack[T]]):
 
     @property
     def grpc(self):
-        self._grpc.next_name = self.next_name
         if self._grpc.initialized is False:
             self._grpc = self._grpc(self._config)
             self._grpc.actions = self.actions
@@ -111,7 +104,6 @@ class Client(Generic[Unpack[T]]):
 
     @property
     def graphql(self):
-        self._graphql.next_name = self.next_name
         if self._graphql.initialized is False:
             self._graphql = self._graphql(self._config)
             self._graphql.actions = self.actions
@@ -123,7 +115,6 @@ class Client(Generic[Unpack[T]]):
 
     @property
     def graphqlh2(self):
-        self._graphqlh2.next_name = self.next_name
         if self._graphqlh2.initialized is False:
             self._graphqlh2 = self._graphqlh2(self._config)
             self._graphqlh2.actions = self.actions
@@ -135,7 +126,6 @@ class Client(Generic[Unpack[T]]):
 
     @property
     def websocket(self):
-        self._websocket.next_name = self.next_name
         if self._websocket.initialized is False:
             self._websocket = self._websocket(self._config)
             self._websocket.actions = self.actions
@@ -147,7 +137,6 @@ class Client(Generic[Unpack[T]]):
 
     @property
     def playwright(self):
-        self._playwright.next_name = self.next_name
         if self._playwright.initialized is False:
             self._playwright = self._playwright(self._config)
             self._playwright.actions = self.actions
@@ -159,7 +148,6 @@ class Client(Generic[Unpack[T]]):
 
     @property
     def udp(self):
-        self._udp.next_name = self.next_name
         if self._udp.initialized is False:
             self._udp = self._udp(self._config)
             self._udp.actions = self.actions
@@ -168,6 +156,15 @@ class Client(Generic[Unpack[T]]):
         self._udp.next_name = self.next_name
         self._udp.intercept = self.intercept
         return self._udp
+    
+    @property
+    def task(self):
+        if self._task.initialized is False:
+            self._task = self._task(self._config)
+            self.clients[RequestTypes.TASK] = self._task
+
+        self._task.next_name = self.next_name
+        return self._task
 
 
         

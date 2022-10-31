@@ -17,7 +17,7 @@ class BaseResult:
         'start',
         'connect_end',
         'write_end',
-        'read_end'
+        'complete'
     )
 
     def __init__(
@@ -43,7 +43,7 @@ class BaseResult:
         self.start = 0
         self.connect_end = 0
         self.write_end = 0
-        self.read_end = 0
+        self.complete = 0
 
     def to_dict(self):
         return {
@@ -57,5 +57,5 @@ class BaseResult:
             'start': float(self.start),
             'connect_end': float(self.connect_end),
             'write_end': float(self.write_end),
-            'read_end': float(self.read_end)
+            'complete': float(self.complete)
         }

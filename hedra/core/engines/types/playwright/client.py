@@ -5,7 +5,7 @@ from hedra.core.engines.types.common.types import RequestTypes
 from .context_config import ContextConfig
 from .context_group import ContextGroup
 from .pool import ContextPool
-from .command import Command
+from .command import PlaywrightCommand
 from .result import PlaywrightResult
 
 
@@ -18,7 +18,7 @@ class MercuryPlaywrightClient:
     def __init__(self,  concurrency: int = 500, group_size: int=50, timeouts: Timeouts = Timeouts()) -> None:
         self.pool = ContextPool(concurrency, group_size)
         self.timeouts = timeouts
-        self.registered: Dict[str, Command] = {}
+        self.registered: Dict[str, PlaywrightCommand] = {}
         self.closed = False
         self.config = None
 
@@ -38,7 +38,7 @@ class MercuryPlaywrightClient:
         for context_group in self.pool:
             await context_group.create()
 
-    async def prepare(self, command: Command) -> Awaitable[None]:
+    async def prepare(self, command: PlaywrightCommand) -> Awaitable[None]:
 
         command.options.extra = {
             **command.options.extra,
@@ -81,7 +81,7 @@ class MercuryPlaywrightClient:
         self.sem = asyncio.Semaphore(self.pool.size)
 
 
-    async def execute_prepared_command(self, command: Command) -> PlaywrightResponseFuture:
+    async def execute_prepared_command(self, command: PlaywrightCommand) -> PlaywrightResponseFuture:
 
         for pending_context in self._pending_context_groups:
             await pending_context.create()

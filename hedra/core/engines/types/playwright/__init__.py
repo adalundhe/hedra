@@ -1,6 +1,6 @@
 from .client import MercuryPlaywrightClient
 from .command import (
-    Command,
+    PlaywrightCommand,
     Page,
     Input,
     URL,

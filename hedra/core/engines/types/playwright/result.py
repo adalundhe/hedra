@@ -1,11 +1,11 @@
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.core.engines.types.common.types import RequestTypes
-from .command import Command
+from .command import PlaywrightCommand
 
 
 class PlaywrightResult(BaseResult):
 
-    def __init__(self, command: Command, error: Exception=None) -> None:
+    def __init__(self, command: PlaywrightCommand, error: Exception=None) -> None:
         super(
             PlaywrightResult,
             self

@@ -38,7 +38,7 @@ class Options:
         self.extra = extra
         self.switch_by = switch_by
 
-class Command:
+class PlaywrightCommand:
     
     def __init__(self, 
         name, command, 

@@ -2,7 +2,7 @@ import asyncio
 import traceback
 from typing_extensions import TypeVarTuple, Unpack
 import psutil
-from typing import Dict, Generic, List, Union
+from typing import Dict, Generic
 from hedra.core.pipelines.hooks.types.hook import Hook
 from hedra.core.pipelines.hooks.types.types import HookType
 from hedra.core.pipelines.hooks.types.internal import Internal
@@ -111,7 +111,7 @@ class Setup(Stage, Generic[Unpack[T]]):
             execute_stage.client = client
             execute_stage.client._config = config
 
-            for hook in execute_stage.hooks.get(HookType.ACTION):
+            for hook in execute_stage.hooks.get(HookType.ACTION, []):
 
                 execute_stage.client.next_name = hook.name
                 execute_stage.client.intercept = True
@@ -156,7 +156,21 @@ class Setup(Stage, Generic[Unpack[T]]):
                 action.hooks.checks = self.get_checks(execute_stage, hook.shortname)
 
                 hook.session = session
-                hook.action = action     
+                hook.action = action    
+
+            for hook in execute_stage.hooks.get(HookType.TASK, []):
+                execute_stage.client.next_name = hook.name
+                task, session = execute_stage.client.task.call(
+                    hook.call,
+                    env=hook.config.env,
+                    user=hook.config.user,
+                    tags=hook.config.tags
+                )
+
+                task.hooks.checks = self.get_checks(execute_stage, hook.shortname) 
+
+                hook.session = session
+                hook.action = task  
 
             execute_stage.client.intercept = False
             for setup_hook in execute_stage.hooks.get(HookType.SETUP):

@@ -6,7 +6,7 @@ from hedra.core.engines.types.common.hooks import Hooks
 from hedra.core.engines.types.playwright.client import MercuryPlaywrightClient
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.types.playwright import (
-    Command,
+    PlaywrightCommand,
     Page,
     URL,
     Input,
@@ -64,51 +64,48 @@ class PlaywrightClient(BaseClient):
         tags: List[Dict[str, str]]=[],
         checks: List[FunctionType] = []
     ):
-        if self.session.registered.get(self.next_name) is None:
-            command = Command(
-                self.next_name,
-                command,
-                page=Page(
-                    selector=selector,
-                    attribute=attribute,
-                    x_coordinate=x_coordinate,
-                    y_coordinate=y_coordinate,
-                    frame=frame
-                ),
-                url=URL(
-                    location=location,
-                    headers=headers
-                ),
-                input=Input(
-                    key=key,
-                    text=text,
-                    function=function,
-                    args=args,
-                    filepath=filepath,
-                    file=file
-                ),
-                options=Options(
-                    event=event,
-                    option=option,
-                    is_checked=is_checked,
-                    timeout=timeout,
-                    extra=extra,
-                    switch_by=switch_by
-                ),
-                user=user,
-                tags=tags,
-                checks=checks
-            )
+        command = PlaywrightCommand(
+            self.next_name,
+            command,
+            page=Page(
+                selector=selector,
+                attribute=attribute,
+                x_coordinate=x_coordinate,
+                y_coordinate=y_coordinate,
+                frame=frame
+            ),
+            url=URL(
+                location=location,
+                headers=headers
+            ),
+            input=Input(
+                key=key,
+                text=text,
+                function=function,
+                args=args,
+                filepath=filepath,
+                file=file
+            ),
+            options=Options(
+                event=event,
+                option=option,
+                is_checked=is_checked,
+                timeout=timeout,
+                extra=extra,
+                switch_by=switch_by
+            ),
+            user=user,
+            tags=tags,
+            checks=checks
+        )
 
-            result = await self.session.prepare(command)
-            if isinstance(result, Exception):
-                raise result
+        await self.session.prepare(command)
 
-            if self.intercept:
-                self.actions.store(self.next_name, command, self.session)
-                
-                loop = asyncio.get_event_loop()
-                self.waiter = loop.create_future()
-                await self.waiter
+        if self.intercept:
+            self.actions.store(self.next_name, command, self.session)
+            
+            loop = asyncio.get_event_loop()
+            self.waiter = loop.create_future()
+            await self.waiter
 
-        return self.session
+        return self.session.execute_prepared_command(command)

@@ -8,5 +8,6 @@ from .types import (
     check,
     metric,
     save,
-    validate
+    validate,
+    task
 )

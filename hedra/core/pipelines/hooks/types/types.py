@@ -12,3 +12,4 @@ class HookType(Enum):
     VALIDATE='VALIDATE'
     INTERNAL='INTERNAL'
     SAVE='SAVE'
+    TASK='TASK'

@@ -1,4 +1,6 @@
+from re import S
 import traceback
+from typing import Dict
 import aiodns
 import socket
 from ipaddress import ip_address, IPv4Address
@@ -112,8 +114,8 @@ class URL:
         return self.parsed.params
 
     @params.setter
-    def params(self, value):
-        self.parsed.params = value
+    def params(self, value: str):
+        self.parsed = self.parsed._replace(params=value)
 
     @property
     def scheme(self):
@@ -121,7 +123,7 @@ class URL:
 
     @scheme.setter
     def scheme(self, value):
-        self.parsed.scheme = value
+        self.parsed = self.parsed._replace(scheme=value)
 
     @property
     def hostname(self):
@@ -129,8 +131,7 @@ class URL:
 
     @hostname.setter
     def hostname(self, value):
-        self.parsed.hostname = value
-
+        self.parsed = self.parsed._replace(hostname=value)
 
     @property
     def path(self):
@@ -149,7 +150,7 @@ class URL:
 
     @path.setter
     def path(self, value):
-        self.parsed.path = value
+        self.parsed = self.parsed._replace(path=value)
         
     @property
     def query(self):
@@ -157,7 +158,7 @@ class URL:
 
     @query.setter
     def query(self, value):
-        self.parsed.query = value
+        self.parsed = self.parsed._replace(query=value)
 
     @property
     def authority(self):
@@ -165,4 +166,4 @@ class URL:
 
     @authority.setter
     def authority(self, value):
-        self.parsed.hostname = value
+        self.parsed = self.parsed._replace(hostname=value)

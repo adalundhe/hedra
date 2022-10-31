@@ -9,6 +9,7 @@ from hedra.reporting.stats import (
     StandardDeviation
 )
 from .results import results_types
+from .types.task_event import TaskEvent
 from .types.base_event import BaseEvent
 
 
@@ -47,7 +48,7 @@ class EventsGroup:
 
     async def add(self, result: Any, stage_name: str):
 
-        event: BaseEvent = results_types.get(result.type)(result)
+        event: BaseEvent = results_types.get(result.type, TaskEvent)(result)
         event.stage = stage_name
 
         if self.source is None:

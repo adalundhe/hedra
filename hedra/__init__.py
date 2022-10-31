@@ -8,7 +8,8 @@ from .core.pipelines.hooks import (
     check,
     save,
     metric,
-    validate
+    validate,
+    task
 )
 
 from .core.pipelines import (

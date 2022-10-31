@@ -163,7 +163,7 @@ class MercuryHTTP2Client:
 
                 await pipe.receive_response(response, stream)
 
-                response.read_end = time.monotonic()
+                response.complete = time.monotonic()
 
                 if action.hooks.after:
                     action = await action.hooks.after(action, response)
@@ -173,7 +173,7 @@ class MercuryHTTP2Client:
                 self.pool.connections.append(connection)
                 
             except Exception as e:
-                response.read_end = time.monotonic()
+                response.complete = time.monotonic()
                 response.response_code = 400
                 response.error = str(e)
 

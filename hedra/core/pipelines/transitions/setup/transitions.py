@@ -115,6 +115,7 @@ async def setup_to_optimize_transition(current_stage: Stage, next_stage: Stage):
         return StageTimeoutError(current_stage), StageTypes.ERROR
     
     except Exception as stage_execution_error:
+        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     return None, StageTypes.OPTIMIZE
@@ -127,6 +128,7 @@ async def setup_to_execute_transition(current_stage: Stage, next_stage: Stage):
         await setup_transition(current_stage, next_stage)
             
     except asyncio.TimeoutError:
+        print(traceback.format_exc())
         return StageTimeoutError(current_stage), StageTypes.ERROR
     
     except Exception as stage_execution_error:

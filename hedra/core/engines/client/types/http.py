@@ -38,30 +38,26 @@ class HTTPClient(BaseClient):
         tags: List[Dict[str, str]] = []
     ):
 
-        if self.session.registered.get(self.next_name) is None:
-
-            request = HTTPAction(
-                self.next_name,
-                url,
-                method='GET',
-                headers=headers,
-                data=None,
-                user=user,
-                tags=tags             
-            )
-
-            await self.session.prepare(request)
-
-            if self.intercept:
-                self.actions.store(self.next_name, request, self.session)
-                
-                loop = asyncio.get_event_loop()
-                self.waiter = loop.create_future()
-                await self.waiter
-
-        return await self.session.execute_prepared_request(
-            self.session.registered.get(self.next_name)
+        request = HTTPAction(
+            self.next_name,
+            url,
+            method='GET',
+            headers=headers,
+            data=None,
+            user=user,
+            tags=tags             
         )
+
+        await self.session.prepare(request)
+
+        if self.intercept:
+            self.actions.store(self.next_name, request, self.session)
+            
+            loop = asyncio.get_event_loop()
+            self.waiter = loop.create_future()
+            await self.waiter
+
+        return await self.session.execute_prepared_request(request)
 
     async def post(
         self,
@@ -71,31 +67,28 @@ class HTTPClient(BaseClient):
         user: str = None,
         tags: List[Dict[str, str]] = []
     ):
-        if self.session.registered.get(self.next_name) is None:
-            request = HTTPAction(
-                self.next_name,
-                url,
-                method='POST',
-                headers=headers,
-                data=data,
-                user=user,
-                tags=tags           
-            )
 
-            result = await self.session.prepare(request)     
-            if isinstance(result, Exception):
-                raise result
-
-            if self.intercept:
-                self.actions.store(self.next_name, request, self.session)
-
-                loop = asyncio.get_event_loop()
-                self.waiter = loop.create_future()
-                await self.waiter
-    
-        return await self.session.execute_prepared_request(
-            self.session.registered.get(self.next_name)
+        request = HTTPAction(
+            self.next_name,
+            url,
+            method='POST',
+            headers=headers,
+            data=data,
+            user=user,
+            tags=tags           
         )
+
+        await self.session.prepare(request)  
+
+        if self.intercept:
+        
+            self.actions.store(self.next_name, request, self.session)
+
+            loop = asyncio.get_event_loop()
+            self.waiter = loop.create_future()
+            await self.waiter
+
+        return await self.session.execute_prepared_request(request)
 
     async def put(
         self,
@@ -106,31 +99,27 @@ class HTTPClient(BaseClient):
         tags: List[Dict[str, str]] = []
     ):
 
-        if self.session.registered.get(self.next_name) is None:
-            request = HTTPAction(
-                self.next_name,
-                url,
-                method='PUT',
-                headers=headers,
-                data=data,
-                user=user,
-                tags=tags
-            )
-
-            result = await self.session.prepare(request)
-            if isinstance(result, Exception):
-                raise result
-
-            if self.intercept:
-                self.actions.store(self.next_name, request, self.session)
-
-                loop = asyncio.get_event_loop()
-                self.waiter = loop.create_future()
-                await self.waiter
-
-        return await self.session.execute_prepared_request(
-            self.session.registered.get(self.next_name)
+        request = HTTPAction(
+            self.next_name,
+            url,
+            method='PUT',
+            headers=headers,
+            data=data,
+            user=user,
+            tags=tags
         )
+
+        await self.session.prepare(request)
+
+        if self.intercept:
+
+            self.actions.store(self.next_name, request, self.session)
+
+            loop = asyncio.get_event_loop()
+            self.waiter = loop.create_future()
+            await self.waiter
+
+        return await self.session.execute_prepared_request(request)
 
     async def patch(
         self,
@@ -141,31 +130,27 @@ class HTTPClient(BaseClient):
         tags: List[Dict[str, str]] = []
     ):
 
-        if self.session.registered.get(self.next_name) is None:
-            request = HTTPAction(
-                self.next_name,
-                url,
-                method='PATCH',
-                headers=headers,
-                data=data,
-                user=user,
-                tags=tags
-            )
-
-            result = await self.session.prepare(request)
-            if isinstance(result, Exception):
-                raise result
-
-            if self.intercept:
-                self.actions.store(self.next_name, request, self.session)
-
-                loop = asyncio.get_event_loop()
-                self.waiter = loop.create_future()
-                await self.waiter
-
-        return await self.session.execute_prepared_request(
-            self.session.registered.get(self.next_name)
+        request = HTTPAction(
+            self.next_name,
+            url,
+            method='PATCH',
+            headers=headers,
+            data=data,
+            user=user,
+            tags=tags
         )
+
+        await self.session.prepare(request)
+
+        if self.intercept:
+
+            self.actions.store(self.next_name, request, self.session)
+
+            loop = asyncio.get_event_loop()
+            self.waiter = loop.create_future()
+            await self.waiter
+
+        return await self.session.execute_prepared_request(request)
 
     async def delete(
         self, 
@@ -174,29 +159,24 @@ class HTTPClient(BaseClient):
         user: str = None,
         tags: List[Dict[str, str]] = []
     ):
-
-        if self.session.registered.get(self.next_name) is None:
-            request = HTTPAction(
-                self.next_name,
-                url,
-                method='DELETE',
-                headers=headers,
-                data=None,
-                user=user,
-                tags=tags 
-            )
-
-            result = await self.session.prepare(request)
-            if isinstance(result, Exception):
-                raise result
-
-            if self.intercept:
-                self.actions.store(self.next_name, request, self.session)
-
-                loop = asyncio.get_event_loop()
-                self.waiter = loop.create_future()
-                await self.waiter
-
-        return await self.session.execute_prepared_request(
-            self.session.registered.get(self.next_name)
+        request = HTTPAction(
+            self.next_name,
+            url,
+            method='DELETE',
+            headers=headers,
+            data=None,
+            user=user,
+            tags=tags 
         )
+
+        await self.session.prepare(request)
+
+        if self.intercept:
+
+            self.actions.store(self.next_name, request, self.session)
+
+            loop = asyncio.get_event_loop()
+            self.waiter = loop.create_future()
+            await self.waiter
+
+        return await self.session.execute_prepared_request(request)

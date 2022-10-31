@@ -32,14 +32,14 @@ class UDPEvent(BaseEvent):
         self.data = result.data
         self.name = self.shortname
 
-        self.time = result.read_end - result.start
+        self.time = result.complete - result.start
         
         self.timings = {
             'total': self.time,
             'waiting': result.start - result.wait_start,
             'connecting': result.connect_end - result.start,
             'writing': result.write_end - result.connect_end,
-            'reading': result.read_end - result.write_end
+            'reading': result.complete - result.write_end
         }
 
 

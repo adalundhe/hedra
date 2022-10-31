@@ -10,7 +10,8 @@ from hedra.core.engines.types.http2 import HTTP2Action
 from hedra.core.engines.types.graphql import GraphQLAction
 from hedra.core.engines.types.graphql_http2 import GraphQLHTTP2Action
 from hedra.core.engines.types.grpc import GRPCAction
-from hedra.core.engines.types.playwright import PlaywrightResult
+from hedra.core.engines.types.playwright import PlaywrightCommand
+from hedra.core.engines.types.task import Task
 from hedra.core.engines.types.websocket import WebsocketAction
 from hedra.core.engines.types.udp import UDPAction
 from hedra.core.engines.types.common.types import RequestTypes
@@ -48,7 +49,8 @@ def execute_actions(parallel_config: str):
         persona.workers = workers
 
         hooks = {
-            HookType.ACTION: []
+            HookType.ACTION: [],
+            HookType.TASK: [],
         }
 
 
@@ -214,6 +216,38 @@ def execute_actions(parallel_config: str):
 
                 hooks[HookType.ACTION].append(hook)
 
+            elif action_type == RequestTypes.TASK:
+
+                hook.session = engines_registry.get(RequestTypes.TASK)(
+                    concurrency=persona.batch.size,
+                    timeouts=hook_action.get('timeouts')
+                )
+
+                task_name = hook_action.get('name')
+                task_hook = registrar.all.get(task_name)
+
+                hook.action: Task = Task(
+                    task_name,
+                    task_hook.call,
+                    source=hook.config.env,
+                    user=hook.config.user,
+                    tags=hook.config.tags
+                )
+
+                if before_hook_name:
+                    before_hook = registrar.all.get(before_hook_name)
+                    hook.action.hooks.before = before_hook.call
+
+                if after_hook_name:
+                    after_hook = registrar.all.get(after_hook_name)
+                    hook.action.hooks.after = after_hook.call
+
+                hook.action.hooks.checks = []
+                for check_hook_name in check_hook_names:
+                    hook.action.hooks.checks.append(check_hook_name)
+
+                hooks[HookType.TASK].append(hook)
+
             else:
                 plugin_type = hook_action.get('plugin_type')
                 timeouts: Timeouts = hook_action.get('timeouts', {})
@@ -252,7 +286,7 @@ def execute_actions(parallel_config: str):
                     hook.action.hooks.checks.append(check_hook_name)
 
                 hooks[HookType.ACTION].append(hook)
-
+                
         persona.setup(hooks)
 
         results = loop.run_until_complete(persona.execute())

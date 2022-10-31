@@ -4,6 +4,7 @@ from .grpc import MercuryGRPCClient
 from .http import MercuryHTTPClient
 from .http2 import MercuryHTTP2Client
 from .playwright import MercuryPlaywrightClient
+from .task import MercuryTaskRunner
 from .udp import MercuryUDPClient
 from .websocket import MercuryWebsocketClient
 from .common.types import RequestTypes
@@ -40,6 +41,10 @@ engines_registry = {
         concurrency=concurrency,
         timeouts=timeouts,
         reset_connections=reset_connections
+    ),
+    RequestTypes.TASK: lambda concurrency, timeouts: MercuryTaskRunner(
+        concurrency=concurrency,
+        timeouts=timeouts
     ),
     RequestTypes.UDP: lambda concurrency, timeouts, reset_connections: MercuryUDPClient(
         concurrency=concurrency,

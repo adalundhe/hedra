@@ -39,27 +39,25 @@ class WebsocketClient(BaseClient):
         user: str = None, 
         tags: List[Dict[str, str]] = []  
     ):
-        if self.session.registered.get(self.next_name) is None:
-            request = WebsocketAction(
-                self.next_name,
-                url,
-                method='GET',
-                headers=headers,
-                data=None,
-                user=user,
-                tags=tags
-            )
 
-            result = await self.session.prepare(request)
-            if isinstance(result, Exception):
-                raise result
-            
-            if self.intercept:
-                self.actions.store(self.next_name, request, self.session)
+        request = WebsocketAction(
+            self.next_name,
+            url,
+            method='GET',
+            headers=headers,
+            data=None,
+            user=user,
+            tags=tags
+        )
 
-                loop = asyncio.get_event_loop()
-                self.waiter = loop.create_future()
-                await self.waiter
+        await self.session.prepare(request)
+
+        if self.intercept:
+            self.actions.store(self.next_name, request, self.session)
+
+            loop = asyncio.get_event_loop()
+            self.waiter = loop.create_future()
+            await self.waiter
 
         return self.session
 
@@ -72,26 +70,23 @@ class WebsocketClient(BaseClient):
         tags: List[Dict[str, str]] = []
     ):
 
-        if self.session.registered.get(self.next_name) is None:
-            request = WebsocketAction(
-                self.next_name,
-                url,
-                method='POST',
-                headers=headers,
-                data=data,
-                user=user,
-                tags=tags
-            )
+        request = WebsocketAction(
+            self.next_name,
+            url,
+            method='POST',
+            headers=headers,
+            data=data,
+            user=user,
+            tags=tags
+        )
 
-            result = await self.session.prepare(request)
-            if isinstance(result, Exception):
-                raise result
+        await self.session.prepare(request)
                 
-            if self.intercept:
-                self.actions.store(self.next_name, request, self.session)
-                
-                loop = asyncio.get_event_loop()
-                self.waiter = loop.create_future()
-                await self.waiter
+        if self.intercept:
+            self.actions.store(self.next_name, request, self.session)
+            
+            loop = asyncio.get_event_loop()
+            self.waiter = loop.create_future()
+            await self.waiter
 
         return self.session

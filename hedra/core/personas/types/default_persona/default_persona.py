@@ -90,6 +90,9 @@ class DefaultPersona:
 
     def setup(self, hooks: Dict[HookType, List[Hook]]):
         self._hooks = hooks.get(HookType.ACTION)
+        self._hooks.extend(
+            hooks.get(HookType.TASK, [])
+        )
         self.actions_count = len(self._hooks)
         
             

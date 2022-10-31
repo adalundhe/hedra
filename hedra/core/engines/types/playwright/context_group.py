@@ -4,7 +4,7 @@ import time
 from async_tools.datatypes import AsyncList
 from typing import List
 from playwright.async_api import async_playwright
-from .command import Command
+from .command import PlaywrightCommand
 from .result import PlaywrightResult
 from .command_librarian import CommandLibrarian
 
@@ -77,7 +77,7 @@ class ContextGroup:
 
             self.librarians.append(command_librarian)
 
-    async def execute(self, command: Command):
+    async def execute(self, command: PlaywrightCommand):
         result = PlaywrightResult(command)
         await self.sem.acquire()
         start = 0
@@ -109,7 +109,7 @@ class ContextGroup:
 
             return result
 
-    async def execute_batch(self, command: Command, timeout: float=None):
+    async def execute_batch(self, command: PlaywrightCommand, timeout: float=None):
         return await asyncio.wait([
             self.execute(command) async for _ in AsyncList(range(self.concurrency))
         ], timeout=timeout)

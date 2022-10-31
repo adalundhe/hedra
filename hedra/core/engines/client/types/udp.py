@@ -37,25 +37,23 @@ class UDPClient(BaseClient):
         tags: List[Dict[str, str]] = []
     ):
 
-        if self.session.registered.get(self.next_name) is None:
+        request = UDPAction(
+            self.next_name,
+            url,
+            wait_for_response=True,
+            data=None,
+            user=user,
+            tags=tags             
+        )
 
-            request = UDPAction(
-                self.next_name,
-                url,
-                wait_for_response=True,
-                data=None,
-                user=user,
-                tags=tags             
-            )
+        await self.session.prepare(request)
 
-            await self.session.prepare(request)
-
-            if self.intercept:
-                self.actions.store(self.next_name, request, self.session)
-                
-                loop = asyncio.get_event_loop()
-                self.waiter = loop.create_future()
-                await self.waiter
+        if self.intercept:
+            self.actions.store(self.next_name, request, self.session)
+            
+            loop = asyncio.get_event_loop()
+            self.waiter = loop.create_future()
+            await self.waiter
 
         return await self.session.execute_prepared_request(
             self.session.registered.get(self.next_name)
@@ -69,27 +67,24 @@ class UDPClient(BaseClient):
         user: str = None,
         tags: List[Dict[str, str]] = []
     ):
-        if self.session.registered.get(self.next_name) is None:
-            request = UDPAction(
-                self.next_name,
-                url,
-                wait_for_response=wait_for_resonse,
-                data=data,
-                user=user,
-                tags=tags           
-            )
 
-            result = await self.session.prepare(request)  
- 
-            if isinstance(result, Exception):
-                raise result
+        request = UDPAction(
+            self.next_name,
+            url,
+            wait_for_response=wait_for_resonse,
+            data=data,
+            user=user,
+            tags=tags           
+        )
 
-            if self.intercept:
-                self.actions.store(self.next_name, request, self.session)
+        await self.session.prepare(request)  
 
-                loop = asyncio.get_event_loop()
-                self.waiter = loop.create_future()
-                await self.waiter
+        if self.intercept:
+            self.actions.store(self.next_name, request, self.session)
+
+            loop = asyncio.get_event_loop()
+            self.waiter = loop.create_future()
+            await self.waiter
     
         return await self.session.execute_prepared_request(
             self.session.registered.get(self.next_name)
