@@ -8,7 +8,7 @@ import importlib
 import ntpath
 from pathlib import Path
 from hedra.core.graphs.stages.stage import Stage
-from hedra.core.graphs import Pipeline
+from hedra.core.graphs import Graph
 
 
 def run_graph(path: str, cpus: int):
@@ -39,7 +39,7 @@ def run_graph(path: str, cpus: int):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    pipeline = Pipeline(
+    pipeline = Graph(
         list(discovered.values()),
         cpus=cpus
     )

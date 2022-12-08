@@ -7,16 +7,16 @@ from hedra.core.graphs.stages.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.transitions.transition import Transition
 from .transitions import TransitionAssembler, local_transitions
-from .status import PipelineStatus
+from .status import GraphStatus
 
 
 
-class Pipeline:
-    status = PipelineStatus.IDLE
+class Graph:
+    status = GraphStatus.IDLE
 
     def __init__(self, stages: List[Stage], cpus: int=None, worker_id: int=None) -> None:
         
-        self.status = PipelineStatus.INITIALIZING
+        self.status = GraphStatus.INITIALIZING
         self.graph = networkx.DiGraph()
         self.transitions_graph = []
         self._transitions: List[List[Transition]] = []
@@ -57,7 +57,7 @@ class Pipeline:
 
     def validate(self):
 
-        self.status = PipelineStatus.VALIDATING
+        self.status = GraphStatus.VALIDATING
         # If we havent specified a Validate stage for save aggregated results,
         # append one.
         if len(self.instances.get(StageTypes.VALIDATE)) < 1:
@@ -90,11 +90,11 @@ class Pipeline:
 
         self.runner.map_to_setup_stages(self.graph)
 
-        self.status = PipelineStatus.ASSEMBLING
+        self.status = GraphStatus.ASSEMBLING
 
     async def run(self):
         
-        self.status = PipelineStatus.RUNNING
+        self.status = GraphStatus.RUNNING
 
         for transition_group in self._transitions:
             for transtition in transition_group:
@@ -111,7 +111,7 @@ class Pipeline:
                 
                 if next_stage == StageTypes.ERROR:
 
-                    self.status = PipelineStatus.FAILED
+                    self.status = GraphStatus.FAILED
 
                     print(f'Executing error transition -  {error.from_stage}')
 
@@ -122,11 +122,11 @@ class Pipeline:
                         error_transtiton.to_stage
                     ) 
                     
-            if self.status == PipelineStatus.FAILED:
+            if self.status == GraphStatus.FAILED:
                 break
         
-        if self.status == PipelineStatus.RUNNING:
-            self.status = PipelineStatus.COMPLETE
+        if self.status == GraphStatus.RUNNING:
+            self.status = GraphStatus.COMPLETE
 
         return self._results
 

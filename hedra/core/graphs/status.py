@@ -1,6 +1,6 @@
 from enum import Enum
 
-class PipelineStatus(Enum):
+class GraphStatus(Enum):
     IDLE='IDLE'
     INITIALIZING='INITIALIZING'
     VALIDATING='VALIDATING'

@@ -1,4 +1,4 @@
-from .pipeline import Pipeline
+from .graph import Graph
 from .stages import (
     Analyze,
     Checkpoint,
