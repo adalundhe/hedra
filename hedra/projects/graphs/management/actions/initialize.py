@@ -36,7 +36,7 @@ class Initialize(RepoAction):
             self._update_ignore()
 
             self.repo.index.add('.gitignore')
-            self.repo.index.add(self.graph_files)
+            self.repo.index.add(self.discovered_files)
 
             self.repo.index.commit(f'Initialized new graph repo at - {self.config.path}')
 

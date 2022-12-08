@@ -87,7 +87,7 @@ def sync_project(
     )
 
     manager = GraphManager(repo_config)
-    manager.discover_graph_files()
+    discovered = manager.discover_graph_files()
 
     workflow_actions = [
         'initialize',
@@ -105,7 +105,7 @@ def sync_project(
         'project_remote': remote
     })
 
-    hedra_config['graphs'] = manager.discovered_graphs
+    hedra_config.update(discovered)
 
     hedra_config['project'] = hedra_project_config
     with open(hedra_config_filepath, 'w') as hedra_config_file:

@@ -25,16 +25,23 @@ class GraphManager:
         }
 
         self.discovered_graphs: Dict[str, str] = {}
+        self.discovered_plugins: Dict[str, str] = {}
         self.config = config
 
     def execute_workflow(self, workflow_actions: List[str]):
         
         for workflow_action in workflow_actions:
 
+            init_files = glob.glob(self.config.path + '/**/__init__.py', recursive=True)
 
+            discovered = [
+                *list(self.discovered_graphs.values()),
+                *list(self.discovered_plugins.values()),
+                *init_files
+            ]
             action: Union[Initialize, Syncrhonize] = self._actions.get(workflow_action)(
                 self.config,
-                list(self.discovered_graphs.values())
+                discovered
             )
 
             if action is None:
@@ -47,19 +54,19 @@ class GraphManager:
 
     def discover_graph_files(self) -> Dict[str, str]:
 
-        candidate_graph_files = glob.glob(self.config.path + '/**/*.py', recursive=True)
+        candidate_files = glob.glob(self.config.path + '/**/*.py', recursive=True)
 
-        for candidate_graph_file_path in candidate_graph_files:
+        for candidate_filepath in candidate_files:
 
-            package_dir = Path(candidate_graph_file_path).resolve().parent
+            package_dir = Path(candidate_filepath).resolve().parent
             package_dir_path = str(package_dir)
             package_dir_module = package_dir_path.split('/')[-1]
             
-            package = ntpath.basename(candidate_graph_file_path)
+            package = ntpath.basename(candidate_filepath)
             package_slug = package.split('.')[0]
-            spec = importlib.util.spec_from_file_location(f'{package_dir_module}.{package_slug}', candidate_graph_file_path)
+            spec = importlib.util.spec_from_file_location(f'{package_dir_module}.{package_slug}', candidate_filepath)
 
-            if candidate_graph_file_path not in sys.path:
+            if candidate_filepath not in sys.path:
                 sys.path.append(str(package_dir.parent))
 
             module = importlib.util.module_from_spec(spec)
@@ -69,19 +76,31 @@ class GraphManager:
                 spec.loader.exec_module(module)
             
                 stage_decendants = list({cls.__name__: cls for cls in Stage.__subclasses__()}.values())
-                # plugin_decendants = list({cls.__name__: cls for cls in Plugin.__subclasses__()}.values())
+                plugin_decendants = list({cls.__name__: cls for cls in Plugin.__subclasses__()}.values())
 
-                discovered = {}
+                graphs = {}
+                plugins = {}
                 for name, obj in inspect.getmembers(module):
                     if inspect.isclass(obj) and issubclass(obj, Stage) and obj not in stage_decendants:
-                        discovered[name] = obj
+                        graphs[name] = obj
 
-                if len(discovered) > 0:               
-                    graph_filepath = Path(candidate_graph_file_path)                
+                    elif inspect.isclass(obj) and issubclass(obj, Plugin) and obj not in plugin_decendants:
+                        plugins[name] = obj
+
+
+                if len(graphs) > 0:               
+                    graph_filepath = Path(candidate_filepath)                
                     self.discovered_graphs[graph_filepath.stem] = str(graph_filepath.resolve())
+
+                if len(plugins) > 0:
+                    plugin_filepath = Path(candidate_filepath)
+                    self.discovered_plugins[plugin_filepath.stem] = str(plugin_filepath.resolve())
 
             except Exception:
                 pass
 
         
-        return self.discovered_graphs
+        return {
+            'graphs': self.discovered_graphs,
+            'plugins': self.discovered_plugins
+        }

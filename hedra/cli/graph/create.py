@@ -1,6 +1,6 @@
 import inspect
 from pathlib import Path
-from hedra.projects.graphs.generated import (
+from hedra.projects.graphs.generation import (
    Generator
 )
 

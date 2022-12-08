@@ -27,7 +27,7 @@ class Syncrhonize(RepoAction):
         self.repo.index.commit(pre_sync_message)
         self.remote.pull(self.branch.name, rebase=True)
 
-        self.repo.index.add(self.graph_files)
+        self.repo.index.add(self.discovered_files)
 
         sync_message = self.config.sync_message
 

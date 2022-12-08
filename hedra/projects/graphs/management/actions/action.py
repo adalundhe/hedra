@@ -9,13 +9,13 @@ from .config import RepoConfig
 
 class RepoAction:
 
-    def __init__(self, config: RepoConfig, graph_files: List[str]) -> None:
+    def __init__(self, config: RepoConfig, discovered_files: List[str]) -> None:
         self.config = config
         self.repo = None
         self.remote = None
         self.branch = None
         self.git = None
-        self.graph_files = graph_files
+        self.discovered_files = discovered_files
 
     def _setup(self):
         self.repo = Repo(self.config.path)
@@ -48,7 +48,7 @@ class RepoAction:
         valid_files = [
             license_file,
             readme_path,
-            *self.graph_files
+            *self.discovered_files
         ]
 
         gitignore_path = f'{self.config.path}/.gitignore'

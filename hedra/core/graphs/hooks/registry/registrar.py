@@ -1,4 +1,3 @@
-import functools
 from types import FunctionType
 from typing import Any, Dict, List, Union, Coroutine
 from hedra.core.graphs.hooks.types.hook import Hook, Metadata
