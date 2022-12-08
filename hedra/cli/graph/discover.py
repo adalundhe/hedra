@@ -1,6 +1,7 @@
 import sys
 import os
 import glob
+import inspect
 import importlib
 import ntpath
 import json
@@ -35,7 +36,12 @@ def discover_graphs(path: str):
             spec.loader.exec_module(module)
             direct_decendants = list({cls.__name__: cls for cls in Stage.__subclasses__()}.values())
 
-            if len(direct_decendants) > 0:
+            discovered = {}
+            for name, obj in inspect.getmembers(module):
+                if inspect.isclass(obj) and issubclass(obj, Stage) and obj not in direct_decendants:
+                    discovered[name] = obj
+
+            if len(discovered) > 0:
                 graph_filepath = Path(candidate_graph_file_path)                
                 discovered_graphs[graph_filepath.stem] = str(graph_filepath.resolve())
 

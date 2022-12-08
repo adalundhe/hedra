@@ -3,6 +3,7 @@ import glob
 import importlib
 import ntpath
 import git
+import inspect
 from pathlib import Path
 from typing import List
 from git import RemoteReference
@@ -72,7 +73,12 @@ class RepoAction:
             
             direct_decendants = list({cls.__name__: cls for cls in Stage.__subclasses__()}.values())
 
-            if len(direct_decendants) > 0:                
+            discovered = {}
+            for name, obj in inspect.getmembers(module):
+                if inspect.isclass(obj) and issubclass(obj, Stage) and obj not in direct_decendants:
+                    discovered[name] = obj
+
+            if len(discovered) > 0:                
                 graph_files.append(candidate_graph_file_path)
 
         
