@@ -33,7 +33,6 @@ class SetupCall:
             await self.hook.call()
 
         except Exception as setup_exception:
-            print(traceback.format_exc())
             self.exception = setup_exception
             self.action_store.waiter.set_result(None)
 
@@ -134,7 +133,6 @@ class Setup(Stage, Generic[Unpack[T]]):
                         await asyncio.wait_for(task, timeout=0.1)
 
                 except HookSetupError as hook_setup_exception:
-                    print(traceback.format_exc())
                     raise hook_setup_exception
 
                 except asyncio.InvalidStateError:

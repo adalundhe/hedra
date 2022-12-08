@@ -6,10 +6,11 @@ from hedra.core.graphs.stages.optimization.algorithms.types.base_algorithm impor
 from hedra.plugins.types.common.plugin_hook import PluginHook
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.common.types import PluginHooks
+from hedra.plugins.types.common.plugin import Plugin
 from hedra.plugins.types.common.registrar import plugin_registrar
 
 
-class OptimizerPlugin(BaseAlgorithm):
+class OptimizerPlugin(BaseAlgorithm, Plugin):
     type=PluginType.OPTIMIZER
 
     def __init__(self, config: Dict[str, Any]) -> None:

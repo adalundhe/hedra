@@ -11,6 +11,7 @@ from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.common.event import Event
 from hedra.plugins.types.common.plugin_hook import PluginHook
 from hedra.plugins.types.common.types import PluginHooks
+from hedra.plugins.types.common.plugin import Plugin
 from hedra.plugins.types.common.registrar import plugin_registrar
 from .action import Action
 from .result import Result
@@ -20,7 +21,7 @@ A = TypeVar('A')
 R = TypeVar('R')
 
 
-class EnginePlugin(Generic[A, R]):
+class EnginePlugin(Generic[A, R], Plugin):
     action: Action[A] = None
     result: Result[R] = None
     event: Union[Event] = Event
@@ -29,6 +30,12 @@ class EnginePlugin(Generic[A, R]):
     type=PluginType.ENGINE
 
     def __init__(self, config: Config) -> None:
+
+        super(
+            EnginePlugin,
+            self
+        ).__init__()
+
         self.hooks = {}
         self.name: str = None
         self.request_type = self.__class__.__name__

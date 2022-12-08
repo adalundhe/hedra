@@ -49,7 +49,7 @@ def discover_graphs(path: str):
             pass
 
     hedra_graphfile_path = os.path.join(
-        os.getcwd(),
+        path,
         '.graphs.json'
     )
 

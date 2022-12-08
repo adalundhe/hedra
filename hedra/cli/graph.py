@@ -33,8 +33,9 @@ def check(path: str):
 @graph.command(
     help="Synchronize changes to graphs at the specified path with those in the specified git repository.\nIf the repository doesn't exist locally it is cloned."
 )
-@click.argument(
-    'url'
+@click.option(
+    '--url',
+    help='Git repository url.'
 )
 @click.option(
     '--path',

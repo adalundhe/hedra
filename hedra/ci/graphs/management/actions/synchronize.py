@@ -17,7 +17,14 @@ class Syncrhonize(RepoAction):
         self.remote.fetch()
 
         self._checkout()
-        self.remote.pull(self.config.branch)
+
+
+        current_time = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+        pre_sync_message = f"Hedra graph update: {self.config.path} - {current_time}" 
+
+        self.repo.git.add(A=True)
+        self.repo.index.commit(pre_sync_message)
+        self.remote.pull(self.branch.name, rebase=True)
 
         graph_files = self._discover_graph_files()
         self.repo.index.add(graph_files)

@@ -7,17 +7,23 @@ import psutil
 from hedra.plugins.types.common.plugin_hook import PluginHook
 from hedra.plugins.types.common.types import PluginHooks
 from hedra.plugins.types.plugin_types import PluginType
+from hedra.plugins.types.common.plugin import Plugin
 from hedra.plugins.types.common.registrar import plugin_registrar
 
 
 T = TypeVar('T')
 
 
-class ReporterPlugin(Generic[T]):
+class ReporterPlugin(Generic[T], Plugin):
     type=PluginType.REPORTER
     config: T = None
 
     def __init__(self, config: T) -> None:
+        
+        super(
+            ReporterPlugin,
+            self
+        ).__init__()
 
         self.loop = asyncio.get_event_loop()
         self.executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))

@@ -12,7 +12,7 @@ from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.personas.persona_manager import get_persona, registered_personas
 from hedra.plugins.types.plugin_types import PluginType
 
-from .parallel.types import PartitionMethod
+from .parallel.partition_method import PartitionMethod
 from .parallel.execute_actions import execute_actions
 from .stage import Stage
 

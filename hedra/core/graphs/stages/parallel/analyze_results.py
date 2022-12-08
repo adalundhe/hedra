@@ -64,7 +64,6 @@ def group_batched_results(config: Dict[str, Any]):
         )
 
     except Exception as e:
-        print(traceback.format_exc())
         raise e
 
 

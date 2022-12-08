@@ -22,7 +22,7 @@ from hedra.core.graphs.hooks.types.types import HookType
 from hedra.plugins.types.engine.action import Action
 
 from hedra.core.personas import get_persona
-from .types import PartitionMethod
+from .partition_method import PartitionMethod
 
 
 def execute_actions(parallel_config: str):

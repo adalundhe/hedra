@@ -8,6 +8,7 @@ from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.plugins.types.common.plugin_hook import PluginHook
 from hedra.plugins.types.common.types import PluginHooks
 from hedra.plugins.types.plugin_types import PluginType
+from hedra.plugins.types.common.plugin import Plugin
 from hedra.plugins.types.common.registrar import plugin_registrar
 from hedra.core.personas.types.default_persona.default_persona import (
     DefaultPersona,
@@ -19,7 +20,7 @@ from hedra.core.engines.client.config import Config
 T = TypeVar('T')
 
 
-class PersonaPlugin(DefaultPersona, Generic[T]):
+class PersonaPlugin(DefaultPersona, Generic[T], Plugin):
     type=PluginType.PERSONA
     
     def __init__(self, config: Config):
