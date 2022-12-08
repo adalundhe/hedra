@@ -1,5 +1,5 @@
 from hedra.core.graphs.hooks.types.hook import Hook
-from hedra.core.graphs.hooks.types.types import HookType
+from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.graphs.stages.stage import Stage
 
 

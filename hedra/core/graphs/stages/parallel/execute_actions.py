@@ -18,7 +18,7 @@ from hedra.core.engines.types.common.types import RequestTypes
 
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.hooks.types.hook import Hook
-from hedra.core.graphs.hooks.types.types import HookType
+from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.plugins.types.engine.action import Action
 
 from hedra.core.personas import get_persona

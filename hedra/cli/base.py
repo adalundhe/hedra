@@ -8,7 +8,9 @@ class CLI(click.MultiCommand):
 
     command_files = {
         'ping': 'ping.py',
-        'graph': 'graph.py'
+        'graph': 'graph.py',
+        'project': 'project.py',
+        'cloud': 'cloud.py'
     }
 
     def list_commands(self, ctx: click.Context) -> List[str]:

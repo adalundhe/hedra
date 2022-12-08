@@ -1,8 +1,8 @@
-from ast import arg
+import functools
 from types import FunctionType
 from typing import Any, Dict, List, Union, Coroutine
 from hedra.core.graphs.hooks.types.hook import Hook, Metadata
-from hedra.core.graphs.hooks.types.types import HookType
+from hedra.core.graphs.hooks.types.hook_types import HookType
 
 
 class Registrar:
@@ -19,6 +19,7 @@ class Registrar:
         if hook_type == HookType.SETUP or hook_type == HookType.TEARDOWN:
 
             def wrap_hook(metadata: Dict[str, Union[str, int]]={}):
+
                 def wrapped_method(func):
 
                     hook_name = func.__qualname__

@@ -54,7 +54,7 @@ T = TypeVar(
     MercuryWebsocketClient
 )
 
-@click.command("Ping the specified uri to ensure it can be reached.")
+@click.command(help="Ping the specified uri to ensure it can be reached.")
 @click.argument('uri')
 @click.option('--engine', default='http', type=str)
 @click.option('--timeout', default=60, type=int)

@@ -1,15 +1,16 @@
 import datetime
+from typing import List
 from .action import RepoAction
 from .config import RepoConfig
 
 
 class Syncrhonize(RepoAction):
 
-    def __init__(self, config: RepoConfig) -> None:
+    def __init__(self, config: RepoConfig, graph_files: List[str]) -> None:
         super(
             Syncrhonize,
             self
-        ).__init__(config)
+        ).__init__(config, graph_files)
 
     def execute(self):
 
@@ -26,8 +27,7 @@ class Syncrhonize(RepoAction):
         self.repo.index.commit(pre_sync_message)
         self.remote.pull(self.branch.name, rebase=True)
 
-        graph_files = self._discover_graph_files()
-        self.repo.index.add(graph_files)
+        self.repo.index.add(self.graph_files)
 
         sync_message = self.config.sync_message
 

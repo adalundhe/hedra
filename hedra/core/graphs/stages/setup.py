@@ -4,7 +4,7 @@ from typing_extensions import TypeVarTuple, Unpack
 import psutil
 from typing import Dict, Generic
 from hedra.core.graphs.hooks.types.hook import Hook
-from hedra.core.graphs.hooks.types.types import HookType
+from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.graphs.hooks.types.internal import Internal
 from hedra.core.engines.client.client import Client
 from hedra.core.engines.client.config import Config

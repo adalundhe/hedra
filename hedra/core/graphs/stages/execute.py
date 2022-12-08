@@ -6,7 +6,7 @@ from typing import Dict, Generic
 from hedra.core.engines.client import Client
 from typing_extensions import TypeVarTuple, Unpack
 from hedra.core.engines.types.registry import engines_registry
-from hedra.core.graphs.hooks.types.types import HookType
+from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.graphs.hooks.types.internal import Internal
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.personas.persona_manager import get_persona, registered_personas

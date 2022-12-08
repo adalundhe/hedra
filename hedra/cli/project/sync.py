@@ -1,12 +1,21 @@
 import os
 import json
+import sys
+import glob
+import inspect
+import importlib
+import ntpath
+import json
+from pathlib import Path
+from typing import List, Dict
+from hedra.core.graphs.stages.stage import Stage
 from urllib.parse import urlparse
-from hedra.ci.graphs.management import GraphManager
-from hedra.ci.graphs.management.actions import RepoConfig
+from hedra.projects.graphs.management import GraphManager
+from hedra.projects.graphs.management.actions import RepoConfig
 from hedra.cli.exceptions.graph.sync import NotSetError
 
 
-def sync_graphs(
+def sync_project(
     url: str, 
     path: str,
     branch: str, 
@@ -26,15 +35,21 @@ def sync_graphs(
         with open(hedra_config_filepath, 'r') as hedra_config_file:
             hedra_config = json.load(hedra_config_file)
 
-    hedra_repo_config = hedra_config.get('repository', {})
+    hedra_project_config = hedra_config.get('project', {})
     if url is None:
-        url = hedra_repo_config.get('remote_url')
+        url = hedra_project_config.get('project_url')
     
     if username is None:
-        username = hedra_repo_config.get('remote_username')
+        username = hedra_project_config.get('project_username')
 
     if password is None:
-        password = hedra_repo_config.get('remote_password')
+        password = hedra_project_config.get('project_password')
+
+    if branch is None:
+        branch = hedra_project_config.get('project_branch', 'main')
+
+    if remote is None:
+        remote = hedra_project_config.get('project_remote', 'origin')
 
     if url is None:
         raise NotSetError(
@@ -71,21 +86,28 @@ def sync_graphs(
         password=password
     )
 
+    manager = GraphManager(repo_config)
+    manager.discover_graph_files()
+
     workflow_actions = [
         'initialize',
         'synchronize'
     ]
 
-    manager = GraphManager()
-    manager.execute_workflow(workflow_actions, repo_config)
+    
+    manager.execute_workflow(workflow_actions)
 
-    hedra_repo_config.update({
-        'remote_url': url,
-        'remote_username': username,
-        'remote_password': password
+    hedra_project_config.update({
+        'project_url': url,
+        'project_username': username,
+        'project_password': password,
+        'project_branch': branch,
+        'project_remote': remote
     })
 
-    hedra_config['repository'] = hedra_repo_config
+    hedra_config['graphs'] = manager.discovered_graphs
+
+    hedra_config['project'] = hedra_project_config
     with open(hedra_config_filepath, 'w') as hedra_config_file:
             hedra_config = json.dump(hedra_config, hedra_config_file, indent=4)
 

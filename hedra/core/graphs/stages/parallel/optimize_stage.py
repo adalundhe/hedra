@@ -3,7 +3,7 @@ import dill
 from typing import Any, Dict, List, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.graphs.hooks.registry.registrar import registrar
-from hedra.core.graphs.hooks.types.types import HookType
+from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.graphs.stages.optimization import Optimizer
 from hedra.core.personas import get_persona
 

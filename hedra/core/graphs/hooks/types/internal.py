@@ -1,6 +1,6 @@
 from typing import Any, Coroutine
 
-from hedra.core.graphs.hooks.types.types import HookType
+from hedra.core.graphs.hooks.types.hook_types import HookType
 from .hook import Hook
 
 

@@ -4,7 +4,7 @@ import asyncio
 from typing import Dict, List
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.graphs.hooks.types.hook import Hook
-from hedra.core.graphs.hooks.types.types import HookType
+from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.types.types import PersonaTypes
 

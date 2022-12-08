@@ -2,6 +2,7 @@ import asyncio
 import os
 import inspect
 import uvloop
+import json
 uvloop.install()
 import sys
 import importlib
@@ -12,6 +13,20 @@ from hedra.core.graphs import Graph
 
 
 def run_graph(path: str, cpus: int):
+
+    hedra_config_filepath = os.path.join(
+        os.getcwd(),
+        '.hedra.json'
+    )
+
+    hedra_config = {}
+    if os.path.exists(hedra_config_filepath):
+        with open(hedra_config_filepath, 'r') as hedra_config_file:
+            hedra_config = json.load(hedra_config_file)
+
+    hedra_graphs = hedra_config.get('graphs', {})
+    if path in hedra_graphs:
+        path = hedra_graphs.get(path)
     
     package_dir = Path(path).resolve().parent
     package_dir_path = str(package_dir)

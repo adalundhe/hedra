@@ -9,11 +9,11 @@ from .config import RepoConfig
 
 class Initialize(RepoAction):
 
-    def __init__(self, config: RepoConfig) -> None:
+    def __init__(self, config: RepoConfig, graph_files: List[str]) -> None:
         super(
             Initialize,
             self
-        ).__init__(config)
+        ).__init__(config, graph_files)
 
     def execute(self):
 
@@ -32,18 +32,23 @@ class Initialize(RepoAction):
         except Exception:
 
             self.repo = Repo.init(self.config.path)
-            
-            graph_files = self._discover_graph_files()
 
             self._update_ignore()
 
             self.repo.index.add('.gitignore')
-            self.repo.index.add(graph_files)
+            self.repo.index.add(self.graph_files)
 
             self.repo.index.commit(f'Initialized new graph repo at - {self.config.path}')
 
-            self.repo.create_remote(self.config.remote, self.config.uri)
+            remote_names = [
+                remote.name for remote in self.repo.remotes
+            ]
+            if self.config.remote not in remote_names:
+                self.repo.create_remote(self.config.remote, self.config.uri)
+
             self.remote = self.repo.remote(self.config.remote)
+
+            self.remote.set_url(self.config.uri)
         
             self._checkout()
 

@@ -9,7 +9,7 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.graphs.hooks.types.internal import Internal
-from hedra.core.graphs.hooks.types.types import HookType
+from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from .stage import Stage
 

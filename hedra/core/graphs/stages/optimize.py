@@ -1,7 +1,7 @@
 import asyncio
 import dill
 from typing import Dict, List, Tuple
-from hedra.core.graphs.hooks.types.types import HookType
+from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.hooks.types.internal import Internal
 from hedra.core.engines.client.time_parser import TimeParser

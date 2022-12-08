@@ -7,7 +7,7 @@ from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.events import EventsGroup
 from hedra.reporting.metric import MetricsSet
 from hedra.core.graphs.hooks.types.internal import Internal
-from hedra.core.graphs.hooks.types.types import HookType
+from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.reporting.events import results_types

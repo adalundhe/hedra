@@ -1,3 +1,5 @@
+from typing import List
+
 class RepoConfig:
 
     def __init__(self, 
@@ -7,7 +9,7 @@ class RepoConfig:
         remote: str='origin', 
         sync_message: str=None,
         username: str=None, 
-        password: str=None
+        password: str=None,
     ) -> None:
 
         self.path = path
