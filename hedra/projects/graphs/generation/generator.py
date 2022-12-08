@@ -1,10 +1,12 @@
 import inspect
+
 from hedra.core.graphs.stages import (
     Analyze,
     Execute,
     Setup,
     Submit
 )
+
 from hedra.reporting.types import (
     JSONConfig
 )
@@ -22,7 +24,8 @@ class Generator:
     def __init__(self) -> None:
 
         self.hooks = [
-            'action'
+            'action',
+            'depends'
         ]
 
         self.stages = [
@@ -59,9 +62,13 @@ class Generator:
     def generate_stages(self):
 
         generated_stages = []
-        for stage_type in self.stages:
+        for idx, stage_type in enumerate(self.stages):
             serialized_stage = inspect.getsource(stage_type)
-            generated_stages.append(serialized_stage)
+
+            if idx > 0:
+                generated_stages.append(f'@depends({self.stages[idx-1].__name__})\n{serialized_stage}')
+            else:
+                generated_stages.append(serialized_stage)
 
         serialized_stages = '\n\n'.join(generated_stages)
 

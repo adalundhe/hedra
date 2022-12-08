@@ -10,7 +10,8 @@ class CLI(click.MultiCommand):
         'ping': 'ping.py',
         'graph': 'graph.py',
         'project': 'project.py',
-        'cloud': 'cloud.py'
+        'cloud': 'cloud.py',
+        'plugin': 'plugin.py'
     }
 
     def list_commands(self, ctx: click.Context) -> List[str]:
