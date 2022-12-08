@@ -1,4 +1,4 @@
-from .core.pipelines.hooks import (
+from .core.graphs.hooks import (
     action,
     setup,
     teardown,
@@ -12,7 +12,7 @@ from .core.pipelines.hooks import (
     task
 )
 
-from .core.pipelines import (
+from .core.graphs import (
     Analyze,
     Checkpoint,
     Execute,

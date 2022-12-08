@@ -145,11 +145,11 @@ class HTTP2Pipe:
         self._headers_sent = True
 
     async def receive_response(self, response: HTTP2Result, stream: Stream):
-       
+
         done = False
         while done is False:
             # events = await self._receive_events(stream)
-            data = await asyncio.wait_for(stream.read(), timeout=10)
+            data = await asyncio.wait_for(stream.read(), timeout=stream.timeouts.socket_read_timeout)
 
             stream.frame_buffer.data.extend(data)
             stream.frame_buffer.max_frame_size = stream.max_outbound_frame_size
@@ -163,6 +163,7 @@ class HTTP2Pipe:
 
                     if frame.type == 0x0:
                         # DATA
+
                         end_stream = 'END_STREAM' in frame.flags
                         flow_controlled_length = frame.flow_controlled_length
                         frame_data = frame.data
@@ -206,7 +207,6 @@ class HTTP2Pipe:
 
                     elif frame.type == 0x01:
                         # HEADERS
-
                         deferred_headers = DeferredHeaders(
                             stream.encoder,
                             frame,
@@ -357,7 +357,7 @@ class HTTP2Pipe:
 
             if done:
                 break
-        
+
         return response
 
     async def submit_request_body(self, request: HTTP2Action, stream: Stream) -> None:

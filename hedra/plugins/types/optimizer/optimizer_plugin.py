@@ -2,7 +2,7 @@ from ctypes import Union
 import inspect
 import math
 from typing import Any, Dict
-from hedra.core.pipelines.stages.optimization.algorithms.types.base_algorithm import BaseAlgorithm
+from hedra.core.graphs.stages.optimization.algorithms.types.base_algorithm import BaseAlgorithm
 from hedra.plugins.types.common.plugin_hook import PluginHook
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.common.types import PluginHooks

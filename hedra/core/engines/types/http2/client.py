@@ -161,7 +161,10 @@ class MercuryHTTP2Client:
 
                 response.write_end = time.monotonic()
 
-                await pipe.receive_response(response, stream)
+                await asyncio.wait_for(
+                    pipe.receive_response(response, stream), 
+                    timeout=self.timeouts.total_timeout
+                )
 
                 response.complete = time.monotonic()
 

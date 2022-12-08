@@ -38,7 +38,8 @@ setup(
         'art',
         'scikit-learn',
         'uvloop',
-        'tdigest'
+        'tdigest',
+        'GitPython'
     ],
     entry_points = {
         'console_scripts': [

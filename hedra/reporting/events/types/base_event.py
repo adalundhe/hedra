@@ -1,6 +1,6 @@
 import traceback
 from hedra.core.engines.types.common.base_result import BaseResult
-from hedra.core.pipelines.hooks.registry.registrar import registrar
+from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.reporting.tags import Tag
 
 

@@ -7,7 +7,8 @@ import os
 class CLI(click.MultiCommand):
 
     command_files = {
-        'run': 'run.py'
+        'ping': 'ping.py',
+        'graph': 'graph.py'
     }
 
     def list_commands(self, ctx: click.Context) -> List[str]:
@@ -19,9 +20,10 @@ class CLI(click.MultiCommand):
 
     def get_command(self, ctx: click.Context, name: str) -> Union[click.Command, None]:
         ns = {}
+        print(name)
         command_file = os.path.join(
             os.path.dirname(__file__),
-            self.command_files.get(name)
+            self.command_files.get(name, 'ping.py')
         )
 
         with open(command_file) as f:

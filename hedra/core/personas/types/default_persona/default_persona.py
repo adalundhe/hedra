@@ -6,9 +6,9 @@ from easy_logger import Logger
 from concurrent.futures import ThreadPoolExecutor
 from async_tools.functions.awaitable import awaitable
 from asyncio import Task
-from hedra.core.pipelines.hooks.types.types import HookType
+from hedra.core.graphs.hooks.types.types import HookType
 from hedra.core.personas.batching.batch import Batch
-from hedra.core.pipelines.hooks.types.hook import Hook
+from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.personas.batching import Batch
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.types.types import PersonaTypes

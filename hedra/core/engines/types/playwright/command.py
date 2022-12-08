@@ -41,7 +41,8 @@ class Options:
 class PlaywrightCommand:
     
     def __init__(self, 
-        name, command, 
+        name, 
+        command, 
         page: Page = Page(), 
         url: URL = URL(), 
         input: Input = Input(), 

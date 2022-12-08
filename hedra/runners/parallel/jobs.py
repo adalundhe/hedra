@@ -4,10 +4,10 @@ import traceback
 from easy_logger import Logger
 from pycli_tools.arguments.bundler import Bundler
 from hedra.core import Executor
-from hedra.core.pipelines.hooks import (
+from hedra.core.graphs.hooks import (
     Execute
 )
-from hedra.core.pipelines.stages.stage import Stage
+from hedra.core.graphs.stages.stage import Stage
 
 
 def run_job(config):

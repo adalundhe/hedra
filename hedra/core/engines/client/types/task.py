@@ -6,7 +6,7 @@ from hedra.core.engines.types.task.task import Task
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.client.store import ActionsStore
-from hedra.core.pipelines.hooks.types.hook import Hook
+from hedra.core.graphs.hooks.types.hook import Hook
 from .base_client import BaseClient
 
 

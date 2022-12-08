@@ -30,3 +30,6 @@ class Config:
         self.reset_connections = kwargs.get('reset_connections')
         self.graceful_stop = kwargs.get('graceful_stop', 1)
         self.optimized = False
+
+        if self.request_timeout > self.total_time:
+            self.request_timeout = self.total_time
