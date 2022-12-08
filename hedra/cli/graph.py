@@ -4,7 +4,8 @@ import os
 from hedra.cli.graph import (
     check_graph,
     run_graph,
-    sync_graphs
+    sync_graphs,
+    discover_graphs
 )
 
 @click.group(help='Commands to run, lint, generate, and manage graphs.')
@@ -88,3 +89,15 @@ def sync(
 @click.argument('path')
 def create(path: str):
     pass
+
+
+@graph.command(
+    help='Recursively searches the current directory or specified path for graph files and stores them in a .graphs.json file.'
+)
+@click.option(
+    '--path',
+    default=os.getcwd(),
+    help='Path to search for graph files.'
+)
+def discover(path: str):
+    discover_graphs(path)

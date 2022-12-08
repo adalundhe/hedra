@@ -148,7 +148,7 @@ class HTTP2Pipe:
 
         done = False
         while done is False:
-            # events = await self._receive_events(stream)
+            
             data = await asyncio.wait_for(stream.read(), timeout=stream.timeouts.socket_read_timeout)
 
             stream.frame_buffer.data.extend(data)

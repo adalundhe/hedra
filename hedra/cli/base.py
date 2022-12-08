@@ -20,7 +20,7 @@ class CLI(click.MultiCommand):
 
     def get_command(self, ctx: click.Context, name: str) -> Union[click.Command, None]:
         ns = {}
-        print(name)
+        
         command_file = os.path.join(
             os.path.dirname(__file__),
             self.command_files.get(name, 'ping.py')
@@ -30,4 +30,4 @@ class CLI(click.MultiCommand):
             code = compile(f.read(), command_file, 'exec')
             eval(code, ns, ns)
 
-        return ns[name]
+        return ns.get(name)
