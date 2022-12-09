@@ -1,4 +1,4 @@
-from typing import List
+from typing import Optional
 
 class RepoConfig:
 
@@ -7,9 +7,10 @@ class RepoConfig:
         uri: str, 
         branch: str='main',
         remote: str='origin', 
-        sync_message: str=None,
-        username: str=None, 
-        password: str=None,
+        sync_message: Optional[str]=None,
+        username: Optional[str]=None, 
+        password: Optional[str]=None,
+        ignore_options: Optional[str]=None
     ) -> None:
 
         self.path = path
@@ -19,3 +20,13 @@ class RepoConfig:
         self.sync_message = sync_message
         self.username = username
         self.password = password
+        self.ignore_options = [
+            '__pycache__',
+            '**/*.pyx'
+        ]
+
+        if isinstance(ignore_options, str) and len(ignore_options) > 0:
+            self.ignore_options.extend(
+                ignore_options.split(',')
+            )
+

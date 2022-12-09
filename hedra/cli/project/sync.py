@@ -22,7 +22,8 @@ def sync_project(
     remote: str, 
     sync_message: str, 
     username: str, 
-    password: str
+    password: str,
+    ignore: str
 ):
 
     hedra_config_filepath = os.path.join(
@@ -83,7 +84,8 @@ def sync_project(
         remote=remote,
         sync_message=sync_message,
         username=username,
-        password=password
+        password=password,
+        ignore_options=ignore
     )
 
     manager = GraphManager(repo_config)

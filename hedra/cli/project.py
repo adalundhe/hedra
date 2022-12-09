@@ -41,6 +41,10 @@ def project():
     '--password',
     help='Git repository password'
 )
+@click.option(
+    '--ignore',
+    help='Comma delimited list of files to add to the project .gitignore.'
+)
 def sync(
     url: str, 
     path: str,
@@ -48,7 +52,8 @@ def sync(
     remote: str, 
     sync_message: str, 
     username: str, 
-    password: str
+    password: str,
+    ignore: str
 ):
     sync_project(
         url,
@@ -57,7 +62,8 @@ def sync(
         remote,
         sync_message,
         username,
-        password
+        password,
+        ignore
     )
 
 

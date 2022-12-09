@@ -53,24 +53,11 @@ class RepoAction:
 
         gitignore_path = f'{self.config.path}/.gitignore'
 
-        with open(gitignore_path, 'a+') as hedra_gitignore:
-            
-            candidate_filter_files = [
-                str(path.resolve()) for path in Path(self.config.path).rglob('*') if '.git' not in str(path.resolve())
-            ]  
-
-            existing_ignore_files = self.repo.ignored(candidate_filter_files)
+        existing_ignore_files = []
+        with open(gitignore_path, 'r') as hedra_gitignore:
             existing_ignore_files.extend([
-                existing_ignore_file for existing_ignore_file in hedra_gitignore.readlines()
+                existing_ignore_file.strip('\n') for existing_ignore_file in hedra_gitignore.readlines()
             ])
-
-
-            if '__pycache__' not in existing_ignore_files:
-                hedra_gitignore.writelines('\n__pycache__\n')
-
-            if '**/*.pyc' not in existing_ignore_files:
-                hedra_gitignore.writelines('\n**/*.pyc\n')
-
 
         with open(gitignore_path, 'a+') as hedra_gitignore:
             
@@ -78,8 +65,10 @@ class RepoAction:
             candidate_filter_files = [
                 str(path.resolve()) for path in Path(self.config.path).rglob('*') if '.git' not in str(path.resolve())
             ]
-            
-            existing_ignore_files = self.repo.ignored(candidate_filter_files)
+
+            existing_ignore_files.extend(
+                self.repo.ignored(candidate_filter_files)
+            )
             
             for candidate_filter_file in candidate_filter_files:
 
@@ -94,13 +83,16 @@ class RepoAction:
                 if valid_ignore_candidate and not_already_ignored and not_directory:
                     filter_files.append(candidate_relative_path)
 
+            for ignore_option in self.config.ignore_options:
+                if ignore_option not in existing_ignore_files:
+                    filter_files.append(ignore_option)
+
             filter_files_data = '\n'.join([
                 filepath for filepath in filter_files
             ])
 
             if len(filter_files) > 0:
-                hedra_gitignore.writelines(f'{filter_files_data}\n')
+                hedra_gitignore.writelines(f'\n{filter_files_data}\n')
                 
-        
         self.repo.index.add('.gitignore')
 
