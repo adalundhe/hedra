@@ -6,12 +6,14 @@ from hedra.core.graphs.hooks.types.hook_types import HookType
 
 class Registrar:
     all: Dict[str, Hook] = {}
+    module_paths: Dict[str, str] = {}
 
     def __init__(self, hook_type) -> None:
 
         self.hook_type = hook_type
 
-    def __call__(self, _: FunctionType) -> Any:
+    def __call__(self, hook: FunctionType) -> Any:
+        self.module_paths[hook.__name__] = hook.__module__
         return self.add_hook(self.hook_type)
 
     def add_hook(self, hook_type: str):

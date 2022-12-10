@@ -8,5 +8,5 @@ class InvalidPluginType(Exception):
         valid_plugin_types = '\n-'.join(valid_types)
 
         super().__init__(
-            f'Error - invalid plugin type - {plugin_type} - specified.\nValid types are \n-{valid_plugin_types}'
+            f'\n\nError - invalid plugin type - {plugin_type} - specified.\n\nValid types are: \n-{valid_plugin_types}\n'
         )

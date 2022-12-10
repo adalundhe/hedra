@@ -4,8 +4,8 @@ from hedra.plugins.types.reporter import (
     ReporterConfig,
     ReporterPlugin,
     Metrics,
-    connect,
-    close,
+    reporter_connect,
+    reporter_close,
     process_events,
     process_shared,
     process_metrics,
@@ -24,7 +24,7 @@ class  CustomReporter(ReporterPlugin):
     def __init__(self, config: CustomReporterConfig) -> None:
         super().__init__(config)
 
-    @connect()
+    @reporter_connect()
     async def reporter_connect(self):
         pass
 
@@ -48,6 +48,6 @@ class  CustomReporter(ReporterPlugin):
     async def reporter_process_errors(self, metrics: List[Metrics]):
         pass
 
-    @close()
+    @reporter_close()
     async def reporter_close(self):
         pass

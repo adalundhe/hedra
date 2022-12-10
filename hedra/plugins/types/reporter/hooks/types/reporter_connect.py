@@ -5,7 +5,7 @@ from hedra.plugins.types.common.registrar import plugin_registrar
 
 
 @plugin_registrar(PluginHooks.ON_REPORTER_CONNECT)
-def connect():
+def reporter_connect():
 
     def wrapper(func) -> PluginHook:
 

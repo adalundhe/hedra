@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import List, Dict
 from hedra.core.graphs.stages.stage import Stage
 from urllib.parse import urlparse
-from hedra.projects.graphs.management import GraphManager
-from hedra.projects.graphs.management.actions import RepoConfig
+from hedra.projects.management import GraphManager
+from hedra.projects.management.graphs.actions import RepoConfig
 from hedra.cli.exceptions.graph.sync import NotSetError
 
 

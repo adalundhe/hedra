@@ -7,12 +7,13 @@ from .plugin_hook import PluginHook
 class PluginRegistrar:
 
     all: Dict[str, PluginHook] = {}
+    module_paths: Dict[str, str] = {}
 
     def __init__(self, hook_type) -> None:
-
         self.hook_type = hook_type
 
-    def __call__(self, _: FunctionType) -> Any:
+    def __call__(self, plugin_hook: FunctionType) -> Any:
+        self.module_paths[plugin_hook.__name__] = plugin_hook.__module__
         return self.add_hook(self.hook_type)
 
     def add_hook(self, hook_type: str):
@@ -21,7 +22,6 @@ class PluginRegistrar:
 
                 hook_name = func.__qualname__
                 hook_shortname = func.__name__
-
 
                 self.all[hook_name] = PluginHook(
                     hook_name,

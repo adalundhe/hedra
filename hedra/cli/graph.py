@@ -32,5 +32,9 @@ def check(path: str):
     help='Creates basic scaffolding for a test graph at the specified path.'
 )
 @click.argument('path')
-def create(path: str):
-    create_graph(path)
+@click.option(
+    '--stages',
+    help='Optional comma delimited list of stages to generate for the graph.'
+)
+def create(path: str, stages: str):
+    create_graph(path, stages)
