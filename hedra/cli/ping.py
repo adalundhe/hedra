@@ -48,9 +48,10 @@ def ping(uri: str, engine: str, timeout: int, log_level: str):
         LoggerTypes.DISTRIBUTED,
         LoggerTypes.FILESYSTEM
     )
+    logging_manager.update_log_level(log_level)
 
     logger = HedraLogger()
-    logger.initialize(log_level)
+    logger.initialize()
 
     engine_types_map = {
         'http': RequestTypes.HTTP,

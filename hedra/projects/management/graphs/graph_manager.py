@@ -30,7 +30,7 @@ class GraphManager:
         self.config = config
         self.log_level = log_level
         self.logger = HedraLogger()
-        self.logger.initialize(log_level)
+        self.logger.initialize()
 
     def execute_workflow(self, workflow_actions: List[str]):
         

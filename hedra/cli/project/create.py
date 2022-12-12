@@ -23,9 +23,10 @@ def create_project(
         LoggerTypes.DISTRIBUTED,
         LoggerTypes.FILESYSTEM
     )
+    logging_manager.update_log_level(log_level)
 
     logger = HedraLogger()
-    logger.initialize(log_level)
+    logger.initialize()
 
     hedra_config_filepath = os.path.join(
         path,

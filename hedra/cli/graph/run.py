@@ -31,7 +31,7 @@ def run_graph(path: str, cpus: int, log_level: str, logfiles_directory: str):
         os.mkdir(logfiles_directory)
 
     logger = HedraLogger()
-    logger.initialize(log_level)
+    logger.initialize()
 
     graph_name = path
     if os.path.isfile(graph_name):

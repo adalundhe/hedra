@@ -24,9 +24,10 @@ def check_graph(path: str, log_level: str):
         LoggerTypes.DISTRIBUTED,
         LoggerTypes.FILESYSTEM
     )
+    logging_manager.update_log_level(log_level)
 
     logger = HedraLogger()
-    logger.initialize(log_level)
+    logger.initialize()
 
     logger['console'].sync.info(f'Validating graph at - {path}.')
     

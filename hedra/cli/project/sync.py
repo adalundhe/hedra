@@ -32,9 +32,10 @@ def sync_project(
         LoggerTypes.DISTRIBUTED,
         LoggerTypes.FILESYSTEM
     )
+    logging_manager.update_log_level(log_level)
 
     logger = HedraLogger()
-    logger.initialize(log_level)
+    logger.initialize()
     logger['console'].sync.info(f'Running project sync at - {path}...')
 
     hedra_config_filepath = os.path.join(

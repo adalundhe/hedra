@@ -15,9 +15,10 @@ def create_plugin(plugin_type: str, path: str, log_level: str):
         LoggerTypes.DISTRIBUTED,
         LoggerTypes.FILESYSTEM
     )
+    logging_manager.update_log_level(log_level)
 
     logger = HedraLogger()
-    logger.initialize(log_level)
+    logger.initialize()
 
     logger['console'].sync.info(f'Creating new - {plugin_type} - plugin at - {path}.')
 
