@@ -27,6 +27,8 @@ class Syncrhonize(RepoAction):
         self.repo.index.commit(pre_sync_message)
         self.remote.pull(self.branch.name, rebase=True)
 
+        self._update_ignore(force_create=True)
+
         self.repo.index.add(self.discovered_files)
 
         sync_message = self.config.sync_message
@@ -36,7 +38,6 @@ class Syncrhonize(RepoAction):
             sync_message = f"Hedra graph update: {self.config.path} - {current_time}" 
 
         self.repo.index.commit(sync_message)
-
-        self.remote.push()
+        self.remote.push(self.config.branch, set_upstream=True)
 
 

@@ -1,6 +1,5 @@
 import json
-from types import FunctionType
-from typing import Coroutine, Dict, Iterator, Union, List
+from typing import Dict, Iterator, Union, List
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.http.action import HTTPAction
 try:
@@ -22,7 +21,8 @@ class GraphQLAction(HTTPAction):
         headers: Dict[str, str] = {}, 
         data: Union[str, dict, Iterator, bytes, None] = None, 
         user: str=None, 
-        tags: List[Dict[str, str]] = []
+        tags: List[Dict[str, str]] = [],
+        redirects: int=10
     ) -> None:
 
         super(
@@ -39,6 +39,7 @@ class GraphQLAction(HTTPAction):
         )
 
         self.type = RequestTypes.GRAPHQL
+        self.redirects = redirects
 
     def _setup_data(self) -> None:
         source = Source(self._data.get("query"))

@@ -3,9 +3,26 @@ from typing import Optional
 from hedra.projects.generation import GraphGenerator
 from hedra.core.graphs.stages.stage import Stage
 from hedra.cli.exceptions.graph.create import InvalidStageType
+from hedra.logging import HedraLogger
+from hedra.logging import (
+    HedraLogger,
+    LoggerTypes,
+    logging_manager
+)
 
 
-def create_graph(path: str, stages: Optional[str]):
+def create_graph(path: str, stages: Optional[str], log_level: str):
+
+    logging_manager.disable(
+        LoggerTypes.HEDRA, 
+        LoggerTypes.DISTRIBUTED,
+        LoggerTypes.FILESYSTEM
+    )
+
+    logger = HedraLogger()
+    logger.initialize(log_level)
+
+    logger['console'].sync.info(f'Creating new graph at - {path}.')
 
     if stages is None:
         stages_list = [
@@ -17,8 +34,15 @@ def create_graph(path: str, stages: Optional[str]):
 
     else:
         stages_list = stages.split(',')
-
     
+    generated_stages_count = len(stages_list)
+    generated_stages = ''.join([
+        f'\n-{stage}' for stage in stages_list
+    ])   
+
+    logger['console'].sync.info(f'Generating - {generated_stages_count} stages:{generated_stages}') 
+
+
     generator = GraphGenerator()
 
     for stage in stages_list:
@@ -34,3 +58,5 @@ def create_graph(path: str, stages: Optional[str]):
         generated_test.write(
             generator.generate_graph(stages_list)
         )
+
+    logger['console'].sync.info('\nGraph generated!\n')

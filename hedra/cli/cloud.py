@@ -60,3 +60,23 @@ def submit(config_path: str, cluster: str):
 )
 def check(graph_name: str, cluster: str):
     pass
+
+
+@cloud.group(help='Follow test progress as it runs on the specified Hedra Cloud cluster.')
+@click.argument('test_id')
+@click.option(
+    '--cluster',
+    help='Hedra Cluster address.'
+)
+def watch(test_id: str, cluster: str):
+    pass
+
+
+@cloud.group(help='Update graph config for the specified graph on the specified Hedra Cloud cluster.')
+@click.argument('graph_name')
+@click.option(
+    '--cluster',
+    help='Hedra Cluster address.'
+)
+def update(graph_name: str, cluster: str):
+    pass

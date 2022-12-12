@@ -1,11 +1,12 @@
 from __future__ import annotations
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Union, Optional
 from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.graphs.hooks.types.internal import Internal
 from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.engines.client.time_parser import TimeParser
+from hedra.logging import HedraLogger
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.reporter.reporter_plugin import ReporterPlugin
 from hedra.plugins.types.plugin_types import PluginType
@@ -36,6 +37,7 @@ class Stage:
         self.allow_parallel = False
         self.executor: BatchExecutor = None
         self.plugins_by_type: Dict[PluginType, Dict[str, Union[EnginePlugin, ReporterPlugin]]] = {}
+        self.logger: Optional[HedraLogger] = None
 
         if self.stage_timeout:
             time_parser = TimeParser(self.stage_timeout)

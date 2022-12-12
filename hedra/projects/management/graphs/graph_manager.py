@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List, Union, Dict
 from hedra.core.graphs.stages.stage import Stage
 from hedra.plugins.types.common.plugin import Plugin
+from hedra.logging import HedraLogger
 from .actions import (
     Syncrhonize,
     Initialize,
@@ -18,7 +19,7 @@ from .exceptions import InvalidActionError
 
 class GraphManager:
 
-    def __init__(self, config: RepoConfig) -> None:
+    def __init__(self, config: RepoConfig, log_level: str='info') -> None:
         self._actions = {
             'initialize': Initialize,
             'synchronize': Syncrhonize   
@@ -27,6 +28,9 @@ class GraphManager:
         self.discovered_graphs: Dict[str, str] = {}
         self.discovered_plugins: Dict[str, str] = {}
         self.config = config
+        self.log_level = log_level
+        self.logger = HedraLogger()
+        self.logger.initialize(log_level)
 
     def execute_workflow(self, workflow_actions: List[str]):
         
@@ -96,7 +100,8 @@ class GraphManager:
                     plugin_filepath = Path(candidate_filepath)
                     self.discovered_plugins[plugin_filepath.stem] = str(plugin_filepath.resolve())
 
-            except Exception:
+            except Exception as e:
+                self.logger.sync.console.error(f'Encountered error loading file at - {str(e)}.')
                 pass
 
         

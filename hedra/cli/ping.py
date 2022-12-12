@@ -1,4 +1,5 @@
 import uvloop
+import traceback
 uvloop.install()
 
 
@@ -8,37 +9,18 @@ import asyncio
 from hedra.core.engines.types.registry import engines_registry
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common.timeouts import Timeouts
-from hedra.core.engines.types.common.base_action import BaseAction
-from hedra.core.engines.types.grpc import (
-    GRPCAction,
-    MercuryGRPCClient
-)
-from hedra.core.engines.types.graphql import (
-    GraphQLAction,
-    MercuryGraphQLClient
-)
-from hedra.core.engines.types.graphql_http2 import (
-    GraphQLHTTP2Action,
-    MercuryGraphQLHTTP2Client
-)
-from hedra.core.engines.types.http import (
-    HTTPAction,
-    MercuryHTTPClient
-)
-from hedra.core.engines.types.http2 import (
-    HTTP2Action,
-    MercuryHTTP2Client
-)
-from hedra.core.engines.types.playwright import (
-    MercuryPlaywrightClient
-)
-from hedra.core.engines.types.udp import (
-    UDPAction,
-    MercuryUDPClient
-)
-from hedra.core.engines.types.websocket import (
-    WebsocketAction,
-    MercuryWebsocketClient
+from hedra.core.engines.types.grpc import GRPCAction, MercuryGRPCClient
+from hedra.core.engines.types.graphql import GraphQLAction, MercuryGraphQLClient
+from hedra.core.engines.types.graphql_http2 import GraphQLHTTP2Action, MercuryGraphQLHTTP2Client
+from hedra.core.engines.types.http import HTTPAction, MercuryHTTPClient
+from hedra.core.engines.types.http2 import HTTP2Action, MercuryHTTP2Client
+from hedra.core.engines.types.playwright import MercuryPlaywrightClient
+from hedra.core.engines.types.udp import UDPAction, MercuryUDPClient
+from hedra.core.engines.types.websocket import WebsocketAction, MercuryWebsocketClient
+from hedra.logging import (
+    HedraLogger,
+    LoggerTypes,
+    logging_manager
 )
 
 
@@ -58,7 +40,17 @@ T = TypeVar(
 @click.argument('uri')
 @click.option('--engine', default='http', type=str)
 @click.option('--timeout', default=60, type=int)
-def ping(uri: str, engine: str, timeout: int):
+@click.option('--log-level', default='info', type=str)
+def ping(uri: str, engine: str, timeout: int, log_level: str):
+
+    logging_manager.disable(
+        LoggerTypes.HEDRA, 
+        LoggerTypes.DISTRIBUTED,
+        LoggerTypes.FILESYSTEM
+    )
+
+    logger = HedraLogger()
+    logger.initialize(log_level)
 
     engine_types_map = {
         'http': RequestTypes.HTTP,
@@ -70,14 +62,15 @@ def ping(uri: str, engine: str, timeout: int):
         'websocket': RequestTypes.WEBSOCKET
     }
 
-    
+    logger['console'].sync.info(f'Pinging target - {uri} - using engine - {engine}.')
+    logger['console'].sync.debug(f'Pinging with timeout of - {timeout} - seconds.')
 
     engine_type = engine_types_map.get(engine, RequestTypes.HTTP)
 
-    asyncio.run(ping_target(uri, engine_type, timeout))
+    asyncio.run(ping_target(uri, engine_type, timeout, logger))
     
 
-async def ping_target(uri: str, engine_type: RequestTypes, timeout: int):
+async def ping_target(uri: str, engine_type: RequestTypes, timeout: int, logger: HedraLogger):
 
     action_name = f'ping_{uri}'
 
@@ -140,8 +133,13 @@ async def ping_target(uri: str, engine_type: RequestTypes, timeout: int):
 
     try:
         
+        await logger['console'].aio.debug(f'Preparing to connect to - {uri}.')
+
         action.setup()
         await selected_engine.prepare(action)
 
-    except Exception as ping_error:
-        raise ping_error
+        await logger['console'].aio.info(f'Successfully connected to - {uri}!\n')
+
+    except Exception:
+        ping_error = traceback.format_exc().split('\n')[-2]
+        await logger['console'].aio.error(f'Error - could not ping - {uri}.\nEncountered - {str(ping_error)} - error.\n')

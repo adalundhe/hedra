@@ -25,6 +25,8 @@ setup(
         "Operating System :: OS Independent"
     ],
     install_requires=[
+        'aiologger',
+        'aiologger[aiofiles]',
         'attr',
         'networkx',
         'aiodns',

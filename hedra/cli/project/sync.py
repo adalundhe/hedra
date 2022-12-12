@@ -1,13 +1,17 @@
 import os
 import json
 import json
-from pathlib import Path
-from typing import List, Dict
-from hedra.core.graphs.stages.stage import Stage
 from urllib.parse import urlparse
 from hedra.projects.management import GraphManager
 from hedra.projects.management.graphs.actions import RepoConfig
 from hedra.cli.exceptions.graph.sync import NotSetError
+from hedra.logging import HedraLogger
+from hedra.logging import (
+    HedraLogger,
+    LoggerTypes,
+    logging_manager
+)
+
 
 
 def sync_project(
@@ -18,8 +22,20 @@ def sync_project(
     sync_message: str, 
     username: str, 
     password: str,
-    ignore: str
+    ignore: str,
+    log_level: str,
+    local: bool
 ):
+
+    logging_manager.disable(
+        LoggerTypes.HEDRA, 
+        LoggerTypes.DISTRIBUTED,
+        LoggerTypes.FILESYSTEM
+    )
+
+    logger = HedraLogger()
+    logger.initialize(log_level)
+    logger['console'].sync.info(f'Running project sync at - {path}...')
 
     hedra_config_filepath = os.path.join(
         path,
@@ -32,6 +48,8 @@ def sync_project(
             hedra_config = json.load(hedra_config_file)
 
     hedra_project_config = hedra_config.get('project', {})
+    
+
     if url is None:
         url = hedra_project_config.get('project_url')
     
@@ -69,8 +87,9 @@ def sync_project(
         )
 
     parsed_url = urlparse(url)
-
     repo_url = f'{parsed_url.scheme}://{username}:{password}@{parsed_url.hostname}{parsed_url.path}'
+
+    logger['console'].sync.info('Initializing project manager.')
 
     repo_config = RepoConfig(
         path,
@@ -82,17 +101,34 @@ def sync_project(
         password=password,
         ignore_options=ignore
     )
-
-    manager = GraphManager(repo_config)
+    
+    manager = GraphManager(repo_config, log_level=log_level)
     discovered = manager.discover_graph_files()
 
-    workflow_actions = [
-        'initialize',
-        'synchronize'
-    ]
+    new_graphs_count = len({
+        graph_name for graph_name in discovered['graphs'] if graph_name not in hedra_config['graphs']
+    })
 
-    
-    manager.execute_workflow(workflow_actions)
+    new_plugins_count = len(({
+        plugin_name for plugin_name in discovered['plugins'] if plugin_name not in hedra_config['plugins']
+    }))
+
+    logger['console'].sync.info(f'Found - {new_graphs_count} - new graphs and - {new_plugins_count} - plugins.')
+
+    if local is False:
+
+        logger['console'].sync.info(f'Synchronizing project state with remote at - {url}...')
+
+        workflow_actions = [
+            'initialize',
+            'synchronize'
+        ]
+
+        
+        manager.execute_workflow(workflow_actions)
+
+    else:
+        logger['console'].sync.info('Skipping remote sync.')
 
     hedra_project_config.update({
         'project_url': url,
@@ -104,8 +140,11 @@ def sync_project(
 
     hedra_config.update(discovered)
 
+    logger['console'].sync.info('Saving project state to .hedra.json config.')
+
     hedra_config['project'] = hedra_project_config
     with open(hedra_config_filepath, 'w') as hedra_config_file:
             hedra_config = json.dump(hedra_config, hedra_config_file, indent=4)
-
+            
+    logger['console'].sync.info('Sync complete!\n')
 

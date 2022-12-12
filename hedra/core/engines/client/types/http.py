@@ -35,7 +35,8 @@ class HTTPClient(BaseClient):
         url: str, 
         headers: Dict[str, str] = {}, 
         user: str = None,
-        tags: List[Dict[str, str]] = []
+        tags: List[Dict[str, str]] = [],
+        redirects: int = 10
     ):
 
         request = HTTPAction(
@@ -45,7 +46,8 @@ class HTTPClient(BaseClient):
             headers=headers,
             data=None,
             user=user,
-            tags=tags             
+            tags=tags,
+            redirects=redirects             
         )
 
         await self.session.prepare(request)
@@ -65,7 +67,8 @@ class HTTPClient(BaseClient):
         headers: Dict[str, str] = {}, 
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
-        tags: List[Dict[str, str]] = []
+        tags: List[Dict[str, str]] = [],
+        redirects: int = 10
     ):
 
         request = HTTPAction(
@@ -75,7 +78,8 @@ class HTTPClient(BaseClient):
             headers=headers,
             data=data,
             user=user,
-            tags=tags           
+            tags=tags,
+            redirects=redirects           
         )
 
         await self.session.prepare(request)  
@@ -96,7 +100,8 @@ class HTTPClient(BaseClient):
         headers: Dict[str, str] = {}, 
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
-        tags: List[Dict[str, str]] = []
+        tags: List[Dict[str, str]] = [],
+        redirects: int = 10
     ):
 
         request = HTTPAction(
@@ -106,7 +111,8 @@ class HTTPClient(BaseClient):
             headers=headers,
             data=data,
             user=user,
-            tags=tags
+            tags=tags,
+            redirects=redirects
         )
 
         await self.session.prepare(request)
@@ -127,7 +133,8 @@ class HTTPClient(BaseClient):
         headers: Dict[str, str] = {}, 
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
-        tags: List[Dict[str, str]] = []
+        tags: List[Dict[str, str]] = [],
+        redirects: int = 10
     ):
 
         request = HTTPAction(
@@ -137,7 +144,8 @@ class HTTPClient(BaseClient):
             headers=headers,
             data=data,
             user=user,
-            tags=tags
+            tags=tags,
+            redirects=redirects
         )
 
         await self.session.prepare(request)
@@ -157,7 +165,8 @@ class HTTPClient(BaseClient):
         url: str, 
         headers: Dict[str, str] = {}, 
         user: str = None,
-        tags: List[Dict[str, str]] = []
+        tags: List[Dict[str, str]] = [],
+        redirects: int = 10
     ):
         request = HTTPAction(
             self.next_name,
@@ -166,7 +175,8 @@ class HTTPClient(BaseClient):
             headers=headers,
             data=None,
             user=user,
-            tags=tags 
+            tags=tags,
+            redirects=redirects
         )
 
         await self.session.prepare(request)

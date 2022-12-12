@@ -20,7 +20,8 @@ class HTTPAction(BaseAction):
         'encoded_data',
         'encoded_headers',
         'is_stream',
-        'ssl_context'
+        'ssl_context',
+        'redirects'
     )
     
     def __init__(
@@ -31,7 +32,8 @@ class HTTPAction(BaseAction):
         headers: Dict[str, str] = {}, 
         data: Union[str, dict, Iterator, bytes, None] = None, 
         user: str=None, 
-        tags: List[Dict[str, str]] = []
+        tags: List[Dict[str, str]] = [],
+        redirects: int=10
     ) -> None:
         super(HTTPAction, self).__init__(
             name,
@@ -52,6 +54,7 @@ class HTTPAction(BaseAction):
         self.encoded_headers = None
         self.is_stream = False
         self.ssl_context = None
+        self.redirects = redirects
 
     @property
     def size(self):

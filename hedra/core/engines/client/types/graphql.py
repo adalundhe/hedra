@@ -41,7 +41,8 @@ class GraphQLClient(BaseClient):
         variables: Dict[str, Any] = None, 
         headers: Dict[str, str] = {}, 
         user: str = None, 
-        tags: List[Dict[str, str]] = []
+        tags: List[Dict[str, str]] = [],
+        redirects: int = 10
     ):
 
         request = GraphQLAction(
@@ -55,7 +56,8 @@ class GraphQLClient(BaseClient):
                 "variables": variables
             },
             user=user,
-            tags=tags
+            tags=tags,
+            redirects=redirects
         )
 
         await self.session.prepare(request)

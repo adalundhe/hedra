@@ -11,5 +11,10 @@ def plugin():
 @plugin.command()
 @click.argument('plugin_type')
 @click.argument('path')
-def create(plugin_type: str, path: str, ):
-    create_plugin(plugin_type, path)
+@click.option(
+    '--log-level',
+    default='info',
+    help='Set log level.'
+)
+def create(plugin_type: str, path: str, log_level: str):
+    create_plugin(plugin_type, path, log_level)

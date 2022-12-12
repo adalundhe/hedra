@@ -1,7 +1,5 @@
 import os
-import glob
 from typing import List
-from pathlib import Path
 from git.repo import Repo
 from .action import RepoAction
 from .config import RepoConfig
@@ -34,8 +32,6 @@ class Initialize(RepoAction):
             self.repo = Repo.init(self.config.path)
 
             self._update_ignore()
-
-            self.repo.index.add('.gitignore')
             self.repo.index.add(self.discovered_files)
 
             self.repo.index.commit(f'Initialized new graph repo at - {self.config.path}')
@@ -52,4 +48,4 @@ class Initialize(RepoAction):
         
             self._checkout()
 
-        self.remote.push(self.config.branch, set_upstream=True)
+        
