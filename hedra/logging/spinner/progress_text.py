@@ -47,7 +47,7 @@ class ProgressText:
         while self.run_cli_task:
             for cli_task in self.cli_messages:
                 self.cli_message = cli_task
-                await asyncio.sleep(len(self.cli_messages) * 1.25)
+                await asyncio.sleep(2.5)
 
                 if self.run_cli_task is False:
                     return
@@ -59,6 +59,7 @@ class ProgressText:
         self.cli_messages = []
 
     async def clear_and_replace(self, message: str):
+        await self.stop_cli_tasks()
         self.cli_message = message
         self.cli_messages = [message]
-        await asyncio.sleep(1)
+        self.start_cli_tasks()

@@ -1,4 +1,6 @@
 import dill
+import time
+import statistics
 from collections import defaultdict
 from typing import Union, List, Dict
 from hedra.plugins.types.plugin_types import PluginType
@@ -37,9 +39,12 @@ class Analyze(Stage):
         self.accepted_hook_types = [ HookType.METRIC ]
         self.requires_shutdown = True
         self.allow_parallel = True
+        self.analysis_execution_time = 0
 
     @Internal
     async def run(self):
+
+        analysis_execution_time_start = time.monotonic()
 
         engine_plugins = self.plugins_by_type.get(PluginType.ENGINE)
         for plugin_name, plugin in engine_plugins.items():
@@ -54,6 +59,20 @@ class Analyze(Stage):
         metric_hook_names = [hook.name for hook in self.hooks.get(HookType.METRIC)]
 
         batches = self.executor.partion_stage_batches(all_results)
+        total_group_results = 0
+
+        elapsed_times = []
+        for stage_name, _, _ in batches:
+            stage_results = self.raw_results.get(stage_name)
+            total_group_results += stage_results.get('total_results', 0)
+            elapsed_times.append(
+                stage_results.get('total_elapsed', 0)
+            )
+
+        median_execution_time = round(statistics.median(elapsed_times))
+        await self.logger.spinner.append_message(
+            f'Calculating stats for - {total_group_results} - actions over a median stage execution time of {median_execution_time} seconds'
+        )
 
         custom_event_types = []
 
@@ -114,12 +133,20 @@ class Analyze(Stage):
                 batch_configs
             ))
 
+        stages_count = len(stage_configs)
+        await self.logger.spinner.append_message(
+            f'Calculating results for - {stages_count} - stages'
+        )
+
+
         stage_batches = await self.executor.execute_batches(
             stage_configs,
             group_batched_results
         )
 
         processed_results = []
+
+        self.logger.spinner.set_message_at(2, f'Converting aggregate results to metrics for - {stages_count} - stages.')
         
         for stage_name, stage_results in stage_batches:
         
@@ -191,5 +218,13 @@ class Analyze(Stage):
         for result in processed_results:
             summaries['stages'].update(result.get('stage_metrics'))
             summaries['session_total'] += result.get('stage_total')
+
+        self.analysis_execution_time = round(
+            time.monotonic() - analysis_execution_time_start
+        )
+
+        await self.logger.spinner.set_default_message(
+            f'Completed results analysis for {total_group_results} actions and {stages_count} stages over {self.analysis_execution_time} seconds'
+        )
          
         return summaries

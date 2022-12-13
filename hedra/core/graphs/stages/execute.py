@@ -47,7 +47,8 @@ class Execute(Stage, Generic[Unpack[T]]):
     async def run(self):
 
         config = self.client._config
-        await self.logger.spinner.append_message(f'Stage {self.name} executing - {config.batch_size} - VUs over {self.workers} threads for {config.total_time_string} using - {config.persona_type} - persona')
+        persona_type_name = config.persona_type.capitalize()
+        await self.logger.spinner.append_message(f'Stage {self.name} executing - {config.batch_size} - VUs over {self.workers} threads for {config.total_time_string} using - {persona_type_name} - persona')
 
         engine_plugins = self.plugins_by_type.get(PluginType.ENGINE)
         for plugin in engine_plugins.values():
@@ -102,10 +103,11 @@ class Execute(Stage, Generic[Unpack[T]]):
                 results.extend(result_set.get('results'))
                 elapsed_times.append(result_set.get('total_elapsed'))
 
+            total_results = len(results)
             total_elapsed = statistics.median(elapsed_times)
 
             await self.logger.spinner.set_default_message(
-                f'Completed - {len(results)} - actions at - {round(len(results)/total_elapsed)} actions/second'
+                f'Completed - {total_results} actions at  {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds'
             )
 
         else:
@@ -118,5 +120,6 @@ class Execute(Stage, Generic[Unpack[T]]):
 
         return {
             'results': results,
+            'total_results': total_results,
             'total_elapsed': total_elapsed
         }

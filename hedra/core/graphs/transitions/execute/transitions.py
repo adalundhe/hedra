@@ -1,5 +1,6 @@
 import asyncio
 import traceback
+from typing import Dict, List, Union
 from hedra.core.graphs.stages.stage import Stage
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -7,6 +8,7 @@ from hedra.core.graphs.transitions.exceptions import (
     StageExecutionError,
     StageTimeoutError
 )
+from hedra.core.engines.types.common.base_result import BaseResult
 
 
 async def execute_transition(current_stage: Stage, next_stage: Stage):
@@ -23,20 +25,22 @@ async def execute_transition(current_stage: Stage, next_stage: Stage):
     current_stage.total_concurrent_execute_stages = len(total_concurrent_execute_stages)
     
     if current_stage.timeout:
-        execution_results = await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
+        execution_results: Dict[str, Union[List[BaseResult], int, float]] = await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
 
     else:
-        execution_results = await current_stage.run()
+        execution_results: Dict[str, Union[List[BaseResult], int, float]] = await current_stage.run()
 
     if current_stage.context.results.get(current_stage.name) is None:
         current_stage.context.results[current_stage.name] = {
             'results': execution_results.get('results'),
+            'total_results': execution_results.get('total_results'),
             'total_elapsed': execution_results.get('total_elapsed')
         }
     
     else:
         current_stage.context.results[current_stage.name].update({
             'results': execution_results.get('results'),
+            'total_results': execution_results.get('total_results'),
             'total_elapsed': execution_results.get('total_elapsed')
         })
 

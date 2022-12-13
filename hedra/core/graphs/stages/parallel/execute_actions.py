@@ -293,6 +293,7 @@ def execute_actions(parallel_config: str):
 
         return {
             'results': results,
+            'total_results': len(results),
             'total_elapsed': persona.total_elapsed
         }
     except Exception as e:

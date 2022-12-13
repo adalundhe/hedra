@@ -96,8 +96,12 @@ class AsyncSpinner(Yaspin):
     def append_message(self, message: str) -> Coroutine[None]:
         return self.display.append_cli_message(message)
 
-    def set_default_message(self, message: str):
+    def set_default_message(self, message: str) -> Coroutine[None]:
         return self.display.clear_and_replace(message)
+
+    def set_message_at(self, message_index: int, message:str) -> None:
+        if message_index < len(self.display.cli_messages):
+            self.display.cli_messages[message_index] = message
 
     async def debug(self, message: str, *args: List[Any], **kwargs: Mapping[str, Any]) -> Task:
         
