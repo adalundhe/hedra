@@ -1,4 +1,4 @@
-from ctypes import Union
+import asyncio
 import dill
 import statistics
 from time import sleep
@@ -45,6 +45,12 @@ class Execute(Stage, Generic[Unpack[T]]):
 
     @Internal
     async def run(self):
+
+        config = self.client._config
+
+        await self.logger.console.aio.append_progress_message(
+            f'Stage {self.name} executing - {config.batch_size} - VUs over {self.workers} threads for {config.total_time_string} using - {config.persona_type} - persona'
+        )
 
         engine_plugins = self.plugins_by_type.get(PluginType.ENGINE)
         for plugin in engine_plugins.values():
@@ -101,8 +107,9 @@ class Execute(Stage, Generic[Unpack[T]]):
 
             total_elapsed = statistics.median(elapsed_times)
 
-            print(len(results))
-            print(len(results)/total_elapsed)
+            await self.logger.console.aio.set_default_message(
+                f'Completed - {len(results)} - actions at - {round(len(results)/total_elapsed)} actions/second'
+            )
 
         else:
 

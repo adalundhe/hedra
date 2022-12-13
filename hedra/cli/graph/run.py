@@ -19,7 +19,11 @@ from hedra.logging import (
 
 def run_graph(path: str, cpus: int, log_level: str, logfiles_directory: str):
 
-    logging_manager.disable(LoggerTypes.DISTRIBUTED)
+    logging_manager.disable(
+        LoggerTypes.DISTRIBUTED,
+        LoggerTypes.DISTRIBUTED_FILESYSTEM
+    )
+
     logging_manager.update_log_level(log_level)
     logging_manager.logfiles_directory = logfiles_directory
 
@@ -37,7 +41,7 @@ def run_graph(path: str, cpus: int, log_level: str, logfiles_directory: str):
     if os.path.isfile(graph_name):
         graph_name = Path(graph_name).stem
 
-    logger['console'].sync.info(f'Loading graph - {graph_name.capitalize()}.')
+    logger['console'].sync.info(f'Loading graph - {graph_name.capitalize()}\n')
 
     hedra_config_filepath = os.path.join(
         os.getcwd(),
@@ -88,15 +92,17 @@ def run_graph(path: str, cpus: int, log_level: str, logfiles_directory: str):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
+    logger.filesystem.sync.create_logfile('hedra.core.log')
+    logger.filesystem.create_filelogger('hedra.core.log')
+
     pipeline = Graph(
+        graph_name,
         list(discovered.values()),
         cpus=cpus
     )
 
-    logger['console'].sync.info(f'Validating graph - {graph_name.capitalize()}.')
-    pipeline.validate()
+    pipeline.assemble()
 
-    logger['console'].sync.info(f'Running graph - {graph_name.capitalize()}.')
     loop.run_until_complete(pipeline.run())
 
     os._exit(0)

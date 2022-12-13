@@ -10,13 +10,14 @@ class Config:
             if config_option_value is None:
                 del kwargs[config_option_name]
     
-        time_parser = TimeParser(
-            kwargs.get('total_time', '1m')
-        )
+        
+
+        self.total_time_string = kwargs.get('total_time', '1m')
+        parsed_time = TimeParser(self.total_time_string)
 
         self.log_level = kwargs.get('log_level', 'info')
         self.persona_type = kwargs.get('persona_type', 'default')
-        self.total_time = time_parser.time
+        self.total_time = parsed_time.time
         self.batch_size = kwargs.get('batch_size', 1000)
         self.batch_interval = kwargs.get('batch_interval')
         self.action_interval = kwargs.get('action_interval', 0)

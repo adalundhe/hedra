@@ -1,11 +1,16 @@
 
 import asyncio
-from turtle import pen
+import uuid
 import networkx
+import threading
+import os
+from yaspin.spinners import Spinners
 from typing import Dict, List
 from hedra.core.graphs.stages.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.transitions.transition import Transition
+from hedra.logging import HedraLogger
+from hedra.logging.graphics import cli_progress_manager, AsyncSpinner
 from .transitions import TransitionAssembler, local_transitions
 from .status import GraphStatus
 
@@ -14,13 +19,34 @@ from .status import GraphStatus
 class Graph:
     status = GraphStatus.IDLE
 
-    def __init__(self, stages: List[Stage], cpus: int=None, worker_id: int=None) -> None:
+    def __init__(
+        self, 
+        graph_name: str,
+        stages: List[Stage], 
+        cpus: int=None, 
+        worker_id: int=None
+    ) -> None:
         
+        self.graph_name = graph_name
+        self.graph_id = str(uuid.uuid4())
         self.status = GraphStatus.INITIALIZING
         self.graph = networkx.DiGraph()
+        self.logging = HedraLogger()
+        self._thread_id = threading.current_thread().ident
+        self._process_id = os.getpid()
+        self._graph_metadata_log_string = f'Graph - {self.graph_name}:{self.graph_id} - thread:{self._thread_id} - process:{self._process_id} - '
+
+        self.logging.initialize()
+
+        self.logging['hedra'].sync.debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.INITIALIZING.name} - from - {GraphStatus.IDLE.name}')
+        self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.INITIALIZING.name} - {GraphStatus.IDLE.name}')
+
         self.transitions_graph = []
         self._transitions: List[List[Transition]] = []
         self._results = None
+
+        self.logging['hedra'].sync.debug(f'{self._graph_metadata_log_string} - Found - {len(stages)} - stages')
+        self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Found - {len(stages)} - stages')
 
         self.stage_types = {
             subclass.stage_type: subclass for subclass in Stage.__subclasses__()
@@ -41,8 +67,16 @@ class Graph:
         ])
 
         for stage in stages:
+            
+            self.logging['hedra'].sync.debug(f'{self._graph_metadata_log_string} - Adding dependencies for stage - {stage.__name__}')
+            self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Adding dependencies for stage - {stage.__name__}')
+
             for dependency in stage.dependencies:
                 if self.graph.nodes.get(dependency.__name__):
+                    
+                    self.logging['hedra'].sync.debug(f'{self._graph_metadata_log_string} - Adding edge from stage - {dependency.__name__} - to stage - {stage.__name__}')
+                    self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Adding edge from stage - {dependency.__name__} - to stage - {stage.__name__}.')
+
                     self.graph.add_edge(dependency.__name__, stage.__name__)
 
         self.execution_order = [
@@ -55,77 +89,138 @@ class Graph:
             worker_id=worker_id
         )
 
-    def validate(self):
+        self.logging['hedra'].sync.debug(f'{self._graph_metadata_log_string} - Initialization complete\n')
+        self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Initialization complete')
 
-        self.status = GraphStatus.VALIDATING
+    def assemble(self):
+
+        self.status = GraphStatus.ASSEMBLING
+
+        self.logging['hedra'].sync.debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.ASSEMBLING.name} - from - {GraphStatus.INITIALIZING.name}')
+        self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.ASSEMBLING.name} - from - {GraphStatus.INITIALIZING.name}')
+
         # If we havent specified a Validate stage for save aggregated results,
         # append one.
         if len(self.instances.get(StageTypes.VALIDATE)) < 1:
+            self.logging['hedra'].sync.debug(f'{self._graph_metadata_log_string} - Prepending {StageTypes.VALIDATE.name} stage')
+            self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Prepending {StageTypes.VALIDATE.name} stage')
+
             self._prepend_stage(StageTypes.VALIDATE)
 
         # A user will never specify an Idle stage. Instead, we prepend one to 
         # serve as the source node for a graphs, ensuring graphs have a 
         # valid starting point and preventing the user from forgetting things
         # like a Setup stage.
+
+        self.logging['hedra'].sync.debug(f'{self._graph_metadata_log_string} - Prepending {StageTypes.IDLE.name} stage')
+        self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Prepending {StageTypes.IDLE.name} stage')
+
         self._prepend_stage(StageTypes.IDLE)
 
         # If we haven't specified an Analyze stage for results aggregation,
         # append one.
         if len(self.instances.get(StageTypes.ANALYZE)) < 1:
-           self._append_stage(StageTypes.ANALYZE)
+            self.logging['hedra'].sync.debug(f'{self._graph_metadata_log_string} - Appending {StageTypes.ANALYZE.name} stage')
+            self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Appending {StageTypes.ANALYZE.name} stage')
+
+            self._append_stage(StageTypes.ANALYZE)
 
         # If we havent specified a Submit stage for save aggregated results,
         # append one.
         if len(self.instances.get(StageTypes.SUBMIT)) < 1:
+            self.logging['hedra'].sync.debug(f'{self._graph_metadata_log_string} - Appending {StageTypes.SUBMIT.name} stage')
+            self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Appending {StageTypes.SUBMIT.name} stage')
+
             self._append_stage(StageTypes.SUBMIT)
 
         # Like Idle, a user will never specify a Complete stage. We append
         # one to serve as the sink node, ensuring all Graphs executed can
         # reach a single exit point.
+        self.logging['hedra'].sync.debug(f'{self._graph_metadata_log_string} - Appending {StageTypes.COMPLETE.name} stage')
+        self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Appending {StageTypes.COMPLETE.name} stage')
+
         self._append_stage(StageTypes.COMPLETE)
 
+        self.logging['hedra'].sync.debug(f'{self._graph_metadata_log_string} - Generating graph stages and transitions')
+        self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Generating graph stages and transitions')
+
         self.runner.generate_stages(self.stages)
-
         self._transitions = self.runner.build_transitions_graph(self.execution_order, self.graph)
-
         self.runner.map_to_setup_stages(self.graph)
 
-        self.status = GraphStatus.ASSEMBLING
+        self.logging['hedra'].sync.debug(f'{self._graph_metadata_log_string} - Assembly complete')
+        self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Assembly complete')
 
     async def run(self):
+
+        await self.logging['hedra'].aio.debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.RUNNING.name} - from - {GraphStatus.ASSEMBLING.name}')
+        await self.logging.filesystem.aio['hedra.core'].debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.RUNNING.name} - from - {GraphStatus.ASSEMBLING.name}')
         
         self.status = GraphStatus.RUNNING
 
         for transition_group in self._transitions:
-            for transtition in transition_group:
-                print(f'Executing {transtition.from_stage}')
+
+            current_stages = ', '.join([transition.from_stage.name for transition in transition_group])
+            await cli_progress_manager.append_cli_message(f"Executing stages - {current_stages}")
+            cli_progress_manager.start_cli_tasks()
+
+            async with self.logging.console.aio.create_spinner(
+                Spinners.bouncingBar, 
+                text=cli_progress_manager, 
+                color="cyan", 
+                attrs=["bold"]
+            ) as status_spinner:
                 
-            results = await asyncio.gather(*[
-                asyncio.create_task(transition.transition(
-                    transition.from_stage, 
-                    transition.to_stage
-                )) for transition in transition_group
-            ])
+                cli_progress_manager.spinner = status_spinner
 
-            for error, next_stage in results:
-                
-                if next_stage == StageTypes.ERROR:
+                for transition in transition_group:
 
-                    self.status = GraphStatus.FAILED
+                    await self.logging['hedra'].aio.debug(f'{self._graph_metadata_log_string} - Executing stage transition from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
+                    await self.logging.filesystem.aio['hedra.core'].info(f'{self._graph_metadata_log_string} - Executing stage transition from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
+                    await self.logging.filesystem.aio['hedra.core'].info(f'{self._graph_metadata_log_string} - Executing stage - {transition.from_stage.name}')
 
-                    print(f'Executing error transition -  {error.from_stage}')
+                results = await asyncio.gather(*[
+                    asyncio.create_task(transition.transition(
+                        transition.from_stage, 
+                        transition.to_stage
+                    )) for transition in transition_group
+                ])
 
-                    error_transtiton = self.runner.create_error_transition(error)
+                completed_transitions_count = len(results)
+                await self.logging['hedra'].aio.debug(f'{self._graph_metadata_log_string} - Completed -  {completed_transitions_count} - transitions')
+                await self.logging.filesystem.aio['hedra.core'].debug(f'{self._graph_metadata_log_string} - Completed -  {completed_transitions_count} - transitions')
 
-                    await error_transtiton.transition(
-                        error_transtiton.from_stage,
-                        error_transtiton.to_stage
-                    ) 
+                for error, next_stage in results:
                     
-            if self.status == GraphStatus.FAILED:
-                break
+                    if next_stage == StageTypes.ERROR:
+
+                        self.status = GraphStatus.FAILED
+
+                        await self.logging['hedra'].aio.debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.FAILED.name} - from - {GraphStatus.RUNNING.name}')
+                        await self.logging.filesystem.aio['hedra.core'].debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.FAILED.name} - from - {GraphStatus.RUNNING.name}')
+
+                        await self.logging['hedra'].aio.error(f'{self._graph_metadata_log_string} - Encountered error executing stage - {error.from_stage}')
+                        await self.logging.filesystem.aio['hedra.core'].error(f'{self._graph_metadata_log_string} - Encountered error executing stage - {error.from_stage}')
+
+                        error_transtiton = self.runner.create_error_transition(error)
+
+                        await error_transtiton.transition(
+                            error_transtiton.from_stage,
+                            error_transtiton.to_stage
+                        ) 
+                    
+                if self.status == GraphStatus.FAILED:
+                    await self.logging.console.aio.set_progress_fail('Error')
+                    break
+                
+                await self.logging.console.aio.set_progress_ok('✔')
+            
+            await cli_progress_manager.stop_cli_tasks()
         
         if self.status == GraphStatus.RUNNING:
+            await self.logging['hedra'].aio.debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.COMPLETE.name} - from - {GraphStatus.RUNNING.name}')
+            await self.logging.filesystem.aio['hedra.core'].debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.COMPLETE.name} - from - {GraphStatus.RUNNING.name}')
+
             self.status = GraphStatus.COMPLETE
 
         return self._results
@@ -146,8 +241,6 @@ class Graph:
                 transition.to_stage
             )) for transition in validation_stages
         ])
-
-        print(f'Graph at - {graph_path} - passed!')
 
     async def cleanup(self):
         pass

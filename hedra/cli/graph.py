@@ -24,8 +24,13 @@ def graph():
     default='info',
     help='Set log level.'
 )
-def run(path: str, cpus: int, log_level: str):
-    run_graph(path, cpus, log_level)
+@click.option(
+    '--log-directory',
+    default=f'{os.getcwd()}/logs',
+    help='Set log level.'
+)
+def run(path: str, cpus: int, log_level: str, log_directory: str):
+    run_graph(path, cpus, log_level, log_directory)
 
 
 @graph.command(help="Validate the specified test file.")
@@ -52,10 +57,5 @@ def check(path: str, log_level: str):
     default='info',
     help='Set log level.'
 )
-@click.option(
-    '--log-directory',
-    default=f'{os.getcwd()}/logs',
-    help='Set log level.'
-)
-def create(path: str, stages: str, log_level: str, log_directory: str):
-    create_graph(path, stages, log_level, log_directory)
+def create(path: str, stages: str, log_level: str):
+    create_graph(path, stages, log_level)

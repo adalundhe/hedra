@@ -11,7 +11,6 @@ from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.graphs.stages.parallel.batch_executor import BatchExecutor
 from hedra.core.graphs.transitions.exceptions.exceptions import IsolatedStageError
-from hedra.logging import HedraLogger, logging_manager
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.reporter.reporter_plugin import ReporterPlugin
 from hedra.plugins.types.plugin_types import PluginType
@@ -47,18 +46,12 @@ class TransitionAssembler:
         }
 
         for stage in self.generated_stages.values():
-
-            stage_logger = HedraLogger()
-            stage_logger.initialize(logging_manager.log_level)
-
             stage.workers = self.cpus
             stage.worker_id = self.worker_id
-            stage.logger = stage_logger
 
             methods = inspect.getmembers(stage, predicate=inspect.ismethod) 
 
             for _, method in methods:
-
                 method_name = method.__qualname__
                 hook: Hook = registrar.all.get(method_name)
                 

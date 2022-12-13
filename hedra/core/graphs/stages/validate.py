@@ -1,10 +1,11 @@
+import asyncio
 import inspect
-from inspect import iscoroutinefunction
 import os
 from pathlib import Path
 from types import MethodType
 from typing import Dict
 from collections import defaultdict
+from inspect import iscoroutinefunction
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.graphs.hooks.types.hook_types import HookType
@@ -48,6 +49,8 @@ class Validate(Stage):
         stages = {
             stage_type: stage for stage_type, stage in self.stages.items() if stage_type != StageTypes.VALIDATE
         }
+
+        await self.logger.console.aio.append_progress_message(f'Validating - {len(stages)} - stages')
         
         hooks_by_name: Dict[str, Hook] = defaultdict(dict)
         for stages_types in stages.values():
@@ -231,6 +234,10 @@ class Validate(Stage):
                     assert hook_for_validation is not None, f"Specified hook {hook_name} for stage {stage} not found for @validate hook {hook.name}"
 
                     await hook.call(hook_for_validation.call)
+
+            await self.logger.console.aio.set_default_message(
+                f'Validated - {len(stages)} stages'
+            )
 
         except AssertionError as hook_validation_error:
             raise HookValidationError(stage, str(hook_validation_error))

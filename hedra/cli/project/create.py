@@ -21,8 +21,10 @@ def create_project(
     logging_manager.disable(
         LoggerTypes.HEDRA, 
         LoggerTypes.DISTRIBUTED,
-        LoggerTypes.FILESYSTEM
+        LoggerTypes.FILESYSTEM,
+        LoggerTypes.DISTRIBUTED_FILESYSTEM
     )
+
     logging_manager.update_log_level(log_level)
 
     logger = HedraLogger()

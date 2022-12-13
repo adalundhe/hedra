@@ -2,6 +2,7 @@ import os
 import asyncio
 import datetime
 import aiofiles
+from typing import Dict
 from pathlib import Path
 from aiologger.levels import LogLevel
 from aiologger.formatters.base import Formatter
@@ -12,6 +13,7 @@ class AsyncFilesystemLogger:
 
     def __init__(
         self, 
+        logfiles_directory: str,
         log_level=LogLevel.NOTSET, 
         logger_enabled: bool = True,
         rotation_interval_type: RolloverInterval=RolloverInterval.DAYS,
@@ -25,40 +27,55 @@ class AsyncFilesystemLogger:
         self.rotation_interval = rotation_interval
         self.backups = backups
         self.rotation_time = rotation_time
-        self.files = {}
+        self.logfiles_directory: str = logfiles_directory
 
-    def __getitem__(self, filepath: str=None):
+        self.files: Dict[str, AsyncLogger] = {}
+        self.filepaths: Dict[str, str] = {}
 
-        file_logger = self.files.get(filepath)
+    def __getitem__(self, logger_name: str):
+
+        file_logger = self.files.get(logger_name)
+
         if file_logger is None:
-
-            logger_name = Path(filepath).stem
-
-            async_logger = AsyncLogger(
-                name=logger_name,
-                level=self.log_level,
-                logger_enabled=self.logger_enabled
+            file_logger = self._create_file_logger(
+                logger_name,
+                os.path.join(
+                    self.logfiles_directory,
+                    f'{logger_name}.log'
+                ) 
             )
 
-            async_file_handler = AsyncTimedRotatingFileHandler(
-                filepath,
-                when=self.rotation_interval_type,
-                interval=self.rotation_interval,
-                backup_count=self.backups,
-                at_time=self.rotation_time
-            )
+            self.files[logger_name] = file_logger
 
-            async_file_handler.formatter = Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(funcName)s:%(lineno)d - Thread: %(thread)d Process:%(process)d - %(message)s',
-                '%Y-%m-%dT%H:%M:%S.Z'
-            )
+        return file_logger
 
-            async_logger.add_handler(async_file_handler)
+    def _create_file_logger(self, logger_name: str, filepath: str) -> AsyncLogger:
+        async_logger = AsyncLogger(
+            name=logger_name,
+            level=self.log_level,
+            logger_enabled=self.logger_enabled
+        )
 
-        else:
-            return file_logger
+        async_file_handler = AsyncTimedRotatingFileHandler(
+            filepath,
+            when=self.rotation_interval_type,
+            interval=self.rotation_interval,
+            backup_count=self.backups,
+            at_time=self.rotation_time
+        )
 
-    async def create_logfile(self, filepath: str):
+        async_file_handler.formatter = Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(funcName)s:%(lineno)d - %(message)s',
+            '%Y-%m-%dT%H:%M:%S.%Z'
+        )
+
+        async_logger.add_handler(async_file_handler)
+
+        return async_logger
+
+    async def create_logfile(self, log_filename: str):
+
+        filepath = os.path.join(self.logfiles_directory, log_filename)
 
         loop = asyncio.get_event_loop()
         path_exists = await loop.run_in_executor(
@@ -70,3 +87,16 @@ class AsyncFilesystemLogger:
         if path_exists is False:
             async with aiofiles.open(filepath, 'w') as logfile:
                 await logfile.close()
+
+            self.update_files(filepath)
+
+        else:
+            self.update_files(filepath)
+
+    def update_files(self, filepath: str):
+        logger_name = Path(filepath).stem
+
+        if self.files.get(logger_name) is None:
+            self.files[logger_name] = self._create_file_logger(logger_name, filepath)
+            self.filepaths[logger_name] = filepath
+

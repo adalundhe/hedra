@@ -55,13 +55,13 @@ class LoggingManager:
             logger_type for logger_type, logger_enabled in self.enabled_loggers.items() if not logger_enabled
         ]
 
-    def list_enabled_names(self):
+    def list_enabled_type_names(self):
         enabled_loggers = self.list_enabled()
         return [
             self.logger_types.get_name(logger_type) for logger_type in enabled_loggers
         ]
 
-    def list_disabled_names(self):
+    def list_disabled_type_names(self):
         disabled_loggers = self.list_disabled()
         return [
             self.logger_types.get_name(logger_type) for logger_type in disabled_loggers

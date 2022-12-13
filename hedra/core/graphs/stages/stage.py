@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Dict, List, Union, Optional
+from typing import Any, Dict, List, Union
 from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.graphs.hooks.types.internal import Internal
 from hedra.core.graphs.hooks.types.hook_types import HookType
@@ -37,7 +37,8 @@ class Stage:
         self.allow_parallel = False
         self.executor: BatchExecutor = None
         self.plugins_by_type: Dict[PluginType, Dict[str, Union[EnginePlugin, ReporterPlugin]]] = {}
-        self.logger: Optional[HedraLogger] = None
+        self.logger: HedraLogger = HedraLogger()
+        self.logger.initialize()
 
         if self.stage_timeout:
             time_parser = TimeParser(self.stage_timeout)

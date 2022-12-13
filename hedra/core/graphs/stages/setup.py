@@ -1,7 +1,6 @@
 import asyncio
-import traceback
-from typing_extensions import TypeVarTuple, Unpack
 import psutil
+from typing_extensions import TypeVarTuple, Unpack
 from typing import Dict, Generic
 from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.graphs.hooks.types.hook_types import HookType
@@ -69,6 +68,10 @@ class Setup(Stage, Generic[Unpack[T]]):
         execute_stage_id = 1
 
         stages = dict(self.stages)
+
+        execute_stage_names = ', '.join(list(stages.keys()))
+
+        await self.logger.console.aio.append_progress_message(f'Setting up - {execute_stage_names}')
         
         for execute_stage_name, execute_stage in stages.items():
 
@@ -99,7 +102,6 @@ class Setup(Stage, Generic[Unpack[T]]):
             )
    
             client = Client()
-
             engine_plugins: Dict[str, EnginePlugin] = self.plugins_by_type.get(PluginType.ENGINE)
 
             for plugin_name, plugin in engine_plugins.items():
@@ -175,6 +177,8 @@ class Setup(Stage, Generic[Unpack[T]]):
                 await setup_hook.call()
 
             self.stages[execute_stage_name] = execute_stage
+
+        await self.logger.console.aio.set_default_message(f'Setup for - {execute_stage_names} - complete')
 
         return self.stages
 

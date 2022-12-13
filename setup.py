@@ -27,6 +27,7 @@ setup(
     install_requires=[
         'aiologger',
         'aiologger[aiofiles]',
+        'yaspin',
         'attr',
         'networkx',
         'aiodns',

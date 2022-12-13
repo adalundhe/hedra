@@ -16,7 +16,8 @@ def create_graph(path: str, stages: Optional[str], log_level: str):
     logging_manager.disable(
         LoggerTypes.HEDRA, 
         LoggerTypes.DISTRIBUTED,
-        LoggerTypes.FILESYSTEM
+        LoggerTypes.FILESYSTEM,
+        LoggerTypes.DISTRIBUTED_FILESYSTEM
     )
     logging_manager.update_log_level(log_level)
 
