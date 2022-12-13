@@ -10,7 +10,7 @@ from hedra.core.graphs.stages.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.transitions.transition import Transition
 from hedra.logging import HedraLogger
-from hedra.logging.graphics import cli_progress_manager, AsyncSpinner
+from hedra.logging.graphics import cli_progress_manager
 from .transitions import TransitionAssembler, local_transitions
 from .status import GraphStatus
 
