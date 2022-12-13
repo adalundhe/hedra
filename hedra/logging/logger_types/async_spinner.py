@@ -5,6 +5,7 @@ import time
 import signal
 import functools
 import inspect
+from enum import Enum
 from os import get_terminal_size
 from typing import List, Mapping, Any, Dict, Coroutine
 from asyncio import Task
@@ -16,6 +17,11 @@ from hedra.logging.spinner import ProgressText
 from yaspin.helpers import to_unicode
 from .async_logger import AsyncLogger
 from .logger_types import LoggerTypes
+
+
+class LoggerMode(Enum):
+    CONSOLE='console'
+    SYSTEM='system'
 
 
 async def default_handler(signame: str,spinner: AsyncSpinner):  # pylint: disable=unused-argument
@@ -72,24 +78,31 @@ class AsyncSpinner(Yaspin):
 
         self.enabled = enabled
         self.logger_enabled = True
+        self.logger_mode = LoggerMode.CONSOLE
 
         self._stdout_lock = asyncio.Lock()
         self._loop = asyncio.get_event_loop()
 
     @property
     def console(self):
-        for handler in self.logger.handlers:
-            handler.formatter = Formatter('%(message)s')
+        if self.logger_mode == LoggerMode.SYSTEM:
+            for handler in self.logger.handlers:
+                handler.formatter = Formatter('%(message)s')
+
+            self.logger_mode = LoggerMode.CONSOLE
 
         return self
 
     @property
     def system(self):
-        for handler in self.logger.handlers:
-            handler.formatter = Formatter(
-                    '%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(funcName)s:%(lineno)d - %(message)s',
-                    datefmt='%Y-%m-%dT%H:%M:%S.%Z'
-            )
+        if self.logger_mode == LoggerMode.CONSOLE:
+            for handler in self.logger.handlers:
+                handler.formatter = Formatter(
+                        '%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(funcName)s:%(lineno)d - %(message)s',
+                        datefmt='%Y-%m-%dT%H:%M:%S.%Z'
+                )
+
+            self.logger_mode = LoggerMode.SYSTEM
 
         return self
 
@@ -106,6 +119,7 @@ class AsyncSpinner(Yaspin):
     async def debug(self, message: str, *args: List[Any], **kwargs: Mapping[str, Any]) -> Task:
         
         if self.logger_enabled:
+            await self._stdout_lock.acquire()
             await self._clear_line()
 
             # Ensure output is Unicode
@@ -117,13 +131,14 @@ class AsyncSpinner(Yaspin):
             )
 
             self._cur_line_len = 0
+            self._stdout_lock.release()
 
             return log_result
 
     async def info(self, message: str, *args: List[Any], **kwargs: Mapping[str, Any]) -> Task:
 
         if self.logger_enabled:
-            
+            await self._stdout_lock.acquire()
             await self._clear_line()
 
             # Ensure output is Unicode
@@ -135,13 +150,14 @@ class AsyncSpinner(Yaspin):
             )
 
             self._cur_line_len = 0
+            self._stdout_lock.release()
             
             return log_result
 
     async def warning(self, message: str, *args: List[Any], **kwargs: Mapping[str, Any]) -> Task:
         
         if self.logger_enabled:
-            
+            await self._stdout_lock.acquire()
             await self._clear_line()
 
             # Ensure output is Unicode
@@ -153,12 +169,12 @@ class AsyncSpinner(Yaspin):
             )
 
             self._cur_line_len = 0
-            
+            self._stdout_lock.release()
             return log_result
 
     async def warn(self, message: str, *args: List[Any], **kwargs: Mapping[str, Any]) -> Task:
         if self.logger_enabled:  
-            
+            await self._stdout_lock.acquire()
             await self._clear_line()
 
             # Ensure output is Unicode
@@ -170,13 +186,13 @@ class AsyncSpinner(Yaspin):
             )
 
             self._cur_line_len = 0
-            
+            self._stdout_lock.release()
             return log_result
 
     async def error(self, message: str, *args: List[Any], **kwargs: Mapping[str, Any]) -> Task:
         
         if self.logger_enabled:
-            
+            await self._stdout_lock.acquire()
             await self._clear_line()
 
             # Ensure output is Unicode
@@ -188,13 +204,13 @@ class AsyncSpinner(Yaspin):
             )
 
             self._cur_line_len = 0
-            
+            self._stdout_lock.release()
             return log_result
 
     async def critical(self, message: str, *args: List[Any], **kwargs: Mapping[str, Any]) -> Task:
         
         if self.logger_enabled:
-            
+            await self._stdout_lock.acquire()
             await self._clear_line()
 
             # Ensure output is Unicode
@@ -206,13 +222,13 @@ class AsyncSpinner(Yaspin):
             )
 
             self._cur_line_len = 0
-            
+            self._stdout_lock.release()
             return log_result
     
     async def fatal(self, message: str, *args: List[Any], **kwargs: Mapping[str, Any]) -> Task:
         
         if self.logger_enabled:
-            
+            await self._stdout_lock.acquire()
             await self._clear_line()
 
             # Ensure output is Unicode
@@ -224,7 +240,7 @@ class AsyncSpinner(Yaspin):
             )
 
             self._cur_line_len = 0
-            
+            self._stdout_lock.release()
             return log_result
 
     async def __aenter__(self):
@@ -319,7 +335,7 @@ class AsyncSpinner(Yaspin):
             """Write text in the terminal without breaking the spinner."""
             # similar to tqdm.write()
             # https://pypi.python.org/pypi/tqdm#writing-messages
-                
+            await self._stdout_lock.acquire()
             await self._clear_line()
 
             if isinstance(text, (str, bytes)):
@@ -336,7 +352,8 @@ class AsyncSpinner(Yaspin):
                 
             )
 
-            self._cur_line_len = 0      
+            self._cur_line_len = 0    
+            self._stdout_lock.release()  
 
     async def ok(self, text="OK"):
         if self.enabled:
@@ -375,7 +392,8 @@ class AsyncSpinner(Yaspin):
                 # Wait a bit to avoid wasting cycles
                 await asyncio.sleep(self._interval)
                 continue
-
+            
+            await self._stdout_lock.acquire()
             terminal_size = await self._loop.run_in_executor(
                 None,
                 get_terminal_size
@@ -413,6 +431,8 @@ class AsyncSpinner(Yaspin):
 
             except asyncio.TimeoutError:
                 pass
+
+            self._stdout_lock.release()
 
     async def _clear_line(self):
         if sys.stdout.isatty():

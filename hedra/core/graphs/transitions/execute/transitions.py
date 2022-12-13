@@ -9,11 +9,15 @@ from hedra.core.graphs.transitions.exceptions import (
     StageTimeoutError
 )
 from hedra.core.engines.types.common.base_result import BaseResult
+from hedra.logging import HedraLogger
 
 
-async def execute_transition(current_stage: Stage, next_stage: Stage):
+async def execute_transition(current_stage: Stage, next_stage: Stage, logger: HedraLogger):
 
     execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE)
+
+    await logger.spinner.system.debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
+    await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
 
     total_concurrent_execute_stages = []
     for generation_stage_name in current_stage.generation_stage_names:
@@ -46,6 +50,9 @@ async def execute_transition(current_stage: Stage, next_stage: Stage):
 
     current_stage.context.results_stages.append(current_stage)
     current_stage.context.visited.append(current_stage.name)
+
+    await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
+    await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
     
     next_stage.context = current_stage.context
 
@@ -53,6 +60,9 @@ async def execute_transition(current_stage: Stage, next_stage: Stage):
 
 
 async def execute_to_setup_transition(current_stage: Stage, next_stage: Stage):
+
+    logger = HedraLogger()
+    logger.initialize()
 
     try:
         valid_states = [
@@ -63,7 +73,7 @@ async def execute_to_setup_transition(current_stage: Stage, next_stage: Stage):
         if current_stage.state in valid_states:
             current_stage.state = StageStates.EXECUTING
 
-            current_stage, next_stage = await execute_transition(current_stage, next_stage)
+            current_stage, next_stage = await execute_transition(current_stage, next_stage, logger)
             execute_stages = list(current_stage.context.stages.get(StageTypes.EXECUTE).values())
             visited = current_stage.context.visited
 
@@ -72,6 +82,10 @@ async def execute_to_setup_transition(current_stage: Stage, next_stage: Stage):
                     stage.state = StageStates.INITIALIZED
 
             current_stage.state = StageStates.EXECUTED
+
+        else:
+            await logger.spinner.system.debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
 
     except asyncio.TimeoutError:
         return StageTimeoutError(current_stage), StageTypes.ERROR
@@ -86,6 +100,9 @@ async def execute_to_setup_transition(current_stage: Stage, next_stage: Stage):
 
 async def execute_to_execute_transition(current_stage: Stage, next_stage: Stage):
 
+    logger = HedraLogger()
+    logger.initialize()
+
     try:
         valid_states = [
             StageStates.SETUP,
@@ -95,9 +112,13 @@ async def execute_to_execute_transition(current_stage: Stage, next_stage: Stage)
         if current_stage.state in valid_states:
             current_stage.state = StageStates.EXECUTING
 
-            current_stage, next_stage = await execute_transition(current_stage, next_stage)
+            current_stage, next_stage = await execute_transition(current_stage, next_stage, logger)
 
             current_stage.state = StageStates.EXECUTED
+
+        else:
+            await logger.spinner.system.debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
 
     except asyncio.TimeoutError:
         return StageTimeoutError(current_stage), StageTypes.ERROR
@@ -112,6 +133,9 @@ async def execute_to_execute_transition(current_stage: Stage, next_stage: Stage)
 
 async def execute_to_optimize_transition(current_stage: Stage, next_stage: Stage):
     
+    logger = HedraLogger()
+    logger.initialize()
+
     try:
         valid_states = [
             StageStates.SETUP,
@@ -121,9 +145,13 @@ async def execute_to_optimize_transition(current_stage: Stage, next_stage: Stage
         if current_stage.state in valid_states:
             current_stage.state = StageStates.EXECUTING
 
-            current_stage, next_stage = await execute_transition(current_stage, next_stage)
+            current_stage, next_stage = await execute_transition(current_stage, next_stage, logger)
 
             current_stage.state = StageStates.EXECUTED
+
+        else:
+            await logger.spinner.system.debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
             
     except asyncio.TimeoutError:
         return StageTimeoutError(current_stage), StageTypes.ERROR
@@ -138,6 +166,9 @@ async def execute_to_optimize_transition(current_stage: Stage, next_stage: Stage
 
 async def execute_to_teardown_transition(current_stage: Stage, next_stage: Stage):
 
+    logger = HedraLogger()
+    logger.initialize()
+
     try:
 
         valid_states = [
@@ -151,6 +182,10 @@ async def execute_to_teardown_transition(current_stage: Stage, next_stage: Stage
             current_stage, next_stage = await execute_transition(current_stage, next_stage)
 
             current_stage.state = StageStates.EXECUTED
+
+        else:
+            await logger.spinner.system.debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
             
     except asyncio.TimeoutError:
         return StageTimeoutError(current_stage), StageTypes.ERROR
@@ -165,6 +200,9 @@ async def execute_to_teardown_transition(current_stage: Stage, next_stage: Stage
 
 async def execute_to_analyze_transition(current_stage: Stage, next_stage: Stage):
 
+    logger = HedraLogger()
+    logger.initialize()
+
     try:
         
         valid_states = [
@@ -178,13 +216,15 @@ async def execute_to_analyze_transition(current_stage: Stage, next_stage: Stage)
             current_stage, next_stage = await execute_transition(current_stage, next_stage)
 
             current_stage.state = StageStates.EXECUTED
+
+        else:
+            await logger.spinner.system.debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
             
     except asyncio.TimeoutError:
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
-        print(traceback.format_exc())
-        exit(0)
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     current_stage = None
@@ -193,6 +233,9 @@ async def execute_to_analyze_transition(current_stage: Stage, next_stage: Stage)
 
 
 async def execute_to_checkpoint_transition(current_stage: Stage, next_stage: Stage):
+
+    logger = HedraLogger()
+    logger.initialize()
 
     try:
 
@@ -210,6 +253,10 @@ async def execute_to_checkpoint_transition(current_stage: Stage, next_stage: Sta
             next_stage.previous_stage = current_stage.name
 
             current_stage.state = StageStates.EXECUTED
+
+        else:
+            await logger.spinner.system.debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
             
     except asyncio.TimeoutError:
         return StageTimeoutError(current_stage), StageTypes.ERROR
@@ -223,6 +270,9 @@ async def execute_to_checkpoint_transition(current_stage: Stage, next_stage: Sta
 
 
 async def execute_to_wait_transition(current_stage: Stage, next_stage: Stage):
+
+    logger = HedraLogger()
+    logger.initialize()
 
     try:
 
@@ -240,6 +290,10 @@ async def execute_to_wait_transition(current_stage: Stage, next_stage: Stage):
             next_stage.previous_stage = current_stage.name
 
             current_stage.state = StageStates.EXECUTED
+
+        else:
+            await logger.spinner.system.debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
             
     except asyncio.TimeoutError:
         return StageTimeoutError(current_stage), StageTypes.ERROR

@@ -1,4 +1,6 @@
 from __future__ import annotations
+import threading
+import os
 from typing import Any, Dict, List, Union
 from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.graphs.hooks.types.internal import Internal
@@ -37,8 +39,12 @@ class Stage:
         self.allow_parallel = False
         self.executor: BatchExecutor = None
         self.plugins_by_type: Dict[PluginType, Dict[str, Union[EnginePlugin, ReporterPlugin]]] = {}
+
         self.logger: HedraLogger = HedraLogger()
         self.logger.initialize()
+
+        self.graph_name: str = None
+        self.graph_id: str = None
 
         if self.stage_timeout:
             time_parser = TimeParser(self.stage_timeout)
@@ -51,3 +57,15 @@ class Stage:
     @Internal
     async def run(self):
         pass
+
+    @property
+    def thread_id(self) -> int:
+        return threading.current_thread().ident
+
+    @property
+    def process_id(self) -> int:
+        return os.getpid()
+
+    @property
+    def metadata_string(self):
+        return f'Graph - {self.graph_name}:{self.graph_id} - thread:{self.thread_id} - process:{self.process_id} - '

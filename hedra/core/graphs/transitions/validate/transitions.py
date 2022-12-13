@@ -11,13 +11,21 @@ from hedra.core.graphs.stages.exceptions import (
     ReservedMethodError,
     MissingReservedMethodError
 )
+from hedra.logging import HedraLogger
 
 
 async def validate_to_setup_transition(current_stage: Stage, next_stage: Stage):
 
+    logger = HedraLogger()
+    logger.initialize()
+
     try:
 
         if current_stage.state == StageStates.INITIALIZED:
+
+            await logger.spinner.system.debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
+
             current_stage.state = StageStates.VALIDATING
             current_stage.stages = current_stage.context.stages
             
@@ -28,6 +36,13 @@ async def validate_to_setup_transition(current_stage: Stage, next_stage: Stage):
                 await current_stage.run()
             
             current_stage.state = StageStates.VALIDATED
+
+            await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
+
+        else:
+            await logger.spinner.system.debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
 
         next_stage.state = StageStates.VALIDATED
         next_stage.context = current_stage.context

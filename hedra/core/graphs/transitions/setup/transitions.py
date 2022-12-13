@@ -7,9 +7,17 @@ from hedra.core.graphs.transitions.exceptions import (
     StageExecutionError,
     StageTimeoutError
 )
+from hedra.logging import HedraLogger
 
 
 async def setup_transition(current_stage: Stage, next_stage: Stage):
+
+    logger = HedraLogger()
+    logger.initialize()
+
+    await logger.spinner.system.debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
+    await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
+
     execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE).items()
     paths = current_stage.context.paths.get(current_stage.name)
     path_lengths = current_stage.context.path_lengths.get(current_stage.name)
@@ -85,6 +93,9 @@ async def setup_transition(current_stage: Stage, next_stage: Stage):
         execute_stage.state = StageStates.SETUP
 
     current_stage.context.stages[StageTypes.EXECUTE].update(setup_results)
+
+    await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
+    await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
 
     next_stage.context = current_stage.context
     current_stage = None

@@ -106,17 +106,18 @@ class Execute(Stage, Generic[Unpack[T]]):
             total_results = len(results)
             total_elapsed = statistics.median(elapsed_times)
 
-            await self.logger.spinner.set_default_message(
-                f'Completed - {total_results} actions at  {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds'
-            )
-
         else:
 
             persona = get_persona(self.client._config)
             persona.setup(self.hooks)
 
             results = await persona.execute()
+            total_results = len(results)
             total_elapsed = persona.total_elapsed
+
+        await self.logger.spinner.set_default_message(
+            f'Completed - {total_results} actions at  {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds'
+        )
 
         return {
             'results': results,

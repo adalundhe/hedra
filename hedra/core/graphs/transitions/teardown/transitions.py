@@ -8,8 +8,14 @@ from hedra.core.graphs.transitions.exceptions import (
     StageExecutionError,
     StageTimeoutError
 )
+from hedra.logging import HedraLogger
+
 
 async def teardown_transition(current_stage: Stage, next_stage: Stage):
+
+    logger = HedraLogger()
+    logger.initialize()
+
     teardown_hooks = []
     execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE).values()
     paths = current_stage.context.paths
@@ -19,6 +25,9 @@ async def teardown_transition(current_stage: Stage, next_stage: Stage):
     ]
     
     if current_stage.state == StageStates.INITIALIZED:
+
+        await logger.spinner.system.debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
+        await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
 
         current_stage.state = StageStates.TEARDOWN_INITIALIZED
 
@@ -47,6 +56,13 @@ async def teardown_transition(current_stage: Stage, next_stage: Stage):
                 stage.state = StageStates.TEARDOWN_COMPLETE
 
         current_stage.state = StageStates.TEARDOWN_COMPLETE
+        
+        await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
+        await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
+
+    else:
+        await logger.spinner.system.debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
+        await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
 
     next_stage.context = current_stage.context
 

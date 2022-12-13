@@ -7,11 +7,19 @@ from hedra.core.graphs.transitions.exceptions import (
     StageExecutionError,
     StageTimeoutError
 )
+from hedra.logging import HedraLogger
 
 
 async def submit_transition(current_stage: Stage, next_stage: Stage):
 
+    logger = HedraLogger()
+    logger.initialize()
+
     if current_stage.state == StageStates.INITIALIZED:
+
+        await logger.spinner.system.debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
+        await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
+
         current_stage.state = StageStates.SUBMITTING
         
         current_stage.summaries = current_stage.context.summaries
@@ -24,6 +32,13 @@ async def submit_transition(current_stage: Stage, next_stage: Stage):
 
         current_stage.state = StageStates.SUBMITTED
         next_stage.state = StageStates.SUBMITTED
+
+        await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
+        await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
+
+    else:
+        await logger.spinner.system.debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
+        await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
     
     next_stage.context = current_stage.context
 

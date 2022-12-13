@@ -1,8 +1,9 @@
 import asyncio
-from ctypes import Union
 import networkx
 import inspect
-from typing import Coroutine, Dict, List, Tuple
+import threading
+import os
+from typing import Coroutine, Dict, List, Tuple, Union
 from hedra.core.graphs.stages.stage import Stage
 from hedra.core.graphs.stages.error import Error
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -11,6 +12,7 @@ from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.graphs.stages.parallel.batch_executor import BatchExecutor
 from hedra.core.graphs.transitions.exceptions.exceptions import IsolatedStageError
+from hedra.logging import HedraLogger
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.reporter.reporter_plugin import ReporterPlugin
 from hedra.plugins.types.plugin_types import PluginType
@@ -25,8 +27,17 @@ from .idle import (
 
 class TransitionAssembler:
 
-    def __init__(self, transition_types, cpus: int=None, worker_id: int=None) -> None:
+    def __init__(
+        self, 
+        transition_types, 
+        graph_name: str=None,
+        graph_id: str=None,
+        cpus: int=None, 
+        worker_id: int=None
+    ) -> None:
         self.transition_types: Dict[Tuple[StageTypes, StageTypes], Coroutine] = transition_types
+        self.graph_name = graph_name
+        self.graph_id = graph_id
         self.generated_stages = {}
         self.transitions = {}
         self.instances_by_type: Dict[str, List[Stage]] = {}
@@ -34,18 +45,38 @@ class TransitionAssembler:
         self.worker_id = worker_id
         self.loop = asyncio.get_event_loop()
 
+        self.logging = HedraLogger()
+        self.logging.initialize()
+
+        self._thread_id = threading.current_thread().ident
+        self._process_id = os.getpid()
+
+        self._graph_metadata_log_string = f'Graph - {self.graph_name}:{self.graph_id} - thread:{self._thread_id} - process:{self._process_id} - '
+
     def generate_stages(self, stages: Dict[str, Stage]):
+
+        stages_count = len(stages)
+        self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Generating - {stages_count} - stages')
+        self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Generating - {stages_count} - stages')
 
         self.instances_by_type = {}
 
         for stage in stages.values():
             self.instances_by_type[stage.stage_type] = []
 
+        stage_types_count = len(self.instances_by_type)
+        self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Found - {stage_types_count} - unique stage types')
+        self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Found - {stage_types_count} - unique stage types')
+
         self.generated_stages: Dict[str, Stage] = {
             stage_name: stage() for stage_name, stage in stages.items()
         }
 
         for stage in self.generated_stages.values():
+            
+            stage.graph_name = self.graph_name
+            stage.graph_id = self.graph_id
+
             stage.workers = self.cpus
             stage.worker_id = self.worker_id
 
@@ -61,7 +92,13 @@ class TransitionAssembler:
 
             self.instances_by_type[stage.stage_type].append(stage)
 
+            self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Successfully generated - {stages_count} - stages')
+            self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Successfully generated - {stages_count} - stages')
+
     def build_transitions_graph(self, topological_generations: List[List[str]], graph: networkx.Graph):
+
+        self.logging.hedra.sync.debug(f'Buiding transitions matrix')
+        self.logging.filesystem.sync['hedra.core'].debug(f'Buiding transitions matrix')
 
         transitions: List[List[Transition]] = []
         plugins: Dict[PluginType, Dict[str, Union[EnginePlugin, ReporterPlugin]]] = {
@@ -92,6 +129,10 @@ class TransitionAssembler:
                 StageTypes.IDLE
             ]
 
+            stages_count = len(stages)
+            self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Provisioning workers - {stages_count} - stages')
+            self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Provisioning workers- {stages_count} - stages')
+
             for stage in stages.values():
 
                 for plugin_name, plugin in stage.plugins.items():
@@ -100,6 +141,9 @@ class TransitionAssembler:
                 if stage.allow_parallel is False and stage.stage_type not in no_workers_stages:
                     stage.workers = 1
                     stage_pool_size -= 1
+
+                    self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Stage - {stage.name} - provisioned - {stage.workers} - workers')
+                    self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Stage - {stage.name} - provisioned - {stage.workers} - workers')
 
                     stage.executor = BatchExecutor(stage.workers)
 
@@ -115,6 +159,10 @@ class TransitionAssembler:
                 batched_stages: List[Tuple[str, Stage, int]] = batch_executor.partion_stage_batches(parallel_stages)
                 
                 for _, stage, assigned_workers_count in batched_stages:
+
+                    self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Stage - {stage.name} - provisioned - {assigned_workers_count} - workers')
+                    self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Stage - {stage.name} - provisioned - {assigned_workers_count} - workers')
+
                     stage.workers = assigned_workers_count
                     stage.executor = BatchExecutor(max_workers=assigned_workers_count)
 
@@ -124,7 +172,11 @@ class TransitionAssembler:
 
                 stage.plugins_by_type = plugins
 
-                neighbors = graph.neighbors(stage.name)
+                neighbors = list(graph.neighbors(stage.name))
+
+                neighbors_count = len(neighbors)
+                self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Discovered - {neighbors_count} - neighboring stages for stage - {stage.name}')
+                self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Discovered - {neighbors_count} - neighboring stages for stage - {stage.name}')
                 
                 for neighbor in neighbors:
                     neighbor_stage = self.generated_stages.get(neighbor)
@@ -141,6 +193,9 @@ class TransitionAssembler:
 
                         raise invalid_transition_error
 
+                    self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Created transition from - {stage.name} - to - {neighbor_stage.name}')
+                    self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Created transition from - {stage.name} - to - {neighbor_stage.name}')
+
                     transition = Transition(
                         transition_action,
                         stage,
@@ -152,9 +207,15 @@ class TransitionAssembler:
             if len(generation_transitions) > 0:
                 transitions.append(generation_transitions)
 
+        self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Transition matrix assemmbly complete')
+        self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Transition matrix assemmbly complete')
+
         return transitions
 
     def map_to_setup_stages(self, graph: networkx.DiGraph):
+
+        self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Mapping stages to requisite Setup stages')
+        self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Mapping stages to requisite Setup stages')
         
         idle_stages = self.instances_by_type.get(StageTypes.IDLE)
         for idle_stage in idle_stages:
@@ -205,6 +266,10 @@ class TransitionAssembler:
                         stage_path_lengths[path_stage_name] = path_lengths_set
 
                     idle_stage.context.path_lengths[stage_name] = stage_path_lengths.get(stage_name)
+
+            
+        self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')
+        self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')
     
     def create_error_transition(self, error: Exception):
 

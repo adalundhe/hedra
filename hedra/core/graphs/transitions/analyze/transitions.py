@@ -7,10 +7,19 @@ from hedra.core.graphs.transitions.exceptions import (
     StageExecutionError,
     StageTimeoutError
 )
+from hedra.logging import HedraLogger
 
 
 async def analyze_transition(current_stage: Stage, next_stage: Stage):
+
+    logger = HedraLogger()
+    logger.initialize()
+
     if current_stage.state == StageStates.INITIALIZED:
+
+        await logger.spinner.system.debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
+        await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
+        
         current_stage.state = StageStates.ANALYZING
 
         raw_results = current_stage.context.results
@@ -46,6 +55,13 @@ async def analyze_transition(current_stage: Stage, next_stage: Stage):
         current_stage.state = StageStates.ANALYZED
 
         next_stage.context = current_stage.context
+
+        await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
+        await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
+
+    else:
+        await logger.spinner.system.debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
+        await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
         
 
 async def analyze_to_checkpoint_transition(current_stage: Stage, next_stage: Stage):
@@ -78,7 +94,6 @@ async def analyze_to_submit_transition(current_stage: Stage, next_stage: Stage):
         return StageTimeoutError(current_stage), StageTypes.ERROR
     
     except Exception as stage_runtime_error:
-        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_runtime_error)), StageTypes.ERROR
 
     current_stage = None

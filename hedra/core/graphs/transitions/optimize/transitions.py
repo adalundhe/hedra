@@ -8,9 +8,16 @@ from hedra.core.graphs.transitions.exceptions import (
     StageExecutionError,
     StageTimeoutError
 )
+from hedra.logging import HedraLogger
 
 
 async def optimize_transition(current_stage: Stage, next_stage: Stage):
+
+    logger = HedraLogger()
+    logger.initialize()
+
+    await logger.spinner.system.debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
+    await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
 
     execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE).items()
     paths = current_stage.context.paths.get(current_stage.name)
@@ -45,6 +52,9 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
 
     next_stage.context.optimized_params = optimization_results
     next_stage.state = StageStates.OPTIMIZED
+
+    await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
+    await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
 
     next_stage.context = current_stage.context
 
