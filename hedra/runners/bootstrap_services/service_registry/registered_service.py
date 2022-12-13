@@ -2,16 +2,12 @@ import imp
 
 
 import uuid
-from easy_logger import Logger
 from .service_node import ServiceNode
 
 
 class RegisteredService:
 
     def __init__(self, expected_leaders) -> None:
-
-        logger = Logger()
-        self.session_logger = logger.generate_logger()
 
         self.service_id = str(uuid.uuid4())
         self.registered_nodes = {}

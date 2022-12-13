@@ -19,6 +19,7 @@ try:
 except Exception:
     PrometheusConfig = None
     has_connector = False
+    basic_auth_handler = lambda: None
 
 
 class Prometheus:

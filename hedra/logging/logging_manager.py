@@ -1,5 +1,6 @@
 from typing import List
 from aiologger.levels import LogLevel
+from .spinner import ProgressText
 from .logger_types import (
     LoggerTypes,
     LoggerTypesMap
@@ -29,6 +30,7 @@ class LoggingManager:
         self.log_level = LogLevel.INFO
         self.log_level_name = 'info'
         self.logfiles_directory = None
+        self.progress_display = ProgressText()
 
     def update_log_level(self, log_level_name: str):
         self.log_level = self.log_levels.get(log_level_name, LogLevel.INFO)

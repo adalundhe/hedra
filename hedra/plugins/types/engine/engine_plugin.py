@@ -24,7 +24,7 @@ R = TypeVar('R')
 class EnginePlugin(Generic[A, R], Plugin):
     action: Action[A] = None
     result: Result[R] = None
-    event: Union[Event] = Event
+    event: Union[Event[Result[R]]] = Event
     security_context: Any = None
     initialized: bool = False
     type=PluginType.ENGINE

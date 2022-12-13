@@ -1,5 +1,5 @@
 import asyncio
-from easy_logger import Logger
+
 from hedra.runners.leader_services.job_registry import job
 
 from hedra.runners.worker_services.proto.worker_pb2 import JobCompleteResponse

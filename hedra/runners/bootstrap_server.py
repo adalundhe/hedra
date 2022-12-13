@@ -1,13 +1,10 @@
 import asyncio
-from easy_logger import Logger
 from .bootstrap_services import BootstrapManager
 
 
 class BootstrapServer:
 
     def __init__(self, config) -> None:
-        logger = Logger()
-        self.session_logger = logger.generate_logger()
         self.manager = BootstrapManager(config)
         self.loop = None
 

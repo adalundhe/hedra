@@ -10,7 +10,6 @@ from hedra.core.graphs.stages.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.transitions.transition import Transition
 from hedra.logging import HedraLogger
-from hedra.logging.graphics import cli_progress_manager
 from .transitions import TransitionAssembler, local_transitions
 from .status import GraphStatus
 
@@ -161,17 +160,9 @@ class Graph:
         for transition_group in self._transitions:
 
             current_stages = ', '.join([transition.from_stage.name for transition in transition_group])
-            await cli_progress_manager.append_cli_message(f"Executing stages - {current_stages}")
-            cli_progress_manager.start_cli_tasks()
+            await self.logging.spinner.append_message(f"Executing stages - {current_stages}")
 
-            async with self.logging.console.aio.create_spinner(
-                Spinners.bouncingBar, 
-                text=cli_progress_manager, 
-                color="cyan", 
-                attrs=["bold"]
-            ) as status_spinner:
-                
-                cli_progress_manager.spinner = status_spinner
+            async with self.logging.spinner as status_spinner:
 
                 for transition in transition_group:
 
@@ -210,13 +201,11 @@ class Graph:
                         ) 
                     
                 if self.status == GraphStatus.FAILED:
-                    await self.logging.console.aio.set_progress_fail('Error')
+                    await status_spinner.fail('Error')
                     break
                 
-                await self.logging.console.aio.set_progress_ok('✔')
+                await status_spinner.ok('✔')
             
-            await cli_progress_manager.stop_cli_tasks()
-        
         if self.status == GraphStatus.RUNNING:
             await self.logging['hedra'].aio.debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.COMPLETE.name} - from - {GraphStatus.RUNNING.name}')
             await self.logging.filesystem.aio['hedra.core'].debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.COMPLETE.name} - from - {GraphStatus.RUNNING.name}')

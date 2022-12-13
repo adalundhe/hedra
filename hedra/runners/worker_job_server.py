@@ -1,13 +1,10 @@
 import asyncio
 from .worker_services.worker_manager import WorkerManager
-from easy_logger import Logger
 
 
 class DistributedWorkerServer:
 
     def __init__(self, config):
-        logger = Logger()
-        self.session_logger = logger.generate_logger()
         self.manager = WorkerManager(config, config.reporter_config)
         self.loop = None
         

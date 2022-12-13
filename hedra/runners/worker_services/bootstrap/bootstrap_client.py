@@ -1,6 +1,6 @@
 import os
 import grpc
-from easy_logger import Logger
+
 from broadkast.grpc import BroadkastClient
 from broadkast.discovery import Query
 from hedra.runners.worker_services.leader_registry import LeaderRegistry

@@ -1,4 +1,4 @@
-from easy_logger import Logger
+
 from .registered_worker import RegisteredWorker
 
 

@@ -59,8 +59,7 @@ def run_graph(path: str, cpus: int, log_level: str, logfiles_directory: str):
         hedra_graphs[graph_name] = path
         with open(hedra_config_filepath, 'w') as hedra_config_file:
             hedra_config['graphs'] = hedra_graphs
-
-            json.dump(hedra_config)   
+            json.dump(hedra_config, hedra_config_file, indent=4)   
 
     if path in hedra_graphs:
         path = hedra_graphs.get(path)
@@ -104,5 +103,7 @@ def run_graph(path: str, cpus: int, log_level: str, logfiles_directory: str):
     pipeline.assemble()
 
     loop.run_until_complete(pipeline.run())
+
+    logger.console.sync.info(f'\nGraph - {graph_name.capitalize()} - completed!\n')
 
     os._exit(0)

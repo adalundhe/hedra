@@ -1,7 +1,7 @@
 import asyncio
 import time
 import os
-from easy_logger import Logger
+
 from hedra.reporting import Handler
 from hedra.runners.leader_services.bootstrap import BootstrapManager
 from hedra.runners.leader_services.leader_registry import LeaderRegistry

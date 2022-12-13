@@ -7,25 +7,30 @@ from pathlib import Path
 from aiologger.levels import LogLevel
 from aiologger.formatters.base import Formatter
 from aiologger.handlers.files import AsyncTimedRotatingFileHandler, RolloverInterval
+from .logger_types import LoggerTypes
 from .async_logger import AsyncLogger
 
 class AsyncFilesystemLogger:
 
     def __init__(
         self, 
-        logfiles_directory: str,
-        log_level=LogLevel.NOTSET, 
+        logger_name: str=None,
+        logger_type: LoggerTypes=LoggerTypes.FILESYSTEM,
+        logfiles_directory: str=None,
+        log_level: LogLevel=LogLevel.NOTSET, 
         logger_enabled: bool = True,
         rotation_interval_type: RolloverInterval=RolloverInterval.DAYS,
         rotation_interval: int=1,
-        backups: int=1,
+        backup_count: int=1,
         rotation_time: datetime.time=None
     ) -> None:
+        self.logger_name = logger_name
+        self.logger_type = logger_type
         self.log_level = log_level
         self.logger_enabled = logger_enabled
         self.rotation_interval_type = rotation_interval_type
         self.rotation_interval = rotation_interval
-        self.backups = backups
+        self.backups = backup_count
         self.rotation_time = rotation_time
         self.logfiles_directory: str = logfiles_directory
 
@@ -51,8 +56,9 @@ class AsyncFilesystemLogger:
 
     def _create_file_logger(self, logger_name: str, filepath: str) -> AsyncLogger:
         async_logger = AsyncLogger(
-            name=logger_name,
-            level=self.log_level,
+            logger_name=logger_name,
+            logger_type=self.logger_type,
+            log_level=self.log_level,
             logger_enabled=self.logger_enabled
         )
 

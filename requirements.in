@@ -1,4 +1,3 @@
-
 attr
 networkx
 aiodns
@@ -18,3 +17,7 @@ art
 scikit-learn
 uvloop
 tdigest
+GitPython
+aiologger
+aiologger[aiofiles]
+yaspin

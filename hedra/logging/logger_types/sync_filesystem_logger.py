@@ -6,6 +6,7 @@ from pathlib import Path
 from aiologger.levels import LogLevel
 from logging.handlers import TimedRotatingFileHandler
 from aiologger.handlers.files import RolloverInterval
+from .logger_types import LoggerTypes
 from .sync_logger import SyncLogger
 
 
@@ -13,19 +14,23 @@ class SyncFilesystemLogger:
 
     def __init__(
         self, 
-        logfiles_directory: str,
-        log_level=LogLevel.NOTSET, 
+        logger_name: str=None,
+        logger_type: LoggerTypes=LoggerTypes.FILESYSTEM,
+        log_level: LogLevel=LogLevel.NOTSET, 
+        logfiles_directory: str=None,
         logger_enabled: bool = True,
         rotation_interval_type: RolloverInterval=RolloverInterval.DAYS,
         rotation_interval: int=1,
-        backups: int=1,
+        backup_count: int=1,
         rotation_time: datetime.time=None
     ) -> None:
+        self.logger_name = logger_name
+        self.logger_type = logger_type
         self.log_level = log_level
         self.logger_enabled = logger_enabled
         self.rotation_interval_type = rotation_interval_type
         self.rotation_interval = rotation_interval
-        self.backups = backups
+        self.backups = backup_count
         self.rotation_time = rotation_time
         self.logfiles_directory: str = logfiles_directory
 
@@ -51,8 +56,9 @@ class SyncFilesystemLogger:
 
     def _create_file_logger(self, logger_name: str, filepath: str) -> SyncLogger:
         sync_logger = SyncLogger(
-            name=logger_name,
-            level=self.log_level,
+            logger_name=logger_name,
+            logger_type=self.logger_type,
+            log_level=self.log_level,
             logger_enabled=self.logger_enabled
         )
 

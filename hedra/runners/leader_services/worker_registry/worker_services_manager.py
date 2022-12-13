@@ -1,7 +1,7 @@
 import asyncio
 import os
 import grpc
-from easy_logger import Logger
+
 from .worker_registry import WorkerRegistry
 from hedra.runners.utils.connect_timeout import connect_or_return_none, connect_with_retry_async
 from hedra.runners.worker_services.proto import (

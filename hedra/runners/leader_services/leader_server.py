@@ -1,7 +1,6 @@
 import grpc
 import os
 import psutil
-from easy_logger import Logger
 from .service import LeaderService
 from .proto import add_DistributedServerServicer_to_server
 
@@ -9,9 +8,6 @@ from .proto import add_DistributedServerServicer_to_server
 class LeaderServer:
 
     def __init__(self, config):
-        logger = Logger()
-
-        self.session_logger = logger.generate_logger('hedra')
         self.config = config
         self.ip = None
         self.port = None

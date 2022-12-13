@@ -1,7 +1,6 @@
 import grpc
 import os
 import psutil
-from easy_logger import Logger
 from .service import BootstrapService
 from .proto import add_BootstrapServerServicer_to_server
 
@@ -9,10 +8,7 @@ from .proto import add_BootstrapServerServicer_to_server
 class BootstrapServer:
 
     def __init__(self, config, leader_id) -> None:
-        logger = Logger()
         self.leader_id = leader_id
-
-        self.session_logger = logger.generate_logger()
 
         self.session_logger.info('Initializing bootstrap server...')
         

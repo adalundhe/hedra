@@ -2,7 +2,7 @@ import asyncio
 from asyncio.tasks import wait
 import os
 import grpc
-from easy_logger import Logger
+
 from hedra.runners.worker_services.bootstrap import BootstrapManager
 from .leader_registry import LeaderRegistry
 

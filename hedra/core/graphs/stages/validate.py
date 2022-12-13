@@ -50,7 +50,7 @@ class Validate(Stage):
             stage_type: stage for stage_type, stage in self.stages.items() if stage_type != StageTypes.VALIDATE
         }
 
-        await self.logger.console.aio.append_progress_message(f'Validating - {len(stages)} - stages')
+        await self.logger.spinner.append_message(f'Validating - {len(stages)} - stages')
         
         hooks_by_name: Dict[str, Hook] = defaultdict(dict)
         for stages_types in stages.values():
@@ -235,7 +235,7 @@ class Validate(Stage):
 
                     await hook.call(hook_for_validation.call)
 
-            await self.logger.console.aio.set_default_message(
+            await self.logger.spinner.set_default_message(
                 f'Validated - {len(stages)} stages'
             )
 

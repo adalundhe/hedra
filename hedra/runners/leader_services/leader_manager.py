@@ -1,15 +1,11 @@
 import asyncio
 import uuid
-from easy_logger import Logger
 from .leader_server import LeaderServer
 
 
 class LeaderManager:
 
     def __init__(self, config, reporter_config) -> None:
-        logger = Logger()
-
-        self.leader_type = config.runner_mode
         self.config = config
         self.reporter_config = reporter_config
 
@@ -17,7 +13,6 @@ class LeaderManager:
             self.job_config = config
 
 
-        self.session_logger = logger.generate_logger()
         self.leader_id = None
 
         self._live_progress_updates = config.distributed_config.get('live_progress_updates', False)

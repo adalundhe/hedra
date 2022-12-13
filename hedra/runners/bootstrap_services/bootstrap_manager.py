@@ -1,17 +1,11 @@
 import asyncio
-import asyncio
-import asyncio
 import uuid
-from easy_logger import Logger
 from .bootstrap_server import BootstrapServer
 
 
 class BootstrapManager:
 
     def __init__(self, config) -> None:
-        logger = Logger()
-
-        self.session_logger = logger.generate_logger()
         self.leader_id = uuid.uuid4()
 
         self.session_logger.info('Initializing bootstrap server...')

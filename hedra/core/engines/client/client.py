@@ -1,10 +1,6 @@
 from asyncio import Future
-from types import UnionType
-from typing import Dict, Generic, Iterable, TypeVar, Union
+from typing import Dict, Generic, Iterable, Union
 from typing_extensions import TypeVarTuple, Unpack
-
-from datadog import initialize
-
 from hedra.core.engines.types.common.types import RequestTypes
 from .store import ActionsStore
 from .config import Config

@@ -1,8 +1,6 @@
 import dill
 from collections import defaultdict
 from typing import Union, List, Dict
-from easy_logger import Logger
-from hedra.plugins.types.engine import EnginePlugin
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.events import EventsGroup
 from hedra.reporting.metric import MetricsSet
@@ -34,8 +32,6 @@ class Analyze(Stage):
 
     def __init__(self) -> None:
         super().__init__()
-        logger = Logger()
-        self.session_logger = logger.generate_logger('hedra')
         self.raw_results = {}
 
         self.accepted_hook_types = [ HookType.METRIC ]

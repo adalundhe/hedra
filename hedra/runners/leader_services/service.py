@@ -1,4 +1,3 @@
-from easy_logger import Logger
 from .proto import (
     DistributedServerServicer,
     PipelineStageResponse,
@@ -24,8 +23,6 @@ class LeaderService(DistributedServerServicer):
     def __init__(self):
         super().__init__()
         
-        logger = Logger()
-        self.session_logger = logger.generate_logger()
         self.leader_ip = None
         self.leader_port = None
         self.leader_address = None

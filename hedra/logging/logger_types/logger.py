@@ -1,13 +1,14 @@
-import datetime
 from typing import Dict
-from aiologger.levels import LogLevel
-from aiologger.handlers.files import RolloverInterval   
 from typing import Generic, TypeVar
+from hedra.logging.config import LoggingConfig
 from .async_filesystem_logger import AsyncFilesystemLogger
-from .sync_filesystem_logger import SyncFilesystemLogger
 from .async_logger import AsyncLogger
+from .async_spinner import AsyncSpinner
+from .sync_filesystem_logger import SyncFilesystemLogger
 from .sync_logger import SyncLogger
-from .logger_types import LoggerTypes, LoggerTypesMap
+from .logger_types import LoggerTypes
+from .logger_types_map import LoggerTypesMap
+
 
 A = TypeVar('A')
 S = TypeVar('S')
@@ -15,56 +16,22 @@ S = TypeVar('S')
 
 class Logger(Generic[A, S]):
 
-    def __init__(
-        self, 
-        logger_name: str, 
-        logger_type: LoggerTypes,
-        logfiles_directory: str=None,
-        log_level: LogLevel=LogLevel.INFO, 
-        logger_enabled: bool=None, 
-        rotation_interval_type: RolloverInterval=RolloverInterval.DAYS,
-        rotation_interval: int=1,
-        backup_count: int=1,
-        rotation_time: datetime.time=None
-    ) -> None:
+    def __init__(self, config: LoggingConfig) -> None:
         self.logger_types = LoggerTypesMap()
-        self.log_level = log_level
-        self.logger_enabled = logger_enabled
+        self.log_level = config.log_level
+        self.logger_enabled = config.logger_enabled
 
+        if config.logger_type == LoggerTypes.SPINNER:
+            self.aio: A = self.logger_types.async_loggers.get(config.logger_type, AsyncSpinner)(**config.spinner)
+            self.sync: S = None
 
-        if logger_type == LoggerTypes.FILESYSTEM or logger_type == LoggerTypes.DISTRIBUTED_FILESYSTEM:
-            self.aio: A = self.logger_types.async_loggers.get(logger_type, AsyncFilesystemLogger)(
-                logfiles_directory,
-                log_level=log_level,
-                logger_enabled=logger_enabled,
-                rotation_interval_type=rotation_interval_type,
-                rotation_interval=rotation_interval,
-                backups=backup_count,
-                rotation_time=rotation_time
-            )
-
-            self.sync: S = self.logger_types.sync_loggers.get(logger_type, SyncFilesystemLogger)(
-                logfiles_directory,
-                log_level=log_level,
-                logger_enabled=logger_enabled,
-                rotation_interval_type=rotation_interval_type,
-                rotation_interval=rotation_interval,
-                backups=backup_count,
-                rotation_time=rotation_time
-            )
+        elif config.logger_type == LoggerTypes.FILESYSTEM or config.logger_type == LoggerTypes.DISTRIBUTED_FILESYSTEM:
+            self.aio: A = self.logger_types.async_loggers.get(config.logger_type, AsyncFilesystemLogger)(**config.filesystem_logger)
+            self.sync: S = self.logger_types.sync_loggers.get(config.logger_type, SyncFilesystemLogger)(**config.filesystem_logger)
 
         else:
-            self.aio: A = self.logger_types.async_loggers.get(logger_type, AsyncLogger)(
-                logger_name,
-                level=log_level,
-                logger_enabled=logger_enabled
-            )
-
-            self.sync: S = self.logger_types.sync_loggers.get(logger_type, SyncLogger)(
-                logger_name,
-                level=log_level,
-                logger_enabled=logger_enabled
-            )
+            self.aio: A = self.logger_types.async_loggers.get(config.logger_type, AsyncLogger)(**config.cli_logger)
+            self.sync: S = self.logger_types.sync_loggers.get(config.logger_type, SyncLogger)(**config.cli_logger)
 
     def set_patterns(self, pattern: str, datefmt_pattern: str=None):
 

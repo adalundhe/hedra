@@ -1,7 +1,7 @@
 import asyncio
 import dill
 import traceback
-from easy_logger import Logger
+
 from pycli_tools.arguments.bundler import Bundler
 from hedra.core import Executor
 from hedra.core.graphs.hooks import (

@@ -2,17 +2,22 @@ import sys
 import logging
 from typing import Mapping, Any, List
 from aiologger.levels import LogLevel
+from .logger_types import LoggerTypes
 
 
 class SyncLogger(logging.Logger):
 
     def __init__(
         self, 
-        name: str, 
-        level: LogLevel = LogLevel.INFO, 
+        logger_name: str=None, 
+        logger_type: LoggerTypes=LoggerTypes.CONSOLE,
+        log_level: LogLevel = LogLevel.INFO, 
         logger_enabled: bool=True
     ) -> None:
-        super().__init__(name, level=level)
+        super().__init__(logger_name, level=log_level)
+        self.logger_name = logger_name
+        self.logger_type = logger_type
+        self.log_level = log_level
         self.logger_enabled = logger_enabled
 
     def initialize(self, pattern: str, datefmt_pattern: str=None):

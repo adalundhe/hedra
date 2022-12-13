@@ -10,7 +10,7 @@ from hedra.runners.leader_services.proto import (
 from google.protobuf.json_format import (
     MessageToDict
 )
-from easy_logger import Logger
+
 from hedra.command_line import CommandLine
 from hedra.runners.utils.connect_timeout import connect_with_retry
 

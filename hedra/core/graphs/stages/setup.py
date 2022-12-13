@@ -71,7 +71,7 @@ class Setup(Stage, Generic[Unpack[T]]):
 
         execute_stage_names = ', '.join(list(stages.keys()))
 
-        await self.logger.console.aio.append_progress_message(f'Setting up - {execute_stage_names}')
+        await self.logger.spinner.append_message(f'Setting up - {execute_stage_names}')
         
         for execute_stage_name, execute_stage in stages.items():
 
@@ -178,7 +178,7 @@ class Setup(Stage, Generic[Unpack[T]]):
 
             self.stages[execute_stage_name] = execute_stage
 
-        await self.logger.console.aio.set_default_message(f'Setup for - {execute_stage_names} - complete')
+        await self.logger.spinner.set_default_message(f'Setup for - {execute_stage_names} - complete')
 
         return self.stages
 

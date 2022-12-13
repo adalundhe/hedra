@@ -2,7 +2,6 @@ import time
 import asyncio
 import psutil
 from typing import Dict, List
-from easy_logger import Logger
 from concurrent.futures import ThreadPoolExecutor
 from async_tools.functions.awaitable import awaitable
 from asyncio import Task
@@ -83,8 +82,6 @@ class DefaultPersona:
         self.is_timed = True
         self.timer_thread = None
 
-        logger = Logger()
-        self.session_logger = logger.generate_logger('hedra')
         self.current_action_idx = 0
         self.optimized_params = None
 

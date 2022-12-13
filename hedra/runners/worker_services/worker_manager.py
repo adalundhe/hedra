@@ -1,7 +1,7 @@
 import asyncio
 import os
 import uuid
-from easy_logger import Logger
+
 from .worker_server import WorkerServer
 
 

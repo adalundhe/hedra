@@ -1,4 +1,4 @@
-from easy_logger import Logger
+
 from hedra.runners.leader_services.proto import DistributedServerStub
 from .registered_leader import RegisteredLeader
 

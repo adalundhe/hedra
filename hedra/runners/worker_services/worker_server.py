@@ -3,7 +3,7 @@ import os
 import psutil
 import asyncio
 from concurrent import futures
-from easy_logger import Logger
+
 from .service import WorkerService
 from .proto import add_WorkerServerServicer_to_server
 

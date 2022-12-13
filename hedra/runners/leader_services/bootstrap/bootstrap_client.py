@@ -2,7 +2,6 @@ import os
 from typing import List
 import uuid
 import grpc
-from easy_logger import Logger
 from broadkast.grpc import BroadkastClient
 from broadkast.discovery import Query
 from hedra.runners.bootstrap_services.proto.bootstrap_pb2 import ServiceRegistrationStatusResponse
@@ -22,8 +21,6 @@ from broadkast.grpc.proto import (
 class BoostrapClient:
 
     def __init__(self, config) -> None:
-        logger = Logger()
-        self.session_logger = logger.generate_logger()
 
         self.use_bootstrap = config.distributed_config.get(
             'use_bootstrap'

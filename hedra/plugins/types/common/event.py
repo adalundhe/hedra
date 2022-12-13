@@ -1,7 +1,7 @@
 import json
 from typing import Generic, TypeVar
 from hedra.reporting.events.types.base_event import BaseEvent
-from hedra.plugins.types.engine.result import Result
+
 
 T = TypeVar('T')
 
@@ -12,7 +12,7 @@ class Event(BaseEvent, Generic[T]):
         'type'
     )
 
-    def __init__(self, result: Result[T]) -> None:
+    def __init__(self, result: T) -> None:
         super().__init__(result)
 
         self.timings = result.as_timings()

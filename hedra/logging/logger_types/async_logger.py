@@ -4,24 +4,27 @@ import sys
 import asyncio
 import aiologger
 from asyncio import Task
+from aiologger.levels import LogLevel
 from aiologger.formatters.base import Formatter
 from aiologger.handlers.streams import AsyncStreamHandler
-from aiologger.levels import LogLevel
-from hedra.logging.graphics import cli_progress_manager, AsyncSpinner
+from .logger_types import LoggerTypes
 
 
 class AsyncLogger(aiologger.Logger):
 
     def __init__(
         self, 
-        name: str, 
-        level: LogLevel = LogLevel.INFO, 
+        logger_name: str=None, 
+        logger_type: LoggerTypes=LoggerTypes.CONSOLE,
+        log_level: LogLevel = LogLevel.INFO, 
         logger_enabled: bool=True
     ) -> None:
-        super().__init__(name=name, level=level)
+        super().__init__(name=logger_name, level=log_level)
 
+        self.logger_name = logger_name
+        self.logger_type = logger_type
+        self.log_level = log_level
         self.logger_enabled = logger_enabled
-        self.progress_manager = cli_progress_manager
         self.pattern = None
         self.datefmt_pattern = None
 
@@ -40,58 +43,8 @@ class AsyncLogger(aiologger.Logger):
             )
         )
 
-    def create_spinner(
-        self,
-        spinner=None, 
-        text="", 
-        color=None, 
-        on_color=None, 
-        attrs=None, 
-        reversal=False, 
-        side="left", 
-        sigmap=None, 
-        timer=False,
-        logger: AsyncLogger=None
-    ) -> AsyncSpinner:
-        spinner = AsyncSpinner(
-            spinner=spinner, 
-            text=text, 
-            color=color, 
-            on_color=on_color, 
-            attrs=attrs, 
-            reversal=reversal, 
-            side=side, 
-            sigmap=sigmap, 
-            timer=timer,
-            enabled=self.logger_enabled
-        )
-
-        if logger is None:
-            logger = self
-
-        spinner.set_logger(
-            logger, 
-            logger_enabled=logger.logger_enabled
-        )
-
-        return spinner
-
-    def progress(self, message: str):
-        return self.progress_manager.spinner.write(message)
-
-    def append_progress_message(self, message: str):
-        return self.progress_manager.append_cli_message(message)
-
-    def set_default_message(self, message: str):
-        return self.progress_manager.clear_and_replace(message)
-
-    def set_progress_ok(self, message: str):
-        return self.progress_manager.spinner.ok(message)
-
-    def set_progress_fail(self, message: str):
-        return self.progress_manager.spinner.fail(message)
-
     def _make_log_task(self, level, msg, *args, **kwargs) -> Task:
+
         if self.logger_enabled:
             return super()._make_log_task(level, msg, *args, **kwargs)
 

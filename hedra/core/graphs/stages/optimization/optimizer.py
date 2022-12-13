@@ -2,7 +2,6 @@ import asyncio
 import math
 import time
 from typing import Any, Dict
-from easy_logger import Logger
 from async_tools.datatypes import AsyncList
 from hedra.core.personas.batching.param_type import ParamType
 from .algorithms import get_algorithm
@@ -16,10 +15,6 @@ class Optimizer:
 
         algorithm_type = config.get('algorithm', 'shg')
         persona = config.get('persona')
-
-
-        logger = Logger()
-        self.algorithm_logger = logger.generate_logger()
 
         self._optimization_time_limit = config.get('time_limit', 60)
 

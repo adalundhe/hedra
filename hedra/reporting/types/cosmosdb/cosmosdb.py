@@ -1,8 +1,5 @@
-from os import name
 import uuid
-from typing import Any, List
-
-from matplotlib.pyplot import get
+from typing import List
 from hedra.reporting.events.types.base_event import BaseEvent
 from hedra.reporting.metric import MetricsSet
 

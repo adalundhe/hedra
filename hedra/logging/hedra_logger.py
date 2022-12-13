@@ -1,4 +1,3 @@
-import os
 import datetime
 from typing import Dict, Type, Union
 from aiologger.handlers.files import RolloverInterval
@@ -8,52 +7,51 @@ from .logger_types import (
     LoggerTypesMap,
     AsyncLogger,
     AsyncFilesystemLogger,
+    AsyncSpinner,
     SyncLogger,
     SyncFilesystemLogger
 )
+from .config import LoggingConfig
 from .logging_manager import logging_manager
 
 
 class HedraLogger:
 
     def __init__(self) -> None:
-        self.loggers: Dict[str, Logger[Union[AsyncLogger, AsyncFilesystemLogger], Union[SyncLogger, SyncFilesystemLogger]]] = {}
+        self.loggers: Dict[str, Logger[Union[AsyncLogger, AsyncFilesystemLogger, AsyncSpinner], Union[SyncLogger, SyncFilesystemLogger]]] = {}
 
         self.logger_names = logging_manager.logger_types.names
         self.logger_types = logging_manager.logger_types.types
         self.logger_types_map = LoggerTypesMap()
 
-    def initialize(
-        self, 
-        rotation_interval_type: RolloverInterval=RolloverInterval.DAYS,
-        rotation_interval: int=1,
-        backups: int=1,
-        rotation_time: datetime.time=None
-    ):
+    def initialize(self, config: LoggingConfig=LoggingConfig()):
 
         for logger_type in self.logger_types:
             
             logger_name = logging_manager.logger_types.get_name(logger_type)
             logger_enabled = logging_manager.get_logger_enabled_state(logger_type)
 
+            config.from_dict({
+                'logger_name': logger_name,
+                'logger_enabled': logger_enabled,
+                'logger_type': logger_type,
+                'log_level': logging_manager.log_level,
+                'logfiles_directory': logging_manager.logfiles_directory,
+                'spinner_display': logging_manager.progress_display
+            })
+
             ASYNC_TYPE = Type[AsyncLogger]
             SYNC_TYPE = Type[SyncLogger]
+            
+            if logger_type == LoggerTypes.SPINNER:
+                ASYNC_TYPE = Type[AsyncSpinner]
+                SYNC_TYPE = None
 
-            if logger_type == LoggerTypes.FILESYSTEM:
+            elif logger_type == LoggerTypes.FILESYSTEM:
                 ASYNC_TYPE = Type[AsyncFilesystemLogger]
                 SYNC_TYPE = Type[SyncFilesystemLogger]
 
-            logger: Logger[ASYNC_TYPE, SYNC_TYPE] = Logger(
-                logger_name,
-                logger_type,
-                logfiles_directory=logging_manager.logfiles_directory,
-                log_level=logging_manager.log_level,
-                logger_enabled=logger_enabled,
-                rotation_interval_type=rotation_interval_type,
-                rotation_interval=rotation_interval,
-                backup_count=backups,
-                rotation_time=rotation_time
-            )
+            logger: Logger[ASYNC_TYPE, SYNC_TYPE] = Logger(config)
 
             if logger_type == LoggerTypes.CONSOLE:
                 logger.set_patterns('%(message)s')
@@ -67,7 +65,7 @@ class HedraLogger:
 
             self.loggers[logger_name] = logger
 
-    def __getitem__(self, logger_name: str) -> Logger[Union[AsyncLogger, AsyncFilesystemLogger], Union[SyncLogger, SyncFilesystemLogger]]:
+    def __getitem__(self, logger_name: str) -> Logger[Union[AsyncLogger, AsyncFilesystemLogger, AsyncSpinner], Union[SyncLogger, SyncFilesystemLogger]]:
         logger = self.loggers.get(logger_name)
         if logger is None:
             logger = Logger(
@@ -99,6 +97,10 @@ class HedraLogger:
     @property
     def distributed_filesystem(self) -> Logger[AsyncFilesystemLogger, SyncFilesystemLogger]:
         return self.loggers['distributed_filesystem']
+
+    @property
+    def spinner(self) -> AsyncSpinner:
+        return self.loggers['spinner'].aio
 
     def create_logger(
         self,

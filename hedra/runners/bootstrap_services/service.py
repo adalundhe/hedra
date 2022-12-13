@@ -1,6 +1,5 @@
 import os
 from .service_registry import ServiceRegistry
-from easy_logger import Logger
 import uuid
 from .proto import (
     ServiceRegisterRequest,
@@ -21,9 +20,6 @@ class BootstrapService(BootstrapServerServicer):
     def __init__(self, config) -> None:
         super().__init__()
 
-        logger = Logger()
-
-        self.session_logger = logger.generate_logger()
         self.bootstrap_service_id = str(uuid.uuid4())
 
         self.bootstrap_ip = config.distributed_config.get(
