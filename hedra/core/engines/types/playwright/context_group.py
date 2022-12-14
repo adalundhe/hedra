@@ -1,7 +1,7 @@
 
 import asyncio
 import time
-from async_tools.datatypes import AsyncList
+from hedra.tools.data_structures import AsyncList
 from typing import List
 from playwright.async_api import async_playwright
 from .command import PlaywrightCommand

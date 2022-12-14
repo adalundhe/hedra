@@ -1,8 +1,8 @@
 import asyncio
 import os
 import grpc
-from async_tools.datatypes import AsyncList, AsyncDict
-from async_tools.functions.awaitable import awaitable
+from hedra.tools.data_structures import AsyncList, AsyncDict
+from hedra.tools.helpers import awaitable
 from hedra.runners.leader_services.proto import (
     WorkerUpdateRequest,
     DistributedServerStub

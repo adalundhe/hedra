@@ -2,7 +2,7 @@ import asyncio
 import math
 import time
 from typing import Any, Dict
-from async_tools.datatypes import AsyncList
+from hedra.tools.data_structures import AsyncList
 from hedra.core.personas.batching.param_type import ParamType
 from .algorithms import get_algorithm
 

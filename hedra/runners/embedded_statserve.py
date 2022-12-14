@@ -1,5 +1,5 @@
 import time
-from async_tools.functions import check_event_loop
+from hedra.tools.helpers import check_event_loop
 from statserve.server import Server
 
 

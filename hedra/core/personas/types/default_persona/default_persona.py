@@ -3,7 +3,7 @@ import asyncio
 import psutil
 from typing import Dict, List
 from concurrent.futures import ThreadPoolExecutor
-from async_tools.functions.awaitable import awaitable
+from hedra.tools.helpers import awaitable
 from asyncio import Task
 from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.personas.batching.batch import Batch

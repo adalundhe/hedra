@@ -1,4 +1,4 @@
-from async_tools.datatypes.async_list import AsyncList
+from hedra.tools.data_structures.async_list import AsyncList
 
 
 class JobQueue:
