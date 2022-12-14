@@ -179,7 +179,7 @@ async def execute_to_teardown_transition(current_stage: Stage, next_stage: Stage
         if current_stage.state in valid_states:
             current_stage.state = StageStates.EXECUTING
 
-            current_stage, next_stage = await execute_transition(current_stage, next_stage)
+            current_stage, next_stage = await execute_transition(current_stage, next_stage, logger)
 
             current_stage.state = StageStates.EXECUTED
 
@@ -213,7 +213,7 @@ async def execute_to_analyze_transition(current_stage: Stage, next_stage: Stage)
         if current_stage.state in valid_states:
             current_stage.state = StageStates.EXECUTING
 
-            current_stage, next_stage = await execute_transition(current_stage, next_stage)
+            current_stage, next_stage = await execute_transition(current_stage, next_stage, logger)
 
             current_stage.state = StageStates.EXECUTED
 
@@ -247,7 +247,7 @@ async def execute_to_checkpoint_transition(current_stage: Stage, next_stage: Sta
         if current_stage.state in valid_states:
             current_stage.state = StageStates.EXECUTING
 
-            current_stage, next_stage = await execute_transition(current_stage, next_stage)
+            current_stage, next_stage = await execute_transition(current_stage, next_stage, logger)
             next_stage.data = current_stage.context.results
 
             next_stage.previous_stage = current_stage.name
@@ -284,7 +284,7 @@ async def execute_to_wait_transition(current_stage: Stage, next_stage: Stage):
         if current_stage.state in valid_states:
             current_stage.state = StageStates.EXECUTING
 
-            current_stage, next_stage = await execute_transition(current_stage, next_stage)
+            current_stage, next_stage = await execute_transition(current_stage, next_stage, logger)
             next_stage.data = current_stage.context.results[current_stage.name]
 
             next_stage.previous_stage = current_stage.name

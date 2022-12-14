@@ -15,8 +15,10 @@ class Teardown(Stage):
         super().__init__()
         self.actions = []
 
-    @Internal
+    @Internal()
     async def run(self):
+
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting Teardown stage.')
 
         methods = inspect.getmembers(self, predicate=inspect.ismethod) 
         for _, method in methods:
@@ -26,10 +28,14 @@ class Teardown(Stage):
 
             if hook:
                 self.hooks[hook.hook_type].append(hook)
-        
-        await asyncio.gather(*[
-            hook.call() for hook in self.hooks.get(
-                HookType.TEARDOWN,
-                []
-            )
-        ])
+
+        teardown_hooks = self.hooks.get(HookType.TEARDOWN)
+
+        if teardown_hooks:
+
+            teardown_hook_names = ', '.join([hook.name for hook in teardown_hooks])
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Running teardown hooks - {teardown_hook_names}')           
+            await asyncio.gather(*[ hook.call() for hook in teardown_hooks])
+
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Teardown complete.')

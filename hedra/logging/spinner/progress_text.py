@@ -35,7 +35,7 @@ class ProgressText:
     async def append_cli_message(self, text: str):
         self.cli_text = text
         self.cli_messages.append(text)
-        await asyncio.sleep(len(self.cli_messages))
+        await asyncio.sleep(2.5)
 
     def start_cli_tasks(self):
         if self.enabled:

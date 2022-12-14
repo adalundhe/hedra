@@ -1,3 +1,4 @@
+import uuid
 from asyncio import Future
 from typing import Dict, Generic, Iterable, Union
 from typing_extensions import TypeVarTuple, Unpack
@@ -25,8 +26,12 @@ T = TypeVarTuple('T')
 class Client(Generic[Unpack[T]]):
 
     def __init__(self) -> None:
+
+        self.client_id = str(uuid.uuid4())
+
         self.next_name = None
         self.intercept = False
+
         self._config: Config = None
         self._http = HTTPClient
         self._http2 = HTTP2Client

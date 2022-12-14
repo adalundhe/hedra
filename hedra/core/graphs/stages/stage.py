@@ -1,6 +1,7 @@
 from __future__ import annotations
 import threading
 import os
+import uuid
 from typing import Any, Dict, List, Union
 from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.graphs.hooks.types.internal import Internal
@@ -26,6 +27,8 @@ class Stage:
 
     def __init__(self) -> None:
         self.name = self.__class__.__name__
+        self.stage_id = str(uuid.uuid4())
+
         self.state = StageStates.INITIALIZED
         self.next_stage: str = None
         self.hooks: Dict[HookType, List[Hook]] = {}
@@ -54,7 +57,9 @@ class Stage:
         else:
             self.timeout = None
 
-    @Internal
+        self.internal_hooks = ['run']
+
+    @Internal()
     async def run(self):
         pass
 
@@ -68,4 +73,4 @@ class Stage:
 
     @property
     def metadata_string(self):
-        return f'Graph - {self.graph_name}:{self.graph_id} - thread:{self.thread_id} - process:{self.process_id} - Stage: {self.name} - '
+        return f'Graph - {self.graph_name}:{self.graph_id} - thread:{self.thread_id} - process:{self.process_id} - Stage: {self.name}:{self.stage_id} - '

@@ -19,6 +19,7 @@ async def idle_to_validate_transition(current_stage: Stage, next_stage: Stage):
         
         await logger.spinner.system.debug(f'{current_stage.metadata_string} - NoOp transition from {current_stage.name} to {next_stage.name}')
         await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - NoOp transition from {current_stage.name} to {next_stage.name}')
+        await current_stage.run()
 
         next_stage.context = current_stage.context
 
@@ -37,6 +38,7 @@ async def idle_to_wait_transition(current_stage: Stage, next_stage: Stage):
 
         await logger.spinner.system.debug(f'{current_stage.metadata_string} - NoOp transition from {current_stage.name} to {next_stage.name}')
         await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - NoOp transition from {current_stage.name} to {next_stage.name}')
+        await current_stage.run()
 
         next_stage.context = current_stage.context
 

@@ -1,3 +1,4 @@
+from collections import defaultdict
 from types import FunctionType
 from typing import Any, Dict, List, Union, Coroutine
 from hedra.core.graphs.hooks.types.hook import Hook, Metadata
@@ -6,6 +7,7 @@ from hedra.core.graphs.hooks.types.hook_types import HookType
 
 class Registrar:
     all: Dict[str, Hook] = {}
+    reserved: Dict[str, Dict[str, Hook]] = defaultdict(dict)
     module_paths: Dict[str, str] = {}
 
     def __init__(self, hook_type) -> None:

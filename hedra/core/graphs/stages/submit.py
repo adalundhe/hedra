@@ -55,8 +55,11 @@ class Submit(Stage, Generic[T]):
         self.events = []
         self.reporter: Reporter = None
 
-    @Internal
+    @Internal()
     async def run(self):
+
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Initializing results submission')
+
         reporter_plugins = self.plugins_by_type.get(PluginType.REPORTER)
 
         for plugin_name, plugin in reporter_plugins.items():
@@ -64,18 +67,24 @@ class Submit(Stage, Generic[T]):
 
             if isinstance(self.config, plugin.config):
                 self.config.reporter_type = plugin_name
+            
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Reporter plugin - {plugin_name}')
         
         self.reporter = Reporter(self.config)
         reporter_name = self.reporter.reporter_type.name.capitalize()
 
-        await self.logger.spinner.append_message(
-            f'Submitting results via - {reporter_name} - reporter'
-        )
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Submitting results via - {reporter_name}:{self.reporter.reporter_id} - reporter')
+        await self.logger.spinner.append_message(f'Submitting results via - {reporter_name} - reporter')
 
         await self.reporter.connect()
 
+        session_total = self.summaries.get('session_total', 0)
         if self.submit_events:
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {reporter_name}:{self.reporter.reporter_id} - Submitting - {session_total} - Events')
             await self.reporter.submit_events(self.events)
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {reporter_name}:{self.reporter.reporter_id} - Submitted - {session_total} - Events')
 
         metrics = []
 
@@ -85,15 +94,14 @@ class Submit(Stage, Generic[T]):
                 stage.get('actions', {}).values()
             ))
 
-        session_total = self.summaries.get('session_total', 0)
-    
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {reporter_name}:{self.reporter.reporter_id} - Submitting Metrics')
+
         await self.reporter.submit_common(metrics)
         await self.reporter.submit_metrics(metrics)
         await self.reporter.submit_errors(metrics)
         await self.reporter.submit_custom(metrics)
         await self.reporter.close()
 
-        await self.logger.spinner.set_default_message(
-            f'Successfully submitted the results for {session_total} actions via {reporter_name} reporter'
-        )
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {reporter_name}:{self.reporter.reporter_id} - Completed Metrics submission')
+        await self.logger.spinner.set_default_message(f'Successfully submitted the results for {session_total} actions via {reporter_name} reporter')
 

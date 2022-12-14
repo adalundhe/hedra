@@ -38,7 +38,7 @@ class Optimize(Stage):
 
         self.optimization_execution_time = 0
 
-    @Internal
+    @Internal()
     async def run(self, stages: Dict[str, Execute]):
 
         optimization_execution_time_start = time.monotonic()
@@ -46,32 +46,23 @@ class Optimize(Stage):
         stage_names = ', '.join(list(stages.keys()))
         stages_count = len(stages)
 
-        await self.logger.spinner.system.debug(f'{self.metadata_string} - Optimizing stages {stage_names} using {self.algorithm} algorithm')
-        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Optimizing stages {stage_names} using {self.algorithm} algorithm')
-        await self.logger.spinner.append_message(
-            f'Optimizer - {self.name} optimizing stages {stage_names} using {self.algorithm} algorithm'
-        )
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Optimizing stages {stage_names} using {self.algorithm} algorithm')
+        await self.logger.spinner.append_message(f'Optimizer - {self.name} optimizing stages {stage_names} using {self.algorithm} algorithm')
 
         optimizer_plugins = self.plugins_by_type.get(PluginType.OPTIMIZER)
         for plugin_name, plugin in optimizer_plugins.items():            
             registered_algorithms[plugin_name] = plugin
-
-            await self.logger.spinner.system.debug(f'{self.metadata_string} - Loaded Optimizer plugin - {plugin_name}')
-            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Loaded Optimizer plugin - {plugin_name}')
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Optimizer plugin - {plugin_name}')
 
         engine_plugins = self.plugins_by_type.get(PluginType.ENGINE)
         for plugin_name, plugin in engine_plugins.items():
             registered_engines[plugin_name] = lambda config: plugin(config)
-
-            await self.logger.spinner.system.debug(f'{self.metadata_string} - Loaded Engine plugin - {plugin_name}')
-            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Loaded Engine plugin - {plugin_name}')
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Engine plugin - {plugin_name}')
 
         persona_plugins = self.plugins_by_type.get(PluginType.PERSONA)
         for plugin_name, plugin in persona_plugins.items():
             registered_personas[plugin_name] = lambda config: plugin(config)
-
-            await self.logger.spinner.system.debug(f'{self.metadata_string} - Loaded Persona plugin - {plugin_name}')
-            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Loaded Persona plugin - {plugin_name}')
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Persona plugin - {plugin_name}')
 
         optimization_results = []
 
@@ -89,7 +80,6 @@ class Optimize(Stage):
         batched_stages: List[Tuple[str, Execute, int]] = list(self.executor.partion_stage_batches(optimize_stages))
         batched_configs = []
 
-        await self.logger.spinner.system.debug(f'{self.metadata_string} - Batching optimization for - {stages_count} stages')
         await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Batching optimization for - {stages_count} stages')
 
         for stage_name, stage, assigned_workers_count in batched_stages:
@@ -128,18 +118,15 @@ class Optimize(Stage):
                 configs
             ))
 
-            await self.logger.spinner.system.debug(f'{self.metadata_string} - Provisioned - {assigned_workers_count} - workers for stage - {stage_name}')
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Provisioned - {assigned_workers_count} - workers for stage - {stage_name}')
 
-        await self.logger.spinner.system.debug(f'{self.metadata_string} - Starting optimizaiton for - {stages_count} - stages')
-        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Starting optimizaiton for - {stages_count} - stages')
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting optimizaiton for - {stages_count} - stages')
 
         results = await self.executor.execute_batches(
             batched_configs,
             optimize_stage
         )
 
-        await self.logger.spinner.system.debug(f'{self.metadata_string} - Completed optimizaiton for - {stages_count} - stages')
         await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Completed optimizaiton for - {stages_count} - stages')
 
         for _, result in results:
@@ -171,8 +158,7 @@ class Optimize(Stage):
 
             stage_optimzations[stage_name] = optimized_batch_size
 
-            await self.logger.spinner.system.debug(f'{self.metadata_string} - Stage - {stage_name} - configured to use optimized batch size of - {optimized_batch_size} - VUs')
-            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Stage - {stage_name} - configured to use optimized batch size of - {optimized_batch_size} - VUs')
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Stage - {stage_name} - configured to use optimized batch size of - {optimized_batch_size} - VUs')
 
             optimized_config.optimized = True
             stage.optimized = True
@@ -186,12 +172,9 @@ class Optimize(Stage):
             f'{stage_name}: {optimized_batch_size}' for stage_name, optimized_batch_size in stage_optimzations.items()
         ])
 
-        await self.logger.spinner.set_default_message(
-            f'Optimized - batch sizes for stages - {optimized_batch_sizes} - over {self.optimization_execution_time} seconds'
-        )
 
-        await self.logger.spinner.system.debug(f'{self.metadata_string} - Optimization complete for stages - {stage_names} - over - {self.optimization_execution_time} - seconds')
-        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Optimization complete for stages - {stage_names} - over - {self.optimization_execution_time} - seconds')
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Optimization complete for stages - {stage_names} - over - {self.optimization_execution_time} - seconds')
+        await self.logger.spinner.set_default_message(f'Optimized - batch sizes for stages - {optimized_batch_sizes} - over {self.optimization_execution_time} seconds')
 
         return [
             result.get('params') for result in optimization_results

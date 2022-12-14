@@ -25,7 +25,7 @@ class Checkpoint(Stage):
         self._save_file: TextIO = None
         self.requires_shutdown = True
 
-    @Internal
+    @Internal()
     async def run(self):
         
         loop = asyncio.get_event_loop()
@@ -34,15 +34,12 @@ class Checkpoint(Stage):
 
         save_hooks = self.hooks.get(HookType.SAVE)
 
-        await self.logger.spinner.system.debug(f'{self.metadata_string} - Executing checkpoints for - {len(save_hooks)} - items')
-        await self.logger.filesystem.sync['hedra.core'].debug(f'{self.metadata_string} - Executing checkpoints for - {len(save_hooks)} - items')
+        await self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Executing checkpoints for - {len(save_hooks)} - items')
         
         for save_hook in save_hooks:
             checkpoint_data = await save_hook.call(self.data)
 
-
-            await self.logger.spinner.system.debug(f'{self.metadata_string} - Executing checkpoint - {save_hook.name}')
-            await self.logger.filesystem.sync['hedra.core'].debug(f'{self.metadata_string} - Executing checkpoint - {save_hook.name}')
+            await self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Executing checkpoint - {save_hook.name}')
 
             if save_hook.config.path is None:
 
@@ -72,11 +69,9 @@ class Checkpoint(Stage):
                 self._save_file.close
             )
 
-            await self.logger.spinner.system.debug(f'{self.metadata_string} - Checkpoint - {save_hook.name} - complete')
-            await self.logger.filesystem.sync['hedra.core'].debug(f'{self.metadata_string} - Checkpoint - {save_hook.name} - complete')
+            await self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Checkpoint - {save_hook.name} - complete')
 
-        await self.logger.spinner.system.debug(f'{self.metadata_string} - Completed checkpoints for - {len(save_hooks)} - items')
-        await self.logger.filesystem.sync['hedra.core'].debug(f'{self.metadata_string} - Completed checkpoints for - {len(save_hooks)} - items')
+        await self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Completed checkpoints for - {len(save_hooks)} - items')
         
 
         self._shutdown_task = loop.run_in_executor(None, executor.shutdown)

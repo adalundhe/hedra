@@ -9,6 +9,7 @@ class Wait(Stage):
     def __init__(self) -> None:
         super().__init__()
 
-    @Internal
+    @Internal()
     async def run(self):
-        pass
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Waiting for Stage group to complete')
+        await self.logger.spinner.append_message(f'Stage - {self.name} - Waiting for Stage group to complete')

@@ -10,7 +10,6 @@ class Complete(Stage):
     def __init__(self) -> None:
         super().__init__()
 
-    @Internal
+    @Internal()
     async def run(self):
-        await self.logger.spinner.system.debug(f'{self.metadata_string} - Running complete stage')
-        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Running complete stage')
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Graph has reached terminal point')

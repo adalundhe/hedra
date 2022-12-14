@@ -1,3 +1,4 @@
+import uuid
 from typing import Any, List, TypeVar, Union
 from hedra.plugins.types.reporter.reporter_config import ReporterConfig
 from .types import ReporterTypes
@@ -133,6 +134,7 @@ class Reporter:
         }
 
     def __init__(self, reporter_config: Union[ReporterConfig, ReporterType]) -> None:
+        self.reporter_id = str(uuid.uuid4())
 
         if reporter_config is None:
             reporter_config = JSONConfig()

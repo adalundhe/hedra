@@ -9,7 +9,7 @@ from hedra.core.graphs.stages.error import Error
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.hooks.registry.registrar import registrar
-from hedra.core.graphs.hooks.types.hook import Hook
+from hedra.core.graphs.hooks.types.hook import Hook, HookType
 from hedra.core.graphs.stages.parallel.batch_executor import BatchExecutor
 from hedra.core.graphs.transitions.exceptions.exceptions import IsolatedStageError
 from hedra.logging import HedraLogger
@@ -79,6 +79,10 @@ class TransitionAssembler:
 
             stage.workers = self.cpus
             stage.worker_id = self.worker_id
+
+            for hook_shortname, hook in registrar.reserved[stage.name].items():
+                    hook.call = hook.call.__get__(stage, stage.__class__)
+                    setattr(stage, hook_shortname, hook.call)
 
             methods = inspect.getmembers(stage, predicate=inspect.ismethod) 
 
@@ -281,6 +285,8 @@ class TransitionAssembler:
         ))
 
         error_stage = Error()
+        error_stage.graph_name = self.graph_name
+        error_stage.graph_id = self.graph_id
         error_stage.error = error
 
         return Transition(
