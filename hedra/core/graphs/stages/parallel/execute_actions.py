@@ -2,7 +2,7 @@ import asyncio
 from distutils.command.config import config
 import dill
 
-from hedra.core.engines import engines_registry
+from hedra.core.engines import registered_engines
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.http import HTTPAction
@@ -77,7 +77,7 @@ def execute_actions(parallel_config: str):
 
             if action_type == RequestTypes.HTTP:
                 
-                hook.session = engines_registry.get(RequestTypes.HTTP)(
+                hook.session = registered_engines.get(RequestTypes.HTTP)(
                     concurrency=persona.batch.size,
                     timeouts=hook_action.get('timeouts'),
                     reset_connections=hook_action.get('reset_connections')
@@ -125,7 +125,7 @@ def execute_actions(parallel_config: str):
 
             elif action_type == RequestTypes.HTTP2:
 
-                hook.session = engines_registry.get(RequestTypes.HTTP2)(
+                hook.session = registered_engines.get(RequestTypes.HTTP2)(
                     concurrency=persona.batch.size,
                     timeouts=hook_action.get('timeouts'),
                     reset_connections=hook_action.get('reset_connections')
@@ -173,7 +173,7 @@ def execute_actions(parallel_config: str):
 
             elif action_type == RequestTypes.UDP:
 
-                hook.session = engines_registry.get(RequestTypes.UDP)(
+                hook.session = registered_engines.get(RequestTypes.UDP)(
                     concurrency=persona.batch.size,
                     timeouts=hook_action.get('timeouts'),
                     reset_connections=hook_action.get('reset_connections')
@@ -218,7 +218,7 @@ def execute_actions(parallel_config: str):
 
             elif action_type == RequestTypes.TASK:
 
-                hook.session = engines_registry.get(RequestTypes.TASK)(
+                hook.session = registered_engines.get(RequestTypes.TASK)(
                     concurrency=persona.batch.size,
                     timeouts=hook_action.get('timeouts')
                 )
@@ -260,7 +260,7 @@ def execute_actions(parallel_config: str):
                     reset_connections=hook_action.get('reset_connections')
                 )
   
-                plugin = engines_registry.get(plugin_type)(config)
+                plugin = registered_engines.get(plugin_type)(config)
                 hook.session = plugin
 
                 hook.action: Action = plugin.action(**{

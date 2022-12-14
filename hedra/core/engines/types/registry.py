@@ -11,7 +11,7 @@ from .common.types import RequestTypes
 
 
 
-engines_registry = {
+registered_engines = {
     RequestTypes.HTTP: lambda concurrency, timeouts, reset_connections: MercuryHTTPClient(
         concurrency=concurrency,
         timeouts=timeouts,

@@ -5,7 +5,7 @@ from time import sleep
 from typing import Dict, Generic
 from hedra.core.engines.client import Client
 from typing_extensions import TypeVarTuple, Unpack
-from hedra.core.engines.types.registry import engines_registry
+from hedra.core.engines.types.registry import registered_engines
 from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.graphs.hooks.types.internal import Internal
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -48,17 +48,30 @@ class Execute(Stage, Generic[Unpack[T]]):
 
         config = self.client._config
         persona_type_name = config.persona_type.capitalize()
+
+        await self.logger.spinner.system.debug(f'{self.metadata_string} - Executing - {config.batch_size} - VUs over {self.workers} threads for {config.total_time_string} using - {persona_type_name} - persona')
+        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Executing - {config.batch_size} - VUs over {self.workers} threads for {config.total_time_string} using - {persona_type_name} - persona')
         await self.logger.spinner.append_message(f'Stage {self.name} executing - {config.batch_size} - VUs over {self.workers} threads for {config.total_time_string} using - {persona_type_name} - persona')
 
         engine_plugins = self.plugins_by_type.get(PluginType.ENGINE)
         for plugin in engine_plugins.values():
-            engines_registry[plugin.name] = plugin
+            registered_engines[plugin.name] = plugin
+
+            await self.logger.spinner.system.debug(f'{self.metadata_string} - Loaded Engine plugin - {plugin.name}')
+            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Loaded Engine plugin - {plugin.name}')
 
         persona_plugins = self.plugins_by_type.get(PluginType.PERSONA)
+
         for plugin_name, plugin in persona_plugins.items():
             registered_personas[plugin_name] = lambda config: plugin(config)
 
+            await self.logger.spinner.system.debug(f'{self.metadata_string} - Loaded Persona plugin - {plugin.name}')
+            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Loaded Persona plugin - {plugin.name}')
+
         if self.workers > 1:
+
+            await self.logger.spinner.system.debug(f'{self.metadata_string} - Provisionin execution over - {self.workers} - workers')
+            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Provisionin execution over - {self.workers} - workers')
 
             hooks = [
                 {
@@ -82,7 +95,10 @@ class Execute(Stage, Generic[Unpack[T]]):
                     'order': hook.config.order,
                     **hook.action.to_serializable()
                 } for hook in self.hooks.get(HookType.TASK, [])
-            ])             
+            ])
+
+            await self.logger.spinner.system.debug(f'{self.metadata_string} - Starting execution for - {self.workers} workers')
+            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Starting execution for - {self.workers} workers')             
     
             results_sets = await self.executor.execute_stage_batch(
                 execute_actions,
@@ -96,6 +112,9 @@ class Execute(Stage, Generic[Unpack[T]]):
                     }) for idx in range(self.executor.max_workers)
                 ]
             )
+
+            await self.logger.spinner.system.debug(f'{self.metadata_string} - Completed execution for - {self.workers} workers')
+            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Completed execution for - {self.workers} workers')            
             
             results = []
             elapsed_times = []
@@ -115,8 +134,10 @@ class Execute(Stage, Generic[Unpack[T]]):
             total_results = len(results)
             total_elapsed = persona.total_elapsed
 
+        await self.logger.spinner.system.debug( f'{self.metadata_string} - Completed - {total_results} actions at  {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
+        await self.logger.filesystem.aio['hedra.core'].debug( f'{self.metadata_string} - Completed - {total_results} actions at  {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
         await self.logger.spinner.set_default_message(
-            f'Completed - {total_results} actions at  {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds'
+            f'Stage - {self.name} completed {total_results} actions at {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds'
         )
 
         return {

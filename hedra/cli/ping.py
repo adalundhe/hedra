@@ -6,7 +6,7 @@ uvloop.install()
 from typing import TypeVar
 import click
 import asyncio
-from hedra.core.engines.types.registry import engines_registry
+from hedra.core.engines.types.registry import registered_engines
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.grpc import GRPCAction, MercuryGRPCClient
@@ -81,7 +81,7 @@ async def ping_target(uri: str, engine_type: RequestTypes, timeout: int, logger:
         total_timeout=timeout
     )
     
-    selected_engine: T  = engines_registry.get(engine_type, MercuryHTTPClient)(
+    selected_engine: T  = registered_engines.get(engine_type, MercuryHTTPClient)(
         concurrency=1,
         timeouts=timeouts,
         reset_connections=False

@@ -12,4 +12,5 @@ class Complete(Stage):
 
     @Internal
     async def run(self):
-        pass
+        await self.logger.spinner.system.debug(f'{self.metadata_string} - Running complete stage')
+        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Running complete stage')

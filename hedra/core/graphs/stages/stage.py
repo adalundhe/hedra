@@ -68,4 +68,4 @@ class Stage:
 
     @property
     def metadata_string(self):
-        return f'Graph - {self.graph_name}:{self.graph_id} - thread:{self.thread_id} - process:{self.process_id} - '
+        return f'Graph - {self.graph_name}:{self.graph_id} - thread:{self.thread_id} - process:{self.process_id} - Stage: {self.name} - '

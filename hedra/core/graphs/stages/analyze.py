@@ -44,6 +44,9 @@ class Analyze(Stage):
     @Internal
     async def run(self):
 
+        await self.logger.spinner.debug(f'{self.metadata_string} - Starting results analysis')
+        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Starting results analysis')
+
         analysis_execution_time_start = time.monotonic()
 
         engine_plugins = self.plugins_by_type.get(PluginType.ENGINE)
@@ -69,16 +72,27 @@ class Analyze(Stage):
                 stage_results.get('total_elapsed', 0)
             )
 
+        await self.logger.spinner.debug(f'{self.metadata_string} - Paritioned {len(batches)} batches of results')
+        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Paritioned {len(batches)} batches of results')
+
         median_execution_time = round(statistics.median(elapsed_times))
         await self.logger.spinner.append_message(
-            f'Calculating stats for - {total_group_results} - actions over a median stage execution time of {median_execution_time} seconds'
+            f'Calculating stats for - {total_group_results} - actions executed over a median stage execution time of {median_execution_time} seconds'
         )
+
+        await self.logger.spinner.debug(f'{self.metadata_string} - Calculating stats for - {total_group_results} - actions over a median stage execution time of {median_execution_time} seconds')
+        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Calculating stats for - {total_group_results} - actions over a median stage execution time of {median_execution_time} seconds')
 
         custom_event_types = []
 
         for plugin in self.plugins:
+            custom_event_name = f'{plugin.__name__}Event'
+
+            await self.logger.spinner.system.debug(f'{self.metadata_string} - Generated custom Event - {custom_event_name} - for Reporter plugin - {plugin.__name__}')
+            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Generated custom Event - {custom_event_name} - for Reporter plugin - {plugin.__name__}')
+            
             custom_event_types.append({
-                'event_name':  f'{plugin.__name__}Event',
+                'event_name':  custom_event_name,
                 'event_type': plugin.__name__,
                 'event_fields': plugin.event_fields
             })
@@ -87,6 +101,9 @@ class Analyze(Stage):
         for metric_hook_name in metric_hook_names:
             custom_metric_hook = registrar.all.get(metric_hook_name)
             custom_metric_hooks.append(custom_metric_hook)
+
+            await self.logger.spinner.system.debug(f'{self.metadata_string} - Loaded custom Metric hook - {metric_hook_name}')
+            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Loaded custom Metric hook - {metric_hook_name}')
 
         stage_configs = []
         stage_total_times = {}
@@ -133,10 +150,16 @@ class Analyze(Stage):
                 batch_configs
             ))
 
+            await self.logger.spinner.system.debug(f'{self.metadata_string} - Assigned {assigned_workers_count} to process results from stage - {stage_name}')
+            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Assigned {assigned_workers_count} to process results from stage - {stage_name}')
+
         stages_count = len(stage_configs)
         await self.logger.spinner.append_message(
             f'Calculating results for - {stages_count} - stages'
         )
+
+        await self.logger.spinner.system.debug(f'{self.metadata_string} - Processing results or - {stages_count} - stages')
+        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Processing results or - {stages_count} - stages')
 
 
         stage_batches = await self.executor.execute_batches(
@@ -144,9 +167,15 @@ class Analyze(Stage):
             group_batched_results
         )
 
+        await self.logger.spinner.system.debug(f'{self.metadata_string} - Completed parital results aggregation for - {stages_count} - stages')
+        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Completed parital results aggregation for - {stages_count} - stages')
+
         processed_results = []
 
         self.logger.spinner.set_message_at(2, f'Converting aggregate results to metrics for - {stages_count} - stages.')
+
+        await self.logger.spinner.system.debug(f'{self.metadata_string} - Starting stage results aggregation for {stages_count} stages')
+        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Starting stage results aggregation for {stages_count} stages')
         
         for stage_name, stage_results in stage_batches:
         
@@ -204,6 +233,12 @@ class Analyze(Stage):
 
                 stage_total += events_group.total
 
+                await self.logger.spinner.system.debug(f'{self.metadata_string} - Convererted stats for stage - {stage_name} to metrics set')
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Convererted stats for stage - {stage_name} to metrics set')
+        
+            await self.logger.spinner.system.debug(f'{self.metadata_string} - Calculated results for - {events_group.total} - actions from stage - {stage_name}')
+            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Calculated results for - {events_group.total} - actions from stage - {stage_name}')
+
             processed_results.append({
                 'stage_metrics': {
                     stage_name: {
@@ -223,6 +258,8 @@ class Analyze(Stage):
             time.monotonic() - analysis_execution_time_start
         )
 
+        await self.logger.spinner.system.debug(f'{self.metadata_string} - Completed results analysis for - {stages_count} - stages in - {self.analysis_execution_time} seconds')
+        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Completed results analysis for - {stages_count} - stages in - {self.analysis_execution_time} seconds')
         await self.logger.spinner.set_default_message(
             f'Completed results analysis for {total_group_results} actions and {stages_count} stages over {self.analysis_execution_time} seconds'
         )
