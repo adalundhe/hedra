@@ -91,8 +91,12 @@ class Optimize(Stage):
 
             for worker_idx in range(assigned_workers_count):
                 configs.append({
+                    'graph_name': self.graph_name,
+                    'graph_id': self.graph_id,
                     'optimize_params': self.optimize_params,
                     'worker_idx': worker_idx,
+                    'source_stage_name': self.name,
+                    'source_stage_id': self.stage_id,
                     'execute_stage_name': stage_name,
                     'execute_stage_generation_count': assigned_workers_count,
                     'execute_stage_id': stage.execution_stage_id,
