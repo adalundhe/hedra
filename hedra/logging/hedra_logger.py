@@ -1,5 +1,6 @@
 import datetime
 from typing import Dict, Type, Union
+from aiologger.levels import LogLevel
 from aiologger.handlers.files import RolloverInterval
 from .logger_types import (
     Logger, 
@@ -22,6 +23,7 @@ class HedraLogger:
 
         self.logger_names = logging_manager.logger_types.names
         self.logger_types = logging_manager.logger_types.types
+        self.log_level: LogLevel = None
         self.logger_types_map = LoggerTypesMap()
 
     def initialize(self, config: LoggingConfig=LoggingConfig()):
@@ -30,6 +32,7 @@ class HedraLogger:
             
             logger_name = logging_manager.logger_types.get_name(logger_type)
             logger_enabled = logging_manager.get_logger_enabled_state(logger_type)
+            self.log_level = logging_manager.log_level
 
             config.from_dict({
                 'logger_name': logger_name,

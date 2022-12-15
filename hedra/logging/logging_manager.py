@@ -1,3 +1,4 @@
+import asyncio
 from typing import List
 from aiologger.levels import LogLevel
 from .spinner import ProgressText

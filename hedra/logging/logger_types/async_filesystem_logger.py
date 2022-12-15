@@ -91,8 +91,8 @@ class AsyncFilesystemLogger:
         )
         
         if path_exists is False:
-            async with aiofiles.open(filepath, 'w') as logfile:
-                await logfile.close()
+            logfile = await aiofiles.open(filepath)
+            await logfile.close()
 
             self.update_files(filepath)
 

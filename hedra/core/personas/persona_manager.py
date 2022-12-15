@@ -1,4 +1,3 @@
-from distutils.command.config import config
 from .types.default_persona import DefaultPersona
 from .types.batched_persona import BatchedPersona
 from .types.sequenced_persona import SequencedPersonaCollection

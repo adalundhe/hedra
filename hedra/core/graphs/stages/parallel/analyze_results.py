@@ -41,7 +41,12 @@ async def process_batch(
                 )) for stage_result in results_batch
         ])
         
-        for events_group in events.values():  
+        for events_stage_name, events_group in events.items():  
+
+            await events_group.logger.filesystem.aio['hedra.reporting'].debug(
+                f'{metadata_string} - Events group - {events_group.events_group_id} - created for Stage - {events_stage_name} - Processed - {events_group.total}'
+            )
+
             events_group.calculate_partial_group_stats()
 
         elapsed = time.time() - start
