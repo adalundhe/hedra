@@ -1,1 +1,1 @@
-from .persona_manager import get_persona
+from .persona_registry import get_persona

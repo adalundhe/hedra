@@ -9,6 +9,19 @@ from hedra.core.engines.types.common.protocols.shared.constants import _DEFAULT_
 
 class UDPConnection:
 
+    __slots__ = (
+        'dns_address',
+        'port',
+        'ip_addr',
+        'lock',
+        'reader',
+        'writer',
+        'connected',
+        'reset_connection',
+        'pending',
+        '_connection_factory'
+    )
+
     def __init__(self, reset_connection: bool=False) -> None:
         self.dns_address: str = None
         self.port: int = None

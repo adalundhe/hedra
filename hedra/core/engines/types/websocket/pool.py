@@ -5,6 +5,12 @@ from .connection import WebsocketConnection
 
 class Pool:
 
+    __slots__ = (
+        'size',
+        'connections',
+        'reset_connections'
+    )
+
     def __init__(self, size: int, reset_connections: bool = False) -> None:
         self.size = size
         self.connections: List[WebsocketConnection] = []

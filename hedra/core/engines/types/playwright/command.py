@@ -5,6 +5,14 @@ from .hooks import Hooks
 
 class Page:
 
+    __slots__ = (
+        'selector',
+        'attribute',
+        'x_coordinate',
+        'y_coordinate',
+        'frame'
+    )
+
     def __init__(self, selector: str=None, attribute: str=None, x_coordinate: int=0, y_coordinate: int=0, frame=0) -> None:
         self.selector = selector
         self.attribute = attribute
@@ -24,6 +32,11 @@ class Page:
 
 class URL:
 
+    __slots__ = (
+        'location',
+        'headers'
+    )
+
     def __init__(self, location: str=None, headers: Dict[str, str]={}) -> None:
         self.location = location
         self.headers = headers
@@ -36,6 +49,19 @@ class URL:
 
 
 class Input:
+
+    __slots__ = (
+        'key',
+        'text',
+        'expression',
+        'args',
+        'filepath',
+        'file',
+        'path',
+        'option',
+        'by_label',
+        'by_value'
+    )
 
     def __init__(
         self, 
@@ -78,6 +104,15 @@ class Input:
 
 class Options:
 
+    __slots__ = (
+        'event',
+        'option',
+        'is_checked',
+        'timeout',
+        'extra',
+        'switch_by'
+    )
+
     def __init__(self, event: str=None, option=None, is_checked=False, timeout=10, extra={}, switch_by: str='url') -> None:
         self.event = event
         self.option = option
@@ -97,6 +132,17 @@ class Options:
         }
 
 class PlaywrightCommand:
+
+    __slots__ = (
+        'name',
+        'command',
+        'page',
+        'url',
+        'input',
+        'options',
+        'metadata',
+        'hooks'
+    )
     
     def __init__(self, 
         name, 

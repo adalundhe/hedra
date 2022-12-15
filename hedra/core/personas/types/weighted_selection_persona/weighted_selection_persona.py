@@ -1,6 +1,7 @@
 import random
 import time
 import asyncio
+import uuid
 from typing import Dict, List
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.graphs.hooks.types.hook import Hook
@@ -10,10 +11,17 @@ from hedra.core.personas.types.types import PersonaTypes
 
 
 class WeightedSelectionPersona(DefaultPersona):
+    
+    __slots__ = (
+        'weights',
+        'indexes',
+        'sample'
+    )
 
     def __init__(self, config: Config):
         super().__init__(config)
 
+        self.persona_id = str(uuid.uuid4())
         self.weights: List[int] = []
         self.indexes: List[int] = []
         self.sample: List[int] = []
@@ -29,8 +37,9 @@ class WeightedSelectionPersona(DefaultPersona):
         argument. You may specify a wait between batches (between each step) by specifying an integer number of seconds via the --batch-interval argument.
         '''
 
-    async def setup(self, hooks: Dict[HookType, List[Hook]]):
-        self.session_logger.debug('Setting up persona...')
+    async def setup(self, hooks: Dict[HookType, List[Hook]], metadata_string: str):
+
+        self.metadata_string = f'{metadata_string} Persona: {self.type.capitalize()}:{self.persona_id} - '
         
         actions = hooks.get(HookType.ACTION)
         self.actions_count = len(actions)

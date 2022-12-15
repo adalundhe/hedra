@@ -4,6 +4,13 @@ from .context_config import ContextConfig
 
 class ContextPool:
 
+    __slots__ = (
+        'size',
+        'group_size',
+        'group_count',
+        'contexts'
+    )
+
     def __init__(self, pool_size, group_size) -> None:
         self.size = pool_size
         self.group_size = group_size

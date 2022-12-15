@@ -16,6 +16,18 @@ UDPBatchResponseFuture = Awaitable[Tuple[Set[UDPResponseFuture], Set[UDPResponse
 
 class MercuryUDPClient:
 
+    __slots__ = (
+        'session_id',
+        'timeouts',
+        '_hosts',
+        'closed',
+        'sem',
+        'pool',
+        'active',
+        'waiter',
+        'ssl_context'
+    )
+
     def __init__(self, concurrency: int=10**3, timeouts: Timeouts = Timeouts(), reset_connections: bool=False) -> None:
 
         self.session_id = str(uuid.uuid4())

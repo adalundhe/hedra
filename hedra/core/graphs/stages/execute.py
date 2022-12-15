@@ -14,7 +14,7 @@ from hedra.core.engines.types.playwright import (
     MercuryPlaywrightClient,
     ContextConfig
 )
-from hedra.core.personas.persona_manager import get_persona, registered_personas
+from hedra.core.personas.persona_registry import get_persona, registered_personas
 from hedra.plugins.types.plugin_types import PluginType
 
 from .parallel.partition_method import PartitionMethod
@@ -166,7 +166,7 @@ class Execute(Stage, Generic[Unpack[T]]):
 
             results = await persona.execute()
 
-            elapsed = time.monotonic()
+            elapsed = time.monotonic() - start
 
             await self.logger.filesystem.aio['hedra.core'].info(
                 f'{self.metadata_string} - Execution complete - Time (including addtional setup) took: {round(elapsed, 2)} seconds'

@@ -15,6 +15,23 @@ R = TypeVar('R')
 
 class MercuryCustomClient(Generic[A, R]):
 
+    __slots__ = (
+        'session_id',
+        'timeouts',
+        'registered',
+        '_hosts',
+        'closed',
+        'sem',
+        'active',
+        'waiter',
+        'plugin',
+        '_on_connect',
+        '_on_execute',
+        '_on_close',
+        'custom_connection',
+        'pool'
+    )
+
     def __init__(
         self, 
         plugin: Any,

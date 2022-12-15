@@ -9,6 +9,16 @@ from hedra.core.engines.types.common.types import RequestTypes
 
 
 class UDPAction(BaseAction):
+
+    __slots__ = (
+        'wait_for_response',
+        'type',
+        'url',
+        '_data',
+        'encoded_data',
+        'is_stream',
+        'ssl_context'
+    )
     
     def __init__(
         self,
@@ -34,7 +44,6 @@ class UDPAction(BaseAction):
         self._data = data
 
         self.encoded_data = None
-        self.encoded_headers = None
         self.is_stream = False
         self.ssl_context = None
 

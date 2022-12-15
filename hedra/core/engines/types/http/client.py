@@ -18,6 +18,7 @@ HTTPBatchResponseFuture = Awaitable[Tuple[Set[HTTPResponseFuture], Set[HTTPRespo
 class MercuryHTTPClient:
 
     __slots__ = (
+        'session_id',
         'timeouts',
         'registered',
         '_hosts',

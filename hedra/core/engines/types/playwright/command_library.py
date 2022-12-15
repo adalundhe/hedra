@@ -6,6 +6,10 @@ from .command import PlaywrightCommand
 
 class CommandLibrary:
 
+    __slots__ = (
+        'page'
+    )
+
 
     def __init__(self, page) -> None:
         self.page: Page = page

@@ -12,6 +12,7 @@ from .result import TaskResult
 class MercuryTaskRunner:
 
     __slots__ = (
+        'session_id',
         'timeouts',
         'concurrency',
         'registered',

@@ -1,6 +1,7 @@
 import math
 import time
 import asyncio
+import uuid
 from asyncio import Task
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.types.default_persona.default_persona import DefaultPersona
@@ -19,13 +20,29 @@ async def cancel_pending(pend: Task):
 
 class ConstantArrivalPersona(DefaultPersona):
 
+    __slots__ = (
+        'completed_counter'
+    )
+
     def __init__(self, config: Config):
         super(ConstantArrivalPersona, self).__init__(config)
+
+        self.persona_id = str(uuid.uuid4())
+
         self.completed_counter = CompletedCounter()
         self.type = PersonaTypes.CONSTANT_ARRIVAL
             
     async def execute(self):
+
+        hook_names = ', '.join([
+            hook.name for hook in self._hooks
+        ])
+
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing {self.actions_count} Hooks: {hook_names}')
+
         total_time = self.total_time
+
+        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Executing for a total of - {total_time} - seconds')
 
         await self.start_updates()
 
@@ -41,21 +58,43 @@ class ConstantArrivalPersona(DefaultPersona):
         self.end = time.monotonic()
         self.pending_actions = len(pending)
 
+        await self.logger.filesystem.aio['hedra.core'].debug(
+            f'{self.metadata_string} - Execution completed with - {self.pending_actions} - actions left pending'
+        )
+
         results = await asyncio.gather(*completed)
         
         await self.stop_updates()
+
+        cleanup_start = time.monotonic()
+
         await asyncio.gather(*[
             asyncio.create_task(
                 cancel_pending(pend)
             ) for pend in pending
         ])
 
+        cleanup_elapsed = time.monotonic() - cleanup_start
+        await self.logger.filesystem.aio['hedra.core'].info(
+            f'{self.metadata_string} - Cleanup completed - Resolved {self.pending_actions} pending actions in {round(cleanup_elapsed, 2)} seconds'
+        )
+
         for hook in self._hooks:
+
+            session_closed_start = time.monotonic()
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Closing session - {hook.session.session_id} - for Hook - {hook.name}')
             await hook.session.close()
+
+            session_closed_elapsed = time.monotonic() - session_closed_start
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Closed session - {hook.session.session_id} - for Hook - {hook.name}. Took: {round(session_closed_elapsed, 2)} seconds')
   
         self.total_actions = len(set(results))
         self.total_elapsed = self.end - self.start
         self.optimized_params = None
+
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed execution')
 
         return results
 

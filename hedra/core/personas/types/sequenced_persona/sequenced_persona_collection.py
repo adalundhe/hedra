@@ -1,3 +1,4 @@
+import uuid
 from typing import Dict, List
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.graphs.hooks.types.hook import Hook
@@ -10,9 +11,13 @@ class SequencedPersonaCollection(DefaultPersona):
 
     def __init__(self, config: Config):
         super(SequencedPersonaCollection, self).__init__(config)
+
+        self.persona_id = str(uuid.uuid4())
         self.type = PersonaTypes.SEQUENCE
 
-    async def setup(self, hooks: Dict[HookType, List[Hook]]):
+    async def setup(self, hooks: Dict[HookType, List[Hook]], metadata_string: str):
+
+        self.metadata_string = f'{metadata_string} Persona: {self.type.capitalize()}:{self.persona_id} - '
         
         sequence = sorted(
             hooks.get(HookType.ACTION),

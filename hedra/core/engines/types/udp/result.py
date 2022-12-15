@@ -6,6 +6,21 @@ from .action import UDPAction
 
 class UDPResult(BaseResult):
 
+    __slots__ = (
+        'url',
+        'ip_addr',
+        'has_response',
+        'path',
+        'params',
+        'query',
+        'hostname',
+        'body',
+        'response_code',
+        '_version',
+        '_reason'
+        '_status'
+    )
+
     def __init__(self, action: UDPAction, error: Exception=None) -> None:
 
         super(

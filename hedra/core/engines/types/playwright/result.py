@@ -5,6 +5,16 @@ from .command import PlaywrightCommand
 
 class PlaywrightResult(BaseResult):
 
+    __slots__ = (
+        'url',
+        'headers',
+        'command',
+        'selector',
+        'x_coord',
+        'y_coord',
+        'frame'
+    )
+
     def __init__(self, command: PlaywrightCommand, error: Exception=None) -> None:
         super(
             PlaywrightResult,

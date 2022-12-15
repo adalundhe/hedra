@@ -1,4 +1,5 @@
 import time
+import uuid
 import asyncio
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.engines.client.config import Config
@@ -9,6 +10,8 @@ class RampedIntervalPersona(DefaultPersona):
 
     def __init__(self, config: Config):
         super(RampedIntervalPersona, self).__init__(config)
+
+        self.persona_id = str(uuid.uuid4())
         self.type = PersonaTypes.RAMPED_INTERVAL
             
     async def generator(self, total_time):

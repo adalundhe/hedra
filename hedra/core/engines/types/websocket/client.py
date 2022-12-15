@@ -17,6 +17,19 @@ WebsocketBatchResponseFuture = Awaitable[Tuple[Set[WebsocketResponseFuture], Set
 
 class MercuryWebsocketClient:
 
+    __slots__ = (
+        'session_id',
+        'timeouts',
+        'registered',
+        '_hosts',
+        'closed',
+        'sem',
+        'pool',
+        'active',
+        'waiter',
+        'ssl_context'
+    )
+
 
     def __init__(self, concurrency: int = 10 ** 3, timeouts: Timeouts = Timeouts(), reset_connections: bool=False) -> None:
         

@@ -1,4 +1,4 @@
-import math
+import uuid
 import time
 import asyncio
 from asyncio import Task
@@ -20,6 +20,8 @@ class ConstantSpawnPersona(DefaultPersona):
 
     def __init__(self, config: Config):
         super(ConstantSpawnPersona, self).__init__(config)
+
+        self.persona_id = str(uuid.uuid4())
         self.action_interval = config.action_interval
         self.type = PersonaTypes.CONSTANT_SPAWN
 

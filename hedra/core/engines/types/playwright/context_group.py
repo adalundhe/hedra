@@ -11,6 +11,21 @@ from .command_librarian import CommandLibrarian
 
 class ContextGroup:
 
+    __slots__ = (
+        'browser_type',
+        'device_type',
+        'locale',
+        'geolocation',
+        'permissions',
+        'color_scheme',
+        'concurrency',
+        'librarians',
+        'config',
+        'options',
+        'contexts',
+        'sem'
+    )
+
     def __init__(
         self, 
         browser_type: str=None, 

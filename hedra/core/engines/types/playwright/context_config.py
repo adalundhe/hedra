@@ -2,6 +2,11 @@ from typing import Dict, List, Any
 
 class ContextConfig:
 
+    __slots__ = (
+        'data',
+        'options'
+    )
+
     def __init__(
         self, 
         browser_type: str='chromium', 

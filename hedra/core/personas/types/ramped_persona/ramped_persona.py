@@ -1,6 +1,6 @@
 import time
 import asyncio
-import math
+import uuid
 from hedra.tools.helpers import awaitable
 from hedra.tools.data_structures.async_list import AsyncList
 from hedra.core.personas.types.default_persona import DefaultPersona
@@ -12,6 +12,8 @@ class RampedPersona(DefaultPersona):
 
     def __init__(self, config: Config):
         super(RampedPersona, self).__init__(config)
+
+        self.persona_id = str(uuid.uuid4())
         self.type = PersonaTypes.RAMPED
         
     async def generator(self, total_time):

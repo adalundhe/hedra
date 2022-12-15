@@ -7,7 +7,7 @@ from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.hooks.types.internal import Internal
 from hedra.core.engines.client.time_parser import TimeParser
 from hedra.core.engines.types.registry import registered_engines
-from hedra.core.personas.persona_manager import registered_personas
+from hedra.core.personas.persona_registry import registered_personas
 from hedra.core.graphs.stages.optimization.algorithms import registered_algorithms
 from hedra.plugins.types.plugin_types import PluginType
 from .parallel.optimize_stage import optimize_stage

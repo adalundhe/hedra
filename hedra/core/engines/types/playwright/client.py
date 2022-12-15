@@ -16,6 +16,22 @@ PlaywrightBatchResponseFuture = Awaitable[Tuple[Set[PlaywrightResponseFuture], S
 
 class MercuryPlaywrightClient:
 
+    __slots__ = (
+        'session_id',
+        'pool',
+        'timeouts',
+        'registered',
+        'closed',
+        'config',
+        'sem',
+        'active',
+        'waiter',
+        '_discarded_context_groups',
+        '_discarded_contexts',
+        '_pending_context_groups',
+        '_playwright_setup'
+    )
+
     def __init__(self,  concurrency: int = 500, group_size: int=50, timeouts: Timeouts = Timeouts()) -> None:
         
         self.session_id = str(uuid.uuid4())

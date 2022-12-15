@@ -1,8 +1,10 @@
 import time
 import asyncio
 import psutil
+import uuid
 from typing import Dict, List
 from concurrent.futures import ThreadPoolExecutor
+from hedra.logging import HedraLogger
 from hedra.tools.helpers import awaitable
 from asyncio import Task
 from hedra.core.graphs.hooks.types.hook_types import HookType
@@ -28,6 +30,9 @@ async def cancel_pending(pend: Task):
 class DefaultPersona:
 
     __slots__ = (
+        'metadata_string',
+        'persona_id',
+        'logger',
         'type',
         'workers',
         'actions',
@@ -48,7 +53,6 @@ class DefaultPersona:
         'graceful_stop',
         'is_timed',
         'timer_thread',
-        'session_logger',
         'loop',
         'current_action_idx',
         'optimized_params',
@@ -56,7 +60,12 @@ class DefaultPersona:
     )    
 
     def __init__(self, config: Config):
-        
+        self.persona_id = str(uuid.uuid4())
+        self.logger = HedraLogger()
+        self.logger.initialize()
+
+        self.metadata_string: str = None
+
         self.type = PersonaTypes.DEFAULT
         self.workers = 1
 
@@ -85,7 +94,10 @@ class DefaultPersona:
         self.current_action_idx = 0
         self.optimized_params = None
 
-    def setup(self, hooks: Dict[HookType, List[Hook]]):
+    def setup(self, hooks: Dict[HookType, List[Hook]], metadata_string: str):
+
+        self.metadata_string = f'{metadata_string} Persona: {self.type.capitalize()}:{self.persona_id} - '
+
         self._hooks = hooks.get(HookType.ACTION)
         self._hooks.extend(
             hooks.get(HookType.TASK, [])
@@ -95,7 +107,15 @@ class DefaultPersona:
             
     async def execute(self):
         hooks = self._hooks
+        hook_names = ', '.join([
+            hook.name for hook in hooks
+        ])
+
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing {self.actions_count} Hooks: {hook_names}')
+
         total_time = self.total_time
+
+        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Executing for a total of - {total_time} - seconds')
         loop = asyncio.get_running_loop()
 
         await self.start_updates()
@@ -110,11 +130,17 @@ class DefaultPersona:
         ], timeout=self.graceful_stop)
 
         self.end = time.monotonic()
+
         self.pending_actions = len(pending)
+        await self.logger.filesystem.aio['hedra.core'].debug(
+            f'{self.metadata_string} - Execution completed with - {self.pending_actions} - actions left pending'
+        )
 
         results = await asyncio.gather(*completed)
         
         await self.stop_updates()
+
+        cleanup_start = time.monotonic()
 
         await asyncio.gather(*[
             asyncio.create_task(
@@ -122,12 +148,27 @@ class DefaultPersona:
             ) for pend in pending
         ])
 
+        cleanup_elapsed = time.monotonic() - cleanup_start
+        await self.logger.filesystem.aio['hedra.core'].info(
+            f'{self.metadata_string} - Cleanup completed - Resolved {self.pending_actions} pending actions in {round(cleanup_elapsed, 2)} seconds'
+        )
+
         for hook in hooks:
+
+            session_closed_start = time.monotonic()
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Closing session - {hook.session.session_id} - for Hook - {hook.name}')
             await hook.session.close()
+
+            session_closed_elapsed = time.monotonic() - session_closed_start
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Closed session - {hook.session.session_id} - for Hook - {hook.name}. Took: {round(session_closed_elapsed, 2)} seconds')
         
         self.total_actions = len(set(results))
         self.total_elapsed = self.end - self.start
         self.optimized_params = None
+
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed execution')
 
         return results
 
@@ -159,10 +200,12 @@ class DefaultPersona:
 
     async def start_updates(self):
         if self._live_updates:
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Live Updates enabled')
             self.timer_thread = asyncio.create_task(self._run_timer_in_background())
     
     async def stop_updates(self):
         if self._live_updates:
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Live Updates stopped')
             self.run_timer = False
             await self.timer_thread
 
