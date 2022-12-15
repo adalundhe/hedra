@@ -119,7 +119,7 @@ async def start_execution(parallel_config: Dict[str, Any]):
 
     elapsed = time.monotonic() - start
 
-    await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Execution complete - Took: {round(elapsed, 2)} seconds')
+    await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Execution complete - Time (including addtional setup) took: {round(elapsed, 2)} seconds')
 
     return {
         'results': results,
