@@ -12,11 +12,28 @@ class Page:
         self.y_coordinate = y_coordinate
         self.frame = frame
 
+    def to_serializable(self):
+        return {
+            'selector': self.selector,
+            'attribute': self.attribute,
+            'x_coordinage': self.x_coordinate,
+            'y_coordinate': self.y_coordinate,
+            'frame': self.frame
+        }
+
+
 class URL:
 
     def __init__(self, location: str=None, headers: Dict[str, str]={}) -> None:
         self.location = location
         self.headers = headers
+
+    def to_serializable(self):
+        return {
+                'location': self.location,
+                'headers': self.headers
+        }
+
 
 class Input:
 
@@ -44,6 +61,21 @@ class Input:
         self.by_label = by_label
         self.by_value = by_value
 
+    def to_serializable(self):
+        return {
+                'key': self.key,
+                'text': self.text,
+                'expression': self.expression,
+                'args': self.args,
+                'filepath': self.filepath,
+                'file': self.file,
+                'path': self.path,
+                'option': self.option,
+                'by_label': self.by_label,
+                'by_value': self.by_value
+        }
+
+
 class Options:
 
     def __init__(self, event: str=None, option=None, is_checked=False, timeout=10, extra={}, switch_by: str='url') -> None:
@@ -53,6 +85,16 @@ class Options:
         self.timeout = timeout
         self.extra = extra
         self.switch_by = switch_by
+
+    def to_serializable(self):
+        return {
+            'event': self.event,
+            'option': self.option,
+            'is_checked': self.is_checked,
+            'timeout': self.timeout,
+            'extra': self.extra,
+            'switch_by': self.switch_by
+        }
 
 class PlaywrightCommand:
     
@@ -74,3 +116,29 @@ class PlaywrightCommand:
         self.options = options
         self.metadata = Metadata(user, tags)
         self.hooks = Hooks()
+
+    def to_serializable(self):
+
+        return {
+            'name': self.name,
+            'command': self.command,
+            'page': self.page.to_serializable(),
+            'url': self.url.to_serializable(),
+            'input': self.input.to_serializable(),
+            'options': self.options.to_serializable(),
+            'metadata': {
+                'user': self.metadata.user,
+                'tags': self.metadata.tags
+            },
+            'hooks': self.hooks.to_names()
+        }
+
+    def iter_values(self):
+        fields = {
+            'name': self.name,
+            'command': self.command,
+            **self.page.to_serializable(),
+            **self.url.to_serializable()
+            **self.input.to_serializable(),
+            **self.options.to_serializable()
+        }

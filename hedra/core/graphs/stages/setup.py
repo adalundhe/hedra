@@ -1,7 +1,7 @@
 import asyncio
 import psutil
 from typing_extensions import TypeVarTuple, Unpack
-from typing import Dict, Generic
+from typing import Dict, Generic, List, Any
 from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.graphs.hooks.types.internal import Internal
@@ -11,6 +11,7 @@ from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.personas.types import PersonaTypesMap
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.plugin_types import PluginType
+from playwright.async_api import Geolocation
 from .execute import Execute
 from .stage import Stage
 from .exceptions import (
@@ -53,6 +54,13 @@ class Setup(Stage, Generic[Unpack[T]]):
     request_timeout=60
     reset_connections=False
     apply_to_stages=[]
+    browser_type: str='chromium'
+    device_type: str=None
+    locale: str=None
+    geolocation: Geolocation=None
+    permissions: List[str]=[]
+    playwright_options: Dict[str, Any]={}
+
     
     def __init__(self) -> None:
         super().__init__()
@@ -113,8 +121,13 @@ class Setup(Stage, Generic[Unpack[T]]):
                 connect_timeout=self.connect_timeout,
                 request_timeout=self.request_timeout,
                 graceful_stop=self.graceful_stop,
-                reset_connections=self.reset_connections
-
+                reset_connections=self.reset_connections,
+                browser_type=self.browser_type,
+                device_type=self.device_type,
+                locale=self.locale,
+                geolocation=self.geolocation,
+                permissions=self.permissions,
+                playwright_options=self.playwright_options
             )
    
             client = Client()

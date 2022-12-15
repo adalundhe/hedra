@@ -2,24 +2,36 @@
 import asyncio
 import time
 from hedra.tools.data_structures import AsyncList
-from typing import List
+from typing import List, Dict, Any
 from playwright.async_api import async_playwright
+from playwright.async_api import Geolocation
 from .command import PlaywrightCommand
 from .result import PlaywrightResult
 from .command_librarian import CommandLibrarian
 
 class ContextGroup:
 
-    def __init__(self, browser_type=None, device_type=None, locale=None, geolocations=None, permissions=None, color_scheme=None, concurrency=None) -> None:
+    def __init__(
+        self, 
+        browser_type: str=None, 
+        device_type: str=None, 
+        locale: str=None, 
+        geolocation: Geolocation=None, 
+        permissions: List[str]=None, 
+        color_scheme: str=None, 
+        concurrency: int=None,
+        options: Dict[str, Any]=None
+    ) -> None:
         self.browser_type = browser_type
         self.device_type = device_type
         self.locale = locale
-        self.geolocations = geolocations
+        self.geolocation = geolocation
         self.permissions = permissions
         self.color_scheme = color_scheme
         self.concurrency = concurrency
         self.librarians: List[CommandLibrarian] = []
         self.config = {}
+        self.options = options
         self.contexts = []
         self.sem = asyncio.Semaphore(value=concurrency)
 
@@ -43,14 +55,15 @@ class ContextGroup:
             device = playwright.devices[self.device_type]
 
             self.config = {
-                **device
+                **device,
+                **self.options
             }
 
         if self.locale:
             self.config['locale'] = self.locale
 
-        if self.geolocations:
-            self.config['geolocation'] = self.geolocations
+        if self.geolocation:
+            self.config['geolocation']: Geolocation = self.geolocation
 
         if self.permissions:
             self.config['permissions'] = self.permissions

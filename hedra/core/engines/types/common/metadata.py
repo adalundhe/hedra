@@ -21,3 +21,8 @@ class Metadata:
             self.user = user
             
         self.tags.extend(tags)
+
+    def tags_to_string_list(self):
+        return [
+           f'{tag.get("name")}:{tag.get("value")}'  for tag in self.tags
+        ]

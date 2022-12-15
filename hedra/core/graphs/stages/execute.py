@@ -1,8 +1,8 @@
-import asyncio
+
 import dill
+import time
 import statistics
-from time import sleep
-from typing import Dict, Generic
+from typing import Generic
 from hedra.core.engines.client import Client
 from typing_extensions import TypeVarTuple, Unpack
 from hedra.core.engines.types.common.types import RequestTypes
@@ -104,6 +104,10 @@ class Execute(Stage, Generic[Unpack[T]]):
                 execute_actions,
                 [
                     dill.dumps({
+                        'graph_name': self.graph_name,
+                        'graph_id': self.graph_id,
+                        'source_stage_name': self.name,
+                        'source_stage_id': self.stage_id,
                         'partition_method': PartitionMethod.BATCHES,
                         'workers': self.workers,
                         'worker_id': idx + 1,
@@ -125,6 +129,9 @@ class Execute(Stage, Generic[Unpack[T]]):
             total_elapsed = statistics.median(elapsed_times)
 
         else:
+
+            start = time.monotonic()
+
             persona_config = self.client._config
             persona = get_persona(persona_config)
             persona.setup(self.hooks)
@@ -136,16 +143,35 @@ class Execute(Stage, Generic[Unpack[T]]):
 
             for hook in action_and_task_hooks:
                 if hook.action.type == RequestTypes.PLAYWRIGHT and isinstance(hook.session, MercuryPlaywrightClient):
+
+                    await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Setting up Playwright Session')
+
+                    await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Playwright Session - {hook.session.session_id} - Browser Type: {persona_config.browser_type}')
+                    await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Playwright Session - {hook.session.session_id} - Device Type: {persona_config.device_type}')
+                    await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Playwright Session - {hook.session.session_id} - Locale: {persona_config.locale}')
+                    await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Playwright Session - {hook.session.session_id} - geolocation: {persona_config.geolocation}')
+                    await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Playwright Session - {hook.session.session_id} - Permissions: {persona_config.permissions}')
+                    await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Playwright Session - {hook.session.session_id} - Color Scheme: {persona_config.color_scheme}')
+
+
                     await hook.session.setup(ContextConfig(
                         browser_type=persona_config.browser_type,
                         device_type=persona_config.device_type,
                         locale=persona_config.locale,
-                        geolocations=persona_config.geolocations,
+                        geolocation=persona_config.geolocation,
                         permissions=persona_config.permissions,
-                        color_scheme=persona_config.color_scheme
+                        color_scheme=persona_config.color_scheme,
+                        options=persona_config.playwright_options
                     ))
 
             results = await persona.execute()
+
+            elapsed = time.monotonic()
+
+            await self.logger.filesystem.aio['hedra.core'].info(
+                f'{self.metadata_string} - Execution complete - Time (including addtional setup) took: {round(elapsed, 2)} seconds'
+            )  
+
             total_results = len(results)
             total_elapsed = persona.total_elapsed
 

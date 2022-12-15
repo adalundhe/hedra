@@ -1,3 +1,5 @@
+from typing import Dict, List, Any
+
 class ContextConfig:
 
     def __init__(
@@ -5,15 +7,18 @@ class ContextConfig:
         browser_type: str='chromium', 
         device_type: str=None, 
         locale: str=None, 
-        geolocations: str=None, 
-        permissions: str=None, 
-        color_scheme: str=None
+        geolocation: Dict[str, float]=None, 
+        permissions: List[str]=[], 
+        color_scheme: str=None,
+        options: Dict[str, Any]={}
     ) -> None:
         self.data = {
             'browser_type': browser_type,
             'device_type': device_type,
             'locale': locale,
-            'geolocations': geolocations,
+            'geolocation': geolocation,
             'permissions': permissions,
             'color_scheme': color_scheme
         }
+
+        self.options = options

@@ -1,4 +1,5 @@
 import psutil
+from typing import List
 from .time_parser import TimeParser
 
 
@@ -38,6 +39,8 @@ class Config:
         self.browser_type = kwargs.get('browser_type', 'chromium')
         self.device_type = kwargs.get('device_type')
         self.locale = kwargs.get('locale')
-        self.geolocations = kwargs.get('geolocations')
-        self.permissions = kwargs.get('permissions')
+        self.geolocation = kwargs.get('geolocation')
+        self.permissions: List[str] = kwargs.get('permissions', [])
         self.color_scheme = kwargs.get('color_scheme')
+        self.group_size = kwargs.get('group_size')
+        self.playwright_options = kwargs.get('playwright_options', {})

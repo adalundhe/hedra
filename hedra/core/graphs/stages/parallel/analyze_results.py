@@ -50,7 +50,7 @@ async def process_batch(
 
             events_group.calculate_partial_group_stats()
 
-        elapsed = time.time() - start
+        elapsed = time.monotonic() - start
 
         await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Results aggregation complete - Took: {round(elapsed, 2)} seconds')
 

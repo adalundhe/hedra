@@ -1,23 +1,42 @@
 import asyncio
 import dill
+import threading
+import os
+import time
 from typing import Dict, Any
 from hedra.core.engines.client.config import Config
 from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.graphs.hooks.types.hook_types import HookType
-from hedra.core.engines.types.playwright import (
-    MercuryPlaywrightClient,
-    ContextConfig
-)
+from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.registry import RequestTypes
 from hedra.core.personas import get_persona
+from hedra.logging import HedraLogger
 from .partition_method import PartitionMethod
 from .action_assembly import ActionAssembler
 
 async def start_execution(parallel_config: Dict[str, Any]):
+
+    logger = HedraLogger()
+    logger.initialize()
+
+    start = time.monotonic()
+
+    graph_name = parallel_config.get('graph_name')
+    graph_id = parallel_config.get('graph_id')
+    source_stage_name = parallel_config.get('source_stage_name')
+    source_stage_id = parallel_config.get('source_stage_id')
+    thread_id = threading.current_thread().ident
+    process_id = os.getpid()
+
+    metadata_string = f'Graph - {graph_name}:{graph_id} - thread:{thread_id} - process:{process_id} - Stage: {source_stage_name}:{source_stage_id} - '
+
+    execution_hooks = parallel_config.get('hooks')
     partition_method = parallel_config.get('partition_method')
     persona_config: Config = parallel_config.get('config')
     workers = parallel_config.get('workers')
     worker_id = parallel_config.get('worker_id')
+
+    execution_hooks_count = len(execution_hooks)
 
     if partition_method == PartitionMethod.BATCHES and persona_config.optimized is False:
         if workers == worker_id:
@@ -29,13 +48,17 @@ async def start_execution(parallel_config: Dict[str, Any]):
     persona = get_persona(persona_config)
     persona.workers = workers
 
+
+    await logger.filesystem.aio['hedra.core'].info(
+        f'{metadata_string} - Executing {execution_hooks_count} actions with a batch size of {persona_config.batch_size} for {persona_config.total_time} seconds using Persona - {persona.type.capitalize()}'
+    )
+
     hooks = {
         HookType.ACTION: [],
         HookType.TASK: [],
     }
 
-
-    for hook_action in parallel_config.get('hooks'):
+    for hook_action in execution_hooks:
         hook_type = hook_action.get('hook_type', HookType.ACTION)
         action_name = hook_action.get('name')
 
@@ -48,31 +71,56 @@ async def start_execution(parallel_config: Dict[str, Any]):
 
         )
 
-        action_type = hook_action.get('type')
+        action_type: str = hook_action.get('type')
         action_assembler = ActionAssembler(
             hook,
             hook_action,
-            persona
+            persona,
+            persona_config,
+            metadata_string
         )
 
-        assembled_hook = action_assembler.assemble(action_type)
+        assembled_hook = await action_assembler.assemble(action_type)
+        
+        await logger.filesystem.aio['hedra.core'].info(
+            f'{metadata_string} - Assembled hook - {hook.name} - using {action_type.capitalize()} Engine'
+        )
 
 
         hooks[hook_type].append(assembled_hook)
-            
+    
     persona.setup(hooks)
 
     if action_type == RequestTypes.PLAYWRIGHT and isinstance(hook.session, MercuryPlaywrightClient):
+
+            await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Setting up Playwright Session')
+
+            await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - Playwright Session - {hook.session.session_id} - Browser Type: {persona_config.browser_type}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - Playwright Session - {hook.session.session_id} - Device Type: {persona_config.device_type}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - Playwright Session - {hook.session.session_id} - Locale: {persona_config.locale}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - Playwright Session - {hook.session.session_id} - geolocation: {persona_config.geolocation}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - Playwright Session - {hook.session.session_id} - Permissions: {persona_config.permissions}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - Playwright Session - {hook.session.session_id} - Color Scheme: {persona_config.color_scheme}')
+
             await hook.session.setup(ContextConfig(
                 browser_type=persona_config.browser_type,
                 device_type=persona_config.device_type,
                 locale=persona_config.locale,
-                geolocations=persona_config.geolocations,
+                geolocation=persona_config.geolocation,
                 permissions=persona_config.permissions,
-                color_scheme=persona_config.color_scheme
+                color_scheme=persona_config.color_scheme,
+                options=persona_config.playwright_options
             ))
 
+
+    await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Starting execution')
+
     results = await persona.execute()
+
+    elapsed = time.monotonic() - start
+
+    await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Execution complete - Took: {round(elapsed, 2)} seconds')
+
     return {
         'results': results,
         'total_results': len(results),

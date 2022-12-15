@@ -1,4 +1,5 @@
-from typing import Dict, Any
+from typing import Dict, Any, Awaitable
+from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.personas.types.default_persona import DefaultPersona
@@ -20,11 +21,14 @@ class ActionAssembler:
         self,
         hook: Hook,
         hook_action: Dict[str, Any],
-        persona: DefaultPersona
+        persona: DefaultPersona,
+        config: Config,
+        metadata_string: str
     ) -> None:
         self.hook = hook
         self.hook_action = hook_action
         self.persona = persona
+        self.config = config
 
         self._assembler_types = {
             RequestTypes.GRAPHQL: assemble_graphql_action,
@@ -38,12 +42,16 @@ class ActionAssembler:
             RequestTypes.WEBSOCKET: assemble_websocket_action
         }
 
-    def assemble(self, action_type: RequestTypes):
+        self.metadata_string = metadata_string
+
+    def assemble(self, action_type: RequestTypes) -> Awaitable[Hook]:
         return self._assembler_types.get(
             action_type,
             assemble_plugin_action
         )(
             self.hook,
             self.hook_action,
-            self.persona
+            self.persona,
+            self.config,
+            self.metadata_string
         )
