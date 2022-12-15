@@ -7,6 +7,7 @@ from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.events import EventsGroup
 from hedra.reporting.metric import MetricsSet
 from hedra.core.graphs.hooks.types.internal import Internal
+from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -44,6 +45,7 @@ class Analyze(Stage):
     @Internal()
     async def run(self):
 
+        await self.logger.filesystem.aio.create_logfile('hedra.reporting.log')
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting results analysis')
 
         analysis_execution_time_start = time.monotonic()
@@ -51,6 +53,8 @@ class Analyze(Stage):
         engine_plugins = self.plugins_by_type.get(PluginType.ENGINE)
         for plugin_name, plugin in engine_plugins.items():
             results_types[plugin_name] = plugin.event
+
+            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Generated custom Event - {plugin.event.type} - for Reporter plugin - {plugin_name}')
         
         all_results = list(self.raw_results.items())
         summaries = {
@@ -78,20 +82,7 @@ class Analyze(Stage):
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Calculating stats for - {total_group_results} - actions over a median stage execution time of {median_execution_time} seconds')
 
-        custom_event_types = []
-
-        for plugin in self.plugins:
-            custom_event_name = f'{plugin.__name__}Event'
-
-            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Generated custom Event - {custom_event_name} - for Reporter plugin - {plugin.__name__}')
-            
-            custom_event_types.append({
-                'event_name':  custom_event_name,
-                'event_type': plugin.__name__,
-                'event_fields': plugin.event_fields
-            })
-        
-        custom_metric_hooks = []
+        custom_metric_hooks: List[Hook] = []
         for metric_hook_name in metric_hook_names:
             custom_metric_hook = registrar.all.get(metric_hook_name)
             custom_metric_hooks.append(custom_metric_hook)
@@ -131,10 +122,13 @@ class Analyze(Stage):
             batch_configs = []
             for batch in stage_batches:
                 batch_configs.append({
+                    'graph_name': self.graph_name,
+                    'graph_id': self.graph_id,
+                    'source_stage_name': self.name,
+                    'source_stage_id': self.stage_id,
                     'analyze_stage_name': stage_name,
                     'analyze_stage_metric_hooks': list(metric_hook_names),
-                    'analyze_stage_batched_results': batch,
-                    'analyze_stage_custom_event_types': custom_event_types
+                    'analyze_stage_batched_results': batch
                 })
 
             stage_configs.append((

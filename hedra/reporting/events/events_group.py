@@ -1,7 +1,9 @@
 from __future__ import annotations
+import uuid
 import numpy
 from collections import defaultdict
 from typing import Any, Dict, Union
+from hedra.logging import HedraLogger
 from hedra.reporting.stats import (
     Median,
     Mean,
@@ -16,6 +18,8 @@ from .types.base_event import BaseEvent
 class EventsGroup:
 
     __slots__ = (
+        'events_group_id',
+        'logger',
         'source',
         'groups',
         'events',
@@ -32,6 +36,9 @@ class EventsGroup:
     )
 
     def __init__(self) -> None:
+
+        self.events_group_id = str(uuid.uuid4())
+
         self.groups: Dict[Dict[str, Union[int, float]]] = {}
         self.timings = defaultdict(list)
         self.source = None
@@ -70,8 +77,8 @@ class EventsGroup:
                 self.timings[timing_group].append(timing)
 
     def calculate_partial_group_stats(self):
-        self.total = self.succeeded + self.failed
 
+        self.total = self.succeeded + self.failed
 
         for group_name, group_timings in self.timings.items():
 

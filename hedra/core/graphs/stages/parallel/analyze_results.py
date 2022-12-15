@@ -2,21 +2,30 @@
 
 import asyncio
 import time
-import traceback
 import dill
-import psutil
+import threading
+import os
 from collections import defaultdict
 from typing import Any, Dict, List
-from hedra.reporting.events import EventsGroup
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.core.graphs.hooks.registry.registrar import registrar
+from hedra.logging import HedraLogger
+from hedra.reporting.events import EventsGroup
 
 
 async def process_batch(
         stage_name: str, 
         custom_metric_hook_names: List[str],
         results_batch: List[BaseResult],
+        metadata_string: str
     ):
+
+        logger = HedraLogger()
+        logger.initialize()
+
+        await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Initializing results aggregation')
+
+        start = time.monotonic()
 
         events =  defaultdict(EventsGroup)
 
@@ -35,21 +44,27 @@ async def process_batch(
         for events_group in events.values():  
             events_group.calculate_partial_group_stats()
 
-        elapsed = 0
-        start = time.monotonic()
+        elapsed = time.time() - start
 
-        while elapsed < 15:
-            await asyncio.sleep(0)
-            elapsed = time.monotonic() - start
+        await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Results aggregation complete - Took: {round(elapsed, 2)} seconds')
 
         return dill.dumps(events)
 
 
 def group_batched_results(config: Dict[str, Any]):
+    graph_name = config.get('graph_name')
+    graph_id = config.get('graph_id')
+    source_stage_name = config.get('source_stage_name')
+    source_stage_id = config.get('source_stage_id')
+
+    thread_id = threading.current_thread().ident
+    process_id = os.getpid()
+
+    meetadata_string = f'Graph - {graph_name}:{graph_id} - thread:{thread_id} - process:{process_id} - Stage: {source_stage_name}:{source_stage_id} - '
+
     stage_name = config.get('analyze_stage_name')
     custom_metric_hook_names = config.get('analyze_stage_metric_hooks', [])
     results_batch = config.get('analyze_stage_batched_results', [])
-    custom_event_types = config.get('analyze_stage_custom_event_types', [])
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -59,7 +74,8 @@ def group_batched_results(config: Dict[str, Any]):
             process_batch(
                 stage_name,
                 custom_metric_hook_names,
-                results_batch
+                results_batch,
+                meetadata_string
             )
         )
 
