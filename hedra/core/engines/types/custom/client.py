@@ -1,7 +1,6 @@
 import asyncio
 import time
-from ctypes import Union
-import traceback
+import uuid
 from typing import Any, Awaitable, Dict, Generic, TypeVar, Union
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.concurrency import Semaphore
@@ -23,6 +22,8 @@ class MercuryCustomClient(Generic[A, R]):
         timeouts: Timeouts = Timeouts(), 
         reset_connections: bool=False
     ) -> None:
+
+        self.session_id = str(uuid.uuid4())
         self.timeouts = timeouts
 
         self.registered: Dict[str, CustomConnection] = {}

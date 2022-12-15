@@ -1,15 +1,13 @@
 import asyncio
 import time
-import traceback
+import uuid
 from typing import Awaitable, Dict, Set, Tuple
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.http2.pipe import HTTP2Pipe
 from hedra.core.engines.types.http2.connection import HTTP2Connection
 from hedra.core.engines.types.common.ssl import get_http2_ssl_context
 from hedra.core.engines.types.common.concurrency import (
-    Semaphore,
-    NoOpSemaphore,
-    BalancingSemaphore
+    Semaphore
 )
 from .pool import HTTP2Pool
 from .action import HTTP2Action
@@ -36,6 +34,7 @@ class MercuryHTTP2Client:
 
     def __init__(self, concurrency: int = 10**3, timeouts: Timeouts = Timeouts(), reset_connections: bool=False) -> None:
 
+        self.session_id = str(uuid.uuid4())
         self.timeouts = timeouts
 
         self._hosts = {}

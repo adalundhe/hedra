@@ -58,8 +58,7 @@ async def assemble_playwright_command(
     hook.session: MercuryPlaywrightClient = registered_engines.get(RequestTypes.PLAYWRIGHT)(
         concurrency=persona.batch.size,
         group_size=config.group_size,
-        timeouts=hook_action.get('timeouts'),
-        reset_connections=hook_action.get('reset_connections')
+        timeouts=hook_action.get('timeouts')
     )
 
     await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - {hook_type_name} Hook - {action_name} - Connect Timeout: {hook.session.timeouts.connect_timeout}')

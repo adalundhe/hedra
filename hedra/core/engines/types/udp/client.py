@@ -1,6 +1,6 @@
 import asyncio
 import time
-import traceback
+import uuid
 from typing import Awaitable, Dict, Set, Tuple, Union
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
 from hedra.core.engines.types.common.timeouts import Timeouts
@@ -18,6 +18,7 @@ class MercuryUDPClient:
 
     def __init__(self, concurrency: int=10**3, timeouts: Timeouts = Timeouts(), reset_connections: bool=False) -> None:
 
+        self.session_id = str(uuid.uuid4())
         self.timeouts = timeouts
 
         self.registered: Dict[str, UDPConnection] = {}

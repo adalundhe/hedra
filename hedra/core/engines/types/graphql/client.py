@@ -1,4 +1,5 @@
 import time
+import uuid
 import asyncio
 from hedra.core.engines.types.http import MercuryHTTPClient
 from hedra.core.engines.types.http.connection import HTTPConnection
@@ -28,6 +29,8 @@ class MercuryGraphQLClient(MercuryHTTPClient):
             timeouts, 
             reset_connections
         )
+
+        self.session_id = str(uuid.uuid4())
 
     async def execute_prepared_request(self, action: GraphQLAction) -> GraphQLResponseFuture:
    

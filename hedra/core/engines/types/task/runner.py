@@ -1,6 +1,6 @@
 import asyncio
 import time
-import traceback
+import uuid
 from typing import Awaitable, Dict
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.concurrency import Semaphore
@@ -22,6 +22,9 @@ class MercuryTaskRunner:
     )
 
     def __init__(self, concurrency: int=10**3, timeouts: Timeouts = Timeouts()) -> None:
+        
+        self.session_id = str(uuid.uuid4())
+
         self.timeouts = timeouts
         self.concurrency = concurrency
 

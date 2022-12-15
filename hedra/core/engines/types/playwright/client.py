@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from typing import Awaitable, Dict, List, Set, Tuple, Union
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.types.common.types import RequestTypes
@@ -16,6 +17,9 @@ PlaywrightBatchResponseFuture = Awaitable[Tuple[Set[PlaywrightResponseFuture], S
 class MercuryPlaywrightClient:
 
     def __init__(self,  concurrency: int = 500, group_size: int=50, timeouts: Timeouts = Timeouts()) -> None:
+        
+        self.session_id = str(uuid.uuid4())
+
         self.pool = ContextPool(concurrency, group_size)
         self.timeouts = timeouts
         self.registered: Dict[str, PlaywrightCommand] = {}

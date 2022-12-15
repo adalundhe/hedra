@@ -1,5 +1,6 @@
 import asyncio
 import time
+import uuid
 from hedra.core.engines.types.http2.client import MercuryHTTP2Client
 from hedra.core.engines.types.common.timeouts import Timeouts
 from typing import Awaitable, Union
@@ -26,6 +27,8 @@ class MercuryGraphQLHTTP2Client(MercuryHTTP2Client):
             timeouts, 
             reset_connections
         )
+
+        self.session_id = str(uuid.uuid4())
 
     async def execute_prepared_request(self, action: GraphQLHTTP2Action) -> GraphQLHTTP2Action:
         
