@@ -54,7 +54,6 @@ class WeightedSelectionPersona(DefaultPersona):
             k=self.batch.size
         )
 
-        self.actions_count = len(self.actions)
         self._hooks = actions
 
 

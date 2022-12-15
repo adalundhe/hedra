@@ -38,7 +38,7 @@ class Graph:
         self.logging.initialize()
 
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.INITIALIZING.name} - from - {GraphStatus.IDLE.name}')
-        self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.INITIALIZING.name} - {GraphStatus.IDLE.name}')
+        self.logging.filesystem.sync['hedra.core'].info(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.INITIALIZING.name} - {GraphStatus.IDLE.name}')
 
         self.transitions_graph = []
         self._transitions: List[List[Transition]] = []
@@ -95,7 +95,7 @@ class Graph:
         self.status = GraphStatus.ASSEMBLING
 
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.ASSEMBLING.name} - from - {GraphStatus.INITIALIZING.name}')
-        self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.ASSEMBLING.name} - from - {GraphStatus.INITIALIZING.name}')
+        self.logging.filesystem.sync['hedra.core'].info(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.ASSEMBLING.name} - from - {GraphStatus.INITIALIZING.name}')
 
         # If we havent specified a Validate stage for save aggregated results,
         # append one.
@@ -152,7 +152,7 @@ class Graph:
     async def run(self):
 
         await self.logging.hedra.aio.debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.RUNNING.name} - from - {GraphStatus.ASSEMBLING.name}')
-        await self.logging.filesystem.aio['hedra.core'].debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.RUNNING.name} - from - {GraphStatus.ASSEMBLING.name}')
+        await self.logging.filesystem.aio['hedra.core'].info(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.RUNNING.name} - from - {GraphStatus.ASSEMBLING.name}')
         
         self.status = GraphStatus.RUNNING
 
@@ -165,9 +165,9 @@ class Graph:
 
                 for transition in transition_group:
 
-                    await status_spinner.system.debug(f'{self._graph_metadata_log_string} - Executing stage transition from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
-                    await self.logging.filesystem.aio['hedra.core'].info(f'{self._graph_metadata_log_string} - Executing stage transition from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
-                    await self.logging.filesystem.aio['hedra.core'].info(f'{self._graph_metadata_log_string} - Executing stage - {transition.from_stage.name}')
+                    await status_spinner.system.debug(f'{self._graph_metadata_log_string} - Executing stage Transtition - {transition.transition_id} -  from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
+                    await self.logging.filesystem.aio['hedra.core'].info(f'{self._graph_metadata_log_string} - Executing stage Transition - {transition.transition_id} - from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
+                    await self.logging.filesystem.aio['hedra.core'].info(f'{self._graph_metadata_log_string} - Executing stage - {transition.from_stage.name}:{transition.from_stage.stage_id}')
 
                 results = await asyncio.gather(*[
                     asyncio.create_task(transition.transition(
@@ -186,7 +186,7 @@ class Graph:
 
                         self.status = GraphStatus.FAILED
 
-                        await status_spinner.system.debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.FAILED.name} - from - {GraphStatus.RUNNING.name}')
+                        await status_spinner.system.info(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.FAILED.name} - from - {GraphStatus.RUNNING.name}')
                         await self.logging.filesystem.aio['hedra.core'].debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.FAILED.name} - from - {GraphStatus.RUNNING.name}')
 
                         await status_spinner.system.error(f'{self._graph_metadata_log_string} - Encountered error executing stage - {error.from_stage}')
@@ -207,7 +207,7 @@ class Graph:
             
         if self.status == GraphStatus.RUNNING:
             await status_spinner.system.debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.COMPLETE.name} - from - {GraphStatus.RUNNING.name}')
-            await self.logging.filesystem.aio['hedra.core'].debug(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.COMPLETE.name} - from - {GraphStatus.RUNNING.name}')
+            await self.logging.filesystem.aio['hedra.core'].info(f'{self._graph_metadata_log_string} - Changed status to - {GraphStatus.COMPLETE.name} - from - {GraphStatus.RUNNING.name}')
 
             self.status = GraphStatus.COMPLETE
 
