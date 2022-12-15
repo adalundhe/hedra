@@ -44,5 +44,5 @@ class Hook:
         self.config = metadata
         self.checks = checks
         self.session: Any = None
-        self.action = None
+        self.action: Any = None
         self.group = group

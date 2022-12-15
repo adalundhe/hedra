@@ -5,10 +5,15 @@ from time import sleep
 from typing import Dict, Generic
 from hedra.core.engines.client import Client
 from typing_extensions import TypeVarTuple, Unpack
+from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.registry import registered_engines
 from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.graphs.hooks.types.internal import Internal
 from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.core.engines.types.playwright import (
+    MercuryPlaywrightClient,
+    ContextConfig
+)
 from hedra.core.personas.persona_manager import get_persona, registered_personas
 from hedra.plugins.types.plugin_types import PluginType
 
@@ -120,9 +125,25 @@ class Execute(Stage, Generic[Unpack[T]]):
             total_elapsed = statistics.median(elapsed_times)
 
         else:
-
-            persona = get_persona(self.client._config)
+            persona_config = self.client._config
+            persona = get_persona(persona_config)
             persona.setup(self.hooks)
+
+            action_and_task_hooks = [
+                *self.hooks.get(HookType.ACTION, []),
+                *self.hooks.get(HookType.TASK, [])
+            ]
+
+            for hook in action_and_task_hooks:
+                if hook.action.type == RequestTypes.PLAYWRIGHT and isinstance(hook.session, MercuryPlaywrightClient):
+                    await hook.session.setup(ContextConfig(
+                        browser_type=persona_config.browser_type,
+                        device_type=persona_config.device_type,
+                        locale=persona_config.locale,
+                        geolocations=persona_config.geolocations,
+                        permissions=persona_config.permissions,
+                        color_scheme=persona_config.color_scheme
+                    ))
 
             results = await persona.execute()
             total_results = len(results)
