@@ -50,7 +50,7 @@ def optimize_stage(serialized_config: str):
     persona = get_persona(execute_stage_config)
     persona.setup({
         HookType.ACTION: execute_stage_hooks
-    })
+    }, metadata_string)
 
     optimizer = Optimizer({
         'graph_name': graph_name,

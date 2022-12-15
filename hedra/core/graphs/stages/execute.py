@@ -134,7 +134,7 @@ class Execute(Stage, Generic[Unpack[T]]):
 
             persona_config = self.client._config
             persona = get_persona(persona_config)
-            persona.setup(self.hooks)
+            persona.setup(self.hooks, self.metadata_string)
 
             action_and_task_hooks = [
                 *self.hooks.get(HookType.ACTION, []),
