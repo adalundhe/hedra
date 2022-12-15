@@ -1,7 +1,7 @@
 import time
 import asyncio
 import uuid
-from hedra.tools.helpers import awaitable
+import psutil
 from hedra.tools.data_structures.async_list import AsyncList
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.engines.client.config import Config
@@ -20,6 +20,7 @@ class RampedPersona(DefaultPersona):
         elapsed = 0
         idx = 0
         action_idx = 0
+        max_pool_size = int(self.batch.size * (psutil.cpu_count(logical=False) * 2)/self.workers)
         generation_batch_size = int(self.batch.size * self.batch.gradient)
         self._hooks[action_idx].session.shrink_pool(self.batch.size - generation_batch_size)
 
@@ -49,3 +50,13 @@ class RampedPersona(DefaultPersona):
                 
                 action_idx = (action_idx + 1) % self.actions_count
                 await asyncio.sleep(self.batch.interval)
+
+            if self._hooks[action_idx].session.active%max_pool_size == 0:
+                    try:
+                        max_wait = total_time - elapsed
+                        await asyncio.wait_for(
+                            self._hooks[action_idx].session.wait_for_active_threshold(),
+                            timeout=max_wait
+                        )
+                    except asyncio.TimeoutError:
+                        pass

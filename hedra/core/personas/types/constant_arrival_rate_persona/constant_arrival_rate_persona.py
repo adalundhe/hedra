@@ -2,6 +2,7 @@ import math
 import time
 import asyncio
 import uuid
+import psutil
 from asyncio import Task
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.types.default_persona.default_persona import DefaultPersona
@@ -102,6 +103,7 @@ class ConstantArrivalPersona(DefaultPersona):
         elapsed = 0
         idx = 0
         action_idx = 0
+        max_pool_size = int(self.batch.size * (psutil.cpu_count(logical=False) * 2)/self.workers)
         self.completed_counter.last_batch_size = self.batch.size
 
         start = time.time()
@@ -140,3 +142,14 @@ class ConstantArrivalPersona(DefaultPersona):
 
                 action_idx = (action_idx + 1) % self.actions_count
                 await asyncio.sleep(self.batch.interval)
+
+            if self._hooks[action_idx].session.active%max_pool_size == 0:
+                    try:
+                        max_wait = total_time - elapsed
+                        await asyncio.wait_for(
+                            self._hooks[action_idx].session.wait_for_active_threshold(),
+                            timeout=max_wait
+                        )
+                    except asyncio.TimeoutError:
+                        pass
+

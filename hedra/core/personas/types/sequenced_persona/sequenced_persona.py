@@ -7,10 +7,10 @@ from hedra.core.engines.client.config import Config
 from hedra.core.personas.types.types import PersonaTypes
 
 
-class SequencedPersonaCollection(DefaultPersona):
+class SequencedPersona(DefaultPersona):
 
     def __init__(self, config: Config):
-        super(SequencedPersonaCollection, self).__init__(config)
+        super(SequencedPersona, self).__init__(config)
 
         self.persona_id = str(uuid.uuid4())
         self.type = PersonaTypes.SEQUENCE

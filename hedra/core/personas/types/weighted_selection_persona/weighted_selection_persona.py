@@ -2,6 +2,7 @@ import random
 import time
 import asyncio
 import uuid
+import psutil
 from typing import Dict, List
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.graphs.hooks.types.hook import Hook
@@ -59,6 +60,7 @@ class WeightedSelectionPersona(DefaultPersona):
 
     async def generator(self, total_time):
         elapsed = 0
+        max_pool_size = int(self.batch.size * (psutil.cpu_count(logical=False) * 2)/self.workers)
 
         start = time.time()
         while elapsed < total_time:
@@ -67,6 +69,16 @@ class WeightedSelectionPersona(DefaultPersona):
                 
                 await asyncio.sleep(0)
                 elapsed = time.time() - start
+            
+                if self._hooks[action_idx].session.active%max_pool_size == 0:
+                    try:
+                        max_wait = total_time - elapsed
+                        await asyncio.wait_for(
+                            self._hooks[action_idx].session.wait_for_active_threshold(),
+                            timeout=max_wait
+                        )
+                    except asyncio.TimeoutError:
+                        pass
 
             self.sample = random.choices(
                 self.indexes,

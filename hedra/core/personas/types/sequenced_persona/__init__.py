@@ -1,1 +1,1 @@
-from .sequenced_persona_collection import SequencedPersonaCollection
+from .sequenced_persona import SequencedPersona

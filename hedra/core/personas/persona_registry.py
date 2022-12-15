@@ -1,6 +1,6 @@
 from .types.default_persona import DefaultPersona
 from .types.batched_persona import BatchedPersona
-from .types.sequenced_persona import SequencedPersonaCollection
+from .types.sequenced_persona import SequencedPersona
 from .types.ramped_persona import RampedPersona
 from .types.ramped_interval_persona import RampedIntervalPersona
 from .types.weighted_selection_persona import WeightedSelectionPersona
@@ -18,7 +18,7 @@ registered_personas = {
     PersonaTypes.RAMPED_INTERVAL: lambda config: RampedIntervalPersona(config),
     PersonaTypes.CONSTANT_ARRIVAL: lambda config: ConstantArrivalPersona(config),
     PersonaTypes.CONSTANT_SPAWN: lambda config: ConstantSpawnPersona(config),
-    PersonaTypes.SEQUENCE: lambda config: SequencedPersonaCollection(config),
+    PersonaTypes.SEQUENCE: lambda config: SequencedPersona(config),
     PersonaTypes.WEIGHTED: lambda config: WeightedSelectionPersona(config),
     PersonaTypes.NO_WAIT: lambda config: CyclicNoWaitPersona(config)
 }
