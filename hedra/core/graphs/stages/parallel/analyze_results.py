@@ -5,6 +5,7 @@ import time
 import dill
 import threading
 import os
+import traceback
 from collections import defaultdict
 from typing import Any, Dict, List
 from hedra.core.engines.types.common.base_result import BaseResult
@@ -43,7 +44,7 @@ async def process_batch(
         
         for events_stage_name, events_group in events.items():  
 
-            await events_group.logger.filesystem.aio['hedra.reporting'].debug(
+            await logger.filesystem.aio['hedra.reporting'].debug(
                 f'{metadata_string} - Events group - {events_group.events_group_id} - created for Stage - {events_stage_name} - Processed - {events_group.total}'
             )
 
@@ -85,4 +86,5 @@ def group_batched_results(config: Dict[str, Any]):
         )
 
     except Exception as e:
+        print(traceback.format_exc())
         raise e

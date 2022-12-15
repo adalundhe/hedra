@@ -19,7 +19,6 @@ class EventsGroup:
 
     __slots__ = (
         'events_group_id',
-        'logger',
         'source',
         'groups',
         'events',
@@ -38,8 +37,6 @@ class EventsGroup:
     def __init__(self) -> None:
 
         self.events_group_id = str(uuid.uuid4())
-        self.logger = HedraLogger()
-        self.logger.initialize()
 
         self.groups: Dict[Dict[str, Union[int, float]]] = {}
         self.timings = defaultdict(list)
