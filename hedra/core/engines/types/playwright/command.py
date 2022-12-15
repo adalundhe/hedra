@@ -1,4 +1,4 @@
-from typing import Coroutine, Dict, List
+from typing import Coroutine, Dict, List, Any
 from hedra.core.engines.types.common.metadata import Metadata
 from .hooks import Hooks
 
@@ -20,17 +20,33 @@ class URL:
 
 class Input:
 
-    def __init__(self, key=None, text=None, function=None, args=None, filepath=None, file=None) -> None:
+    def __init__(
+        self, 
+        key=None, 
+        text=None, 
+        expression: str=None, 
+        args: List[Any]=None, 
+        filepath=None, 
+        file=None, 
+        path: str=None,
+        option: Any=None,
+        by_label: bool=False,
+        by_value: bool=False
+    ) -> None:
         self.key = key
         self.text = text
-        self.function = function
+        self.expression = expression
         self.args = args
         self.filepath = filepath
         self.file = file
+        self.path = path
+        self.option = option
+        self.by_label = by_label
+        self.by_value = by_value
 
 class Options:
 
-    def __init__(self, event=None, option=None, is_checked=False, timeout=10, extra={}, switch_by: str='url') -> None:
+    def __init__(self, event: str=None, option=None, is_checked=False, timeout=10, extra={}, switch_by: str='url') -> None:
         self.event = event
         self.option = option
         self.is_checked = is_checked

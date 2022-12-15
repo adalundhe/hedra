@@ -30,13 +30,17 @@ class MercuryPlaywrightClient:
         self._discarded_context_groups: List[ContextGroup] = []
         self._discarded_contexts = []
         self._pending_context_groups: List[ContextGroup] = []
+        self._playwright_setup = False
         
 
     async def setup(self, config: ContextConfig):
-        self.config = config
-        self.pool.create_pool(self.config)
-        for context_group in self.pool:
-            await context_group.create()
+        if self._playwright_setup is False:
+            self.config = config
+            self.pool.create_pool(self.config)
+            for context_group in self.pool:
+                await context_group.create()
+
+            self._playwright_setup = True
 
     async def prepare(self, command: PlaywrightCommand) -> Awaitable[None]:
 

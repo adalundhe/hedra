@@ -1,4 +1,4 @@
-from typing import Coroutine, List, Optional
+from typing import Coroutine, List, Optional, Any
 from hedra.core.graphs.hooks.types.hook_types import HookType
 
 
@@ -43,6 +43,6 @@ class Hook:
         self.names = list(set(names))
         self.config = metadata
         self.checks = checks
-        self.session = None
+        self.session: Any = None
         self.action = None
         self.group = group

@@ -34,3 +34,10 @@ class Config:
 
         if self.request_timeout > self.total_time:
             self.request_timeout = self.total_time
+
+        self.browser_type = kwargs.get('browser_type', 'chromium')
+        self.device_type = kwargs.get('device_type')
+        self.locale = kwargs.get('locale')
+        self.geolocations = kwargs.get('geolocations')
+        self.permissions = kwargs.get('permissions')
+        self.color_scheme = kwargs.get('color_scheme')

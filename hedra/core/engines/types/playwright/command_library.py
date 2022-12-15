@@ -1,4 +1,5 @@
 import uuid
+from playwright.async_api import Page
 from hedra.tools.helpers import awaitable
 from .command import PlaywrightCommand
 
@@ -7,7 +8,7 @@ class CommandLibrary:
 
 
     def __init__(self, page) -> None:
-        self.page = page
+        self.page: Page = page
 
     async def goto(self, command: PlaywrightCommand):
         await self.page.goto(
@@ -62,7 +63,7 @@ class CommandLibrary:
     async def evaluate_selector(self, command: PlaywrightCommand):
         await self.page.eval_on_selector(
             command.page.selector, 
-            command.input.function, 
+            command.input.expression, 
             *command.input.args, 
             **command.options.extra
         )
@@ -70,21 +71,21 @@ class CommandLibrary:
     async def evaluate_all_selectors(self, command: PlaywrightCommand):
         await self.page.eval_on_selector_all(
             command.page.selector,
-            command.input.function, 
+            command.input.expression, 
             *command.input.args, 
             **command.options.extra
         )
 
-    async def evaluate_function(self, command: PlaywrightCommand):
+    async def evaluate_expression(self, command: PlaywrightCommand):
         await self.page.evaluate(
-            command.input.function, 
+            command.input.expression, 
             *command.input.args, 
             **command.options.extra
         )
 
     async def evaluate_handle(self, command: PlaywrightCommand):
         await self.page.evaluate_handle(
-            command.input.function, 
+            command.input.expression, 
             *command.input.args, 
             **command.options.extra
         )
@@ -93,7 +94,7 @@ class CommandLibrary:
         await self.page.expect_console_message(
             predicate=await self.page.on(
                 'console',
-                command.input.function
+                command.input.expression
             ), 
             **command.options.extra
         )
@@ -102,7 +103,7 @@ class CommandLibrary:
         await self.page.expect_download(
             predicate=await self.page.on(
                 'download', 
-                command.input.function
+                command.input.expression
             ), 
             **command.options.extra
         )
@@ -123,7 +124,7 @@ class CommandLibrary:
         await self.page.expect_popup(
             predicate=await self.page.on(
                 'popup', 
-                command.input.function
+                command.input.expression
             )
         )
 
@@ -139,7 +140,7 @@ class CommandLibrary:
         )
 
     async def expect_response(self, command: PlaywrightCommand):
-        await self.page.exepect_response(
+        await self.page.expect_response(
             command.url.location, 
             **command.options.extra
         )
@@ -224,18 +225,33 @@ class CommandLibrary:
         await self.page.reload(**command.options.extra)
 
     async def take_screenshot(self, command: PlaywrightCommand):
-        file_id = await awaitable(uuid.uuid4)
         await self.page.screenshot(
-            path=f'{command.input.path}/{file_id}.png', 
+            path=f'{command.input.path}.png', 
             **command.options.extra
         )
 
     async def select_option(self, command: PlaywrightCommand):
-        await self.page.select_option(
-            command.page.selector, 
-            command.options.option, 
-            **command.options.extra
-        )
+
+        if command.input.by_label:
+            await self.page.select_option(
+                command.page.selector, 
+                label=command.input.option, 
+                **command.options.extra
+            )
+
+        elif command.input.by_value:
+            await self.page.select_option(
+                command.page.selector, 
+                value=command.input.option, 
+                **command.options.extra
+            )
+
+        else:
+            await self.page.select_option(
+                command.page.selector, 
+                command.input.option, 
+                **command.options.extra
+            )
 
     async def set_checked(self, command: PlaywrightCommand):
         await self.page.set_checked(
@@ -289,7 +305,7 @@ class CommandLibrary:
 
     async def wait_for_function(self, command: PlaywrightCommand):
         await self.page.wait_for_function(
-            command.input.function, 
+            command.input.expression, 
             *command.input.args, 
             **command.options.extra
         )
@@ -314,7 +330,7 @@ class CommandLibrary:
 
     async def switch_frame(self, command: PlaywrightCommand):
 
-        if command.options.switch_by == 'url':
+        if command.url.location == 'url':
             await self.page.frame(url=command.url.location)
 
         else:
