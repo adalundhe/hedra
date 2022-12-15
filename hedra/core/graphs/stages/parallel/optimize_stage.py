@@ -2,6 +2,7 @@ import asyncio
 import dill
 import threading
 import os
+from collections import defaultdict
 from typing import Any, Dict, List, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.graphs.hooks.registry.registrar import registrar
@@ -39,18 +40,18 @@ def optimize_stage(serialized_config: str):
 
     metadata_string = f'Graph - {graph_name}:{graph_id} - thread:{thread_id} - process:{process_id} - Stage: {source_stage_name}:{source_stage_id} - '
 
-    execute_stage_hooks = [
-        registrar.all.get(hook_name) for hook_name in optimization_config.get('execute_stage_hooks')
-    ]
+    execute_stage_hooks = defaultdict(list)
+    for hook_name in optimization_config.get('execute_stage_hooks'):
+        hook = registrar.all.get(hook_name)
+        execute_stage_hooks[hook.hook_type].append(hook)
+
 
     logger.filesystem.sync['hedra.optimize'].info(f'{metadata_string} - Setting up Optimization')
 
     execute_stage_config.batch_size = batch_size
 
     persona = get_persona(execute_stage_config)
-    persona.setup({
-        HookType.ACTION: execute_stage_hooks
-    }, metadata_string)
+    persona.setup(execute_stage_hooks, metadata_string)
 
     optimizer = Optimizer({
         'graph_name': graph_name,

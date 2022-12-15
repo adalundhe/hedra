@@ -90,6 +90,10 @@ class Optimize(Stage):
             batch_size = int(stage_config.batch_size/assigned_workers_count)
 
             for worker_idx in range(assigned_workers_count):
+                
+                execute_stage_actions = [hook.name for hook in stage.hooks.get(HookType.ACTION)]
+                execute_stage_tasks = [hook.name for hook in stage.hooks.get(HookType.TASK)]
+
                 configs.append({
                     'graph_name': self.graph_name,
                     'graph_id': self.graph_id,
@@ -105,7 +109,8 @@ class Optimize(Stage):
                     'optimizer_iterations': self.optimize_iterations,
                     'optimizer_algorithm': self.algorithm,
                     'execute_stage_hooks': [
-                        hook.name for hook in stage.hooks.get(HookType.ACTION)
+                        *execute_stage_actions,
+                        *execute_stage_tasks
                     ],
                     'time_limit': self.time_limit
                 })

@@ -37,7 +37,7 @@ class WeightedSelectionPersona(DefaultPersona):
         argument. You may specify a wait between batches (between each step) by specifying an integer number of seconds via the --batch-interval argument.
         '''
 
-    async def setup(self, hooks: Dict[HookType, List[Hook]], metadata_string: str):
+    def setup(self, hooks: Dict[HookType, List[Hook]], metadata_string: str):
 
         self.metadata_string = f'{metadata_string} Persona: {self.type.capitalize()}:{self.persona_id} - '
         
