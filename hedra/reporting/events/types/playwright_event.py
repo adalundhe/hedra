@@ -5,6 +5,8 @@ from .base_event import BaseEvent
 class PlaywrightEvent(BaseEvent):
 
     __slots__ = (
+        'event_id',
+        'action_id',
         'url',
         'headers',
         'command',

@@ -1,4 +1,4 @@
-from types import FunctionType
+import uuid
 from typing import Any, Coroutine, Dict, Iterator, Union, List
 from .metadata import Metadata
 from .hooks import Hooks
@@ -6,7 +6,14 @@ from .types import ProtocolMap
 
 class BaseAction:
 
-    __slots__ = ( 'protocols', 'name', 'is_setup', 'metadata', 'hooks')
+    __slots__ = ( 
+        'action_id'
+        'protocols', 
+        'name', 
+        'is_setup', 
+        'metadata', 
+        'hooks'
+    )
 
     def __init__(
         self, 
@@ -16,6 +23,7 @@ class BaseAction:
     ) -> None:
         self.protocols = ProtocolMap()
 
+        self.action_id = str(uuid.uuid4())
         self.name = name
         self.is_setup = False
         self.metadata = Metadata(user, tags)

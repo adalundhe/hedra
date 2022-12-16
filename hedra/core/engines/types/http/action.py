@@ -11,6 +11,7 @@ from hedra.core.engines.types.common.types import RequestTypes
 class HTTPAction(BaseAction):
 
     __slots__ = (
+        'action_id',
         'method',
         'type',
         'url',

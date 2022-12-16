@@ -1,4 +1,5 @@
 import traceback
+import uuid
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.reporting.tags import Tag
@@ -7,6 +8,8 @@ from hedra.reporting.tags import Tag
 class BaseEvent:
 
     __slots__ = (
+        'event_id',
+        'action_id',
         'name',
         'shortname',
         'error',
@@ -20,6 +23,10 @@ class BaseEvent:
     )
 
     def __init__(self, result: BaseResult) -> None:
+
+        self.event_id = str(uuid.uuid4())
+        self.action_id = result.action_id
+
         self.name = None
         self.shortname = result.name
         self.error = result.error

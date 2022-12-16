@@ -10,6 +10,7 @@ from .action import HTTPAction
 class HTTPResult(BaseResult):
 
     __slots__ = (
+        'action_id',
         'url',
         'ip_addr',
         'method',
@@ -31,6 +32,7 @@ class HTTPResult(BaseResult):
             HTTPResult,
             self
         ).__init__(
+            action.action_id,
             action.name,
             action.url.hostname,
             action.metadata.user,

@@ -6,6 +6,7 @@ from .command import PlaywrightCommand
 class PlaywrightResult(BaseResult):
 
     __slots__ = (
+        'action_id',
         'url',
         'headers',
         'command',
@@ -20,6 +21,7 @@ class PlaywrightResult(BaseResult):
             PlaywrightResult,
             self
         ).__init__(
+            command.action_id,
             command.name,
             command.url.location,
             command.metadata.user,

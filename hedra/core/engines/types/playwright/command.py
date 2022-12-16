@@ -1,3 +1,4 @@
+import uuid
 from typing import Coroutine, Dict, List, Any
 from hedra.core.engines.types.common.metadata import Metadata
 from .hooks import Hooks
@@ -134,6 +135,7 @@ class Options:
 class PlaywrightCommand:
 
     __slots__ = (
+        'action_id'
         'name',
         'command',
         'page',
@@ -154,6 +156,7 @@ class PlaywrightCommand:
         user: str = None, 
         tags: List[Dict[str, str]] = []
     ) -> None:
+        self.action_id = str(uuid.uuid4())
         self.name = name
         self.command = command
         self.page = page

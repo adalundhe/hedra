@@ -7,6 +7,7 @@ from .action import UDPAction
 class UDPResult(BaseResult):
 
     __slots__ = (
+        'action_id',
         'url',
         'ip_addr',
         'has_response',
@@ -27,6 +28,7 @@ class UDPResult(BaseResult):
             UDPResult,
             self
         ).__init__(
+            action.action_id,
             action.name,
             action.url.hostname,
             action.metadata.user,

@@ -7,6 +7,8 @@ from .base_event import BaseEvent
 class HTTPEvent(BaseEvent):
 
     __slots__ = (
+        'event_id',
+        'action_id',
         'url',
         'ip_addr',
         'method',

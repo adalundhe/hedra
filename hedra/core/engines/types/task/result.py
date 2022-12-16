@@ -6,6 +6,7 @@ from .task import Task
 class TaskResult(BaseResult):
 
     __slots__ = (
+        'action_id',
         'wait_start',
         'start',
         'complete',
@@ -18,6 +19,7 @@ class TaskResult(BaseResult):
             TaskResult,
             self
         ).__init__(
+            task.action_id,
             task.name,
             task.source,
             task.metadata.user,

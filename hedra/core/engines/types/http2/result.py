@@ -11,6 +11,7 @@ from .action import HTTP2Action
 class HTTP2Result(BaseResult):
 
     __slots__ = (
+        'action_id',
         'url',
         'ip_addr',
         'method',
@@ -35,6 +36,7 @@ class HTTP2Result(BaseResult):
             HTTP2Result,
             self
         ).__init__(
+            action.action_id,
             action.name,
             action.url.hostname,
             action.metadata.user,

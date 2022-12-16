@@ -5,6 +5,7 @@ from .types import RequestTypes
 class BaseResult:
 
     __slots__ = (
+        'action_id',
         'name',
         'checks',
         'error',
@@ -22,6 +23,7 @@ class BaseResult:
 
     def __init__(
         self, 
+        action_id: str,
         name: str, 
         source: str,
         user: str,
@@ -30,6 +32,7 @@ class BaseResult:
         checks: List[Coroutine], 
         error: Exception
     ) -> None:
+        self.action_id = action_id
         self.name = name
         self.checks = checks
         self.error = error
