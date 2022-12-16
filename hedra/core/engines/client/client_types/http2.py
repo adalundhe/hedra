@@ -5,7 +5,8 @@ from types import FunctionType
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.http2 import(
     MercuryHTTP2Client,
-    HTTP2Action
+    HTTP2Action,
+    HTTP2Result
 )
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common import Timeouts
@@ -14,7 +15,7 @@ from hedra.logging import HedraLogger
 from .base_client import BaseClient
 
 
-class HTTP2Client(BaseClient):
+class HTTP2Client(BaseClient[MercuryHTTP2Client, HTTP2Action, HTTP2Result]):
     
     def __init__(self, config: Config) -> None:
         super().__init__()
@@ -58,17 +59,7 @@ class HTTP2Client(BaseClient):
             tags=tags
         )
         
-        await self.session.prepare(request)
-
-        if self.intercept:
-
-            self.actions.store(self.next_name, request, self.session)
-
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_request(request)
+        return await self._execute_action(request)
 
     async def post(
         self,
@@ -88,27 +79,8 @@ class HTTP2Client(BaseClient):
             user=user,
             tags=tags
         )
-        
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Preparing Action - {request.name}'
-        )
-        await self.session.prepare(request)
-        
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Prepared Action - {request.name}'
-        )
-
-        if self.intercept:
-            await self.logger.filesystem.aio['hedra.core'].debug(
-                f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Initiating suspense for Action - {request.name} - and storing'
-            )
-            self.actions.store(self.next_name, request, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_request(request)
+    
+        return await self._execute_action(request)
 
 
     async def put(
@@ -130,26 +102,7 @@ class HTTP2Client(BaseClient):
             tags=tags
         )
 
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Preparing Action - {request.name}'
-        )
-        await self.session.prepare(request)
-        
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Prepared Action - {request.name}'
-        )
-
-        if self.intercept:
-            await self.logger.filesystem.aio['hedra.core'].debug(
-                f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Initiating suspense for Action - {request.name} - and storing'
-            )
-            self.actions.store(self.next_name, request, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_request(request)
+        return await self._execute_action(request)
 
 
     async def patch(
@@ -171,26 +124,7 @@ class HTTP2Client(BaseClient):
             tags=tags
         )
 
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Preparing Action - {request.name}'
-        )
-        await self.session.prepare(request)
-        
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Prepared Action - {request.name}'
-        )
-
-        if self.intercept:
-            await self.logger.filesystem.aio['hedra.core'].debug(
-                f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Initiating suspense for Action - {request.name} - and storing'
-            )
-            self.actions.store(self.next_name, request, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_request(request)
+        return await self._execute_action(request)
 
 
     async def delete(
@@ -211,23 +145,4 @@ class HTTP2Client(BaseClient):
             tags=tags
         )
 
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Preparing Action - {request.name}'
-        )
-        await self.session.prepare(request)
-        
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Prepared Action - {request.name}'
-        )
-
-        if self.intercept:
-            await self.logger.filesystem.aio['hedra.core'].debug(
-                f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Initiating suspense for Action - {request.name} - and storing'
-            )
-            self.actions.store(self.next_name, request, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-            
-        return await self.session.execute_prepared_request(request)
+        return await self._execute_action(request)

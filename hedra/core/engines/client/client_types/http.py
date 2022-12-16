@@ -1,8 +1,11 @@
 import asyncio
 from typing import Dict, Iterator, List, Union
 from hedra.core.engines.client.config import Config
-from hedra.core.engines.types.http.client import MercuryHTTPClient
-from hedra.core.engines.types.http.action import HTTPAction
+from hedra.core.engines.types.http import (
+    MercuryHTTPClient,
+    HTTPAction,
+    HTTPResult
+)
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.client.store import ActionsStore
@@ -10,7 +13,7 @@ from hedra.logging import HedraLogger
 from .base_client import BaseClient
 
 
-class HTTPClient(BaseClient):
+class HTTPClient(BaseClient[MercuryHTTPClient, HTTPAction, HTTPResult]):
 
     def __init__(self, config: Config) -> None:
         super().__init__()
@@ -57,26 +60,7 @@ class HTTPClient(BaseClient):
             redirects=redirects             
         )
 
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Preparing Action - {request.name}'
-        )
-        await self.session.prepare(request)
-
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Prepared Action - {request.name}'
-        )
-
-        if self.intercept:
-            await self.logger.filesystem.aio['hedra.core'].debug(
-                f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Initiating suspense for Action - {request.name} - and storing'
-            )
-            self.actions.store(self.next_name, request, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_request(request)
+        return await self._execute_action(request)
 
     async def post(
         self,
@@ -99,26 +83,7 @@ class HTTPClient(BaseClient):
             redirects=redirects           
         )
 
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Preparing Action - {request.name}'
-        )
-        await self.session.prepare(request)
-
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Prepared Action - {request.name}'
-        )
-
-        if self.intercept:
-            await self.logger.filesystem.aio['hedra.core'].debug(
-                f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Initiating suspense for Action - {request.name} - and storing'
-            )
-            self.actions.store(self.next_name, request, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_request(request)
+        return await self._execute_action(request)
 
     async def put(
         self,
@@ -141,26 +106,7 @@ class HTTPClient(BaseClient):
             redirects=redirects
         )
 
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Preparing Action - {request.name}'
-        )
-        await self.session.prepare(request)
-
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Prepared Action - {request.name}'
-        )
-
-        if self.intercept:
-            await self.logger.filesystem.aio['hedra.core'].debug(
-                f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Initiating suspense for Action - {request.name} - and storing'
-            )
-            self.actions.store(self.next_name, request, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_request(request)
+        return await self._execute_action(request)
 
     async def patch(
         self,
@@ -183,26 +129,7 @@ class HTTPClient(BaseClient):
             redirects=redirects
         )
 
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Preparing Action - {request.name}'
-        )
-        await self.session.prepare(request)
-
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Prepared Action - {request.name}'
-        )
-
-        if self.intercept:
-            await self.logger.filesystem.aio['hedra.core'].debug(
-                f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Initiating suspense for Action - {request.name} - and storing'
-            )
-            self.actions.store(self.next_name, request, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_request(request)
+        return await self._execute_action(request)
 
     async def delete(
         self, 
@@ -223,23 +150,4 @@ class HTTPClient(BaseClient):
             redirects=redirects
         )
 
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Preparing Action - {request.name}'
-        )
-        await self.session.prepare(request)
-
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Prepared Action - {request.name}'
-        )
-
-        if self.intercept:
-            await self.logger.filesystem.aio['hedra.core'].debug(
-                f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Initiating suspense for Action - {request.name} - and storing'
-            )
-            self.actions.store(self.next_name, request, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_request(request)
+        return await self._execute_action(request)

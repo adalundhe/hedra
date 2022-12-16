@@ -5,7 +5,8 @@ from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.grpc import (
     MercuryGRPCClient,
-    GRPCAction
+    GRPCAction,
+    GRPCResult
 )
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.client.store import ActionsStore
@@ -13,7 +14,7 @@ from hedra.logging import HedraLogger
 from .base_client import BaseClient
 
 
-class GRPCClient(BaseClient):
+class GRPCClient(BaseClient[MercuryGRPCClient, GRPCAction, GRPCResult]):
     
     def __init__(self, config: Config) -> None:
         super().__init__()
@@ -57,23 +58,4 @@ class GRPCClient(BaseClient):
             tags=tags
         )
 
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Preparing Action - {request.name}'
-        )
-        await self.session.prepare(request)
-
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Prepared Action - {request.name}'
-        )
-
-        if self.intercept:
-            await self.logger.filesystem.aio['hedra.core'].debug(
-                f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Initiating suspense for Action - {request.name} - and storing'
-            )
-            self.actions.store(self.next_name, request, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return self.session.execute_prepared_request(request)
+        return await self._execute_action(request)

@@ -5,7 +5,8 @@ from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.types.websocket import (
     MercuryWebsocketClient,
-    WebsocketAction
+    WebsocketAction,
+    WebsocketResult
 )
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.client.store import ActionsStore
@@ -13,7 +14,7 @@ from hedra.logging import HedraLogger
 from .base_client import BaseClient
 
 
-class WebsocketClient(BaseClient):
+class WebsocketClient(BaseClient[MercuryWebsocketClient, WebsocketAction, WebsocketResult]):
 
     def __init__(self, config: Config) -> None:
         super().__init__()
@@ -31,9 +32,6 @@ class WebsocketClient(BaseClient):
         self.actions: ActionsStore = None
         self.next_name = None
         self.intercept = False
-
-        self.logger = HedraLogger()
-        self.logger.initialize()
 
     def __getitem__(self, key: str):
         return self.session.registered.get(key)
@@ -56,26 +54,7 @@ class WebsocketClient(BaseClient):
             tags=tags
         )
 
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Preparing Action - {request.name}'
-        )
-        await self.session.prepare(request)
-
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Prepared Action - {request.name}'
-        )
-
-        if self.intercept:
-            await self.logger.filesystem.aio['hedra.core'].debug(
-                f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Initiating suspense for Action - {request.name} - and storing'
-            )
-            self.actions.store(self.next_name, request, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return self.session.execute_prepared_request(request)
+        return await self._execute_action(request)
 
     async def send(
         self, 
@@ -96,23 +75,4 @@ class WebsocketClient(BaseClient):
             tags=tags
         )
 
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Preparing Action - {request.name}'
-        )
-        await self.session.prepare(request)
-
-        await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Prepared Action - {request.name}'
-        )
-
-        if self.intercept:
-            await self.logger.filesystem.aio['hedra.core'].debug(
-                f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Initiating suspense for Action - {request.name} - and storing'
-            )
-            self.actions.store(self.next_name, request, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return self.session.execute_prepared_request(request)
+        return await self._execute_action(request)
