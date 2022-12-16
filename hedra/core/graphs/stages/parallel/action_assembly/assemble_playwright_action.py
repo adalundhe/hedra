@@ -87,7 +87,7 @@ async def assemble_playwright_command(
         tags=action_metadata.get('tags', [])
     )
 
-    for field_name, field_value in hook.action.to_serializable():
+    for field_name, field_value in hook.action.iter_values():
         if field_value is not None:
             await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - {hook_type_name} Hook - {action_name} - {field_name.capitalize()}: {field_value}')
 

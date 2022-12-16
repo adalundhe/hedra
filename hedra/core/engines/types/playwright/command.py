@@ -183,7 +183,7 @@ class PlaywrightCommand:
         }
 
     def iter_values(self):
-        fields = {
+        return {
             'name': self.name,
             'command': self.command,
             **self.page.to_serializable(),
