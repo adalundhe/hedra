@@ -1,5 +1,8 @@
 import uuid
+import threading
+import os
 from typing import Any, List, TypeVar, Union
+from hedra.logging import HedraLogger
 from hedra.plugins.types.reporter.reporter_config import ReporterConfig
 from .types import ReporterTypes
 from .types import (
@@ -135,11 +138,22 @@ class Reporter:
 
     def __init__(self, reporter_config: Union[ReporterConfig, ReporterType]) -> None:
         self.reporter_id = str(uuid.uuid4())
+        self.logger = HedraLogger()
+        self.logger.initialize()
+
+        self.graph_name: str=None
+        self.graph_id: str=None
+        self.stage_name: str=None
+        self.stage_id: str=None
+        self.metadata_string: str=None
+        self.thread_id = threading.current_thread().ident
+        self.process_id = os.getpid()
 
         if reporter_config is None:
             reporter_config = JSONConfig()
 
         self.reporter_type = reporter_config.reporter_type
+        self.reporter_type_name = self.reporter_type.name.capitalize()
         self.reporter_config = reporter_config
         
         selected_reporter = self.reporters.get(self.reporter_type)
@@ -150,22 +164,49 @@ class Reporter:
             self.selected_reporter = selected_reporter(reporter_config)
 
     async def connect(self):
+        self.metadata_string = f'Graph - {self.graph_name}:{self.graph_id} - thread:{self.thread_id} - process:{self.process_id} - Stage: {self.stage_name}:{self.stage_id} - Reporter: {self.reporter_type_name}:{self.reporter_id} - '
+        self.selected_reporter.metadata_string = self.metadata_string
+
+        await self.logger.filesystem.aio.create_logfile('hedra.reporting.log')
+        self.logger.filesystem.create_filelogger('hedra.reporting.log')
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connecting')
         await self.selected_reporter.connect()
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected')
+
     async def submit_common(self, metrics: List[Any]):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting {len(metrics)} shared metrics')
         await self.selected_reporter.submit_common(metrics)
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted {len(metrics)} shared metrics')
+
     async def submit_events(self, events: List[Any]):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting {len(events)} events')
         await self.selected_reporter.submit_events(events)
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted {len(events)} events')
+
     async def submit_metrics(self, metrics: List[Any]):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting {len(metrics)} metrics')
         await self.selected_reporter.submit_metrics(metrics)
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted {len(metrics)} metrics')
+
     async def submit_custom(self, metrics: List[Any]):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting {len(metrics)} custom metrics')
         await self.selected_reporter.submit_custom(metrics)
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted {len(metrics)} custom metrics')
+
     async def submit_errors(self, metrics: List[Any]):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting {len(metrics)} errors')
         await self.selected_reporter.submit_errors(metrics)
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted {len(metrics)} errors')
+
     async def close(self):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closing')
         await self.selected_reporter.close()
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closed')

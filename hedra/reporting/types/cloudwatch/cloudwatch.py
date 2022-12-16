@@ -2,9 +2,11 @@ import asyncio
 import functools
 import datetime
 import json
+import uuid
 from typing import List
 
 import psutil
+from hedra.logging import HedraLogger
 from hedra.reporting.events.types.base_event import BaseEvent
 from hedra.reporting.metric import MetricsSet
 from concurrent.futures import ThreadPoolExecutor
@@ -35,6 +37,11 @@ class Cloudwatch:
         self.metrics_rule_name = config.metrics_rule
         self.errors_rule_name = 'stage_errors'
 
+        self.session_uuid = str(uuid.uuid4())
+        self.metadata_string: str = None
+        self.logger = HedraLogger()
+        self.logger.initialize()
+
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self.events_rule = None
         self.metrics_rule= None
@@ -43,6 +50,9 @@ class Cloudwatch:
         self._loop = asyncio.get_event_loop()
 
     async def connect(self):
+        
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating AWS Cloudwatch client for region - {self.region_name}')
+
         self.client = await self._loop.run_in_executor(
             self._executor,
             functools.partial(
@@ -54,7 +64,11 @@ class Cloudwatch:
             )
         )
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created AWS Cloudwatch client for region - {self.region_name}')
+
     async def submit_events(self, events: List[BaseEvent]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to Cloudwatch rule - {self.events_rule_name}')
 
         cloudwatch_events = [
             {
@@ -77,8 +91,13 @@ class Cloudwatch:
             timeout=self.submit_timeout
         )
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Events to Cloudwatch rule - {self.events_rule_name}')
+
     
     async def submit_common(self, metrics_sets: List[MetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics to Cloudwatch rule - {self.metrics_rule_name}')
+
         common_metrics = [
             {
                 'Time': datetime.datetime.now(),
@@ -105,11 +124,19 @@ class Cloudwatch:
             timeout=self.submit_timeout
         )
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics to Cloudwatch rule - {self.metrics_rule_name}')
+
     async def submit_metrics(self, metrics: List[MetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics to Cloudwatch rule - {self.metrics_rule_name}')
 
         metrics = []
         for metrics_set in metrics:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.metrics_set_id}')
+
             for group_name, group in metrics_set.groups.items():
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Group - {group_name}:{group.metrics_group_id}')
+                
                 metrics.append({
                     'Time': datetime.datetime.now(),
                     'Detail': json.dumps({
@@ -132,11 +159,19 @@ class Cloudwatch:
             timeout=self.submit_timeout
         )
 
-    async def submit_common(self, metrics_sets: List[MetricsSet]):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics to Cloudwatch rule - {self.metrics_rule_name}')
+
+    async def submit_custom(self, metrics_sets: List[MetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to Cloudwatch rule - {self.metrics_rule_name}')
 
         custom_metrics = []
         for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.metrics_set_id}')
+
             for custom_group_name, group in metrics_set.custom_metrics.items():
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Group - {custom_group_name}')
+
                 custom_metrics.append({
                     'Time': datetime.datetime.now(),
                     'Detail': json.dumps({
@@ -161,9 +196,16 @@ class Cloudwatch:
             timeout=self.submit_timeout
         )
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Cloudwatch rule - {self.metrics_rule_name}')
+
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Error Metrics to Cloudwatch rule - {self.errors_rule_name}')
+
         cloudwatch_errors = []
         for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.metrics_set_id}')
+            
             for error in metrics_set.errors:
                 cloudwatch_errors.append({
                     'Time': datetime.datetime.now(),
@@ -183,6 +225,9 @@ class Cloudwatch:
             ),
             timeout=self.submit_timeout
         )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Error Metrics to Cloudwatch rule - {self.errors_rule_name}')
+
 
     async def close(self):
         pass

@@ -23,6 +23,7 @@ async def process_batch(
 
         logger = HedraLogger()
         logger.initialize()
+        logger.create_logger('hedra.reporting.log')
 
         await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Initializing results aggregation')
 

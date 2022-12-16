@@ -39,3 +39,5 @@ class Teardown(Stage):
             await asyncio.gather(*[ hook.call() for hook in teardown_hooks])
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Teardown complete.')
+        
+

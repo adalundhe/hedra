@@ -1,3 +1,4 @@
+import uuid
 from typing import Any, Dict, List, Union
 from hedra.reporting.tags import Tag
 from .metrics_group import MetricsGroup
@@ -13,6 +14,8 @@ class MetricsSet:
         metrics_data: Dict[str, Dict[str, Any]],
         tags: Dict[str, str]
     ) -> None:
+
+        self.metrics_set_id = str(uuid.uuid4())
         self.groups: Dict[str, MetricsGroup] = {}
 
         self.name = name

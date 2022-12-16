@@ -46,6 +46,8 @@ class Analyze(Stage):
     async def run(self):
 
         await self.logger.filesystem.aio.create_logfile('hedra.reporting.log')
+        self.logger.filesystem.create_filelogger('hedra.reporting.log')
+        
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting results analysis')
 
         analysis_execution_time_start = time.monotonic()
@@ -241,5 +243,5 @@ class Analyze(Stage):
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed results analysis for - {stages_count} - stages in - {self.analysis_execution_time} seconds')
         await self.logger.spinner.set_default_message(f'Completed results analysis for {total_group_results} actions and {stages_count} stages over {self.analysis_execution_time} seconds')
-         
+
         return summaries

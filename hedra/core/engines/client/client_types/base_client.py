@@ -84,17 +84,17 @@ class BaseClient(Generic[S, A, R]):
 
     async def _execute_action(self, action: A) -> R:
         await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Preparing Action - {action.name}'
+            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Preparing Action - {action.name}:{action.action_id}'
         )
         await self.session.prepare(action)
 
         await self.logger.filesystem.aio['hedra.core'].debug(
-            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Prepared Action - {action.name}'
+            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Prepared Action - {action.name}:{action.action_id}'
         )
 
         if self.intercept:
             await self.logger.filesystem.aio['hedra.core'].debug(
-                f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Initiating suspense for Action - {action.name} - and storing'
+                f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Initiating suspense for Action - {action.name}:{action.action_id} - and storing'
             )
             self.actions.store(self.next_name, action, self.session)
             

@@ -94,16 +94,17 @@ def run_graph(path: str, cpus: int, log_level: str, logfiles_directory: str):
     logger.filesystem.sync.create_logfile('hedra.core.log')
     logger.filesystem.create_filelogger('hedra.core.log')
 
-    pipeline = Graph(
+    graph = Graph(
         graph_name,
         list(discovered.values()),
         cpus=cpus
     )
 
-    pipeline.assemble()
+    graph.assemble()
 
-    loop.run_until_complete(pipeline.run())
+    loop.run_until_complete(graph.run())
 
-    logger.console.sync.info(f'\nGraph - {graph_name.capitalize()} - completed!\n')
+    logger.filesystem.sync['hedra.core'].info(f'\nGraph - {graph_name.capitalize()} - completed - {graph.logger.spinner.display.total_timer.elapsed_message}\n')
+    logger.console.sync.info(f'\nGraph - {graph_name.capitalize()} - completed! {graph.logger.spinner.display.total_timer.elapsed_message}\n')
 
     os._exit(0)

@@ -42,4 +42,6 @@ class Error(Stage):
     async def run(self):
         await self.logger.spinner.system.error(f'{self.metadata_string} - Encountered error - {self.error}')
         await self.logger.filesystem.aio['hedra.core'].error(f'{self.metadata_string} - Encountered error - {self.error}')
+        
+
 

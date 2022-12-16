@@ -1,3 +1,4 @@
+import uuid
 from typing import Any, Dict, Union
 
 
@@ -12,6 +13,9 @@ class MetricsGroup:
         data: Dict[str, Union[int, float, str, bool]],
         common: Dict[str, int]
     ) -> None:
+
+        self.metrics_group_id = str(uuid.uuid4())
+
         self.name = name
         self.stage = stage
         self.group_name = group_name

@@ -106,9 +106,6 @@ class AsyncSpinner(Yaspin):
 
         return self
 
-    def set_initial_message(self, message: str) -> None:
-        self.display.set_initial_message(message)
-
     def append_message(self, message: str) -> Coroutine[None]:
         return self.display.append_cli_message(message)
 
@@ -118,6 +115,12 @@ class AsyncSpinner(Yaspin):
     def set_message_at(self, message_index: int, message:str) -> None:
         if message_index < len(self.display.cli_messages):
             self.display.cli_messages[message_index] = message
+
+    def finalize(self):
+        self.display.finalized = True
+
+    def group_finalize(self):
+        self.display.group_finalized = True
 
     async def debug(self, message: str, *args: List[Any], **kwargs: Mapping[str, Any]) -> Task:
         
@@ -247,7 +250,7 @@ class AsyncSpinner(Yaspin):
             return log_result
 
     async def __aenter__(self):
-        self.display.start_group_timer()
+        self.display.group_timer.reset()
         await self.start()
         return self
 

@@ -83,7 +83,7 @@ async def start_execution(parallel_config: Dict[str, Any]):
         assembled_hook = await action_assembler.assemble(action_type)
         
         await logger.filesystem.aio['hedra.core'].info(
-            f'{metadata_string} - Assembled hook - {hook.name} - using {action_type.capitalize()} Engine'
+            f'{metadata_string} - Assembled hook - {hook.name}:{hook.hook_id} - using {action_type.capitalize()} Engine'
         )
 
 

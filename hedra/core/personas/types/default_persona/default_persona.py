@@ -157,12 +157,12 @@ class DefaultPersona:
 
             session_closed_start = time.monotonic()
 
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Closing session - {hook.session.session_id} - for Hook - {hook.name}')
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Closing session - {hook.session.session_id} - for Hook - {hook.name}:{hook.hook_id}')
             await hook.session.close()
 
             session_closed_elapsed = time.monotonic() - session_closed_start
 
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Closed session - {hook.session.session_id} - for Hook - {hook.name}. Took: {round(session_closed_elapsed, 2)} seconds')
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Closed session - {hook.session.session_id} - for Hook - {hook.name}:{hook.hook_id}. Took: {round(session_closed_elapsed, 2)} seconds')
         
         self.total_actions = len(set(results))
         self.total_elapsed = self.end - self.start

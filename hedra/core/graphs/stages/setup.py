@@ -159,20 +159,20 @@ class Setup(Stage, Generic[Unpack[T]]):
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Client intercept set to {execute_stage.client.intercept} - Action calls for client id - {execute_stage.client.client_id} - will be suspended on execution')
 
-                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Setting up Action - {hook.name} - for Execute stage - {execute_stage_name}')
-                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Preparing Action hook - {hook.name} - for suspension - Execute stage - {execute_stage_name}')
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Setting up Action - {hook.name}:{hook.hook_id} - for Execute stage - {execute_stage_name}')
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Preparing Action hook - {hook.name}:{hook.hook_id} - for suspension - Execute stage - {execute_stage_name}')
 
                 execute_stage.client.actions.set_waiter(execute_stage.name)
 
                 setup_call = SetupCall(hook)
                 setup_call.action_store = execute_stage.client.actions
 
-                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Executing Action hook call - {hook.name} - Execute stage - {execute_stage_name}')
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Executing Action hook call - {hook.name}:{hook.hook_id} - Execute stage - {execute_stage_name}')
 
                 task = asyncio.create_task(setup_call.setup())
                 await execute_stage.client.actions.wait_for_ready(setup_call)   
 
-                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Exiting suspension for Action - {hook.name} - Execute stage - {execute_stage_name}')
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Exiting suspension for Action - {hook.name}:{hook.hook_id} - Execute stage - {execute_stage_name}')
 
                 try:
                     if setup_call.exception:
@@ -199,7 +199,7 @@ class Setup(Stage, Generic[Unpack[T]]):
                     hook.name
                 )
 
-                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Successfully retrieved prepared Action and Session for action - {action.name} - Execute stage - {execute_stage_name}')
+                await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved prepared Action and Session for action - {action.name}:{action.action_id} - Execute stage - {execute_stage_name}')
 
                 action.hooks.before =  await self.get_hook(execute_stage, hook.shortname, HookType.BEFORE)
                 action.hooks.after = await self.get_hook(execute_stage, hook.shortname, HookType.AFTER)
@@ -210,7 +210,7 @@ class Setup(Stage, Generic[Unpack[T]]):
 
             for hook in execute_stage.hooks.get(HookType.TASK, []):
 
-                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Loading Task hook - {hook.name} - to Execute stage - {execute_stage_name}')
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Loading Task hook - {hook.name}:{hook.hook_id} - to Execute stage - {execute_stage_name}')
 
                 execute_stage.client.next_name = hook.name
                 task, session = execute_stage.client.task.call(
@@ -220,7 +220,7 @@ class Setup(Stage, Generic[Unpack[T]]):
                     tags=hook.config.tags
                 )
 
-                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Successfully retrieved task and session for Task - {task.name} - Execute stage - {execute_stage_name}')
+                await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved task and session for Task - {task.name}:{task.action_id} - Execute stage - {execute_stage_name}')
 
                 task.hooks.checks = self.get_checks(execute_stage, hook.shortname) 
 
@@ -244,6 +244,8 @@ class Setup(Stage, Generic[Unpack[T]]):
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Generated - {tasks_generated_count} - Tasks for Execute stage - {execute_stage_name}')
 
         await self.logger.spinner.set_default_message(f'Setup for - {execute_stage_names} - complete')
+        
+
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed setup')
 
@@ -253,7 +255,7 @@ class Setup(Stage, Generic[Unpack[T]]):
     async def get_hook(self, execute_stage: Execute, shortname: str, hook_type: str):
         for hook in execute_stage.hooks[hook_type]:
             if shortname in hook.names:
-                await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Adding Hook - {hook.name} - of type - {hook.hook_type.name.capitalize()} - to Action - {shortname} - for Execute stage - {execute_stage.name}')
+                await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Adding Hook - {hook.name}:{hook.hook_id} - of type - {hook.hook_type.name.capitalize()} - to Action - {shortname} - for Execute stage - {execute_stage.name}')
 
                 return hook.call
 
@@ -264,7 +266,7 @@ class Setup(Stage, Generic[Unpack[T]]):
 
         for hook in execute_stage.hooks[HookType.CHECK]:
             if shortname in hook.names:
-                await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Adding Check - {hook.name} - to Action or Task - {shortname} - for Execute stage - {execute_stage.name}')
+                await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Adding Check - {hook.name}:{hook.hook_id} - to Action or Task - {shortname} - for Execute stage - {execute_stage.name}')
                 
                 checks.append(hook.call)
 

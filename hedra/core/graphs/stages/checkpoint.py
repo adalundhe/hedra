@@ -75,3 +75,5 @@ class Checkpoint(Stage):
         
 
         self._shutdown_task = loop.run_in_executor(None, executor.shutdown)
+        
+

@@ -1,52 +1,50 @@
 import asyncio
 import datetime
+from .timer import Timer
 
 
 class ProgressText:
     def __init__(self):
-        self.text = None
-        self.start = datetime.datetime.now()
-        self.group_start = datetime.datetime.now()
-        self.elapsed = 0
-        self.group_elapsed = 0
+        self.total_timer = Timer('Total')
+        self.group_timer = Timer('Group')
+
+        self.selected_timer_name = self.group_timer.name
+        self.selected_timer = self.group_timer
+
         self.run_cli_task = False
-        self.cli_message = None
+        self.run_timer_task = False
+        self.cli_message = ''
         self.cli_messages = []
         self.next_cli_message = 0
-        self.cli_text = None
         self._cli_task = None
+        self._timer_task = None
         self.enabled = True
+        self.finalized = False
+        self.group_finalized = False
 
     def __str__(self):
-        current = datetime.datetime.now()
-        self.elapsed = round((current - self.start).total_seconds())
-        self.group_elapsed = (current - self.group_start).total_seconds()
 
-        time_elapsed_string = f'{self.elapsed}s'
+        self.total_timer.update()
+        self.group_timer.update()
 
-        total_minutes = int(self.elapsed/60)
-        if total_minutes > 0:
-            time_elapsed_string = f'{total_minutes}m.{time_elapsed_string}'
+        if self.finalized:
+            return f'{self.cli_message} - {self.total_timer.elapsed_message}'
 
-        total_hours = int(self.elapsed/3600)
-            
-        return f'{self.cli_message}. Elapsed Execution Time: {time_elapsed_string}'
+        elif self.group_finalized:
+            return f'{self.cli_message} - {self.group_timer.elapsed_message}'
 
-    def start_group_timer(self):
-        self.group_start = datetime.datetime.now()
-
-
-    def set_initial_message(self, text: str):
-        self.cli_text = text
-        self.cli_messages = [text]
+        return f'> {self.cli_message} - {self.selected_timer.elapsed_message}'
 
     async def append_cli_message(self, text: str):
-        self.cli_text = text
+        self.cli_message = text
         self.cli_messages.append(text)
-        await asyncio.sleep(2.5)
+        await asyncio.sleep(1)
 
     def start_cli_tasks(self):
         if self.enabled:
+            self.finalized = False
+            self.group_finalized = False
+            self._timer_task = asyncio.create_task(self._start_timer_tasks())
             self._cli_task = asyncio.create_task(self._start_cli_tasks())
 
     async def _start_cli_tasks(self):
@@ -54,15 +52,37 @@ class ProgressText:
 
         while self.run_cli_task:
             for cli_task in self.cli_messages:
-                self.cli_message = cli_task
-                await asyncio.sleep(2.5)
 
                 if self.run_cli_task is False:
                     return
 
+                self.cli_message = cli_task
+                await asyncio.sleep(2.5)
+
+    async def _start_timer_tasks(self):
+        self.run_timer_task = True
+        self.total_timer.update()
+        self.group_timer.update()
+
+        while self.run_timer_task:
+            if self.selected_timer_name == self.total_timer.name:
+                self.selected_timer_name = self.group_timer.name
+                self.selected_timer = self.group_timer
+
+            else:
+                self.selected_timer_name = self.total_timer.name
+                self.selected_timer = self.total_timer
+
+            await asyncio.sleep(2)
+            if self.run_timer_task is False:
+                return
+
+
     async def stop_cli_tasks(self):
         self.run_cli_task = False
+        self.run_timer_task = False
         await self._cli_task
+        await self._timer_task
 
         self.cli_messages = []
 
