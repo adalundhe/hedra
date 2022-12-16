@@ -14,6 +14,7 @@ from hedra.core.engines.types.playwright import (
 )
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.client.store import ActionsStore
+from hedra.logging import HedraLogger
 from .base_client import BaseClient
 
 
@@ -31,12 +32,41 @@ class PlaywrightClient(BaseClient):
         )
 
         self.request_type = RequestTypes.PLAYWRIGHT
+        self.client_type = self.request_type.capitalize()
+
         self.actions: ActionsStore = None
         self.next_name = None
         self.intercept = False
 
+        self.logger = HedraLogger()
+        self.logger.initialize()
+
     def __getitem__(self, key: str):
         return self.session.registered.get(key)
+
+
+    async def _execute_command(self, command: PlaywrightCommand):
+        await self.logger.filesystem.aio['hedra.core'].debug(
+            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Preparing Action - {command.name}'
+        )
+
+        await self.session.prepare(command)
+        
+        await self.logger.filesystem.aio['hedra.core'].debug(
+            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Prepared Action - {command.name}'
+        )
+
+        if self.intercept:
+            await self.logger.filesystem.aio['hedra.core'].debug(
+                f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Initiating suspense for Action - {command.name} - and storing'
+            )
+            self.actions.store(self.next_name, command, self.session)
+            
+            loop = asyncio.get_event_loop()
+            self.waiter = loop.create_future()
+            await self.waiter
+
+        return await self.session.execute_prepared_command(command)
 
     async def goto(
         self, 
@@ -56,15 +86,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def fill(
         self, 
@@ -84,15 +106,7 @@ class PlaywrightClient(BaseClient):
             checks=checks     
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def check(
         self,
@@ -112,15 +126,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def click(
         self,
@@ -140,15 +146,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def double_click(
         self,
@@ -168,15 +166,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def submit_event(
         self,
@@ -200,15 +190,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def drag_and_drop(
         self,
@@ -232,15 +214,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def switch_active_tab(
         self,
@@ -256,15 +230,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def evaluate_selector(
         self,
@@ -290,15 +256,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def evaluate_all_selectors(
         self,
@@ -324,15 +282,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def evaluate_expression(
         self,
@@ -356,15 +306,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def evaluate_handle(
         self,
@@ -388,15 +330,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def exepect_console_message(
         self,
@@ -416,15 +350,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def expect_download(
         self,
@@ -444,15 +370,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def expect_event(
         self,
@@ -474,15 +392,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def expect_location(
         self,
@@ -502,15 +412,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def expect_popup(
         self,
@@ -530,15 +432,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def expect_request(
         self,
@@ -558,15 +452,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def expect_request_finished(
         self,
@@ -586,15 +472,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def expect_response(
         self,
@@ -614,15 +492,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def focus(
         self,
@@ -642,15 +512,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def hover(
         self,
@@ -670,15 +532,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def get_inner_html(
         self,
@@ -698,15 +552,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def get_text(
         self,
@@ -726,15 +572,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def get_input_value(
         self,
@@ -754,15 +592,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def press_key(
         self,
@@ -784,15 +614,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def verify_is_enabled(
         self,
@@ -812,15 +634,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def verify_is_hidden(
         self,
@@ -840,15 +654,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def verify_is_visible(
         self,
@@ -868,15 +674,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def verify_is_checked(
         self,
@@ -896,15 +694,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def get_content(
         self,
@@ -920,15 +710,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def get_element(
         self,
@@ -948,15 +730,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def get_all_elements(
         self,
@@ -976,15 +750,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def reload_page(
         self,
@@ -1002,15 +768,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def take_screenshot(
         self,
@@ -1030,15 +788,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def select_option(
         self,
@@ -1066,15 +816,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def set_checked(
         self,
@@ -1098,15 +840,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def set_default_timeout(
         self,
@@ -1128,15 +862,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def set_navigation_timeout(
         self,
@@ -1158,15 +884,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def set_http_headers(
         self,
@@ -1186,15 +904,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def tap(
         self,
@@ -1214,15 +924,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def get_text_content(
         self,
@@ -1242,15 +944,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def get_page_title(
         self,
@@ -1266,15 +960,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def input_text(
         self,
@@ -1296,15 +982,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def uncheck(
         self,
@@ -1324,15 +1002,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def wait_for_event(
         self,
@@ -1354,15 +1024,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def wait_for_function(
         self,
@@ -1386,15 +1048,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def wait_for_page_load_state(
         self,
@@ -1412,15 +1066,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def wait_for_selector(
         self,
@@ -1440,15 +1086,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def wait_for_timeout(
         self,
@@ -1470,15 +1108,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
     
     async def wait_for_url(
         self,
@@ -1498,15 +1128,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def switch_frame(
         self,
@@ -1528,15 +1150,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def get_frames(
         self,
@@ -1552,15 +1166,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def get_attribute(
         self,
@@ -1584,15 +1190,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def go_back_page(
         self,
@@ -1610,15 +1208,7 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)
 
     async def go_forward_page(
         self,
@@ -1636,12 +1226,4 @@ class PlaywrightClient(BaseClient):
             checks=checks
         )
 
-        await self.session.prepare(command)
-        if self.intercept:
-            self.actions.store(self.next_name, command, self.session)
-            
-            loop = asyncio.get_event_loop()
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.session.execute_prepared_command(command)
+        return await self._execute_command(command)

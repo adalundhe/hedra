@@ -1,6 +1,6 @@
+import uuid
 from typing import Coroutine, List, Optional, Any
 from hedra.core.graphs.hooks.types.hook_types import HookType
-
 
 
 class Metadata:
@@ -35,6 +35,7 @@ class Hook:
         checks: List[Coroutine]=[],
         group: Optional[str]=None
     ) -> None:
+        self.hook_id = str(uuid.uuid4())
         self.name = name
         self.shortname = shortname
         self.call = call

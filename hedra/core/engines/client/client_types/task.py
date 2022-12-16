@@ -7,6 +7,7 @@ from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.client.store import ActionsStore
 from hedra.core.graphs.hooks.types.hook import Hook
+from hedra.logging import HedraLogger
 from .base_client import BaseClient
 
 
@@ -14,6 +15,7 @@ class TaskClient(BaseClient):
 
     def __init__(self, config: Config) -> None:
         super().__init__()
+
         self.session = MercuryTaskRunner(
             concurrency=config.batch_size,
             timeouts=Timeouts(
@@ -21,7 +23,11 @@ class TaskClient(BaseClient):
             )
         )
         self.request_type = RequestTypes.HTTP
+        self.client_type = self.request_type.capitalize()
         self.next_name = None
+
+        self.logger = HedraLogger()
+        self.logger.initialize()
 
     def call(
         self, 

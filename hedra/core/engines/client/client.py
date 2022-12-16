@@ -1,11 +1,13 @@
 import uuid
+import threading
+import os
 from asyncio import Future
 from typing import Dict, Generic, Iterable, Union
 from typing_extensions import TypeVarTuple, Unpack
 from hedra.core.engines.types.common.types import RequestTypes
 from .store import ActionsStore
 from .config import Config
-from .types import  (
+from .client_types import  (
     HTTPClient,
     HTTP2Client,
     GRPCClient,
@@ -25,9 +27,19 @@ T = TypeVarTuple('T')
 
 class Client(Generic[Unpack[T]]):
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        graph_name: str,
+        graph_id: str,
+        stage_name: str,
+        stage_id: str
+    ) -> None:
 
         self.client_id = str(uuid.uuid4())
+        self.graph_name = graph_name
+        self.graph_id = graph_id
+        self.stage_name = stage_name
+        self.stage_id = stage_id
 
         self.next_name = None
         self.intercept = False
@@ -44,9 +56,9 @@ class Client(Generic[Unpack[T]]):
         self._task = TaskClient
 
         self.clients = {}
-        self._plugin = PluginsStore[Unpack[T]]()
+        self._plugin = PluginsStore[Unpack[T]](self.metadata_string)
 
-        self.actions = ActionsStore()
+        self.actions = ActionsStore(self.metadata_string)
 
     def __getitem__(self, key: str):
         return self.clients.get(key)
@@ -60,9 +72,22 @@ class Client(Generic[Unpack[T]]):
                 yield session.waiter
 
     @property
+    def thread_id(self) -> int:
+        return threading.current_thread().ident
+
+    @property
+    def process_id(self) -> int:
+        return os.getpid()
+
+    @property
+    def metadata_string(self):
+        return f'Graph - {self.graph_name}:{self.graph_id} - thread:{self.thread_id} - process:{self.process_id} - Stage: {self.stage_name}:{self.stage_id} - '
+
+    @property
     def plugin(self) -> Dict[str, Union[Unpack[T]]]:
         self._plugin._config = self._config
         self._plugin.actions = self.actions
+        self._plugin.metadata_string = self.metadata_string
         self._plugin.actions.waiter = self.actions.waiter
         self._plugin.actions.current_stage = self.actions.current_stage
         self._plugin.intercept = self.intercept
@@ -74,6 +99,7 @@ class Client(Generic[Unpack[T]]):
     def http(self):
         if self._http.initialized is False:
             self._http = self._http(self._config)
+            self._http.metadata_string = self.metadata_string
             self._http.actions = self.actions
             self.clients[RequestTypes.HTTP] = self._http
 
@@ -85,6 +111,7 @@ class Client(Generic[Unpack[T]]):
     def http2(self):
         if self._http2.initialized is False:
             self._http2 = self._http2(self._config)
+            self._http2.metadata_string = self.metadata_string
             self._http2.actions = self.actions
             self.clients[RequestTypes.HTTP2] = self._http2
        
@@ -96,6 +123,7 @@ class Client(Generic[Unpack[T]]):
     def grpc(self):
         if self._grpc.initialized is False:
             self._grpc = self._grpc(self._config)
+            self._grpc.metadata_string = self.metadata_string
             self._grpc.actions = self.actions
             self.clients[RequestTypes.GRPC] = self._grpc
 
@@ -107,6 +135,7 @@ class Client(Generic[Unpack[T]]):
     def graphql(self):
         if self._graphql.initialized is False:
             self._graphql = self._graphql(self._config)
+            self._graphql.metadata_string = self.metadata_string
             self._graphql.actions = self.actions
             self.clients[RequestTypes.GRAPHQL] = self._graphql
 
@@ -118,6 +147,7 @@ class Client(Generic[Unpack[T]]):
     def graphqlh2(self):
         if self._graphqlh2.initialized is False:
             self._graphqlh2 = self._graphqlh2(self._config)
+            self._graphqlh2.metadata_string = self.metadata_string
             self._graphqlh2.actions = self.actions
             self.clients[RequestTypes.GRAPHQL_HTTP2] = self._graphqlh2
 
@@ -129,6 +159,7 @@ class Client(Generic[Unpack[T]]):
     def websocket(self):
         if self._websocket.initialized is False:
             self._websocket = self._websocket(self._config)
+            self._websocket.metadata_string = self.metadata_string
             self._websocket.actions = self.actions
             self.clients[RequestTypes.WEBSOCKET] = self._websocket
 
@@ -140,6 +171,7 @@ class Client(Generic[Unpack[T]]):
     def playwright(self):
         if self._playwright.initialized is False:
             self._playwright = self._playwright(self._config)
+            self._playwright.metadata_string = self.metadata_string
             self._playwright.actions = self.actions
             self.clients[RequestTypes.PLAYWRIGHT] = self._playwright
 
@@ -151,6 +183,7 @@ class Client(Generic[Unpack[T]]):
     def udp(self):
         if self._udp.initialized is False:
             self._udp = self._udp(self._config)
+            self._udp.metadata_string = self.metadata_string
             self._udp.actions = self.actions
             self.clients[RequestTypes.UDP] = self._udp
 
@@ -162,6 +195,7 @@ class Client(Generic[Unpack[T]]):
     def task(self):
         if self._task.initialized is False:
             self._task = self._task(self._config)
+            self._task.metadata_string = self.metadata_string
             self.clients[RequestTypes.TASK] = self._task
 
         self._task.next_name = self.next_name

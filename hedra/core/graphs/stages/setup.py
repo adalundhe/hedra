@@ -131,7 +131,12 @@ class Setup(Stage, Generic[Unpack[T]]):
                 playwright_options=self.playwright_options
             )
    
-            client = Client()
+            client = Client(
+                self.graph_name,
+                self.graph_id,
+                execute_stage.name,
+                execute_stage.stage_id
+            )
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Created Client, id - {client.client_id} - for Execute stage - {execute_stage_name}')
 
             engine_plugins: Dict[str, EnginePlugin] = self.plugins_by_type.get(PluginType.ENGINE)

@@ -29,7 +29,12 @@ class Execute(Stage, Generic[Unpack[T]]):
     def __init__(self) -> None:
         super().__init__()
         self.persona = None
-        self.client: Client[Unpack[T]] = Client()
+        self.client: Client[Unpack[T]] = Client(
+            self.graph_name,
+            self.graph_id,
+            self.name,
+            self.stage_id
+        )
         
         self.accepted_hook_types = [ 
             HookType.SETUP, 

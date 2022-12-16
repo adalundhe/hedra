@@ -11,18 +11,23 @@ from hedra.core.engines.types import (
     MercuryWebsocketClient,
     MercuryUDPClient
 )
+from hedra.logging import HedraLogger
 from typing import Any, Tuple, Union
 
 
 class ActionsStore:
 
-    def __init__(self) -> None:
+    def __init__(self, metadata_string: str) -> None:
+        self.metadata_string = metadata_string
         self.actions = defaultdict(dict)
         self.sessions = defaultdict(dict)
         self._loop = None
         self.current_stage: str = None
         self.waiter = None
         self.setup_call = None
+        self.metadata_string: str = None
+        self.logger = HedraLogger()
+        self.logger.initialize()
 
     def set_waiter(self, stage: str):
 
@@ -33,8 +38,11 @@ class ActionsStore:
         self.current_stage = stage
 
     async def wait_for_ready(self, setup_call):
+        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Action Store waiting for Action or Task to notify store it is ready')
         self.setup_call = setup_call
         await self.waiter
+
+        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Action Store was notified and is exiting suspension')
 
     def store(self, request: str, action: Any, session: Any):
 

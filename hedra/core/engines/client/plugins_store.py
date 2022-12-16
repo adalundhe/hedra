@@ -8,12 +8,13 @@ T = TypeVarTuple('T')
 
 class PluginsStore(Generic[Unpack[T]]):
 
-    def __init__(self):
+    def __init__(self, metadata_string: str):
         self._plugins: Dict[str, Union[Unpack[T]]] = {}
         self._config: Config = None
-        self.actions = ActionsStore()
+        self.actions = ActionsStore(metadata_string)
         self.next_name: str = None
         self.intercept: bool = False
+        self.metadata_string: str = metadata_string
         self.clients = {}
 
     def __getitem__(self, plugin_name: str) -> Union[Unpack[T]]:
@@ -25,6 +26,7 @@ class PluginsStore(Generic[Unpack[T]]):
             custom_plugin.actions = self.actions
             custom_plugin.initialized = True
 
+        custom_plugin.metadata_string = self.metadata_string
         custom_plugin.next_name = self.next_name
         custom_plugin.intercept = self.intercept
 

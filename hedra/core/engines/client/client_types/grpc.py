@@ -2,72 +2,78 @@ import asyncio
 from types import FunctionType
 from typing import Any, Dict, List
 from hedra.core.engines.client.config import Config
-from hedra.core.engines.types.graphql import (
-    MercuryGraphQLClient,
-    GraphQLAction
-)
 from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core.engines.types.grpc import (
+    MercuryGRPCClient,
+    GRPCAction
+)
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.client.store import ActionsStore
+from hedra.logging import HedraLogger
 from .base_client import BaseClient
 
 
-class GraphQLClient(BaseClient):
-
+class GRPCClient(BaseClient):
+    
     def __init__(self, config: Config) -> None:
         super().__init__()
-        
-        self.session = MercuryGraphQLClient(
+
+        self.session = MercuryGRPCClient(
             concurrency=config.batch_size,
             timeouts=Timeouts(
                 total_timeout=config.request_timeout
             ),
             reset_connections=config.reset_connections
         )
-        self.request_type = RequestTypes.GRAPHQL
+        self.request_type = RequestTypes.GRPC
+        self.client_type = self.request_type.capitalize()
+
         self.actions: ActionsStore = None
         self.next_name = None
         self.intercept = False
-        self.waiter = None
+
+        self.logger = HedraLogger()
+        self.logger.initialize()
 
     def __getitem__(self, key: str):
         return self.session.registered.get(key)
 
-    async def query(
-        self,
+    async def request(
+        self, 
         url: str, 
-        query: str,
-        operation_name: str = None,
-        variables: Dict[str, Any] = None, 
         headers: Dict[str, str] = {}, 
+        protobuf: Any = None, 
         user: str = None, 
-        tags: List[Dict[str, str]] = [],
-        redirects: int = 10
+        tags: List[Dict[str, str]] = []
     ):
 
-        request = GraphQLAction(
+        request = GRPCAction(
             self.next_name,
             url,
             method='POST',
             headers=headers,
-            data={
-                "query": query,
-                "operation_name": operation_name,
-                "variables": variables
-            },
+            data=protobuf,
             user=user,
-            tags=tags,
-            redirects=redirects
+            tags=tags
         )
 
+        await self.logger.filesystem.aio['hedra.core'].debug(
+            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Preparing Action - {request.name}'
+        )
         await self.session.prepare(request)
 
+        await self.logger.filesystem.aio['hedra.core'].debug(
+            f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Prepared Action - {request.name}'
+        )
+
         if self.intercept:
+            await self.logger.filesystem.aio['hedra.core'].debug(
+                f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Initiating suspense for Action - {request.name} - and storing'
+            )
             self.actions.store(self.next_name, request, self.session)
             
             loop = asyncio.get_event_loop()
             self.waiter = loop.create_future()
             await self.waiter
 
-        return self.session
-        
+        return self.session.execute_prepared_request(request)
