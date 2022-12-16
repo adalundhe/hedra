@@ -106,6 +106,9 @@ class AsyncSpinner(Yaspin):
 
         return self
 
+    def set_initial_message(self, message: str) -> None:
+        self.display.set_initial_message(message)
+
     def append_message(self, message: str) -> Coroutine[None]:
         return self.display.append_cli_message(message)
 
@@ -244,6 +247,7 @@ class AsyncSpinner(Yaspin):
             return log_result
 
     async def __aenter__(self):
+        self.display.start_group_timer()
         await self.start()
         return self
 
@@ -269,9 +273,10 @@ class AsyncSpinner(Yaspin):
 
     async def start(self):
         if self.enabled:
+
             if self._sigmap:
                 self._register_signal_handlers()
-
+            
             await self._hide_cursor()
             self._start_time = time.time()
             self._stop_time = None  # Reset value to properly calculate subsequent spinner starts (if any)  # pylint: disable=line-too-long
@@ -279,11 +284,12 @@ class AsyncSpinner(Yaspin):
             self._hide_spin = asyncio.Event()
             try:
                 self._spin_thread = asyncio.create_task(self._spin())
-                self.display.start_cli_tasks()
             finally:
                 # Ensure cursor is not hidden if any failure occurs that prevents
                 # getting it back
                 await self._show_cursor()
+
+            self.display.start_cli_tasks()
 
     async def stop(self):
         if self.enabled:
@@ -320,7 +326,7 @@ class AsyncSpinner(Yaspin):
 
     async def show(self):
         """Show the hidden spinner."""
-        thr_is_alive = self._spin_thread and self._spin_thread.is_alive()
+        thr_is_alive = self._spin_thread and (self._spin_thread.done() is False and self._spin_thread.cancelled() is False)
 
         if thr_is_alive and self._hide_spin.is_set():
             
@@ -357,12 +363,14 @@ class AsyncSpinner(Yaspin):
 
     async def ok(self, text="OK"):
         if self.enabled:
+            await self.display.stop_cli_tasks()
             """Set Ok (success) finalizer to a spinner."""
             _text = text if text else "OK"
             await self._freeze(_text)
 
     async def fail(self, text="FAIL"):
         if self.enabled:
+            await self.display.stop_cli_tasks()
             """Set fail finalizer to a spinner."""
             _text = text if text else "FAIL"
             await self._freeze(_text)

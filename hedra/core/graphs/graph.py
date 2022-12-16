@@ -159,7 +159,7 @@ class Graph:
         for transition_group in self._transitions:
 
             current_stages = ', '.join([transition.from_stage.name for transition in transition_group])
-            await self.logging.spinner.append_message(f"Executing stages - {current_stages}")
+            self.logging.spinner.set_initial_message(f"Executing stages - {current_stages}")
 
             async with self.logging.spinner as status_spinner:
 

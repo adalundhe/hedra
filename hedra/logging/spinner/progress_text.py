@@ -6,7 +6,7 @@ class ProgressText:
     def __init__(self):
         self.text = None
         self.start = datetime.datetime.now()
-        self.group_start = 0
+        self.group_start = datetime.datetime.now()
         self.elapsed = 0
         self.group_elapsed = 0
         self.run_cli_task = False
@@ -19,18 +19,26 @@ class ProgressText:
 
     def __str__(self):
         current = datetime.datetime.now()
-        self.elapsed = (current - self.start).total_seconds()
+        self.elapsed = round((current - self.start).total_seconds())
+        self.group_elapsed = (current - self.group_start).total_seconds()
 
-        if self.group_start > 0:
-            self.group_elapsed = current - self.group_start
+        time_elapsed_string = f'{self.elapsed}s'
+
+        total_minutes = int(self.elapsed/60)
+        if total_minutes > 0:
+            time_elapsed_string = f'{total_minutes}m.{time_elapsed_string}'
+
+        total_hours = int(self.elapsed/3600)
             
-        return f'{self.cli_message}. Elapsed Execution Time: {round(self.elapsed)}s'
+        return f'{self.cli_message}. Elapsed Execution Time: {time_elapsed_string}'
 
     def start_group_timer(self):
         self.group_start = datetime.datetime.now()
 
-    def reset_group_timer(self):
-        self.group_start = 0
+
+    def set_initial_message(self, text: str):
+        self.cli_text = text
+        self.cli_messages = [text]
 
     async def append_cli_message(self, text: str):
         self.cli_text = text
@@ -58,8 +66,14 @@ class ProgressText:
 
         self.cli_messages = []
 
+    async def pause_cli_tasks(self):
+        self.run_cli_task = False
+        if self._cli_task:
+            await self._cli_task
+
     async def clear_and_replace(self, message: str):
-        await self.stop_cli_tasks()
+
+        await self.pause_cli_tasks()
         self.cli_message = message
         self.cli_messages = [message]
         self.start_cli_tasks()
