@@ -79,9 +79,38 @@ def check(path: str, log_level: str):
     help='Optional comma delimited list of stages to generate for the graph.'
 )
 @click.option(
+    '--engine',
+    default='http',
+    help='Engine to use in generated graph'
+)
+@click.option(
+    '--persona',
+    default='default',
+    help='Persona to use in generated graph'
+)
+@click.option(
+    '--reporter',
+    default='json',
+    help='Reporter to use in generated graph'
+)
+@click.option(
     '--log-level',
     default='info',
     help='Set log level.'
 )
-def create(path: str, stages: str, log_level: str):
-    create_graph(path, stages, log_level)
+def create(
+    path: str, 
+    stages: str, 
+    engine: str,
+    persona: str,
+    reporter: str,
+    log_level: str
+):
+    create_graph(
+        path, 
+        stages, 
+        engine,
+        persona,
+        reporter,
+        log_level
+    )

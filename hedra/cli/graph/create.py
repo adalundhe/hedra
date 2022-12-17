@@ -11,7 +11,14 @@ from hedra.logging import (
 )
 
 
-def create_graph(path: str, stages: Optional[str], log_level: str):
+def create_graph(
+    path: str, 
+    stages: Optional[str], 
+    engine: str,
+    persona: str,
+    reporter: str,
+    log_level: str
+):
 
     logging_manager.disable(
         LoggerTypes.HEDRA, 
@@ -48,7 +55,7 @@ def create_graph(path: str, stages: Optional[str], log_level: str):
     generator = GraphGenerator()
 
     for stage in stages_list:
-        if stage not in generator.generator_types:
+        if stage not in generator.valid_types:
             raise InvalidStageType(stage, [
                 generator_type_name for generator_type_name, generator_type in generator.generator_types.items() if inspect.isclass(
                     generator_type
@@ -58,7 +65,12 @@ def create_graph(path: str, stages: Optional[str], log_level: str):
 
     with open(path, 'w') as generated_test:
         generated_test.write(
-            generator.generate_graph(stages_list)
+            generator.generate_graph(
+                stages_list,
+                engine=engine,
+                persona=persona,
+                reporter=reporter
+            )
         )
 
     logger['console'].sync.info('\nGraph generated!\n')

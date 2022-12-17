@@ -1,9 +1,9 @@
 from typing import List
 from .stages import (
     AnalyzeStage,
-    ExecuteStage,
+    ExecuteHTTPStage,
     SetupStage,
-    SubmitResultsStage
+    SubmitJSONResultsStage
 )
 
 from hedra.core.graphs.hooks import depends
@@ -16,17 +16,45 @@ class GraphGenerator(Generator):
     def __init__(self) -> None:
         super().__init__({
             'analyze': AnalyzeStage,
-            'execute':ExecuteStage,
+            'http':ExecuteHTTPStage,
             'setup': SetupStage,
-            'submit': SubmitResultsStage,
+            'json': SubmitJSONResultsStage,
             'depends': depends
         }, registrar.module_paths)
 
-    def generate_graph(self, stages: List[str]):
+        self.valid_types = [
+            'analyze',
+            'execute',
+            'setup',
+            'submit'
+        ]
+
+    def generate_graph(
+        self, 
+        stages: List[str],
+        engine: str=None,
+        persona: str=None,
+        reporter: str=None
+    ):
+
+        if engine not in self.generator_types:
+            engine = 'http'
+
+        if reporter not in self.generator_types:
+            reporter = 'json'
 
         for stage in stages:
-            modules = self.gather_required_items(stage)
-            self.collect_imports(stage, modules)
+
+            generator_type = stage
+            if stage == "execute":
+                generator_type = engine
+
+            elif stage == "submit":
+                generator_type = reporter
+
+            modules = self.gather_required_items(generator_type)
+
+            self.collect_imports(generator_type, modules)
 
         self.collect_imports(
             None,

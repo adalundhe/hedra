@@ -1,4 +1,4 @@
 from .generated_analyze_stage import AnalyzeStage
-from .generated_execute_stage import ExecuteStage
-from .generated_results_stage import SubmitResultsStage
+from .generated_http_execute_stage import ExecuteHTTPStage
+from .generated_json_results_stage import SubmitJSONResultsStage
 from .generated_setup_stage import SetupStage

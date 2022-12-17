@@ -7,7 +7,7 @@ from hedra.core.graphs.hooks import (
 )
 
 
-class ExecuteStage(Execute):
+class ExecuteHTTPStage(Execute):
 
     @action()
     async def http_get(self):
