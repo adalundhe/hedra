@@ -15,6 +15,8 @@ def create_project(
     path: str,
     username: str, 
     password: str,
+    bypass_connection_validation: bool,
+    connection_validation_retries: int,
     log_level: str,
 ):
 
@@ -94,6 +96,10 @@ def create_project(
         manager.execute_workflow(workflow_actions)
 
         hedra_config = {
+            "core": {
+                "bypass_connection_validation": bypass_connection_validation,
+                "connection_validation_retries": connection_validation_retries
+            },
             'project': {
                 'project_url': url,
                 'project_username': username,

@@ -1,5 +1,6 @@
 import asyncio
 import psutil
+import traceback
 from typing_extensions import TypeVarTuple, Unpack
 from typing import Dict, Generic, List, Any
 from hedra.core.graphs.hooks.types.hook import Hook
@@ -9,6 +10,7 @@ from hedra.core.engines.client.client import Client
 from hedra.core.engines.client.config import Config
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.personas.types import PersonaTypesMap
+from hedra.logging import HedraLogger
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.plugin_types import PluginType
 from playwright.async_api import Geolocation
@@ -23,18 +25,37 @@ T = TypeVarTuple('T')
 
 class SetupCall:
 
-    def __init__(self, hook: Hook) -> None:
+    def __init__(self, hook: Hook, retries: int=1) -> None:
         self.hook = hook
+        self.hook_name = self.hook.hook_type.name.capitalize()
         self.exception = None
         self.action_store = None
+        self.retries = retries
+        self.current_try = 1
+        self.logger = HedraLogger()
+        self.logger.initialize()
+        self.metadata_string:str = None
+        self.error_traceback: str = None
 
     async def setup(self):
-        try:
-            await self.hook.call()
 
-        except Exception as setup_exception:
-            self.exception = setup_exception
-            self.action_store.waiter.set_result(None)
+        for _ in range(self.retries):
+            try:
+                await self.hook.call()
+
+            except Exception as setup_exception:
+                self.exception = setup_exception
+
+                self.error_traceback = str(traceback.format_exc())
+                await self.logger.spinner.system.error(f'{self.metadata_string} - Encountered connection validation error - {str(setup_exception)} - {self.hook_name} Hook: {self.hook.name}:{self.hook.hook_id}')
+                await self.logger.filesystem.aio['hedra.core'].error(f'{self.metadata_string} - Encountered connection validation error - {str(setup_exception)} - {self.hook_name} Hook: {self.hook.name}:{self.hook.hook_id}')
+
+                if self.current_try >= self.retries:
+                    self.action_store.waiter.set_result(None)
+                    break
+
+                else:
+                    self.current_try += 1
 
 
 
@@ -77,6 +98,9 @@ class Setup(Stage, Generic[Unpack[T]]):
 
     @Internal()
     async def run(self):
+
+        bypass_connection_validation = self.core_config.get('bypass_connection_validation', False)
+        connection_validation_retries = self.core_config.get('connection_validation_retries', 3)
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting setup')
 
@@ -164,7 +188,9 @@ class Setup(Stage, Generic[Unpack[T]]):
 
                 execute_stage.client.actions.set_waiter(execute_stage.name)
 
-                setup_call = SetupCall(hook)
+                setup_call = SetupCall(hook, retries=connection_validation_retries)
+
+                setup_call.metadata_string = self.metadata_string
                 setup_call.action_store = execute_stage.client.actions
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Executing Action hook call - {hook.name}:{hook.hook_id} - Execute stage - {execute_stage_name}')
@@ -173,6 +199,9 @@ class Setup(Stage, Generic[Unpack[T]]):
                 await execute_stage.client.actions.wait_for_ready(setup_call)   
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Exiting suspension for Action - {hook.name}:{hook.hook_id} - Execute stage - {execute_stage_name}')
+
+                action = None
+                session = None
 
                 try:
                     if setup_call.exception:
@@ -183,7 +212,17 @@ class Setup(Stage, Generic[Unpack[T]]):
                         await asyncio.wait_for(task, timeout=0.1)
 
                 except HookSetupError as hook_setup_exception:
-                    raise hook_setup_exception
+
+                    if bypass_connection_validation:
+
+                        hook.hook_type = HookType.TASK
+
+                        execute_stage.hooks[HookType.TASK].append(hook)
+                        action_idx = execute_stage.hooks[HookType.ACTION].index(hook)
+                        execute_stage.hooks[HookType.ACTION].pop(action_idx)
+
+                    else:
+                        raise hook_setup_exception
 
                 except asyncio.InvalidStateError:
                     pass
@@ -193,20 +232,22 @@ class Setup(Stage, Generic[Unpack[T]]):
 
                 except asyncio.TimeoutError:
                     pass
-                     
-                action, session = execute_stage.client.actions.get(
-                    execute_stage.name,
-                    hook.name
-                )
 
-                await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved prepared Action and Session for action - {action.name}:{action.action_id} - Execute stage - {execute_stage_name}')
+                if hook.hook_type == HookType.ACTION:
 
-                action.hooks.before =  await self.get_hook(execute_stage, hook.shortname, HookType.BEFORE)
-                action.hooks.after = await self.get_hook(execute_stage, hook.shortname, HookType.AFTER)
-                action.hooks.checks = await self.get_checks(execute_stage, hook.shortname)
+                    action, session = execute_stage.client.actions.get(
+                        execute_stage.name,
+                        hook.name
+                    )
 
-                hook.session = session
-                hook.action = action    
+                    await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved prepared Action and Session for action - {action.name}:{action.action_id} - Execute stage - {execute_stage_name}')
+                    
+                    action.hooks.before =  await self.get_hook(execute_stage, hook.shortname, HookType.BEFORE)
+                    action.hooks.after = await self.get_hook(execute_stage, hook.shortname, HookType.AFTER)
+                    action.hooks.checks = await self.get_checks(execute_stage, hook.shortname)
+                    
+                    hook.session = session
+                    hook.action = action    
 
             for hook in execute_stage.hooks.get(HookType.TASK, []):
 
@@ -222,7 +263,7 @@ class Setup(Stage, Generic[Unpack[T]]):
 
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved task and session for Task - {task.name}:{task.action_id} - Execute stage - {execute_stage_name}')
 
-                task.hooks.checks = self.get_checks(execute_stage, hook.shortname) 
+                task.hooks.checks = await self.get_checks(execute_stage, hook.shortname) 
 
                 hook.session = session
                 hook.action = task  

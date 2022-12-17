@@ -94,10 +94,10 @@ class MercuryHTTP2Client:
                         if request.url.socket_config:
                             break
 
-                self._hosts[request.url.hostname] = request.url.ip_addr
-
                 if request.url.socket_config is None:
                         raise Exception('Err. - No socket found.')
+                
+                self._hosts[request.url.hostname] = request.url.ip_addr
                         
             else:
                 request.url.ip_addr = self._hosts[request.url.hostname]

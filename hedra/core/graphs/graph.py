@@ -6,7 +6,7 @@ import threading
 import os
 import time
 from yaspin.spinners import Spinners
-from typing import Dict, List
+from typing import Dict, List, Any
 from hedra.core.graphs.stages.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.transitions.transition import Transition
@@ -23,11 +23,13 @@ class Graph:
         self, 
         graph_name: str,
         stages: List[Stage], 
+        config: Dict[str, Any]={},
         cpus: int=None, 
         worker_id: int=None
     ) -> None:
         
         self.execution_time = 0
+        self.core_config = config
 
         self.graph_name = graph_name
         self.graph_id = str(uuid.uuid4())
@@ -90,7 +92,8 @@ class Graph:
             graph_name=self.graph_name,
             graph_id=self.graph_id,
             cpus=cpus,
-            worker_id=worker_id
+            worker_id=worker_id,
+            core_config=self.core_config
         )
 
     def assemble(self):
@@ -198,8 +201,8 @@ class Graph:
                         await status_spinner.system.debug(f'{self.metadata_string} - Changed status to - {GraphStatus.FAILED.name} - from - {GraphStatus.RUNNING.name}')
                         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Changed status to - {GraphStatus.FAILED.name} - from - {GraphStatus.RUNNING.name}')
 
-                        await status_spinner.system.error(f'{self.metadata_string} - Encountered error executing stage - {error.from_stage}')
-                        await self.logger.filesystem.aio['hedra.core'].error(f'{self.metadata_string} - Encountered error executing stage - {error.from_stage}')
+                        await status_spinner.system.error(f'{self.metadata_string} - Encountered error executing stage - {error.from_stage.name}:{error.from_stage.stage_id}')
+                        await self.logger.filesystem.aio['hedra.core'].error(f'{self.metadata_string} - Encountered error executing stage - {error.from_stage.name}:{error.from_stage.stage_id}')
 
                         error_transtiton = self.runner.create_error_transition(error)
 

@@ -43,6 +43,8 @@ class Stage:
         self.executor: BatchExecutor = None
         self.plugins_by_type: Dict[PluginType, Dict[str, Union[EnginePlugin, ReporterPlugin]]] = {}
 
+        self.core_config = {}
+
         self.logger: HedraLogger = HedraLogger()
         self.logger.initialize()
 

@@ -43,6 +43,9 @@ class WeightedSelectionPersona(DefaultPersona):
         self.metadata_string = f'{metadata_string} Persona: {self.type.capitalize()}:{self.persona_id} - '
         
         actions = hooks.get(HookType.ACTION)
+        actions.extend(
+            hooks.get(HookType.TASK)
+        )
         self.actions_count = len(actions)
 
         self.weights = [action.config.weight for action in actions]

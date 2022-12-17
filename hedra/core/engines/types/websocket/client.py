@@ -80,14 +80,14 @@ class MercuryWebsocketClient:
 
                         if action.url.socket_config:
                             break
-                
+
+                    if action.url.socket_config is None:
+                        raise Exception('Err. - No socket found.')
+                    
                     self._hosts[action.url.hostname] = {
                         'ip_addr': action.url.ip_addr,
                         'socket_config': action.url.socket_config
                     }
-
-                    if action.url.socket_config is None:
-                        raise Exception('Err. - No socket found.')
 
             else:
                 host_config = self._hosts[action.url.hostname]

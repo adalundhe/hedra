@@ -6,6 +6,12 @@ from hedra.core.engines.types.common.types import RequestTypes
 class Task(BaseAction):
 
     __slots__ = (
+        'action_id',
+        'protocols', 
+        'name', 
+        'is_setup', 
+        'metadata', 
+        'hooks',
         'type',
         'source',
         'execute'

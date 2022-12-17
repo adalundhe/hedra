@@ -42,7 +42,6 @@ class MercuryPlaywrightClient:
         self.closed = False
         self.config = None
 
-
         self.sem = asyncio.Semaphore(value=concurrency)
         self.active = 0
         self.waiter = None

@@ -21,9 +21,8 @@ class BaseAction:
         user: str=None, 
         tags: List[Dict[str, str]] = []
     ) -> None:
-        self.protocols = ProtocolMap()
-
         self.action_id = str(uuid.uuid4())
+        self.protocols = ProtocolMap()
         self.name = name
         self.is_setup = False
         self.metadata = Metadata(user, tags)

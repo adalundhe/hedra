@@ -3,7 +3,7 @@ import networkx
 import inspect
 import threading
 import os
-from typing import Coroutine, Dict, List, Tuple, Union
+from typing import Coroutine, Dict, List, Tuple, Union, Any
 from hedra.core.graphs.stages.stage import Stage
 from hedra.core.graphs.stages.error import Error
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -33,9 +33,11 @@ class TransitionAssembler:
         graph_name: str=None,
         graph_id: str=None,
         cpus: int=None, 
-        worker_id: int=None
+        worker_id: int=None,
+        core_config: Dict[str, Any]={}
     ) -> None:
         self.transition_types: Dict[Tuple[StageTypes, StageTypes], Coroutine] = transition_types
+        self.core_config = core_config
         self.graph_name = graph_name
         self.graph_id = graph_id
         self.generated_stages = {}
@@ -73,7 +75,7 @@ class TransitionAssembler:
         }
 
         for stage in self.generated_stages.values():
-            
+            stage.core_config = self.core_config
             stage.graph_name = self.graph_name
             stage.graph_id = self.graph_id
 

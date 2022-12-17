@@ -57,44 +57,43 @@ class MercuryHTTPClient:
         try:
             if action.url.is_ssl:
                 action.ssl_context = self.ssl_context
-
-            if self._hosts.get(action.url.hostname) is None:
-
-                    socket_configs = await asyncio.wait_for(action.url.lookup(), timeout=self.timeouts.connect_timeout)
-              
-                    for ip_addr, configs in socket_configs.items():
-                        for config in configs:
-
-                            connection = HTTPConnection()
-                            
-                            try:
-                                await connection.make_connection(
-                                    action.url.hostname,
-                                    ip_addr,
-                                    action.url.port,
-                                    config,
-                                    ssl=action.ssl_context,
-                                    timeout=self.timeouts.connect_timeout
-                                )
-
-                                action.url.socket_config = config
-                                action.url.ip_addr = ip_addr
-                                action.url.has_ip_addr = True
-                                break
-
-                            except Exception as e:
-                                pass
-
-                        if action.url.socket_config:
-                            break
                 
-                    self._hosts[action.url.hostname] = {
-                        'ip_addr': action.url.ip_addr,
-                        'socket_config': action.url.socket_config
-                    }
+            if self._hosts.get(action.url.hostname) is None:
+                socket_configs = await asyncio.wait_for(action.url.lookup(), timeout=self.timeouts.connect_timeout)
+            
+                for ip_addr, configs in socket_configs.items():
+                    for config in configs:
 
-                    if action.url.socket_config is None:
-                        raise Exception('Err. - No socket found.')
+                        connection = HTTPConnection()
+                        
+                        try:
+                            await connection.make_connection(
+                                action.url.hostname,
+                                ip_addr,
+                                action.url.port,
+                                config,
+                                ssl=action.ssl_context,
+                                timeout=self.timeouts.connect_timeout
+                            )
+
+                            action.url.socket_config = config
+                            action.url.ip_addr = ip_addr
+                            action.url.has_ip_addr = True
+                            break
+
+                        except Exception as e:
+                            pass
+
+                    if action.url.socket_config:
+                        break
+
+                if action.url.socket_config is None:
+                    raise Exception('Err. - No socket found.')
+
+                self._hosts[action.url.hostname] = {
+                    'ip_addr': action.url.ip_addr,
+                    'socket_config': action.url.socket_config
+                }
 
             else:
                 host_config = self._hosts[action.url.hostname]

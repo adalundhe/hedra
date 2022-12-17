@@ -21,7 +21,7 @@ class TaskClient(BaseClient[MercuryTaskRunner, Task, TaskResult]):
                 total_timeout=config.request_timeout
             )
         )
-        self.request_type = RequestTypes.HTTP
+        self.request_type = RequestTypes.TASK
         self.client_type = self.request_type.capitalize()
         self.next_name = None
 

@@ -29,6 +29,18 @@ def project():
     help='Git repository password'
 )
 @click.option(
+    '--bypass-connection-validation',
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Skip Hedra's action connection validation."
+)
+@click.option(
+    '--connection-validation-retries',
+    default=3,
+    help="Set the number of retries for connection validation."
+)
+@click.option(
     '--log-level',
     default='info',
     help='Set log level.'
@@ -38,6 +50,8 @@ def create(
     path: str,
     username: str, 
     password: str,
+    bypass_connection_validation: bool,
+    connection_validation_retries: int,
     log_level: str
 ):
     create_project(
@@ -45,6 +59,8 @@ def create(
         path,
         username,
         password,
+        bypass_connection_validation,
+        connection_validation_retries,
         log_level
     )
 

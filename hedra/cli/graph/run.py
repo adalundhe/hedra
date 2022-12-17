@@ -17,7 +17,14 @@ from hedra.logging import (
 )
 
 
-def run_graph(path: str, cpus: int, log_level: str, logfiles_directory: str):
+def run_graph(
+    path: str, 
+    cpus: int, 
+    log_level: str, 
+    logfiles_directory: str,
+    bypass_connection_validation: bool,
+    connection_validation_retries: int,
+):
 
     logging_manager.disable(
         LoggerTypes.DISTRIBUTED,
@@ -54,6 +61,14 @@ def run_graph(path: str, cpus: int, log_level: str, logfiles_directory: str):
             hedra_config = json.load(hedra_config_file)
 
     hedra_graphs = hedra_config.get('graphs', {})
+    hedra_core_config = hedra_config.get('core', {
+        'connection_validation_retries': 3
+    })
+
+    hedra_core_config['bypass_connection_validation'] = bypass_connection_validation
+
+    if connection_validation_retries:
+        hedra_core_config['connection_validation_retries'] = connection_validation_retries
 
     if hedra_graphs.get(graph_name) is None:
         hedra_graphs[graph_name] = path
@@ -97,6 +112,7 @@ def run_graph(path: str, cpus: int, log_level: str, logfiles_directory: str):
     graph = Graph(
         graph_name,
         list(discovered.values()),
+        config=hedra_core_config,
         cpus=cpus
     )
 

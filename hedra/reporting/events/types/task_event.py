@@ -7,6 +7,7 @@ class TaskEvent(BaseEvent):
     def __init__(self, result: TaskResult) -> None:
         super().__init__(result)
 
+        self.time = result.complete - result.start
         self.timings = {
             'total': self.time,
             'waiting': result.start - result.wait_start,

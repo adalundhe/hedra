@@ -93,7 +93,6 @@ class EventsGroup:
             self._streaming_mean[group_name].update(mean)
             self._streaming_variance[group_name].update(variance)
             self._streaming_stdev[group_name].update(stdev)
-            
 
             self.groups[group_name] = {
                 group_name: {
