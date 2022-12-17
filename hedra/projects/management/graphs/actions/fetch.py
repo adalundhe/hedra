@@ -15,3 +15,4 @@ class Fetch(RepoAction):
     def execute(self):
         self._pull_from_remote()
         self._checkout()
+        self._update_ignore()

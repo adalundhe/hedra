@@ -71,7 +71,7 @@ class RepoAction:
 
             with open(gitignore_path, 'a+') as hedra_gitignore:
                 
-                filter_files: List[str] = []
+                filter_files: List[str] = ['**/.hedra.json']
                 candidate_filter_files = [
                     str(path.resolve()) for path in Path(self.config.path).rglob('*') if '.git' not in str(path.resolve())
                 ]
