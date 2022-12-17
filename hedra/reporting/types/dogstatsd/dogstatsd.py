@@ -1,7 +1,8 @@
 
+import uuid
 from typing import List
-
 from numpy import float32, float64, int16, int32, int64
+from hedra.logging import HedraLogger
 from hedra.reporting.events.types.base_event import BaseEvent
 from hedra.reporting.metric.metrics_set import MetricsSet
 
@@ -56,7 +57,16 @@ class DogStatsD(StatsD):
             'timer': self.connection.timer
         }
 
+        self.session_uuid = str(uuid.uuid4())
+        self.metadata_string: str = None
+        self.logger = HedraLogger()
+        self.logger.initialize()
+
+        self.statsd_type = 'StatsD'
+
     async def submit_events(self, events: List[BaseEvent]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to {self.statsd_type}')
 
         for event in events:
             time_update_function = self._update_map.get('gauge')
@@ -70,12 +80,19 @@ class DogStatsD(StatsD):
                 failed_update_function = self._update_map.get('increment')
                 failed_update_function(f'{event.name}_failed', 1)
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Events to {self.statsd_type}')
+
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to {self.statsd_type}')
+
         for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+
             for custom_group_name, group in metrics_set.custom_metrics.items():
 
                 for field, value in group.items():
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metric - {metrics_set.name}:{custom_group_name}:{field}')
                     
                     update_type = None
                     if isinstance(value, (int, int16, int32, int64)):
@@ -89,3 +106,5 @@ class DogStatsD(StatsD):
                         f'{metrics_set.name}_{custom_group_name}_{field}',
                         value
                     )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to {self.statsd_type}')

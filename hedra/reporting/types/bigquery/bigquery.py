@@ -161,11 +161,11 @@ class BigQuery:
 
             await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created table - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.shared_metrics_table_name} - if not exists')
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics Set - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.shared_metrics_table_name} - if not exists')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.shared_metrics_table_name} - if not exists')
 
         rows = []
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
             rows.append({
                 'name': metrics_set.name,
                 'stage': metrics_set.stage,
@@ -187,15 +187,15 @@ class BigQuery:
             )
         )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics Set - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.shared_metrics_table_name} - if not exists')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.shared_metrics_table_name} - if not exists')
 
     async def submit_metrics(self, metrics: List[MetricsSet]):
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics Set - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.metrics_table_name} - if not exists')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.metrics_table_name} - if not exists')
 
         rows = []
         for metrics_set in metrics:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             if self._metrics_table is None:
 
@@ -271,15 +271,15 @@ class BigQuery:
             )
         )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics Set - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.metrics_table_name} - if not exists')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.metrics_table_name} - if not exists')
 
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics Set - Project: {self.project_name} - Dataset: {self.dataset_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics - Project: {self.project_name} - Dataset: {self.dataset_name}')
 
         rows = defaultdict(list)
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
             
             for custom_metrics_group_name, custom_metrics_group in metrics_set.custom_metrics.items():
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Group - {custom_metrics_group_name}')
@@ -359,7 +359,7 @@ class BigQuery:
             )
         )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics Set - Project: {self.project_name} - Dataset: {self.dataset_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics - Project: {self.project_name} - Dataset: {self.dataset_name}')
 
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
 
@@ -367,7 +367,7 @@ class BigQuery:
 
         rows = []
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Errors Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Errors Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             if self._errors_table is None:
 
@@ -429,7 +429,7 @@ class BigQuery:
             )
         )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Errors Metrics Set - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.errors_table_name} - if not exists')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Errors Metrics - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.errors_table_name} - if not exists')
 
     async def close(self):
 

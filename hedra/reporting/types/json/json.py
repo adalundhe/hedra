@@ -1,13 +1,15 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 import functools
 import json
-from typing import Any, List
-
 import psutil
-from .json_config import JSONConfig
+import uuid
+from typing import List
+from concurrent.futures import ThreadPoolExecutor
+from hedra.logging import HedraLogger
 from hedra.reporting.events.types.base_event import BaseEvent
 from hedra.reporting.metric import MetricsSet
+from .json_config import JSONConfig
+
 has_connector = True
 
 class JSON:
@@ -18,10 +20,19 @@ class JSON:
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._loop = asyncio.get_event_loop()
 
+        self.session_uuid = str(uuid.uuid4())
+        self.metadata_string: str = None
+        self.logger = HedraLogger()
+        self.logger.initialize()
+
+
     async def connect(self):
-        pass
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping connect')
 
     async def submit_events(self, events: List[BaseEvent]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Events to file - {self.events_filepath}')
+
         event_records = [
             event.record for event in events
         ]
@@ -37,13 +48,18 @@ class JSON:
                 )
             )
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Events to file - {self.events_filepath}')
+
     async def submit_common(self, metrics_sets: List[MetricsSet]):
-        pass
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping Shared Metrics')
 
     async def submit_metrics(self, metrics: List[MetricsSet]):
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Metrics to file - {self.metrics_filepath}')
+
         records = {}
         for metrics_set in metrics:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
             
             groups = metrics_set.custom_metrics
 
@@ -69,11 +85,13 @@ class JSON:
                 )
             )
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Metrics to file - {self.metrics_filepath}')
+
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
-        pass
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping Custom Metrics')
 
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
-        pass
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping Error Metrics')
 
     async def close(self):
-        pass
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')

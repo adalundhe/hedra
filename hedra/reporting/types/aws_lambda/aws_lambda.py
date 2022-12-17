@@ -65,8 +65,6 @@ class AWSLambda:
 
         for event in events:
 
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Event - {event.name}:{event.event_id}')
-
             await self._loop.run_in_executor(
                 self._executor,
                 functools.partial(
@@ -76,17 +74,16 @@ class AWSLambda:
                 )
             )
 
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitted Event - {event.name}:{event.event_id}')
         
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Events to Lambda - {self.events_lambda_name}')
 
     async def submit_common(self, metrics_sets: List[MetricsSet]):
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics Set to Lambda - {self.metrics_lambda_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics to Lambda - {self.metrics_lambda_name}')
 
         for metrics_set in metrics_sets:
 
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             await self._loop.run_in_executor(
                 self._executor,
@@ -102,17 +99,15 @@ class AWSLambda:
                 )
             )
 
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitted Shared Metrics Set - {metrics_set.metrics_set_id}')
-
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics Set to Lambda - {self.metrics_lambda_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics to Lambda - {self.metrics_lambda_name}')
 
     async def submit_metrics(self, metrics: List[MetricsSet]):
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics Set to Lambda - {self.metrics_lambda_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics to Lambda - {self.metrics_lambda_name}')
 
         for metrics_set in metrics:
 
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for group_name, group in metrics_set.groups.items():
 
@@ -130,21 +125,17 @@ class AWSLambda:
                         })
                     )
                 )
-
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submittd Metrics Group - {group_name}:{group.metrics_group_id}')
-
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitted Metrics Set - {metrics_set.metrics_set_id}')
             
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics Set to Lambda - {self.metrics_lambda_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics to Lambda - {self.metrics_lambda_name}')
 
 
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics Set to Lambda - {self.metrics_lambda_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Lambda - {self.metrics_lambda_name}')
 
         for metrics_set in metrics_sets:
 
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for group_name, group in metrics_set.custom_metrics.items():
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {group_name}:{metrics_set.metrics_set_id}')
@@ -163,19 +154,15 @@ class AWSLambda:
                     )
                 )
 
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitted Custom Metrics Set - {group_name}:{metrics_set.metrics_set_id}')
-
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitted Custom Metrics Set - {metrics_set.metrics_set_id}')
-
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics Set to Lambda - {self.metrics_lambda_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Lambda - {self.metrics_lambda_name}')
 
     async def submit_errors(self, metrics: List[MetricsSet]):
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Errors Metrics Set to Lambda - {self.metrics_lambda_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Errors Metrics to Lambda - {self.metrics_lambda_name}')
 
         for metrics_set in metrics:
 
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Errors Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Errors Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for error in metrics_set.errors:
                 await self._loop.run_in_executor(
@@ -190,10 +177,8 @@ class AWSLambda:
                         })
                     )
                 )
-                
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Errors Metrics Set - {metrics_set.metrics_set_id}')
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Errors Metrics Set to Lambda - {self.metrics_lambda_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Errors Metrics to Lambda - {metrics_set.name}:{self.metrics_lambda_name}')
             
 
     async def close(self):

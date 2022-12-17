@@ -104,7 +104,7 @@ def run_graph(path: str, cpus: int, log_level: str, logfiles_directory: str):
 
     loop.run_until_complete(graph.run())
 
-    logger.filesystem.sync['hedra.core'].info(f'\nGraph - {graph_name.capitalize()} - completed - {graph.logger.spinner.display.total_timer.elapsed_message}\n')
+    logger.filesystem.sync['hedra.core'].info(f'{graph.metadata_string} - Completed - {graph.logger.spinner.display.total_timer.elapsed_message}\n')
     logger.console.sync.info(f'\nGraph - {graph_name.capitalize()} - completed! {graph.logger.spinner.display.total_timer.elapsed_message}\n')
 
     os._exit(0)

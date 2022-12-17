@@ -13,3 +13,4 @@ class Netdata(StatsD):
 
     def __init__(self, config: NetdataConfig) -> None:
         super(Netdata, self).__init__(config)
+        self.statsd_type = 'Netdata'

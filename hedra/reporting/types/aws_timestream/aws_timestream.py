@@ -151,11 +151,11 @@ class AWSTimestream:
             await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Skipping creation of table - Database: {self.database_name} - Table: {self.metrics_table_name} - if not exists')
 
         records = []
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics Set - Database: {self.database_name} - Table: {self.events_table_name} - if not exists')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics - Database: {self.database_name} - Table: {self.events_table_name} - if not exists')
 
         for metrics_set in metrics:
 
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
  
             for field, value in metrics_set.common_stats.items():
                 timestream_record = AWSTimestreamRecord(
@@ -181,7 +181,7 @@ class AWSTimestream:
             )
         )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics Set - Database: {self.database_name} - Table: {self.events_table_name} - if not exists')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics - Database: {self.database_name} - Table: {self.events_table_name} - if not exists')
 
     async def submit_metrics(self, metrics: List[MetricsSet]):
 
@@ -205,11 +205,11 @@ class AWSTimestream:
             await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Skipping creation of table - Database: {self.database_name} - Table: {self.metrics_table_name} - if not exists')
 
         records = []
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics Set - Database: {self.database_name} - Table: {self.events_table_name} - if not exists')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics - Database: {self.database_name} - Table: {self.events_table_name} - if not exists')
 
         for metrics_set in metrics:
 
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             metrics_groups = {**metrics_set.groups, **metrics_set.custom_metrics}
 
@@ -243,7 +243,7 @@ class AWSTimestream:
             )
         )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics Set - Database: {self.database_name} - Table: {self.events_table_name} - if not exists')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics - Database: {self.database_name} - Table: {self.events_table_name} - if not exists')
 
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping Custom Metrics submission')
@@ -270,11 +270,11 @@ class AWSTimestream:
             await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Skipping creation of table - Database: {self.database_name} - Table: {self.errors_table_name} - if not exists')
 
         error_records = []
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Errors Metrics Set - Database: {self.database_name} - Table: {self.events_table_name} - if not exists')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Errors Metrics - Database: {self.database_name} - Table: {self.events_table_name} - if not exists')
 
         for metrics_set in metrics_sets:
 
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Errors Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Errors Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for error in metrics_set.errors:
                 timestream_record = AWSTimestreamErrorRecord(
@@ -298,7 +298,7 @@ class AWSTimestream:
             )
         )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Errors Metrics Set - Database: {self.database_name} - Table: {self.events_table_name} - if not exists')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Errors Metrics - Database: {self.database_name} - Table: {self.events_table_name} - if not exists')
 
 
     async def close(self):

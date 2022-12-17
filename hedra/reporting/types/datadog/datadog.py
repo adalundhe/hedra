@@ -1,9 +1,6 @@
-import asyncio
-import functools
-from re import S
-import re
-
+import uuid
 from numpy import float32, float64, int16, int32, int64
+from hedra.logging import HedraLogger
 from hedra.reporting.events.types.base_event import BaseEvent
 from hedra.reporting.metric.metrics_set import MetricsSet
 
@@ -42,6 +39,11 @@ class Datadog:
         self.priority = config.priority
         self.custom_fields = config.custom_fields or {}
 
+        self.session_uuid = str(uuid.uuid4())
+        self.metadata_string: str = None
+        self.logger = HedraLogger()
+        self.logger.initialize()
+
         self.types_map = {
             'total': 'count',
             'succeeded': 'count',
@@ -68,6 +70,9 @@ class Datadog:
         self.metrics_api = None
 
     async def connect(self):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connecting to Datadogg API')
+
         self._config = Configuration()
         self._config.api_key["apiKeyAuth"] = self.datadog_api_key
         self._config.api_key["appKeyAuth"] = self.datadog_app_key
@@ -84,8 +89,12 @@ class Datadog:
         self.events_api = EventsApi(self._client)
         self.metrics_api = MetricsApi(self._client)
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to Datadogg API')
+
 
     async def submit_events(self, events: List[BaseEvent]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to Datadog API')
 
         for event in events:
 
@@ -107,15 +116,24 @@ class Datadog:
                 )
             )
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Events to Datadog API')
+
     async def submit_common(self, metrics_sets: List[MetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics to Datadog API')
 
         metrics_series = []
         for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
+
             tags = [
                 f'{tag.name}:{tag.value}' for tag in metrics_set.tags
             ]
 
             for field, value in metrics_set.common_stats.items():
+
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Shared Metric - {metrics_set.name}:common:{field}')
+
                 metric_type = self.types_map.get(field)
                 datadog_metric_type = self._datadog_api_map.get(metric_type)
 
@@ -141,11 +159,16 @@ class Datadog:
 
                 metrics_series.append(series)
                 
-        await self.metrics_api.submit_metrics(MetricPayload(metrics_series))        
+        await self.metrics_api.submit_metrics(MetricPayload(metrics_series))
+        
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics to Datadog API')        
 
     async def submit_metrics(self, metrics: List[MetricsSet]):
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics to Datadog API')
+
         for metrics_set in metrics:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             tags = [
                 f'{tag.name}:{tag.value}' for tag in metrics_set.tags
@@ -153,7 +176,11 @@ class Datadog:
 
             metrics_series = []
             for group_name, group in metrics_set.groups.items():
+
                 for field, value in group.stats.items():
+
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Metric - {metrics_set.name}:{group_name}:{field}')
+
                     metric_type = self.types_map.get(field)
                     datadog_metric_type = self._datadog_api_map.get(metric_type)
 
@@ -174,6 +201,9 @@ class Datadog:
                     metrics_series.append(series)
 
                 for quantile_name, quantile_value in group.quantiles.items():
+
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Metric Quantile - {metrics_set.name}:{group_name}:{quantile_name}th Quantile')
+
                     datadog_metric_type = self._datadog_api_map.get('gauge')
                     series = MetricSeries(
                         f'{metrics_set.name}_{quantile_name}', 
@@ -192,6 +222,9 @@ class Datadog:
                     metrics_series.append(series)
      
                 for custom_field_name, value in group.custom.items():
+
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Custom Metric - {metrics_set.name}:{group_name}:{custom_field_name}')
+
                     datadog_metric_type = group.custom_schemas.get(custom_field_name)
                     datadog_type = self._datadog_api_map.get(datadog_metric_type)
 
@@ -219,17 +252,24 @@ class Datadog:
             
             await self.metrics_api.submit_metrics(MetricPayload(metrics_series))
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics to Datadog API')
+
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to Datadog API')
 
         metrics_series = []
         for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             tags = [
                 f'{tag.name}:{tag.value}' for tag in metrics_set.tags
             ]
 
             for custom_group_name, group in metrics_set.custom_metrics.items():
+
                 for field, value in group.items():
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Custom Metric - {metrics_set.name}:{custom_group_name}:{field}')
                     
                     metric_type = None
                     if isinstance(value, (int, int16, int32, int64)):
@@ -258,10 +298,15 @@ class Datadog:
 
         await self.metrics_api.submit_metrics(MetricPayload(metrics_series))
 
-    async def submit_events(self, metrics_sets: List[MetricsSet]):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Datadog API')
+
+    async def submit_errors(self, metrics_sets: List[MetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Error Metrics to Datadog API')
 
         error_series = [] 
         for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Error Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             tags = [
                 f'{tag.name}:{tag.value}' for tag in metrics_set.tags
@@ -289,6 +334,8 @@ class Datadog:
                 error_series.append(series)
 
         await self.metrics_api.submit_metrics(MetricPayload(error_series))
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Error Metrics to Datadog API')
 
     async def close(self):
         pass

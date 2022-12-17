@@ -1,5 +1,6 @@
-
-from typing import Any, List
+import uuid
+from typing import List
+from hedra.logging import HedraLogger
 from hedra.reporting.events.types.base_event import BaseEvent
 
 
@@ -48,7 +49,16 @@ class TelegrafStatsD(StatsD):
             'timer': self.connection.timer
         }
 
+        self.session_uuid = str(uuid.uuid4())
+        self.metadata_string: str = None
+        self.logger = HedraLogger()
+        self.logger.initialize()
+
+        self.statsd_type = 'TelegrafStatsD'
+
     async def submit_events(self, events: List[BaseEvent]):
+        
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to {self.statsd_type}')
 
         for event in events:
             time_update_function = self._update_map.get('gauge')
@@ -61,3 +71,5 @@ class TelegrafStatsD(StatsD):
             else:
                 failed_update_function = self._update_map.get('increment')
                 failed_update_function(f'{event.name}_failed', 1)
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Events to {self.statsd_type}')

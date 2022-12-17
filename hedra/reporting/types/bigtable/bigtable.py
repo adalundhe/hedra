@@ -144,7 +144,7 @@ class BigTable:
 
     async def submit_common(self, metrics_sets: List[MetricsSet]):
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics Set to Table {self.shared_metrics_table_id}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics to Table {self.shared_metrics_table_id}')
 
         stage_metrics_table = self.instance.table(self.shared_metrics_table_id)
             
@@ -180,7 +180,7 @@ class BigTable:
 
         rows = []
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             row_key = f'{self.shared_metrics_table_id}_{str(uuid.uuid4())}'
             row = stage_metrics_table.direct_row(row_key)
@@ -211,11 +211,11 @@ class BigTable:
             rows
         )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics Set to Table {self.shared_metrics_table_id}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics to Table {self.shared_metrics_table_id}')
     
     async def submit_metrics(self, metrics: List[MetricsSet]):
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics Set to Table {self.metrics_table_id}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics to Table {self.metrics_table_id}')
 
         metrics_table = self.instance.table(self.metrics_table_id)
             
@@ -249,7 +249,7 @@ class BigTable:
         
         rows = []
         for metrics_set in metrics:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for group_name, group in metrics_set.groups.items():
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Group - {group_name}:{group.metrics_group_id}')
@@ -281,15 +281,15 @@ class BigTable:
             rows
         )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics Set to Table {self.metrics_table_id}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics to Table {self.metrics_table_id}')
 
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics Set to Table {self.metrics_table_id}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to Table {self.metrics_table_id}')
 
         rows = defaultdict(list)
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for custom_group_name, custom_group in metrics_set.custom_metrics.items():
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Group - {custom_group_name}')
@@ -353,7 +353,7 @@ class BigTable:
                 table_rows
             )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics Set to Table {self.metrics_table_id}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Table {self.metrics_table_id}')
 
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
 
@@ -393,7 +393,7 @@ class BigTable:
         
         rows = []
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Error Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Error Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
             
             for error in metrics_set.errors:
 

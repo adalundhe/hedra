@@ -93,7 +93,7 @@ class CosmosDB:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics to container - {self.shared_metrics_container_name} with Partition Key /{self.shared_metrics_container_name}')
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             await self.shared_metrics_container.upsert_item({
                 'id': str(uuid.uuid4()),
@@ -117,7 +117,7 @@ class CosmosDB:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics to container - {self.metrics_container_name} with Partition Key /{self.metrics_container_name}')
         for metrics_set in metrics:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for group_name, group in metrics_set.groups.items():
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Group - {group_name}:{group.metrics_group_id}')
@@ -127,16 +127,13 @@ class CosmosDB:
                     'group': group_name,
                     **group.record
                 })
-
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitted Metrics Group - {group_name}:{group.metrics_group_id}')
-
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitted Metrics Set - {metrics_set.metrics_set_id}')
             
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics to container - {self.metrics_container_name} with Partition Key /{self.metrics_container_name}')
 
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
+        
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for custom_group_name, group in metrics_set.custom_metrics.items():
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Group - {custom_group_name}')
@@ -162,9 +159,8 @@ class CosmosDB:
                     **group
                 })
 
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitted Custom Metrics Group - {custom_group_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics to container - {self.metrics_container_name} with Partition Key /{self.metrics_container_name}')
 
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitted Custom Metrics Set - {metrics_set.metrics_set_id}')
 
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
 
@@ -178,7 +174,7 @@ class CosmosDB:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Error Metrics to container - {self.errors_container_name} with Partition Key /{self.errors_container_name}')
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Error Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Error Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for error in metrics_set.errors:
                 await self.metrics_container.upsert_item({
@@ -188,8 +184,6 @@ class CosmosDB:
                     'error_message': error.get('message'),
                     'error_count': error.get('count')
                 })
-
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitted Error Metrics Set - {metrics_set.metrics_set_id}')
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Error Metrics to container - {self.errors_container_name} with Partition Key /{self.errors_container_name}')
 

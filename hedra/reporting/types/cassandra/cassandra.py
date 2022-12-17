@@ -175,7 +175,7 @@ class Cassandra:
 
     async def submit_common(self, metrics_sets: List[MetricsSet]):
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics Set to - Keyspace: {self.keyspace} - Table: {self.shared_metrics_table_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics to - Keyspace: {self.keyspace} - Table: {self.shared_metrics_table_name}')
         
         if self._shared_metrics_table is None:
 
@@ -210,7 +210,7 @@ class Cassandra:
             await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Shared Metrics table - {self.shared_metrics_table_name} - under keyspace - {self.keyspace}')
 
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
             await self._loop.run_in_executor(
                     self._executor,
                     functools.partial(
@@ -224,14 +224,14 @@ class Cassandra:
                     )
                 )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics Set to - Keyspace: {self.keyspace} - Table: {self.shared_metrics_table_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics to - Keyspace: {self.keyspace} - Table: {self.shared_metrics_table_name}')
 
     async def submit_metrics(self, metrics: List[MetricsSet]):
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics Set to - Keyspace: {self.keyspace} - Table: {self.metrics_table_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics to - Keyspace: {self.keyspace} - Table: {self.metrics_table_name}')
 
         for metrics_set in metrics:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
        
             if self._metrics_table is None:
                 
@@ -293,11 +293,13 @@ class Cassandra:
 
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics Set to - Keyspace: {self.keyspace} - Table: {self.metrics_table_name}')
+
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
             
             for custom_group_name, group in metrics_set.custom_metrics.items():
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Group - {custom_group_name}')
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Group - {custom_group_name}')
 
                 custom_metrics_table_name = f'{custom_group_name}_metrics'
                 if self._custom_metrics_tables.get(custom_metrics_table_name):
@@ -354,14 +356,12 @@ class Cassandra:
                         }
                     )
                 )
-
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitted Custom Metrics Group - {custom_group_name}')
-
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitted Custom Metrics Set - {metrics_set.metrics_set_id}')
+        
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics Set to - Keyspace: {self.keyspace} - Table: {self.metrics_table_name}')
 
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Errors Metrics Set to - Keyspace: {self.keyspace} - Table: {self.errors_table_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Errors Metrics to - Keyspace: {self.keyspace} - Table: {self.errors_table_name}')
 
         if self._errors_table is None:
 
@@ -393,7 +393,7 @@ class Cassandra:
             await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Errors Metrics table - {self.errors_table_name} - under keyspace - {self.keyspace}')
 
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Errors Metrics Set - {metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Errors Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for error in metrics_set.errors:
                 await self._loop.run_in_executor(
@@ -409,7 +409,7 @@ class Cassandra:
                     )
                 )
         
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Errors Metrics Set to - Keyspace: {self.keyspace} - Table: {self.errors_table_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Errors Metrics to - Keyspace: {self.keyspace} - Table: {self.errors_table_name}')
  
     async def close(self):
         host_port_combinations = ', '.join([
