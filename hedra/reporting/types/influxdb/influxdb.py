@@ -91,7 +91,7 @@ class InfluxDB:
 
         points = []
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             point = Point(metrics_set.name)
 
@@ -123,7 +123,7 @@ class InfluxDB:
 
         points = []
         for metrics_set in metrics:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
             
             for group_name, group in metrics_set.groups.items():
                 point = Point(metrics_set.name)
@@ -154,7 +154,7 @@ class InfluxDB:
 
         points = defaultdict(list)
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for custom_group_name, group in metrics_set.custom_metrics.items():
 
@@ -191,7 +191,7 @@ class InfluxDB:
 
         points = []
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Errors Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Errors Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for error in metrics_set.errors:
                 point = Point(f'{metrics_set.name}_errors')

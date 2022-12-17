@@ -75,7 +75,7 @@ class Honeycomb:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics to Honeycomb.IO')
 
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             group_metric = {
                 'name': metrics_set.name,
@@ -103,7 +103,7 @@ class Honeycomb:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics to Honeycomb.IO')
 
         for metrics_set in metrics:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for group_name, group in metrics_set.groups.items():
 
@@ -132,7 +132,7 @@ class Honeycomb:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to Honeycomb.IO')
 
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for custom_group_name, group in metrics_set.custom_metrics.items():
 
@@ -162,7 +162,7 @@ class Honeycomb:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Error Metrics to Honeycomb.IO')
 
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for error in metrics_set.errors:
 

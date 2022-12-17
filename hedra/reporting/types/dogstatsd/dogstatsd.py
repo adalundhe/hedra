@@ -87,7 +87,7 @@ class DogStatsD(StatsD):
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to {self.statsd_type}')
 
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for custom_group_name, group in metrics_set.custom_metrics.items():
 

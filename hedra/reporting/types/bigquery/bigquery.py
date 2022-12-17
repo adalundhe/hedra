@@ -367,7 +367,7 @@ class BigQuery:
 
         rows = []
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Errors Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Errors Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             if self._errors_table is None:
 

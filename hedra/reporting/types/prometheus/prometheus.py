@@ -1,7 +1,9 @@
 import asyncio
+import uuid
 import functools
 from typing import List
 from numpy import float32, float64, int16, int32, int64
+from hedra.logging import HedraLogger
 from hedra.reporting.events.types.base_event import BaseEvent
 from hedra.reporting.metric import MetricsSet
 
@@ -54,16 +56,26 @@ class Prometheus:
 
         self._events = {}
         self._metrics = {}
-        self._stage_metrics = {}
+        self._shared_metrics = {}
         self._custom_metrics = {}
         self._errors = {}
+
+        self.session_uuid = str(uuid.uuid4())
+        self.metadata_string: str = None
+        self.logger = HedraLogger()
+        self.logger.initialize()
         
     async def connect(self) -> None:
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connecting to Prometheus Pushgateway at: {self.pushgateway_address}')
+
         self.registry = CollectorRegistry()
         REGISTRY.register(self.registry)
 
         if self.username and self.password:
             self._has_auth = True
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to Prometheus Pushgateway at: {self.pushgateway_address}')
             
 
     def _generate_auth(self) -> basic_auth_handler:
@@ -81,6 +93,7 @@ class Prometheus:
     
     async def _submit_to_pushgateway(self):
         if self._has_auth:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Pushing to secure Prometheus Pushgateway via HTTPS')
             await self._loop.run_in_executor(
                 None,
                 functools.partial(
@@ -92,7 +105,10 @@ class Prometheus:
                 )
             )
 
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Pushed to secure Prometheus Pushgateway via HTTPS')
+
         else:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Pushing to Prometheus Pushgateway via HTTP')
             await self._loop.run_in_executor(
                 None,
                 functools.partial(
@@ -103,7 +119,11 @@ class Prometheus:
                 )
             )
 
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Pushed to Prometheus Pushgateway via HTTP')
+
     async def submit_events(self, events: List[BaseEvent]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to Prometheus - Namespace: {self.namespace}')
 
         for event in events:
             
@@ -141,19 +161,25 @@ class Prometheus:
 
             await self._submit_to_pushgateway()
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Events to Prometheus - Namespace: {self.namespace}')
+
     async def submit_common(self, metrics_sets: List[MetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics to Prometheus - Namespace: {self.namespace}')
         
         for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             tags = [
                 f'{tag.name}:{tag.value}' for tag in metrics_set.tags
             ]
             
-            stage_metrics = self._stage_metrics.get(metrics_set.name)
-            if stage_metrics is None:
-                stage_metrics = {}
+            shared_metrics = self._shared_metrics.get(metrics_set.name)
+            if shared_metrics is None:
+                shared_metrics = {}
 
                 for field in metrics_set.common_stats.keys():
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metric - {metrics_set.name}:common:{field}')
 
                     metric_name = f'{metrics_set.name}_{field}'.replace('.', '_')
                     metric_type = self.types_map.get(field)
@@ -172,20 +198,24 @@ class Prometheus:
                     )
                     prometheus_metric.create_metric()
                     
-                    stage_metrics[field] = prometheus_metric
+                    shared_metrics[field] = prometheus_metric
                 
-                self._stage_metrics[metrics_set.name] = stage_metrics
+                self._shared_metrics[metrics_set.name] = shared_metrics
 
-            self._stage_metrics[metrics_set.name] = stage_metrics
+            self._shared_metrics[metrics_set.name] = shared_metrics
             for field, value in metrics_set.common_stats.items():
-                metric = stage_metrics.get(field)
+                metric = shared_metrics.get(field)
                 metric.update(value)
 
         await self._submit_to_pushgateway()
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics to Prometheus - Namespace: {self.namespace}')
 
     async def submit_metrics(self, metrics: List[MetricsSet]):
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics to Prometheus - Namespace: {self.namespace}')
+
         for metrics_set in metrics:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             tags = [
                 f'{tag.name}:{tag.value}' for tag in metrics_set.tags
@@ -207,6 +237,7 @@ class Prometheus:
                         fields = {}
 
                         for metric_field in metrics_set.stats_fields:
+                            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metric - {metrics_set.name}:{group_name}:{metric_field}')
                             metric_type = self.types_map.get(metric_field)
                             metric_name = f'{metrics_set.name}_{group_name}_{metric_field}'.replace('.', '_')
 
@@ -241,17 +272,21 @@ class Prometheus:
                     field_metric.update(metric_value)
 
         await self._submit_to_pushgateway()
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics to Prometheus - Namespace: {self.namespace}')
 
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
-        for metrics_set in metrics_sets:
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to Prometheus - Namespace: {self.namespace}')
 
-            stage_metrics = self._custom_metrics.get(metrics_set.name)
-            if stage_metrics is None:
-                stage_metrics = {}
+        for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
+
+            custom_metrics = self._custom_metrics.get(metrics_set.name)
+            if custom_metrics is None:
+                custom_metrics = {}
 
                 for custom_group_name, group in metrics_set.custom_metrics.items():
-                    group_metrics = stage_metrics.get(custom_group_name)
+                    group_metrics = custom_metrics.get(custom_group_name)
 
                     if group_metrics is None:
 
@@ -261,6 +296,7 @@ class Prometheus:
                         fields = {}
 
                         for field, value in group.items():
+                            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metric - {metrics_set.name}:{group_name}:{field}')
                             
                             metric_type = None
                             if isinstance(value, (int, int16, int32, int64)):
@@ -293,11 +329,11 @@ class Prometheus:
 
                         group_metrics[custom_group_name] = fields
 
-                stage_metrics[metrics_set.name] = group_metrics
+                custom_metrics[metrics_set.name] = group_metrics
 
-            self._custom_metrics[metrics_set.name] = stage_metrics
+            self._custom_metrics[metrics_set.name] = custom_metrics
             for group_name, group in metrics_set.custom_metrics.items():
-                group_metrics = stage_metrics.get(group_name)
+                group_metrics = custom_metrics.get(group_name)
 
                 for field in group_metrics[group_name]:
                     metric_value = group.get(field)
@@ -305,10 +341,14 @@ class Prometheus:
                     field_metric.update(metric_value)
 
         await self._submit_to_pushgateway()
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Prometheus - Namespace: {self.namespace}')
                     
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Error Metrics to Prometheus - Namespace: {self.namespace}')
+
         for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Error Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             if self._errors.get(metrics_set.name) is None:
                 errors_metric = PrometheusMetric(
@@ -332,7 +372,8 @@ class Prometheus:
                 )
                 
         await self._submit_to_pushgateway()
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Error Metrics to Prometheus - Namespace: {self.namespace}')
 
     async def close(self):
-        pass
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')
                 

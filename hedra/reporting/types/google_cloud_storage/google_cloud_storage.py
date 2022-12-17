@@ -125,7 +125,7 @@ class GoogleCloudStorage:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics to - Namespace: {self.bucket_namespace} - Bucket: {self.shared_metrics_bucket_name}')
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             blob = await self._loop.run_in_executor(
                 self._executor,
@@ -175,7 +175,7 @@ class GoogleCloudStorage:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics to - Namespace: {self.bucket_namespace} - Bucket: {self.metrics_bucket_name}')
         for metrics_set in metrics:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for group_name, group in metrics_set.groups.items():
                 blob = await self._loop.run_in_executor(
@@ -198,7 +198,7 @@ class GoogleCloudStorage:
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for custom_group_name, group in metrics_set.custom_metrics.items():
 
@@ -278,7 +278,7 @@ class GoogleCloudStorage:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Error Metrics to - Namespace: {self.bucket_namespace} - Bucket: {self.errors_bucket_name}')
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Errors Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Errors Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for error in metrics_set.errors:
                 error_message = re.sub(

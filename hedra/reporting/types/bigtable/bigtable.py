@@ -180,7 +180,7 @@ class BigTable:
 
         rows = []
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             row_key = f'{self.shared_metrics_table_id}_{str(uuid.uuid4())}'
             row = stage_metrics_table.direct_row(row_key)

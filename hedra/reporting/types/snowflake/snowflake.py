@@ -1,9 +1,10 @@
 import asyncio
+import uuid
+import psutil
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, List
 from numpy import float32, float64, int16, int32, int64
-
-import psutil
+from hedra.logging import HedraLogger
 from hedra.reporting.events.types.base_event import BaseEvent
 from hedra.reporting.metric import MetricsSet
 
@@ -35,7 +36,7 @@ class Snowflake:
 
         self.events_table_name = config.events_table
         self.metrics_table_name = config.metrics_table
-        self.stage_metrics_table_name = 'stage_metrics'
+        self.shared_metrics_table_name = 'stage_metrics'
         self.errors_table_name = 'stage_errors'
 
         self.custom_fields = config.custom_fields
@@ -48,15 +49,21 @@ class Snowflake:
         self._connection = None
         self._events_table = None
         self._metrics_table = None
-        self._stage_metrics_table = None
+        self._shared_metrics_table = None
         self._custom_metrics_tables = {}
         self._errors_table = None
 
         self._loop = asyncio.get_event_loop()
 
+        self.session_uuid = str(uuid.uuid4())
+        self.metadata_string: str = None
+        self.logger = HedraLogger()
+        self.logger.initialize()
+
     async def connect(self):
 
         try:
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connecting to Snowflake instance at - Warehouse: {self.warehouse} - Database: {self.database} - Schema: {self.schema}')
             self._engine = await self._loop.run_in_executor(
                 self._executor,
                 create_engine,
@@ -79,15 +86,20 @@ class Snowflake:
                 timeout=self.connect_timeout
             )
 
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to Snowflake instance at - Warehouse: {self.warehouse} - Database: {self.database} - Schema: {self.schema}')
+
         except asyncio.TimeoutError:
             raise Exception('Err. - Connection to Snowflake timed out - check your account id, username, and password.')
 
 
     async def submit_events(self, events: List[BaseEvent]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to Table - {self.events_table_name}')
     
         for event in events:
 
             if self._events_table is None:
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Events table - {self.events_table_name} - if not exists')
                 events_table = sqlalchemy.Table(
                     self.events_table_name,
                     self.metadata,
@@ -105,6 +117,7 @@ class Snowflake:
                 )
 
                 self._events_table = events_table
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Events table - {self.events_table_name}')
             
             await self._loop.run_in_executor(
                 self._executor,
@@ -112,12 +125,17 @@ class Snowflake:
                 self._events_table.insert(values=event.record)
             )
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Events to Table - {self.events_table_name}')
+
     async def submit_common(self, metrics_sets: List[MetricsSet]):
 
-        if self._stage_metrics_table is None:
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics to Table - {self.shared_metrics_table_name}')
 
-            stage_metrics_table = sqlalchemy.Table(
-                self.stage_metrics_table_name,
+        if self._shared_metrics_table is None:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Shared Metrics table - {self.shared_metrics_table_name} - if not exists')
+
+            shared_metrics_table = sqlalchemy.Table(
+                self.shared_metrics_table_name,
                 self.metadata,
                 sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
                 sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
@@ -132,16 +150,18 @@ class Snowflake:
             await self._loop.run_in_executor(
                 self._executor,
                 self._connection.execute,
-                CreateTable(stage_metrics_table, if_not_exists=True)
+                CreateTable(shared_metrics_table, if_not_exists=True)
             )
 
-            self._stage_metrics_table = stage_metrics_table
+            self._shared_metrics_table = shared_metrics_table
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Shared Metrics table - {self.shared_metrics_table_name}')
 
         for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
             await self._loop.run_in_executor(
                 self._executor,
                 self._connection.execute,
-                self._stage_metrics_table.insert(values={
+                self._shared_metrics_table.insert(values={
                     'name': metrics_set.name,
                     'stage': metrics_set.stage,
                     'group': 'common',
@@ -149,11 +169,18 @@ class Snowflake:
                 })
             )
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics to Table - {self.shared_metrics_table_name}')
+
     async def submit_metrics(self, metrics: List[MetricsSet]):
 
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics to Table - {self.metrics_table_name}')
+
         for metrics_set in metrics:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             if self._metrics_table is None:
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Metrics table - {self.metrics_table_name} - if not exists')
 
                 metrics_table = sqlalchemy.Table(
                     self.metrics_table_name,
@@ -186,6 +213,7 @@ class Snowflake:
                 )
 
                 self._metrics_table = metrics_table
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Metrics table - {self.metrics_table_name}')
 
         for group_name, group in metrics_set.groups.items():
             await self._loop.run_in_executor(
@@ -197,15 +225,20 @@ class Snowflake:
                 })
             )
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics to Table - {self.metrics_table_name}')
+
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
         for metrics_set in metrics_sets:
-
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            
             for custom_group_name, group in metrics_set.custom_metrics.items():
 
                 custom_table_name = f'{custom_group_name}_metrics'
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to table - {custom_group_name}')
 
                 if self._custom_metrics_tables.get(custom_table_name) is None:
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Custom Metrics table - {custom_group_name} - if not exists')
 
                     custom_table = sqlalchemy.Table(
                         custom_table_name,
@@ -235,6 +268,7 @@ class Snowflake:
                     )
 
                     self._custom_metrics_tables[custom_table_name] = custom_table
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Custom Metrics table - {custom_group_name}')
 
                 await self._loop.run_in_executor(
                     self._executor,
@@ -247,11 +281,18 @@ class Snowflake:
                     })
                 )
 
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to table - {custom_group_name}')
+
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Error Metrics to Table - {self.errors_table_name}')
+
         for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Error Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             if self._errors_table is None:
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Error Metrics table - {self.errors_table_name} - if not exists')
+
                 errors_table = sqlalchemy.Table(
                     self.errors_table_name,
                     self.metadata,
@@ -269,6 +310,7 @@ class Snowflake:
                 )
 
                 self._errors_table = errors_table
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Error Metrics table - {self.errors_table_name}')
 
             for error in metrics_set.errors:
                 await self._loop.run_in_executor(
@@ -281,9 +323,17 @@ class Snowflake:
                         'error_count': error.get('count')
                     })
                 )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Error Metrics to Table - {self.errors_table_name}')
         
     async def close(self):
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closing connection to Snowflake instance at - Warehouse: {self.warehouse} - Database: {self.database} - Schema: {self.schema}')
+
         await self._loop.run_in_executor(
             None,
             self._connection.close
         )
+
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closed session - {self.session_uuid}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closed connection to Snowflake instance at - Warehouse: {self.warehouse} - Database: {self.database} - Schema: {self.schema}')

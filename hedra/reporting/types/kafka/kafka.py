@@ -99,7 +99,7 @@ class Kafka:
 
         batch = self._producer.create_batch()
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             batch.append(
                 value=json.dumps({
@@ -126,7 +126,7 @@ class Kafka:
         
         batch = self._producer.create_batch()
         for metrics_set in metrics:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for group_name, group in metrics_set.groups.items():
                 batch.append(
@@ -153,7 +153,7 @@ class Kafka:
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Customm Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Customm Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for custom_group_name, group in metrics_set.custom_metrics.items():
                 custom_topic_name = f'{custom_group_name}_metrics'
@@ -188,7 +188,7 @@ class Kafka:
 
         batch = self._producer.create_batch()
         for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Error Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Error Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for error in metrics_set.errors:
                 batch.append(
