@@ -1,13 +1,14 @@
 import sys
 import glob
+import uuid
 import importlib
 import ntpath
 import inspect
 from pathlib import Path
 from typing import List, Union, Dict
 from hedra.core.graphs.stages.stage import Stage
-from hedra.plugins.types.common.plugin import Plugin
 from hedra.logging import HedraLogger
+from hedra.plugins.types.common.plugin import Plugin
 from .actions import (
     Fetch,
     Syncrhonize,
@@ -21,6 +22,7 @@ from .exceptions import InvalidActionError
 class GraphManager:
 
     def __init__(self, config: RepoConfig, log_level: str='info') -> None:
+        self.manager_id = str(uuid.uuid4())
         self._actions = {
             'initialize': Initialize,
             'synchronize': Syncrhonize,
@@ -37,6 +39,7 @@ class GraphManager:
     def execute_workflow(self, workflow_actions: List[str]):
         
         for workflow_action in workflow_actions:
+            self.logger.hedra.sync.debug(f'GraphManager: {self.manager_id} - Executing workflow action - {workflow_action}')
 
             init_files = glob.glob(self.config.path + '/**/__init__.py', recursive=True)
 
@@ -57,12 +60,16 @@ class GraphManager:
                 )
 
             action.execute()
+            self.logger.hedra.sync.debug(f'GraphManager: {self.manager_id} - Completed workflow action - {workflow_action}')
 
     def discover_graph_files(self) -> Dict[str, str]:
 
         candidate_files = glob.glob(self.config.path + '/**/*.py', recursive=True)
+        self.logger.hedra.sync.debug(f'GraphManager: {self.manager_id} - Searching for Graph and Plugin files on path - {self.config.path}')
 
         for candidate_filepath in candidate_files:
+
+            self.logger.hedra.sync.debug(f'GraphManager: {self.manager_id} - Analyzing file: {candidate_filepath}')
 
             package_dir = Path(candidate_filepath).resolve().parent
             package_dir_path = str(package_dir)
@@ -94,16 +101,18 @@ class GraphManager:
                         plugins[name] = obj
 
 
-                if len(graphs) > 0:               
+                if len(graphs) > 0:
+                    self.logger.hedra.sync.debug(f'GraphManager: {self.manager_id} - Found Graph file at - {candidate_filepath}')               
                     graph_filepath = Path(candidate_filepath)                
                     self.discovered_graphs[graph_filepath.stem] = str(graph_filepath.resolve())
 
                 if len(plugins) > 0:
+                    self.logger.hedra.sync.debug(f'GraphManager: {self.manager_id} - Found Plugin file at - {candidate_filepath}')     
                     plugin_filepath = Path(candidate_filepath)
                     self.discovered_plugins[plugin_filepath.stem] = str(plugin_filepath.resolve())
 
             except Exception as e:
-                self.logger.sync.console.error(f'Encountered error loading file at - {str(e)}.')
+                self.logger.hedra.sync.error(f'Encountered error loading file at - {str(e)}.')
                 pass
 
         
