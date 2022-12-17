@@ -426,9 +426,7 @@ class BigTable:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Error Metrics to Table {self.errors_table_id}')
 
     async def close(self):
-
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')
-
         await self._loop.run_in_executor(
             self._executor,
             self.client.close

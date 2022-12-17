@@ -32,11 +32,16 @@ class TimescaleDB(Postgres):
 
     async def submit_events(self, events: List[BaseEvent]):
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to Table - {self.events_table_name}')
+
         async with self._connection.begin() as transaction:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Events to Table - {self.events_table_name} - Initiating transaction')
         
             for event in events:
 
                 if self._events_table is None:
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Events table - {self.events_table_name} - if not exists')
+
                     events_table = sqlalchemy.Table(
                         self.events_table_name,
                         self.metadata,
@@ -56,6 +61,7 @@ class TimescaleDB(Postgres):
                     await self._connection.execute(f"CREATE INDEX ON {self.events_table_name} (name, time DESC);")
 
                     self._events_table = events_table
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Events table - {self.events_table_name}')
                 
                 record = event.record
                 record['request_time'] = record['time']
@@ -67,12 +73,19 @@ class TimescaleDB(Postgres):
                 }))
                 
             await transaction.commit()
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Events to Table - {self.events_table_name} - Transaction committed')
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Events to Table - {self.events_table_name}')
 
     async def submit_common(self, metrics_sets: List[MetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics to Table - {self.shared_metrics_table_name}')
         
         async with self._connection.begin() as transaction:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics to Table - {self.shared_metrics_table_name} - Initiating transaction')
 
             if self._stage_metrics_table is None:
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Shared Metrics table - {self.shared_metrics_table_name} - if not exists')
 
                 stage_metrics_table = sqlalchemy.Table(
                     self.stage_metrics_table_name,
@@ -97,7 +110,10 @@ class TimescaleDB(Postgres):
 
                 self._stage_metrics_table = stage_metrics_table
 
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Shared Metrics table - {self.shared_metrics_table_name}')
+
             for metrics_set in metrics_sets:
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
                 await self._connection.execute(
                     self._stage_metrics_table.insert(values={
                         'name': metrics_set.name,
@@ -108,13 +124,22 @@ class TimescaleDB(Postgres):
                 )
 
             await transaction.commit()
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics to Table - {self.shared_metrics_table_name} - Transaction committed')
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics to Table - {self.shared_metrics_table_name}')
 
     async def submit_metrics(self, metrics: List[MetricsSet]):
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics to Table - {self.metrics_table_name}')
+
         async with self._connection.begin() as transaction:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics to Table - {self.metrics_table_name} - Initiating transaction')
+
             for metrics_set in metrics:
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
                 if self._metrics_table is None:
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Metrics table - {self.metrics_table_name} - if not exists')
 
                     metrics_table = sqlalchemy.Table(
                         self.metrics_table_name,
@@ -149,6 +174,8 @@ class TimescaleDB(Postgres):
 
                     self._metrics_table = metrics_table
 
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Metrics table - {self.metrics_table_name}')
+
                 for group_name, group in metrics_set.groups.items():
                     await self._connection.execute(self._metrics_table.insert(values={
                         **group.record,
@@ -156,16 +183,23 @@ class TimescaleDB(Postgres):
                     }))
 
             await transaction.commit()
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics to Table - {self.metrics_table_name} - Transaction committed')
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics to Table - {self.metrics_table_name}')
 
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
         async with self._connection.begin() as transaction:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics - Initiating transaction')
+
             for metrics_set in metrics_sets:
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
                 
                 for custom_group_name, group in metrics_set.custom_metrics.items():
                     custom_table_name = f'{custom_group_name}_metrics'
 
                     if self._custom_metrics_tables.get(custom_table_name) is None:
+                        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Custom Metrics table - {custom_group_name} - if not exists')
 
                         custom_metrics_table = sqlalchemy.Table(
                             custom_table_name,
@@ -199,6 +233,8 @@ class TimescaleDB(Postgres):
 
                         self._custom_metrics_tables[custom_group_name] = custom_metrics_table
 
+                        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Custom Metrics table - {custom_group_name}')
+
                     await self._connection.execute(
                         self._custom_metrics_tables[custom_table_name].insert(values={
                             'name': metrics_set.name,
@@ -209,13 +245,21 @@ class TimescaleDB(Postgres):
                     )
 
             await transaction.commit()
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics - Transaction committed')
 
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Error Metrics to Table - {self.errors_table_name}')
+
         async with self._connection.begin() as transaction:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Error Metrics to Table - {self.errors_table_name} - Initiating transaction')
+
             for metrics_set in metrics_sets:
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Error Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
                 if self._errors_table is None:
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Error Metrics table - {self.errors_table_name} - if not exists')
+
                     errors_table = sqlalchemy.Table(
                         self.errors_table_name,
                         self.metadata,
@@ -237,6 +281,7 @@ class TimescaleDB(Postgres):
 
                     self._errors_table = errors_table    
 
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Error Metrics table - {self.errors_table_name}')
 
                 for error in metrics_set.errors:
                     await self._connection.execute(self._metrics_table.insert(values={
@@ -247,11 +292,18 @@ class TimescaleDB(Postgres):
                     }))
             
             await transaction.commit()
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Error Metrics to Table - {self.errors_table_name} - Transaction committed')
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Error Metrics to Table - {self.errors_table_name}')
                 
-        
     async def close(self):
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closing connectiion to {self.sql_type} at - {self.host}')
+
         await self._connection.close()
         self._engine.terminate()
         await self._engine.wait_closed()
 
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Session Closed - {self.session_uuid}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closed connectiion to {self.sql_type} at - {self.host}')
 

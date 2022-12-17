@@ -1,10 +1,11 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 import functools
 import re
-from typing import List
-
 import psutil
+import uuid
+from typing import List
+from concurrent.futures import ThreadPoolExecutor
+from hedra.logging import HedraLogger
 from hedra.reporting.events.types.base_event import BaseEvent
 from hedra.reporting.metric import MetricsSet
 
@@ -33,7 +34,15 @@ class NewRelic:
         self.client = None
         self._loop = asyncio.get_event_loop()
 
+        self.session_uuid = str(uuid.uuid4())
+        self.metadata_string: str = None
+        self.logger = HedraLogger()
+        self.logger.initialize()
+
     async def connect(self):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connecting to NewRelic - Using config at path - {self.config_path} - Environment - {self.environment}')
+
         await self._loop.run_in_executor(
             self._executor,
             functools.partial(
@@ -54,7 +63,12 @@ class NewRelic:
 
         await asyncio.sleep(1)
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to NewRelic - Using config at path - {self.config_path} - Environment - {self.environment}')
+
     async def submit_events(self, events: List[BaseEvent]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to NewRelic')
+
         for event in events:
             await self._loop.run_in_executor(
                 self._executor,
@@ -64,11 +78,18 @@ class NewRelic:
                     event.record
                 )
             )
+        
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Events to NewRelic')
 
     async def submit_common(self, metrics_sets: List[MetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Shared Metrics to NewRelic')
         
         for metrics_set in metrics_sets:  
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+
             for field, value in metrics_set.common_stats.items():
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metric - {metrics_set.name}:common:{field}')
                 await self._loop.run_in_executor(
                     self._executor,
                     functools.partial(
@@ -78,11 +99,18 @@ class NewRelic:
                     )
                 )
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics to NewRelic')
+
     async def submit_metrics(self, metrics: List[MetricsSet]):
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics to NewRelic')
+
         for metrics_set in metrics:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+
             for group_name, group in metrics_set.groups.items():
                 for field, value in group.stats.items():
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metric - {metrics_set.name}:{group_name}:{field}')
                     await self._loop.run_in_executor(
                         self._executor,
                         functools.partial(
@@ -92,11 +120,18 @@ class NewRelic:
                         )
                     )
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics to NewRelic')
+
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to NewRelic')
+
         for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+
             for custom_group_name, group in metrics_set.custom_metrics.items():
                 for field, value in group.items():
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metric - {metrics_set.name}:{custom_group_name}:{field}')
                     await self._loop.run_in_executor(
                         self._executor,
                         functools.partial(
@@ -106,8 +141,15 @@ class NewRelic:
                         )
                     )
 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to NewRelic')
+
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Error Metrics to NewRelic')
+
         for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics - {metrics_set.name}:{metrics_set.metrics_set_id}')
+
             for error in metrics_set.errors:
                 error_message = re.sub(
                     '[^0-9a-zA-Z]+', 
@@ -124,10 +166,18 @@ class NewRelic:
                         f'{metrics_set.name}_errors_{error_message}',
                         error.get('count')
                     )
-                )            
+                )  
+                
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Error Metrics to NewRelic')          
 
     async def close(self):
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closing connectiion to NewRelic')
+
         await self._loop.run_in_executor(
             self._executor,
             self.client.shutdown
         )
+
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Session Closed - {self.session_uuid}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closed connectiion to NewRelic')
