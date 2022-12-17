@@ -1,9 +1,13 @@
 from typing import List
 from .stages import (
     AnalyzeStage,
+    CheckpointStage,
+    OptimizeStage,
     ExecuteHTTPStage,
     SetupStage,
-    SubmitJSONResultsStage
+    SubmitJSONResultsStage,
+    TeardownStage,
+    ValidateStage
 )
 
 from hedra.core.graphs.hooks import depends
@@ -16,17 +20,25 @@ class GraphGenerator(Generator):
     def __init__(self) -> None:
         super().__init__({
             'analyze': AnalyzeStage,
+            'checkpoint': CheckpointStage,
             'http':ExecuteHTTPStage,
-            'setup': SetupStage,
             'json': SubmitJSONResultsStage,
+            'optimize': OptimizeStage,
+            'setup': SetupStage,
+            'teardown': TeardownStage,
+            'validate': ValidateStage,
             'depends': depends
         }, registrar.module_paths)
 
         self.valid_types = [
             'analyze',
+            'checkpoint',
             'execute',
+            'optimize',
             'setup',
-            'submit'
+            'submit',
+            'teardown',
+            'validate'
         ]
 
     def generate_graph(
