@@ -17,6 +17,12 @@ class RepoAction:
         self.git = None
         self.discovered_files = discovered_files
 
+    def _pull_from_remote(self):
+        self.repo = Repo.clone_from(self.config.uri, self.config.path)
+        self.branch = self.repo.create_head(self.config.branch)
+        self.remote = self.repo.remote(name=self.config.remote)
+        self.git = self.repo.git
+
     def _setup(self):
         self.repo = Repo(self.config.path)
         self.remote = Remote(self.repo, self.config.remote)

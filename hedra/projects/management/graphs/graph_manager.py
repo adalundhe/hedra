@@ -9,6 +9,7 @@ from hedra.core.graphs.stages.stage import Stage
 from hedra.plugins.types.common.plugin import Plugin
 from hedra.logging import HedraLogger
 from .actions import (
+    Fetch,
     Syncrhonize,
     Initialize,
     RepoConfig
@@ -22,7 +23,8 @@ class GraphManager:
     def __init__(self, config: RepoConfig, log_level: str='info') -> None:
         self._actions = {
             'initialize': Initialize,
-            'synchronize': Syncrhonize   
+            'synchronize': Syncrhonize,
+            'fetch': Fetch   
         }
 
         self.discovered_graphs: Dict[str, str] = {}

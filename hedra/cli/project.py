@@ -2,7 +2,8 @@ import os
 import click
 from hedra.cli.project import (
     create_project,
-    sync_project
+    sync_project,
+    get_project
 )
 
 
@@ -138,3 +139,70 @@ def sync(
         log_level,
         local
     )
+
+
+@project.command(
+    help='Clone down remote project to the specified path'
+)
+@click.argument('url')
+@click.option(
+    '--path',
+    default=os.getcwd(),
+    help='Path to graph repository.'
+)
+@click.option(
+    '--branch',
+    help='Git repository branch.'
+)
+@click.option(
+    '--remote',
+    help='Git repository remote.'
+)
+@click.option(
+    '--username',
+    help='Git repository username.'
+)
+@click.option(
+    '--password',
+    help='Git repository password'
+)
+@click.option(
+    '--bypass-connection-validation',
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Skip Hedra's action connection validation."
+)
+@click.option(
+    '--connection-validation-retries',
+    default=3,
+    help="Set the number of retries for connection validation."
+)
+@click.option(
+    '--log-level',
+    default='info',
+    help='Set log level.'
+)
+def get(
+    url: str, 
+    path: str,
+    branch: str, 
+    remote: str, 
+    username: str, 
+    password: str,
+    bypass_connection_validation: bool,
+    connection_validation_retries: int,
+    log_level: str
+):
+    get_project(
+        url,
+        path,
+        branch,
+        remote,
+        username,
+        password,
+        bypass_connection_validation,
+        connection_validation_retries,
+        log_level
+    )
+ 
