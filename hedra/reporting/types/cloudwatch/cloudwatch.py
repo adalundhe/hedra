@@ -205,7 +205,7 @@ class Cloudwatch:
         cloudwatch_errors = []
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.metrics_set_id}')
-            
+
             for error in metrics_set.errors:
                 cloudwatch_errors.append({
                     'Time': datetime.datetime.now(),
@@ -230,4 +230,4 @@ class Cloudwatch:
 
 
     async def close(self):
-        pass
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')

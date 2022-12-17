@@ -412,7 +412,16 @@ class Cassandra:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Errors Metrics Set to - Keyspace: {self.keyspace} - Table: {self.errors_table_name}')
  
     async def close(self):
+        host_port_combinations = ', '.join([
+            f'{host}:{self.port}' for host in self.hosts
+        ])
+
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closing connection to Cassandra Cluster at - {host_port_combinations}')
+
         await self._loop.run_in_executor(
             None,
             self.cluster.shutdown
         )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closed connection to Cassandra Cluster at - {host_port_combinations}')
