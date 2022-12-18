@@ -60,6 +60,11 @@ class MercuryTaskRunner:
             
             try:
 
+                if task.hooks.listen:
+                    event = asyncio.Event()
+                    task.hooks.channel_events.append(event)
+                    await event.wait()
+
                 start = time.monotonic()
 
                 result: BaseResult = await asyncio.wait_for(
@@ -70,6 +75,17 @@ class MercuryTaskRunner:
                 result.wait_start = wait_start
                 result.start = start
                 result.complete = time.monotonic()
+
+                if task.hooks.notify:
+                    await asyncio.gather(*[
+                        asyncio.create_task(channel(task.hooks.listeners)) for channel in task.hooks.channels
+                    ])
+
+                    for listener in task.hooks.listeners: 
+                        if len(listener.hooks.channel_events) > 0:
+                            event = listener.hooks.channel_events.pop()
+                            if not event.is_set():
+                                event.set()   
 
             except Exception as e:
                 result = TaskResult(task)

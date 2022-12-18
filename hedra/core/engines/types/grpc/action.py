@@ -1,5 +1,6 @@
 import binascii
 from typing import Dict, Iterator, List, Union
+from hedra.core.engines.types.common.hooks import Hooks
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.http2.action import HTTP2Action
 
@@ -31,6 +32,7 @@ class GRPCAction(HTTP2Action):
 
         self.timeout = 60
         self.type = RequestTypes.GRPC
+        self.hooks: Hooks[GRPCAction] = Hooks()
 
     def _setup_headers(self):
         grpc_headers = {

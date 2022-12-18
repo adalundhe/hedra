@@ -164,7 +164,7 @@ class PlaywrightCommand:
         self.input = input
         self.options = options
         self.metadata = Metadata(user, tags)
-        self.hooks = Hooks()
+        self.hooks: Hooks[PlaywrightCommand] = Hooks()
 
     def to_serializable(self):
 

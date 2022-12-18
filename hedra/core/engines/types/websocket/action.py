@@ -1,4 +1,5 @@
 from typing import Dict, Iterator, Union, List
+from hedra.core.engines.types.common.hooks import Hooks
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.http.action import HTTPAction
 from .utils import (
@@ -35,6 +36,7 @@ class WebsocketAction(HTTPAction):
         )
 
         self.type = RequestTypes.WEBSOCKET
+        self.hooks: Hooks[WebsocketAction] = Hooks()
 
     def _setup_headers(self):
 

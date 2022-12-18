@@ -35,7 +35,7 @@ class Task(BaseAction):
         self.type = RequestTypes.TASK
         self.source = source
         self.execute = task_action
-        self.hooks = Hooks()
+        self.hooks: Hooks[Task] = Hooks()
 
     def to_serializable(self):
 

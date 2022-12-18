@@ -4,6 +4,7 @@ from typing import Dict, Iterator, Union, List
 from urllib.parse import urlencode
 from hedra.core.engines.types.common.base_action import BaseAction
 from hedra.core.engines.types.common.constants import NEW_LINE
+from hedra.core.engines.types.common.hooks import Hooks
 from hedra.core.engines.types.common import URL
 from hedra.core.engines.types.common.encoder import Encoder
 from hedra.core.engines.types.common.types import RequestTypes
@@ -60,6 +61,8 @@ class HTTP2Action(BaseAction):
         self._remote_settings = h2.settings.Settings(
             client=False
         )
+        
+        self.hooks: Hooks[HTTP2Action] = Hooks()
 
     @property
     def size(self):

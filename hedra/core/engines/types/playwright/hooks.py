@@ -1,8 +1,11 @@
 import asyncio
-from typing import Coroutine, List, Dict
+from typing import Coroutine, List, Generic, TypeVar
 
 
-class Hooks:
+A = TypeVar('A')
+
+
+class Hooks(Generic[A]):
 
     __slots__ = (
         'before',
@@ -20,8 +23,8 @@ class Hooks:
         self.checks: List[Coroutine] = []
         self.notify = False
         self.listen = False
-        self.channel_events = Dict[str, asyncio.Future] = {}
-        self.listeners: List[str] = []
+        self.channel_events: List[asyncio.Event] = []
+        self.listeners: List[A] = []
         self.channels: List[Coroutine] = []
 
     def to_names(self):

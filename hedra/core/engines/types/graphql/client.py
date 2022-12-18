@@ -46,6 +46,11 @@ class MercuryGraphQLClient(MercuryHTTPClient):
                     action = await action.hooks.before(action, response)
                     action.setup()
 
+                if action.hooks.listen:
+                    event = asyncio.Event()
+                    action.hooks.channel_events.append(event)
+                    await event.wait()
+
                 response.start = time.monotonic()
 
                 await connection.make_connection(
@@ -162,6 +167,18 @@ class MercuryGraphQLClient(MercuryHTTPClient):
                 if action.hooks.after:
                     action = await action.hooks.after(action, response)
                     action.setup()
+
+                if action.hooks.notify:
+                    await asyncio.gather(*[
+                        asyncio.create_task(channel(action.hooks.listeners)) for channel in action.hooks.channels
+                    ])
+
+                    for listener in action.hooks.listeners: 
+                        if len(listener.hooks.channel_events) > 0:
+                            listener.setup()
+                            event = listener.hooks.channel_events.pop()
+                            if not event.is_set():
+                                event.set()    
 
             except Exception as e:
                 response.complete = time.monotonic()

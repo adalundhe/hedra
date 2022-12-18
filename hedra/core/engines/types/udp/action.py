@@ -2,7 +2,7 @@ import json
 from typing import Dict, Iterator, Union, List
 from urllib.parse import urlencode
 from hedra.core.engines.types.common.base_action import BaseAction
-from hedra.core.engines.types.common.constants import NEW_LINE
+from hedra.core.engines.types.common.hooks import Hooks
 from hedra.core.engines.types.common.protocols.shared.writer import Writer
 from hedra.core.engines.types.common import URL
 from hedra.core.engines.types.common.types import RequestTypes
@@ -46,6 +46,7 @@ class UDPAction(BaseAction):
         self.encoded_data = None
         self.is_stream = False
         self.ssl_context = None
+        self.hooks: Hooks[UDPAction] = Hooks()
 
     @property
     def size(self):
