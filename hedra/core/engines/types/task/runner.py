@@ -78,7 +78,9 @@ class MercuryTaskRunner:
 
                 if task.hooks.notify:
                     await asyncio.gather(*[
-                        asyncio.create_task(channel(task.hooks.listeners)) for channel in task.hooks.channels
+                        asyncio.create_task(
+                            channel(result, task.hooks.listeners)
+                        ) for channel in task.hooks.channels
                     ])
 
                     for listener in task.hooks.listeners: 

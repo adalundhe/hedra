@@ -266,7 +266,9 @@ class MercuryHTTPClient:
 
                 if action.hooks.notify:
                     await asyncio.gather(*[
-                        asyncio.create_task(channel(action.hooks.listeners)) for channel in action.hooks.channels
+                        asyncio.create_task(
+                            channel(response, action.hooks.listeners)
+                        ) for channel in action.hooks.channels
                     ])
 
                     for listener in action.hooks.listeners: 

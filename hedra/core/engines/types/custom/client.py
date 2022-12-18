@@ -124,14 +124,15 @@ class MercuryCustomClient(Generic[A, R]):
             connection = self.pool.connections.pop()
             
             try:
-                if action.hooks.before:
-                    action = await action.hooks.before(action, result)
-                    action.setup()
 
                 if action.hooks.listen:
                     event = asyncio.Event()
                     action.hooks.channel_events.append(event)
                     await event.wait()
+
+                if action.hooks.before:
+                    action = await action.hooks.before(action, result)
+                    action.setup()
 
                 result.times['start'] = time.monotonic()
 
@@ -150,7 +151,9 @@ class MercuryCustomClient(Generic[A, R]):
 
                 if action.hooks.notify:
                     await asyncio.gather(*[
-                        asyncio.create_task(channel(action.hooks.listeners)) for channel in action.hooks.channels
+                        asyncio.create_task(
+                            channel(result, action.hooks.listeners)
+                        ) for channel in action.hooks.channels
                     ])
 
                     for listener in action.hooks.listeners: 

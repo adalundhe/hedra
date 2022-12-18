@@ -204,7 +204,7 @@ class Validate(Stage):
                 assert hook.hook_type is HookType.AFTER, f"Hook type mismatch - hook {hook.name}:{hook.hook_id} is a {hook.hook_type.name} hook, but Hedra expected a {HookType.AFTER.name} hook."
                 assert hook.shortname in hook.name, f"Shortname {hook.shortname} must be contained in full Hook name {hook.name}:{hook.hook_id} for @after hook {hook.name}:{hook.hook_id}."
                 assert hook.call is not None, f"Method is not not found on stage or was not supplied to @after hook - {hook.name}:{hook.hook_id}"
-                assert hook.call.__code__.co_argcount > 2, f"Missing required argument 'result' for @after hook {hook.name}:{hook.hook_id}"
+                assert hook.call.__code__.co_argcount > 2, f"Missing required arguments 'action' or 'result' for @after hook {hook.name}:{hook.hook_id}"
                 assert hook.call.__code__.co_argcount < 4, f"Too many args. - @after hook {hook.name}:{hook.hook_id} only requires 'action' and 'result' as additional args."
                 assert len(hook.names) > 0, f"No target hook names provided for @after hook {hook.name}:{hook.hook_id}. Please specify at least one hook to validate."
                 assert 'self' in hook.call.__code__.co_varnames
@@ -303,7 +303,8 @@ class Validate(Stage):
                 assert hook.hook_type is HookType.CHANNEL, f"Hook type mismatch - hook {hook.name}:{hook.hook_id} is a {hook.hook_type.name} hook, but Hedra expected a {HookType.CHANNEL.name} hook."
                 assert hook.shortname in hook.name, f"Shortname {hook.shortname} must be contained in full Hook name {hook.name}:{hook.hook_id} for @channel hook {hook.name}:{hook.hook_id}."
                 assert hook.call is not None, f"Method is not not found on stage or was not supplied to @channel hook - {hook.name}:{hook.hook_id}"
-                assert hook.call.__code__.co_argcount > 1, f"Too many args. - @channel hook {hook.name}:{hook.hook_id} requires no additional args."
+                assert hook.call.__code__.co_argcount > 2, f"Missing required arguments 'result' or 'actions' for @channel hook {hook.name}:{hook.hook_id}"
+                assert hook.call.__code__.co_argcount < 4, f"Too many args. - @channel hook {hook.name}:{hook.hook_id} only requires 'result' and 'actions' as additional args."
                 assert 'self' in hook.call.__code__.co_varnames
 
                 stage_actions = list(filter(
