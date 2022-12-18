@@ -4,8 +4,7 @@ from hedra.core.graphs.stages import (
 )
 
 from hedra.reporting.types import (
-    CloudwatchConfig,
-    Cloudwatch
+    CloudwatchConfig
 )
 
 

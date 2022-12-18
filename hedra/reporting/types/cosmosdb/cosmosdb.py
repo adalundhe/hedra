@@ -26,8 +26,10 @@ class CosmosDB:
         self.database_name = config.database
         self.events_container_name = config.events_container
         self.metrics_container_name = config.metrics_container
-        self.shared_metrics_container_name = 'stage_metrics'
-        self.errors_container_name = 'stage_errors'
+        self.shared_metrics_container_name = f'{self.metrics_container_name}_metrics'
+        self.errors_container_name = f'{self.metrics_container}_errors'
+        self.events_partition_key = config.events_partition_key
+        self.metrics_partition_key = config.metrics_partition_key
         self.custom_metrics_containers = {}
 
         self.analytics_ttl = config.analytics_ttl
@@ -66,7 +68,7 @@ class CosmosDB:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Events container - {self.events_container_name} with Partition Key /{self.events_container_name} if not exists')
         self.events_container = await self.database.create_container_if_not_exists(
             self.events_container_name,
-            PartitionKey(f'/{self.events_container_name}')
+            PartitionKey(f'/{self.events_partition_key}')
         )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created or set Events container - {self.events_container_name} with Partition Key /{self.events_container_name}')
@@ -85,7 +87,7 @@ class CosmosDB:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Shared Metrics container - {self.shared_metrics_container_name} with Partition Key /{self.shared_metrics_container_name} if not exists')
         self.shared_metrics_container = await self.database.create_container_if_not_exists(
             self.shared_metrics_container_name,
-            PartitionKey(f'/{self.shared_metrics_container_name}')
+            PartitionKey(f'/{self.metrics_partition_key}')
         )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created or set Shared Metrics container - {self.shared_metrics_container_name} with Partition Key /{self.shared_metrics_container_name}')
@@ -110,7 +112,7 @@ class CosmosDB:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Metrics container - {self.metrics_container_name} with Partition Key /{self.metrics_container_name} if not exists')
         self.metrics_container = await self.database.create_container_if_not_exists(
             self.metrics_container_name,
-            PartitionKey(f'/{self.metrics_container_name}')
+            PartitionKey(f'/{self.metrics_partition_key}')
         )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created or set Metrics container - {self.metrics_container_name} with Partition Key /{self.metrics_container_name}')
@@ -143,7 +145,7 @@ class CosmosDB:
 
                 custom_container = await self.database.create_container_if_not_exists(
                     custom_metrics_container_name,
-                    PartitionKey(f'/{custom_group_name}_metrics')
+                    PartitionKey(f'/{self.metrics_partition_key}')
                 )
 
                 self.custom_metrics_containers[custom_metrics_container_name] = custom_container
@@ -167,7 +169,7 @@ class CosmosDB:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Error Metrics container - {self.errors_container_name} with Partition Key /{self.errors_container_name} if not exists')
         self.errors_container = await self.database.create_container_if_not_exists(
             self.errors_container_name,
-            PartitionKey(f'/{self.errors_container_name}')
+            PartitionKey(f'/{self.metrics_partition_key}')
         )
         
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created or set Error Metrics container - {self.errors_container_name} with Partition Key /{self.errors_container_name}')
