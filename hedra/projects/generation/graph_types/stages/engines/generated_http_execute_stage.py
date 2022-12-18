@@ -11,4 +11,4 @@ class ExecuteHTTPStage(Execute):
 
     @action()
     async def http_get(self):
-        return await self.client.http.get('')
+        return await self.client.http.get('https://<url_here>')

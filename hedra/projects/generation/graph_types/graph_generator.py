@@ -3,11 +3,20 @@ from .stages import (
     AnalyzeStage,
     CheckpointStage,
     OptimizeStage,
-    ExecuteHTTPStage,
     SetupStage,
     SubmitJSONResultsStage,
     TeardownStage,
     ValidateStage
+)
+from .stages.engines import (
+    ExecuteGraphQLStage,
+    ExecuteGraphQLHttp2Stage,
+    ExecuteHTTPStage,
+    ExecuteHTTP2Stage,
+    ExecutePlaywrightStage,
+    ExecuteTaskStage,
+    ExecuteUDPStage,
+    ExecuteWebsocketStage
 )
 
 from hedra.core.graphs.hooks import depends
@@ -21,12 +30,19 @@ class GraphGenerator(Generator):
         super().__init__({
             'analyze': AnalyzeStage,
             'checkpoint': CheckpointStage,
+            'graphql': ExecuteGraphQLStage,
+            'graphql-http2': ExecuteGraphQLHttp2Stage,
             'http':ExecuteHTTPStage,
+            'http2': ExecuteHTTP2Stage,
             'json': SubmitJSONResultsStage,
             'optimize': OptimizeStage,
+            'playwright': ExecutePlaywrightStage,
             'setup': SetupStage,
+            'task': ExecuteTaskStage,
             'teardown': TeardownStage,
+            'udp': ExecuteUDPStage,
             'validate': ValidateStage,
+            'websocket': ExecuteWebsocketStage,
             'depends': depends
         }, registrar.module_paths)
 

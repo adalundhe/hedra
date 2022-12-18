@@ -103,7 +103,7 @@ setup(
             'grpcio-tools'
         ],
         'graphql': [
-            'graphql'
+            'gql'
         ],
         'snowflake': [
             'snowflake-connector-python'
