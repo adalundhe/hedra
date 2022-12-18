@@ -12,7 +12,7 @@ class CloudwatchConfig(BaseModel):
     aws_secret_access_key: str
     region_name: str
     iam_role_arn: str
-    schedule_rate: str
+    schedule_rate: str=None
     events_rule: str='hedra-events'
     metrics_rule: str='hedra-metrics'
     cloudwatch_targets: conlist(_CloudwatchTarget, min_items=1)

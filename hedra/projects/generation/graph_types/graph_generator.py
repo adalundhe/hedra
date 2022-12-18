@@ -4,11 +4,10 @@ from .stages import (
     CheckpointStage,
     OptimizeStage,
     SetupStage,
-    SubmitJSONResultsStage,
     TeardownStage,
     ValidateStage
 )
-from .stages.engines import (
+from .stages.execute import (
     ExecuteGraphQLStage,
     ExecuteGraphQLHttp2Stage,
     ExecuteHTTPStage,
@@ -17,6 +16,11 @@ from .stages.engines import (
     ExecuteTaskStage,
     ExecuteUDPStage,
     ExecuteWebsocketStage
+)
+
+from .stages.submit import (
+    SubmitJSONResultsStage,
+    SubmitCSVResultsStage
 )
 
 from hedra.core.graphs.hooks import depends
@@ -30,6 +34,7 @@ class GraphGenerator(Generator):
         super().__init__({
             'analyze': AnalyzeStage,
             'checkpoint': CheckpointStage,
+            'csv': SubmitCSVResultsStage,
             'graphql': ExecuteGraphQLStage,
             'graphql-http2': ExecuteGraphQLHttp2Stage,
             'http':ExecuteHTTPStage,
