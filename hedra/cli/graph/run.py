@@ -112,7 +112,10 @@ def run_graph(
     graph = Graph(
         graph_name,
         list(discovered.values()),
-        config=hedra_core_config,
+        config={
+            **hedra_core_config,
+            'graph_module': module.__name__
+        },
         cpus=cpus
     )
 

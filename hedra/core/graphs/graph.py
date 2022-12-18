@@ -58,7 +58,7 @@ class Graph:
 
         self.instances: Dict[StageTypes, List[Stage]] = {}
         for stage in self.stage_types.values():
-            stage_instances = stage.__subclasses__()
+            stage_instances = [stage for stage in stage.__subclasses__() if stage.__module__ == self.core_config.get('graph_module')]
             self.instances[stage.stage_type] = stage_instances
 
         self.stages: Dict[str, Stage] = {stage.__name__: stage for stage in stages}

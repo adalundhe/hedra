@@ -183,10 +183,6 @@ class DefaultPersona:
             yield action_idx
             await asyncio.sleep(0)
             elapsed = time.monotonic() - start
-            idx += 1
-
-            if idx%self.batch.size == 0:
-                action_idx = (action_idx + 1)%self.actions_count
 
             if self._hooks[action_idx].session.active%max_pool_size == 0:
                 try:
@@ -197,6 +193,8 @@ class DefaultPersona:
                     )
                 except asyncio.TimeoutError:
                     pass
+
+            action_idx = (action_idx+1)%self.actions_count
 
     async def start_updates(self):
         if self._live_updates:
