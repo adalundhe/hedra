@@ -193,7 +193,6 @@ class TransitionAssembler:
                     ))
 
                     if transition_action == invalid_transition or transition_action == invalid_idle_transition:
-                        print(stage.name, neighbor_stage.name)
                         invalid_transition_error, _ = self.loop.run_until_complete(
                             transition_action(stage, neighbor_stage)
                         )

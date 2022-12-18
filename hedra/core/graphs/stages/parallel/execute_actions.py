@@ -3,7 +3,7 @@ import dill
 import threading
 import os
 import time
-from typing import Dict, Any
+from typing import Dict, Any, List
 from hedra.core.engines.client.config import Config
 from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.graphs.hooks.types.hook_types import HookType
@@ -53,18 +53,19 @@ async def start_execution(parallel_config: Dict[str, Any]):
         f'{metadata_string} - Executing {execution_hooks_count} actions with a batch size of {persona_config.batch_size} for {persona_config.total_time} seconds using Persona - {persona.type.capitalize()}'
     )
 
-    hooks = {
+    hooks: Dict[HookType, List[Hook]] = {
         HookType.ACTION: [],
         HookType.TASK: [],
     }
-
+    
+    actions = {}
     for hook_action in execution_hooks:
         hook_type = hook_action.get('hook_type', HookType.ACTION)
         action_name = hook_action.get('name')
 
         hook = Hook(
             hook_action.get('hook_name'),
-            action_name,
+            hook_action.get('hook_shortname'),
             None,
             hook_action.get('stage'),
             hook_type=HookType.ACTION
@@ -81,6 +82,7 @@ async def start_execution(parallel_config: Dict[str, Any]):
         )
 
         assembled_hook = await action_assembler.assemble(action_type)
+        actions[assembled_hook.name] = assembled_hook.action
         
         await logger.filesystem.aio['hedra.core'].info(
             f'{metadata_string} - Assembled hook - {hook.name}:{hook.hook_id} - using {action_type.capitalize()} Engine'
@@ -88,7 +90,18 @@ async def start_execution(parallel_config: Dict[str, Any]):
 
 
         hooks[hook_type].append(assembled_hook)
-        
+
+
+    actions_and_tasks = [
+        *hooks.get(HookType.ACTION, []),
+        *hooks.get(HookType.TASK, [])
+    ]
+
+    for hook in actions_and_tasks:
+        if hook.action.hooks.notify:
+            for idx, listener_name in enumerate(hook.action.hooks.listeners):
+                hook.action.hooks.listeners[idx] = actions.get(listener_name)
+
     persona.setup(hooks, metadata_string)
 
     if action_type == RequestTypes.PLAYWRIGHT and isinstance(hook.session, MercuryPlaywrightClient):

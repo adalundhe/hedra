@@ -128,7 +128,7 @@ class MercuryHTTPClient:
         self.sem = Semaphore(self.pool.size)
 
     async def execute_prepared_request(self, action: HTTPAction) -> HTTPResponseFuture:
- 
+  
         response = HTTPResult(action)
         response.wait_start = time.monotonic()
         self.active += 1
@@ -141,17 +141,10 @@ class MercuryHTTPClient:
                     action = await action.hooks.before(action, response)
                     action.setup()
 
-                # if action.hooks.listen:
-                #     await self.logger.console.aio.info(f'ACTION: {action.name} WAITING')
-                #     events = []
-                #     for channel_name in action.hooks.channel_events:
-                #         event = asyncio.Event()
-                #         action.hooks.channel_events[channel_name].append(event)
-                #         events.append(event)
-
-                #     await asyncio.gather(*[
-                #         asyncio.create_task(event.wait()) for event in events
-                #     ])
+                if action.hooks.listen:
+                    event = asyncio.Event()
+                    action.hooks.channel_events.append(event)
+                    await event.wait()
 
                 response.start = time.monotonic()
 
@@ -271,19 +264,17 @@ class MercuryHTTPClient:
                     action = await action.hooks.after(action, response)
                     action.setup()
 
-                # if action.hooks.notify:
-                #     pass
-                    # await asyncio.gather(*[
-                    #     asyncio.create_task(channel(action.hooks.listeners)) for channel in action.hooks.channels
-                    # ])
+                if action.hooks.notify:
+                    await asyncio.gather(*[
+                        asyncio.create_task(channel(action.hooks.listeners)) for channel in action.hooks.channels
+                    ])
 
-                    # for listener in action.hooks.listeners:
-                    #     for channel_events in listener.hooks.channel_events.values():
-                    #         if len(channel_events) > 0:
-                    #             event = channel_events.pop()
-
-                    #             if not event.is_set():
-                    #                 event.set()          
+                    for listener in action.hooks.listeners: 
+                        if len(listener.hooks.channel_events) > 0:
+                            listener.setup()
+                            event = listener.hooks.channel_events.pop()
+                            if not event.is_set():
+                                event.set()       
 
             except Exception as e:
                 response.complete = time.monotonic()

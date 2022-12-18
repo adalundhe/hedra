@@ -30,7 +30,7 @@ class Hooks(Generic[A]):
         self.checks = checks
         self.notify = False
         self.listen = False
-        self.channel_events: Dict[str, List[asyncio.Future]] = defaultdict(list)
+        self.channel_events: List[asyncio.Event] = []
         self.listeners: List[A] = []
         self.channels: List[Coroutine] = []
 

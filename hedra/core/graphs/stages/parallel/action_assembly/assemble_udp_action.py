@@ -29,8 +29,6 @@ async def assemble_udp_action(
     )
 
     action_hooks = hook_action.get('hooks', {})
-    notify = hook_action.get('notify', False)
-    listen = hook_action.get('listen', False)
     action_hook_names = action_hooks.get('names')
 
     before_hook_name = action_hook_names.get('before')
@@ -95,8 +93,8 @@ async def assemble_udp_action(
     for tag in hook.action.metadata.tags_to_string_list():
         await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - {hook_type_name} Hook - {action_name} - Tag: {tag}')
 
-    hook.action.hooks.notify = notify
-    hook.action.hooks.listen = listen
+    hook.action.hooks.notify = action_hooks.get('notify', False)
+    hook.action.hooks.listen = action_hooks.get('listen', False)
 
     if before_hook_name:
         before_hook = registrar.all.get(before_hook_name)
@@ -114,9 +112,7 @@ async def assemble_udp_action(
         channel = registrar.all.get(channel_hook_name)
         hook.action.hooks.channels.append(channel.call) 
 
-    hook.action.hooks.listeners = [
-        registrar.all.get(listener_name).action for listener_name in listener_names
-    ]
+    hook.action.hooks.listeners = listener_names
 
     hook.action.url.ip_addr = action_url.get('ip_addr')
     hook.action.url.port = action_url.get('port')

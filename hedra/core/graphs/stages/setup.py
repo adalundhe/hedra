@@ -328,20 +328,20 @@ class Setup(Stage, Generic[Unpack[T]]):
             action: Union[BaseAction, Task] = hook.action
             if len(hook.listen) > 0:
                 action.hooks.listen = True
-                action.hooks.channels.append(hook.call)
                 listeners[hook.name] = hook
 
                 for channel_name in hook.listen:
                     channel: Hook = channels.get(channel_name)
+                    action.hooks.channels.append(channel.call)
                     channel.listeners.append(hook.name)
 
             if len(hook.notify) > 0:
                 action.hooks.notify = True
-                action.hooks.channels.append(hook.call)
                 notifiers[hook.name] = hook
 
                 for channel_name in hook.notify:
                     channel: Hook = channels.get(channel_name)
+                    action.hooks.channels.append(channel.call)
                     channel.notifiers.append(hook.name)
 
         for channel in channels.values():
