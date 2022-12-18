@@ -190,6 +190,9 @@ class Validate(Stage):
                 assert hook.call.__code__.co_argcount == 1, f"Too many args. - @action hook {hook.name}:{hook.hook_id} requires no additional args."
                 assert 'self' in hook.call.__code__.co_varnames
 
+                for notify_action in hook.notify:
+                    assert notify_action not in hook.listen, f"Notify/listen loopback. - @action hook {hook.name}:{hook.hook_id} cannot notify and listen on same channel."
+
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validated {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.AFTER.name.capitalize()} - hooks')
@@ -287,6 +290,40 @@ class Validate(Stage):
                 assert hook.call.__code__.co_argcount > 1, f"Missing required argument 'events_group' for @metric hook {hook.name}:{hook.hook_id}"
                 assert hook.call.__code__.co_argcount < 3, f"Too many args. - @metric hook {hook.name}:{hook.hook_id} only requires 'events_group' as additional arg."
                 assert 'self' in hook.call.__code__.co_varnames
+
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validated {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
+
+            
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.CHANNEL.name.capitalize()} - hooks')
+
+            for hook in self.hooks.get(HookType.CHANNEL):
+
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
+
+                assert hook.hook_type is HookType.CHANNEL, f"Hook type mismatch - hook {hook.name}:{hook.hook_id} is a {hook.hook_type.name} hook, but Hedra expected a {HookType.CHANNEL.name} hook."
+                assert hook.shortname in hook.name, f"Shortname {hook.shortname} must be contained in full Hook name {hook.name}:{hook.hook_id} for @channel hook {hook.name}:{hook.hook_id}."
+                assert hook.call is not None, f"Method is not not found on stage or was not supplied to @channel hook - {hook.name}:{hook.hook_id}"
+                assert hook.call.__code__.co_argcount > 1, f"Too many args. - @channel hook {hook.name}:{hook.hook_id} requires no additional args."
+                assert 'self' in hook.call.__code__.co_varnames
+
+                stage_actions = list(filter(
+                    lambda action_or_task: action_or_task.stage == hook.stage,
+                    [
+                        *self.hooks.get(HookType.ACTION),
+                        *self.hooks.get(HookType.TASK)
+                    ]
+                ))
+
+                stage_notifiers = []
+                for action in stage_actions:
+                    stage_notifiers.extend(action.notify)
+
+                stage_listeners = []
+                for action in stage_actions:
+                    stage_listeners.extend(action.listen)
+
+                assert hook.shortname in stage_notifiers, f"No notifiers found. - @channel hook {hook.name}:{hook.hook_id} requires at least one action with a notify list containing its name"
+                assert hook.shortname in stage_listeners, f"No listeners found. - @channel hook {hook.name}:{hook.hook_id} requires at least one action with a listeners list containing its name"
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validated {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 

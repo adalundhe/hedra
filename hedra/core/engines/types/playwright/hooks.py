@@ -1,4 +1,5 @@
-from typing import Coroutine, List
+import asyncio
+from typing import Coroutine, List, Dict
 
 
 class Hooks:
@@ -6,13 +7,22 @@ class Hooks:
     __slots__ = (
         'before',
         'after',
-        'checks'
+        'checks',
+        'notify',
+        'listen',
+        'listeners',
+        'channels'
     )
 
     def __init__(self) -> None:
         self.before: Coroutine = None
         self.after: Coroutine = None
         self.checks: List[Coroutine] = []
+        self.notify = False
+        self.listen = False
+        self.channel_events = Dict[str, asyncio.Future] = {}
+        self.listeners: List[str] = []
+        self.channels: List[Coroutine] = []
 
     def to_names(self):
 
@@ -31,3 +41,13 @@ class Hooks:
         names['checks'] = check_names
 
         return names
+
+    def to_serializable(self):
+        return {
+            'notify': self.notify,
+            'listen': self.listen,
+            'listeners': [
+                listener.name for listener in self.listeners
+            ],
+            'names': self.to_names()
+        }

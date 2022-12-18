@@ -26,4 +26,4 @@ class BaseAction:
         self.name = name
         self.is_setup = False
         self.metadata = Metadata(user, tags)
-        self.hooks = Hooks()
+        self.hooks: Hooks[BaseAction] = Hooks()

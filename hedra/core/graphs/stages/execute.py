@@ -43,7 +43,8 @@ class Execute(Stage, Generic[Unpack[T]]):
             HookType.TASK,
             HookType.AFTER,
             HookType.TEARDOWN,
-            HookType.CHECK
+            HookType.CHECK,
+            HookType.CHANNEL
         ]
 
         self.concurrent_pool_aware_stages = 0

@@ -13,6 +13,7 @@ class HTTPAction(BaseAction):
     __slots__ = (
         'action_id',
         'method',
+        'listeners',
         'type',
         'url',
         'protocols',
@@ -175,5 +176,5 @@ class HTTPAction(BaseAction):
                 'user': self.metadata.user,
                 'tags': self.metadata.tags
             },
-            'hooks': self.hooks.to_names()
+            'hooks': self.hooks.to_serializable()
         }

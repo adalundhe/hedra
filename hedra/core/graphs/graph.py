@@ -27,7 +27,6 @@ class Graph:
         cpus: int=None, 
         worker_id: int=None
     ) -> None:
-        
         self.execution_time = 0
         self.core_config = config
 
@@ -58,7 +57,7 @@ class Graph:
 
         self.instances: Dict[StageTypes, List[Stage]] = {}
         for stage in self.stage_types.values():
-            stage_instances = stage.__subclasses__()
+            stage_instances = [instance for instance in stage.__subclasses__() if instance.__module__ == self.core_config.get('module_name')]
             self.instances[stage.stage_type] = stage_instances
 
         self.stages: Dict[str, Stage] = {stage.__name__: stage for stage in stages}
@@ -105,6 +104,7 @@ class Graph:
 
         # If we havent specified a Validate stage for save aggregated results,
         # append one.
+
         if len(self.instances.get(StageTypes.VALIDATE)) < 1:
             self.logger.hedra.sync.debug(f'{self.metadata_string} - Prepending {StageTypes.VALIDATE.name} stage')
             self.logger.filesystem.sync['hedra.core'].debug(f'{self.metadata_string} - Prepending {StageTypes.VALIDATE.name} stage')

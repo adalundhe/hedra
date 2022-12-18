@@ -1,10 +1,12 @@
 import asyncio
 import time
 import uuid
+import traceback
 from typing import Awaitable, Dict, Set, Tuple, Union
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.concurrency import Semaphore
+from hedra.logging import HedraLogger
 from .connection import HTTPConnection
 from .action import HTTPAction
 from .result import HTTPResult
@@ -27,7 +29,8 @@ class MercuryHTTPClient:
         'pool',
         'active',
         'waiter',
-        'ssl_context'
+        'ssl_context',
+        'logger'
     )
 
     def __init__(self, concurrency: int=10**3, timeouts: Timeouts = Timeouts(), reset_connections: bool=False) -> None:
@@ -44,6 +47,8 @@ class MercuryHTTPClient:
         self.pool.create_pool()
         self.active = 0
         self.waiter = None
+        self.logger = HedraLogger()
+        self.logger.initialize()
 
         self.ssl_context = get_default_ssl_context()
 
@@ -135,6 +140,18 @@ class MercuryHTTPClient:
                 if action.hooks.before:
                     action = await action.hooks.before(action, response)
                     action.setup()
+
+                # if action.hooks.listen:
+                #     await self.logger.console.aio.info(f'ACTION: {action.name} WAITING')
+                #     events = []
+                #     for channel_name in action.hooks.channel_events:
+                #         event = asyncio.Event()
+                #         action.hooks.channel_events[channel_name].append(event)
+                #         events.append(event)
+
+                #     await asyncio.gather(*[
+                #         asyncio.create_task(event.wait()) for event in events
+                #     ])
 
                 response.start = time.monotonic()
 
@@ -253,6 +270,20 @@ class MercuryHTTPClient:
                 if action.hooks.after:
                     action = await action.hooks.after(action, response)
                     action.setup()
+
+                # if action.hooks.notify:
+                #     pass
+                    # await asyncio.gather(*[
+                    #     asyncio.create_task(channel(action.hooks.listeners)) for channel in action.hooks.channels
+                    # ])
+
+                    # for listener in action.hooks.listeners:
+                    #     for channel_events in listener.hooks.channel_events.values():
+                    #         if len(channel_events) > 0:
+                    #             event = channel_events.pop()
+
+                    #             if not event.is_set():
+                    #                 event.set()          
 
             except Exception as e:
                 response.complete = time.monotonic()

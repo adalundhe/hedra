@@ -1,2 +1,2 @@
 from .generated_json_results_stage import SubmitJSONResultsStage
-from generated_csv_results_stage import SubmitCSVResultsStage
+from .generated_csv_results_stage import SubmitCSVResultsStage

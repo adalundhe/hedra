@@ -179,7 +179,7 @@ class HTTP2Action(BaseAction):
                 'user': self.metadata.user,
                 'tags': self.metadata.tags
             },
-            'hooks': self.hooks.to_names()
+            'hooks': self.hooks.to_serializable()
         }
         
         

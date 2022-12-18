@@ -13,3 +13,4 @@ class HookType(Enum):
     INTERNAL='INTERNAL'
     SAVE='SAVE'
     TASK='TASK'
+    CHANNEL='CHANNEL'
