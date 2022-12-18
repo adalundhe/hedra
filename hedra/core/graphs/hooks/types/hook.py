@@ -1,5 +1,6 @@
 import uuid
-from typing import Coroutine, List, Optional, Any
+import asyncio
+from typing import Coroutine, List, Optional, Any, Dict
 from hedra.core.graphs.hooks.types.hook_types import HookType
 
 
@@ -12,7 +13,7 @@ class Metadata:
         env: str = None, 
         user: str = None, 
         path: str = None,
-        tags: List[str] = []
+        tags: List[str] = [],
     ) -> None:
         self.weight = weight
         self.order = order
@@ -33,7 +34,9 @@ class Hook:
         names: List[str] = [], 
         metadata: Metadata = Metadata(), 
         checks: List[Coroutine]=[],
-        group: Optional[str]=None
+        group: Optional[str]=None,
+        notify: List[str] = [],
+        listen: List[str] = []
     ) -> None:
         self.hook_id = str(uuid.uuid4())
         self.name = name
@@ -47,3 +50,9 @@ class Hook:
         self.session: Any = None
         self.action: Any = None
         self.group = group
+        self.notify = notify
+        self.listen = listen
+        
+        self.notifiers: List[str] = []
+        self.listeners: List[str] = []
+

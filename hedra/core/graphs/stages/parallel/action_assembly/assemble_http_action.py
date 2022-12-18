@@ -29,10 +29,15 @@ async def assemble_http_action(
     )
 
     action_hooks = hook_action.get('hooks', {})
+    notify = hook_action.get('notify', False)
+    listen = hook_action.get('listen', False)
+    action_hook_names = action_hooks.get('names')
 
-    before_hook_name = action_hooks.get('before')
-    after_hook_name = action_hooks.get('after')
-    check_hook_names = action_hooks.get('checks', [])
+    before_hook_name = action_hook_names.get('before')
+    after_hook_name = action_hook_names.get('after')
+    check_hook_names = action_hook_names.get('checks', [])
+    listener_names = action_hook_names.get('listeners', [])
+    channel_hook_names = action_hook_names.get('channels', [])
 
     if before_hook_name:
         await logger.filesystem.aio['hedra.core'].debug(
@@ -49,6 +54,15 @@ async def assemble_http_action(
             f'{metadata_string} - {hook_type_name} Hook - {action_name} - Found Check Hook - {check_hook_name}'
         )
 
+    for channel_hook_name in channel_hook_names:
+        await logger.filesystem.aio['hedra.core'].debug(
+            f'{metadata_string} - {hook_type_name} Hook - {action_name} - Found Channel Hook - {channel_hook_name}'
+        )
+
+    for listener_name in listener_names:
+        await logger.filesystem.aio['hedra.core'].debug(
+            f'{metadata_string} - {hook_type_name} Hook - {action_name} - Found Listener - {listener_name}'
+        )
 
     hook.session: MercuryHTTPClient = registered_engines.get(RequestTypes.HTTP)(
         concurrency=persona.batch.size,
@@ -85,6 +99,9 @@ async def assemble_http_action(
     for tag in hook.action.metadata.tags_to_string_list():
         await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - {hook_type_name} Hook - {action_name} - Tag: {tag}')
 
+    hook.action.hooks.notify = notify
+    hook.action.hooks.listen = listen
+
     if before_hook_name:
         before_hook = registrar.all.get(before_hook_name)
         hook.action.hooks.before = before_hook.call
@@ -94,8 +111,16 @@ async def assemble_http_action(
         hook.action.hooks.after = after_hook.call
 
     hook.action.hooks.checks = []
-    for check_hook_name in check_hook_names:
-        hook.action.hooks.checks.append(check_hook_name)
+    hook.action.hooks.checks.extend(check_hook_names)
+
+    hook.action.hooks.channels = []
+    for channel_hook_name in channel_hook_names:
+        channel = registrar.all.get(channel_hook_name)
+        hook.action.hooks.channels.append(channel.call) 
+
+    hook.action.hooks.listeners = [
+        registrar.all.get(listener_name).action for listener_name in listener_names
+    ]
 
     hook.action.url.ip_addr = action_url.get('ip_addr')
     hook.action.url.port = action_url.get('port')

@@ -11,7 +11,7 @@ class ExecutePlaywrightStage(Execute):
 
     @action()
     async def open_page(self):
-        return await self.client.playwright.goto('')
+        return await self.client.playwright.goto('https://<url_here>')
 
     @action()
     async def click_item(self):

@@ -6,7 +6,13 @@ from hedra.core.graphs.hooks.registry.registrar import registrar
 
 
 @registrar(HookType.TASK)
-def task(weight: int=1, order: int=1, metadata: Dict[str, Union[str, int]]={}, checks: List[Coroutine]=[]):
+def task(
+    weight: int=1, 
+    order: int=1, 
+    metadata: Dict[str, Union[str, int]]={}, checks: List[Coroutine]=[],
+    notify: List[str]=[], 
+    listen: List[str]=[]
+):
 
     def wrapper(func) -> Hook:
 

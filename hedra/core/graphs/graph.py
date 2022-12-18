@@ -27,7 +27,6 @@ class Graph:
         cpus: int=None, 
         worker_id: int=None
     ) -> None:
-        
         self.execution_time = 0
         self.core_config = config
 
@@ -105,6 +104,7 @@ class Graph:
 
         # If we havent specified a Validate stage for save aggregated results,
         # append one.
+
         if len(self.instances.get(StageTypes.VALIDATE)) < 1:
             self.logger.hedra.sync.debug(f'{self.metadata_string} - Prepending {StageTypes.VALIDATE.name} stage')
             self.logger.filesystem.sync['hedra.core'].debug(f'{self.metadata_string} - Prepending {StageTypes.VALIDATE.name} stage')

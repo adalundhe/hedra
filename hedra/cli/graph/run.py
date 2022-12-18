@@ -86,11 +86,12 @@ def run_graph(
     package = ntpath.basename(path)
     package_slug = package.split('.')[0]
     spec = importlib.util.spec_from_file_location(f'{package_dir_module}.{package_slug}', path)
-
+    
     if path not in sys.path:
         sys.path.append(str(package_dir.parent))
 
     module = importlib.util.module_from_spec(spec)
+
     sys.modules[module.__name__] = module
 
     spec.loader.exec_module(module)
@@ -100,7 +101,6 @@ def run_graph(
     discovered = {}
     for name, stage_candidate in inspect.getmembers(module):
         if inspect.isclass(stage_candidate) and issubclass(stage_candidate, Stage) and stage_candidate not in direct_decendants:
-
             discovered[name] = stage_candidate
 
     loop = asyncio.new_event_loop()

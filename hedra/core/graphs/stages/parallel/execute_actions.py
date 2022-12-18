@@ -88,7 +88,7 @@ async def start_execution(parallel_config: Dict[str, Any]):
 
 
         hooks[hook_type].append(assembled_hook)
-    
+        
     persona.setup(hooks, metadata_string)
 
     if action_type == RequestTypes.PLAYWRIGHT and isinstance(hook.session, MercuryPlaywrightClient):

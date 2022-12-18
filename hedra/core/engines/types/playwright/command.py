@@ -179,7 +179,7 @@ class PlaywrightCommand:
                 'user': self.metadata.user,
                 'tags': self.metadata.tags
             },
-            'hooks': self.hooks.to_names()
+            'hooks': self.hooks.to_serializable()
         }
 
     def iter_values(self):

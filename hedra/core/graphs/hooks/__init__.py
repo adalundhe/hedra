@@ -9,5 +9,6 @@ from .types import (
     metric,
     save,
     validate,
-    task
+    task,
+    channel
 )

@@ -1,5 +1,6 @@
 from typing import Coroutine, Dict, List
 from hedra.core.engines.types.common.base_action import BaseAction
+from hedra.core.engines.types.common.hooks import Hooks
 from hedra.core.engines.types.common.types import RequestTypes
 
 
@@ -34,6 +35,7 @@ class Task(BaseAction):
         self.type = RequestTypes.TASK
         self.source = source
         self.execute = task_action
+        self.hooks = Hooks()
 
     def to_serializable(self):
 
@@ -44,5 +46,5 @@ class Task(BaseAction):
                 'user': self.metadata.user,
                 'tags': self.metadata.tags
             },
-            'hooks': self.hooks.to_names()
+            'hooks': self.hooks.to_serializable()
         }

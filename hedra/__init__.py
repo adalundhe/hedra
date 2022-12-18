@@ -9,10 +9,11 @@ from .core.graphs.hooks import (
     save,
     metric,
     validate,
-    task
+    task,
+    channel
 )
 
-from .core.graphs import (
+from .core.graphs.stages import (
     Analyze,
     Checkpoint,
     Execute,

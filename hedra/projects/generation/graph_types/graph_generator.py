@@ -77,6 +77,7 @@ class GraphGenerator(Generator):
             reporter = 'json'
 
         for stage in stages:
+            print(stage)
 
             generator_type = stage
             if stage == "execute":
