@@ -137,14 +137,15 @@ class MercuryHTTPClient:
             connection = self.pool.connections.pop()
             
             try:
-                if action.hooks.before:
-                    action = await action.hooks.before(action, response)
-                    action.setup()
-
+                
                 if action.hooks.listen:
                     event = asyncio.Event()
                     action.hooks.channel_events.append(event)
                     await event.wait()
+
+                if action.hooks.before:
+                    action = await action.hooks.before(action, response)
+                    action.setup()
 
                 response.start = time.monotonic()
 
