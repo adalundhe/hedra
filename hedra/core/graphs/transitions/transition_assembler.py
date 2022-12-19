@@ -108,15 +108,20 @@ class TransitionAssembler:
             self.instances_by_type[stage.stage_type].append(stage)
 
         for event_hook in self.hooks_by_type.get(HookType.EVENT, {}).values():
-            for target_hook_name in event_hook.names:
-                
+
+            for target_hook_name in event_hook.names:    
                 target_hook = registrar.all.get(target_hook_name)
+                
                 if target_hook:
+                    self.logging.filesystem.sync['hedra.core'].info(
+                        f'{self._graph_metadata_log_string} - Appendng Event - {event_hook.name}:{event_hook.hook_id} - to target Stage - {target_hook.stage}:{target_hook.stage_instance.stage_id} Event Hooks'
+                    )
+                    
                     target_hook.stage_instance.hooks[HookType.EVENT].append(Event(target_hook, event_hook))
                
 
-            self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Successfully generated - {stages_count} - stages')
-            self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Successfully generated - {stages_count} - stages')
+        self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Successfully generated - {stages_count} - stages')
+        self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Successfully generated - {stages_count} - stages')
 
     def build_transitions_graph(self, topological_generations: List[List[str]], graph: networkx.Graph):
 

@@ -4,7 +4,7 @@ from hedra.core.graphs.hooks.registry.registrar import registrar
 
 
 @registrar(HookType.EVENT)
-def event(*names):
+def event(*names, pre: bool=False):
     
     def wrapper(func):
 

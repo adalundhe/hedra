@@ -1,9 +1,10 @@
-from typing import Generic, TypeVar
+import asyncio
+from typing import Generic, TypeVar, List
+from hedra.core.graphs.events import Event
 from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.graphs.hooks.types.internal import Internal
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.plugins.types.plugin_types import PluginType
-from hedra.plugins.types.reporter.reporter_config import ReporterConfig
 from hedra.reporting import (
     Reporter,
     BigQueryConfig,
@@ -60,6 +61,22 @@ class Submit(Stage, Generic[T]):
     @Internal()
     async def run(self):
 
+        events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
+        pre_events = [
+            event for event in events if isinstance(event, Event) and event.pre
+        ]
+        
+        if len(pre_events) > 0:
+            pre_event_names = ", ".join([
+                event.shortname for event in pre_events
+            ])
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing PRE events - {pre_event_names}')
+            await asyncio.wait([
+                asyncio.create_task(event.call()) for event in pre_events
+            ], timeout=self.stage_timeout)
+
+
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Initializing results submission')
 
         reporter_plugins = self.plugins_by_type.get(PluginType.REPORTER)
@@ -108,6 +125,21 @@ class Submit(Stage, Generic[T]):
         await self.reporter.submit_errors(metrics)
         await self.reporter.submit_custom(metrics)
         await self.reporter.close()
+
+        post_events = [
+            event for event in events if isinstance(event, Event) and event.pre is False
+        ]
+
+        if len(post_events) > 0:
+            post_event_names = ", ".join([
+                event.shortname for event in post_events
+            ])
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing POST events - {post_event_names}')
+            await asyncio.wait([
+                asyncio.create_task(event.call()) for event in post_events
+            ], timeout=self.stage_timeout)
+
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {reporter_name}:{self.reporter.reporter_id} - Completed Metrics submission')
         await self.logger.spinner.set_default_message(f'Successfully submitted the results for {session_total} actions via {reporter_name} reporter')

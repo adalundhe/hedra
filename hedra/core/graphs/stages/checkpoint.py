@@ -3,10 +3,12 @@ import json
 import os
 import psutil
 import asyncio
+from typing import List
 from datetime import datetime
 from typing import TextIO
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
+from hedra.core.graphs.events import Event
 from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.graphs.hooks.types.internal import Internal
 from hedra.core.graphs.hooks.types.hook_types import HookType
@@ -27,7 +29,22 @@ class Checkpoint(Stage):
 
     @Internal()
     async def run(self):
+
+        events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
+        pre_events = [
+            event for event in events if isinstance(event, Event) and event.pre
+        ]
         
+        if len(pre_events) > 0:
+            pre_event_names = ", ".join([
+                event.shortname for event in pre_events
+            ])
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing PRE events - {pre_event_names}')
+            await asyncio.wait([
+                asyncio.create_task(event.call()) for event in pre_events
+            ], timeout=self.stage_timeout)
+
         loop = asyncio.get_event_loop()
         executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         timestamp = datetime.now().timestamp()
@@ -70,6 +87,21 @@ class Checkpoint(Stage):
             )
 
             await self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Checkpoint - {save_hook.name} - complete')
+        
+        post_events = [
+            event for event in events if isinstance(event, Event) and event.pre is False
+        ]
+
+        if len(post_events) > 0:
+            post_event_names = ", ".join([
+                event.shortname for event in post_events
+            ])
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing POST events - {post_event_names}')
+            await asyncio.wait([
+                asyncio.create_task(event.call()) for event in post_events
+            ], timeout=self.stage_timeout)
+
 
         await self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Completed checkpoints for - {len(save_hooks)} - items')
         

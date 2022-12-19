@@ -1,10 +1,12 @@
 
 import dill
 import time
+import asyncio
 import statistics
-from typing import Generic
+from typing import Generic, List
 from hedra.core.engines.client import Client
 from typing_extensions import TypeVarTuple, Unpack
+from hedra.core.graphs.events import Event
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.registry import registered_engines
 from hedra.core.graphs.hooks.types.hook_types import HookType
@@ -57,6 +59,21 @@ class Execute(Stage, Generic[Unpack[T]]):
 
     @Internal()
     async def run(self):
+
+        events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
+        pre_events = [
+            event for event in events if isinstance(event, Event) and event.pre
+        ]
+        
+        if len(pre_events) > 0:
+            pre_event_names = ", ".join([
+                event.shortname for event in pre_events
+            ])
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing PRE events - {pre_event_names}')
+            await asyncio.wait([
+                asyncio.create_task(event.call()) for event in pre_events
+            ], timeout=self.stage_timeout)
 
         config = self.client._config
         persona_type_name = config.persona_type.capitalize()
@@ -184,11 +201,24 @@ class Execute(Stage, Generic[Unpack[T]]):
             total_results = len(results)
             total_elapsed = persona.total_elapsed
 
+        post_events = [
+            event for event in events if isinstance(event, Event) and event.pre is False
+        ]
+
+        if len(post_events) > 0:
+            post_event_names = ", ".join([
+                event.shortname for event in post_events
+            ])
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing POST events - {post_event_names}')
+            await asyncio.wait([
+                asyncio.create_task(event.call()) for event in post_events
+            ], timeout=self.stage_timeout)
+
+
         await self.logger.filesystem.aio['hedra.core'].info( f'{self.metadata_string} - Completed - {total_results} actions at  {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
         await self.logger.spinner.set_default_message(f'Stage - {self.name} completed {total_results} actions at {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
         
-
-
         return {
             'results': results,
             'total_results': total_results,

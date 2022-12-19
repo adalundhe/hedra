@@ -2,6 +2,7 @@ import asyncio
 import dill
 import time
 from typing import Dict, List, Tuple
+from hedra.core.graphs.events import Event
 from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.hooks.types.internal import Internal
@@ -41,6 +42,21 @@ class Optimize(Stage):
 
     @Internal()
     async def run(self, stages: Dict[str, Execute]):
+
+        events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
+        pre_events = [
+            event for event in events if isinstance(event, Event) and event.pre
+            ]
+        
+        if len(pre_events) > 0:
+            pre_event_names = ", ".join([
+                event.shortname for event in pre_events
+            ])
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing PRE events - {pre_event_names}')
+            await asyncio.wait([
+                asyncio.create_task(event.call()) for event in pre_events
+            ], timeout=self.stage_timeout)
 
         optimization_execution_time_start = time.monotonic()
 
@@ -182,11 +198,22 @@ class Optimize(Stage):
             f'{stage_name}: {optimized_batch_size}' for stage_name, optimized_batch_size in stage_optimzations.items()
         ])
 
+        post_events = [
+            event for event in events if isinstance(event, Event) and event.pre is False
+        ]
+
+        if len(post_events) > 0:
+            post_event_names = ", ".join([
+                event.shortname for event in post_events
+            ])
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing POST events - {post_event_names}')
+            await asyncio.wait([
+                asyncio.create_task(event.call()) for event in post_events
+            ], timeout=self.stage_timeout)
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Optimization complete for stages - {stage_names} - over - {self.optimization_execution_time} - seconds')
         await self.logger.spinner.set_default_message(f'Optimized - batch sizes for stages - {optimized_batch_sizes} - over {self.optimization_execution_time} seconds')
-        
-
 
         return [
             result.get('params') for result in optimization_results

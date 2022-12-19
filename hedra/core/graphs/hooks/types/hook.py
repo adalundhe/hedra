@@ -13,6 +13,7 @@ class Metadata:
         user: str = None, 
         path: str = None,
         tags: List[str] = [],
+        pre: bool=False
     ) -> None:
         self.weight = weight
         self.order = order
@@ -20,6 +21,7 @@ class Metadata:
         self.user = user
         self.path = path
         self.tags = tags
+        self.pre = pre
 
 class Hook:
 

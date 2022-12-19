@@ -1,11 +1,13 @@
 import dill
 import time
 import statistics
+import asyncio
 from collections import defaultdict
 from typing import Union, List, Dict
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.events import EventsGroup
 from hedra.reporting.metric import MetricsSet
+from hedra.core.graphs.events import Event
 from hedra.core.graphs.hooks.types.internal import Internal
 from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.graphs.hooks.types.hook_types import HookType
@@ -44,6 +46,21 @@ class Analyze(Stage):
 
     @Internal()
     async def run(self):
+
+        events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
+        pre_events = [
+            event for event in events if isinstance(event, Event) and event.pre
+        ]
+        
+        if len(pre_events) > 0:
+            pre_event_names = ", ".join([
+                event.shortname for event in pre_events
+            ])
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing PRE events - {pre_event_names}')
+            await asyncio.wait([
+                asyncio.create_task(event.call()) for event in pre_events
+            ], timeout=self.stage_timeout)
 
         await self.logger.filesystem.aio.create_logfile('hedra.reporting.log')
         self.logger.filesystem.create_filelogger('hedra.reporting.log')
@@ -240,6 +257,21 @@ class Analyze(Stage):
         self.analysis_execution_time = round(
             time.monotonic() - analysis_execution_time_start
         )
+
+        post_events = [
+            event for event in events if isinstance(event, Event) and event.pre is False
+        ]
+
+        if len(post_events) > 0:
+            post_event_names = ", ".join([
+                event.shortname for event in post_events
+            ])
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing POST events - {post_event_names}')
+            await asyncio.wait([
+                asyncio.create_task(event.call()) for event in post_events
+            ], timeout=self.stage_timeout)
+
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed results analysis for - {stages_count} - stages in - {self.analysis_execution_time} seconds')
         await self.logger.spinner.set_default_message(f'Completed results analysis for {total_group_results} actions and {stages_count} stages over {self.analysis_execution_time} seconds')

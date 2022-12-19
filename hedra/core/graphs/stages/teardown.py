@@ -1,5 +1,7 @@
 import asyncio
 import inspect
+from typing import List
+from hedra.core.graphs.events import Event
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.hooks.types.internal import Internal
 from hedra.core.graphs.hooks.types.hook import Hook
@@ -18,6 +20,24 @@ class Teardown(Stage):
 
     @Internal()
     async def run(self):
+
+        events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
+        pre_events = [
+            event for event in events if isinstance(event, Event) and event.pre
+        ]
+        
+        if len(pre_events) > 0:
+            pre_event_names = ", ".join([
+                event.shortname for event in pre_events
+            ])
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing PRE events - {pre_event_names}')
+            await asyncio.wait([
+                asyncio.create_task(event.call()) for event in pre_events
+            ], timeout=self.stage_timeout)
+
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing PRE events - {pre_event_names}')
+        await asyncio.wait([asyncio.create_task(event.call()) for event in pre_events], timeout=self.stage_timeout)
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting Teardown stage.')
 
@@ -38,6 +58,20 @@ class Teardown(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Running teardown hooks - {teardown_hook_names}')           
             await asyncio.gather(*[ hook.call() for hook in teardown_hooks])
+
+        post_events = [
+            event for event in events if isinstance(event, Event) and event.pre is False
+        ]
+
+        if len(post_events) > 0:
+            post_event_names = ", ".join([
+                event.shortname for event in post_events
+            ])
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing POST events - {post_event_names}')
+            await asyncio.wait([
+                asyncio.create_task(event.call()) for event in post_events
+            ], timeout=self.stage_timeout)
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Teardown complete.')
         

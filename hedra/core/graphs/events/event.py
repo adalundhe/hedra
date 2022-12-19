@@ -7,18 +7,38 @@ class Event:
     def __init__(self, target: Hook, source: Hook) -> None:
         self.target = target
         self.source = source
-        self.target_name = self.target.name
-        self.target_shortname = self.target.shortname
+        self.target_name = None
+        self.target_shortname = None
+
+        if target:
+            self.target_name = self.target.name
+            self.target_shortname = self.target.shortname
+
+        self.pre = source.config.pre
+        self.as_hook = False
 
     def __getattribute__(self, name: str) -> Any:
         target = object.__getattribute__(self, 'target')
+        source = object.__getattribute__(self, 'source')
         if hasattr(target, name) and name != 'call':
             return getattr(target, name)
+
+        elif target is None and hasattr(source, name) and name != 'call':
+            return getattr(source, name)
 
         return object.__getattribute__(self, name)
 
     async def call(self, *args, **kwargs):
-        result = await self.target.call(*args, **kwargs)
-        await self.source.call(result)
+        
+        if self.pre and self.target:
+            await self.source.call()
+            result = await self.target.call(*args, **kwargs)
+
+        elif self.pre is False and self.target:
+            result = await self.target.call(*args, **kwargs)
+            await self.source.call(result)
+
+        else:
+            result = await self.source.call()
 
         return result

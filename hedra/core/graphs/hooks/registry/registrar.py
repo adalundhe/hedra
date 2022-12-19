@@ -64,7 +64,7 @@ class Registrar:
                 
                 return wrapped_method
 
-        elif hook_type in [HookType.BEFORE, HookType.AFTER, HookType.CHECK, HookType.EVENT]:
+        elif hook_type in [HookType.BEFORE, HookType.AFTER, HookType.CHECK]:
             
             def wrap_hook(*names):
                 def wrapped_method(func):
@@ -77,6 +77,25 @@ class Registrar:
                         func, 
                         hook_type=hook_type,
                         names=names
+                    )
+
+                    return func
+                
+                return wrapped_method
+
+        elif hook_type == HookType.EVENT:
+            def wrap_hook(*names, pre: bool=False):
+                def wrapped_method(func):
+                    hook_name = func.__qualname__
+                    hook_shortname = func.__name__
+
+                    self.all[hook_name] = Hook(
+                        hook_name, 
+                        hook_shortname,
+                        func, 
+                        hook_type=hook_type,
+                        names=names,
+                        metadata=Metadata(pre=pre)
                     )
 
                     return func

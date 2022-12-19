@@ -1,4 +1,4 @@
-import traceback
+import asyncio
 import inspect
 import os
 from pathlib import Path
@@ -72,7 +72,7 @@ class Validate(Stage):
                 stage.context = self.context
 
                 events.extend([
-                    event for event in stage.hooks[HookType.EVENT] if isinstance(event, Event)
+                    event for event in stage.hooks[HookType.EVENT] if isinstance(event, Event) and event.as_hook is False
                 ])
 
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating stage - {stage.name} - of stage type - {stage.stage_type.name}')
@@ -130,13 +130,6 @@ class Validate(Stage):
                         hooks_by_name[hook.name] = hook
 
                         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Found Hook - {hook.name}:{hook.hook_id}- of type - {hook.hook_type.name.capitalize()} - for stage - {base_stage_name}')
-
-        for event in events:
-            stage: Stage = event.target.stage_instance
-            
-            for idx, hook in enumerate(stage.hooks[event.target.hook_type]):
-                if hook.name == event.target.name:
-                    stage.hooks[event.target.hook_type][idx] = event
                     
         methods = inspect.getmembers(self, predicate=inspect.ismethod)
         for _, method in methods:
@@ -311,10 +304,14 @@ class Validate(Stage):
                 assert hook.hook_type is HookType.EVENT, f"Hook type mismatch - hook {hook.name}:{hook.hook_id} is a {hook.hook_type.name} hook, but Hedra expected a {HookType.EVENT.name} hook."
                 assert hook.shortname in hook.name, f"Shortname {hook.shortname} must be contained in full Hook name {hook.name}:{hook.hook_id} for @event hook {hook.name}:{hook.hook_id}."
                 assert hook.call is not None, f"Method is not not found on stage or was not supplied to @event hook - {hook.name}:{hook.hook_id}"
-                assert hook.call.__code__.co_argcount > 1, f"Missing required argument 'result' for @event hook {hook.name}:{hook.hook_id}"
-                assert hook.call.__code__.co_argcount < 3, f"Too many args. - @event hook {hook.name}:{hook.hook_id} only requires 'result' as an additional arg."
-                assert len(hook.names) > 0, f"No target hook names provided for @event hook {hook.name}:{hook.hook_id}. Please specify at least one hook to validate."
                 assert 'self' in hook.call.__code__.co_varnames
+
+                if hook.config.pre is False and len(hook.names) > 0:
+                    assert hook.call.__code__.co_argcount > 1, f"Missing required argument 'result' for @event hook {hook.name}:{hook.hook_id}"
+                    assert hook.call.__code__.co_argcount < 3, f"Too many args. - @event hook {hook.name}:{hook.hook_id} only requires 'result' as an additional arg."
+
+                else:
+                    assert hook.call.__code__.co_argcount == 1, f"Too many args. - @event hook {hook.name}:{hook.hook_id} requires no additional args."
 
                 for name in hook.names:
                     hook_for_validation = hooks_by_name.get(name)
@@ -358,6 +355,21 @@ class Validate(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.VALIDATE.name.capitalize()} - hooks')
 
+            events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
+            pre_events = [
+                event for event in events if isinstance(event, Event) and event.pre
+            ]
+            
+            if len(pre_events) > 0:
+                pre_event_names = ", ".join([
+                    event.shortname for event in pre_events
+                ])
+
+                await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing PRE events - {pre_event_names}')
+                await asyncio.wait([
+                    asyncio.create_task(event.call()) for event in pre_events
+                ], timeout=self.stage_timeout)
+
             for hook in self.hooks[HookType.VALIDATE]:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
@@ -380,6 +392,20 @@ class Validate(Stage):
                     await hook.call(hook_for_validation.call)
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validated {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
+
+            post_events = [
+                event for event in events if isinstance(event, Event) and event.pre is False
+            ]
+
+            if len(post_events) > 0:
+                post_event_names = ", ".join([
+                    event.shortname for event in post_events
+                ])
+
+                await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing POST events - {post_event_names}')
+                await asyncio.wait([
+                    asyncio.create_task(event.call()) for event in post_events
+                ], timeout=self.stage_timeout)
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validation for stages - {validation_stage_names} - complete')
             await self.logger.spinner.set_default_message(f'Validated - {len(stages)} stages')
