@@ -18,10 +18,10 @@ async def setup_transition(current_stage: Stage, next_stage: Stage):
     await logger.spinner.system.debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
 
-    execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE).items()
-    paths = current_stage.context.paths.get(current_stage.name)
-    path_lengths = current_stage.context.path_lengths.get(current_stage.name)
-    visited = current_stage.context.visited
+    execute_stages = current_stage.graph_context.stages.get(StageTypes.EXECUTE).items()
+    paths = current_stage.graph_context.paths.get(current_stage.name)
+    path_lengths = current_stage.graph_context.path_lengths.get(current_stage.name)
+    visited = current_stage.graph_context.visited
 
     execute_stages = {
         stage_name: stage for stage_name, stage in execute_stages if stage_name in paths and stage_name not in visited
@@ -29,8 +29,8 @@ async def setup_transition(current_stage: Stage, next_stage: Stage):
 
     setup_candidates = {}
     
-    setup_stages = current_stage.context.stages.get(StageTypes.SETUP)
-    execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE)
+    setup_stages = current_stage.graph_context.stages.get(StageTypes.SETUP)
+    execute_stages = current_stage.graph_context.stages.get(StageTypes.EXECUTE)
     following_setup_stage_distances = [
         path_length for stage_name, path_length in path_lengths.items() if stage_name in setup_stages
     ]
@@ -48,7 +48,7 @@ async def setup_transition(current_stage: Stage, next_stage: Stage):
 
     current_stage.generation_setup_candidates = len(setup_candidates)
     stages = {}
-    next_stage_decendants = current_stage.context.paths.get(next_stage.name)
+    next_stage_decendants = current_stage.graph_context.paths.get(next_stage.name)
     path_decendants = [
         next_stage.name,
         *next_stage_decendants
@@ -64,11 +64,11 @@ async def setup_transition(current_stage: Stage, next_stage: Stage):
     else:
 
         generation_setup_candidates = [
-            stage_name for stage_name in current_stage.generation_stage_names if stage_name in current_stage.context.stages.get(StageTypes.SETUP)
+            stage_name for stage_name in current_stage.generation_stage_names if stage_name in current_stage.graph_context.stages.get(StageTypes.SETUP)
         ]
 
         user_specified_setup_candidates = []
-        all_setup_stages = current_stage.context.stages.get(StageTypes.SETUP)
+        all_setup_stages = current_stage.graph_context.stages.get(StageTypes.SETUP)
         for stage_name in generation_setup_candidates:
             stage = all_setup_stages.get(stage_name)
 
@@ -92,12 +92,12 @@ async def setup_transition(current_stage: Stage, next_stage: Stage):
     for execute_stage in stages.values():
         execute_stage.state = StageStates.SETUP
 
-    current_stage.context.stages[StageTypes.EXECUTE].update(setup_results)
+    current_stage.graph_context.stages[StageTypes.EXECUTE].update(setup_results)
 
     await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
 
-    next_stage.context = current_stage.context
+    next_stage.graph_context = current_stage.graph_context
     current_stage = None
 
 
@@ -154,8 +154,8 @@ async def setup_to_checkpoint_transition(current_stage: Stage, next_stage: Stage
         await setup_transition(current_stage, next_stage)
 
         next_stage.data = {
-            'stages': current_stage.context.stages[StageTypes.EXECUTE],
-            'reporter_config': current_stage.context.reporting_config
+            'stages': current_stage.graph_context.stages[StageTypes.EXECUTE],
+            'reporter_config': current_stage.graph_context.reporting_config
         }
         
         next_stage.previous_stage = current_stage.name

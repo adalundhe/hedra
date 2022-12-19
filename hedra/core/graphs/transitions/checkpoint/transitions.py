@@ -36,7 +36,7 @@ async def checkpoint_transition(current_stage: Stage, next_stage: Stage):
         await logger.spinner.system.debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
         await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
 
-    next_stage.context = current_stage.context
+    next_stage.graph_context = current_stage.graph_context
 
 
 async def checkpoint_to_setup_transition(current_stage: Stage, next_stage: Stage):

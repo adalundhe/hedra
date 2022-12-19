@@ -82,7 +82,7 @@ class Checkpoint(Stage):
             )
 
             await loop.run_in_executor(
-                self._executor,
+                executor,
                 self._save_file.close
             )
 

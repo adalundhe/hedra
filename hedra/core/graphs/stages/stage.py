@@ -22,7 +22,6 @@ class Stage:
     dependencies: List[Stage]=[]
     all_dependencies: List[Stage]=[]
     next_context: Any = None
-    context: Any = None
     stage_timeout=None
     plugins: Dict[str, Union[EnginePlugin, ReporterPlugin]] = {}
 
@@ -45,6 +44,8 @@ class Stage:
         self.plugins_by_type: Dict[PluginType, Dict[str, Union[EnginePlugin, ReporterPlugin]]] = {}
 
         self.core_config = {}
+        # self.context = {}
+        self.graph_context: Any = None
 
         self.logger: HedraLogger = HedraLogger()
         self.logger.initialize()

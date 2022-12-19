@@ -17,8 +17,8 @@ async def teardown_transition(current_stage: Stage, next_stage: Stage):
     logger.initialize()
 
     teardown_hooks = []
-    execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE).values()
-    paths = current_stage.context.paths
+    execute_stages = current_stage.graph_context.stages.get(StageTypes.EXECUTE).values()
+    paths = current_stage.graph_context.paths
 
     valid_states = [
         StageStates.EXECUTED
@@ -64,7 +64,7 @@ async def teardown_transition(current_stage: Stage, next_stage: Stage):
         await logger.spinner.system.debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
         await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
 
-    next_stage.context = current_stage.context
+    next_stage.graph_context = current_stage.graph_context
 
 
 async def teardown_to_analyze_transition(current_stage: Stage, next_stage: Stage):
@@ -87,7 +87,7 @@ async def teardown_to_checkpoint_transition(current_stage: Stage, next_stage: St
     try:
 
         next_stage.previous_stage = current_stage.name
-        next_stage.context = current_stage.context
+        next_stage.graph_context = current_stage.graph_context
 
     except Exception as stage_execution_error:
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR

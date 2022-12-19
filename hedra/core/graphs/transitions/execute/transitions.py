@@ -14,7 +14,7 @@ from hedra.logging import HedraLogger
 
 async def execute_transition(current_stage: Stage, next_stage: Stage, logger: HedraLogger):
 
-    execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE)
+    execute_stages = current_stage.graph_context.stages.get(StageTypes.EXECUTE)
 
     await logger.spinner.system.debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
@@ -34,27 +34,27 @@ async def execute_transition(current_stage: Stage, next_stage: Stage, logger: He
     else:
         execution_results: Dict[str, Union[List[BaseResult], int, float]] = await current_stage.run()
 
-    if current_stage.context.results.get(current_stage.name) is None:
-        current_stage.context.results[current_stage.name] = {
+    if current_stage.graph_context.results.get(current_stage.name) is None:
+        current_stage.graph_context.results[current_stage.name] = {
             'results': execution_results.get('results'),
             'total_results': execution_results.get('total_results'),
             'total_elapsed': execution_results.get('total_elapsed')
         }
     
     else:
-        current_stage.context.results[current_stage.name].update({
+        current_stage.graph_context.results[current_stage.name].update({
             'results': execution_results.get('results'),
             'total_results': execution_results.get('total_results'),
             'total_elapsed': execution_results.get('total_elapsed')
         })
 
-    current_stage.context.results_stages.append(current_stage)
-    current_stage.context.visited.append(current_stage.name)
+    current_stage.graph_context.results_stages.append(current_stage)
+    current_stage.graph_context.visited.append(current_stage.name)
 
     await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
     
-    next_stage.context = current_stage.context
+    next_stage.graph_context = current_stage.graph_context
 
     return current_stage, next_stage
 
@@ -74,8 +74,8 @@ async def execute_to_setup_transition(current_stage: Stage, next_stage: Stage):
             current_stage.state = StageStates.EXECUTING
 
             current_stage, next_stage = await execute_transition(current_stage, next_stage, logger)
-            execute_stages = list(current_stage.context.stages.get(StageTypes.EXECUTE).values())
-            visited = current_stage.context.visited
+            execute_stages = list(current_stage.graph_context.stages.get(StageTypes.EXECUTE).values())
+            visited = current_stage.graph_context.visited
 
             for stage in execute_stages:
                 if stage.name not in visited and stage.state == StageStates.SETUP:
@@ -248,7 +248,7 @@ async def execute_to_checkpoint_transition(current_stage: Stage, next_stage: Sta
             current_stage.state = StageStates.EXECUTING
 
             current_stage, next_stage = await execute_transition(current_stage, next_stage, logger)
-            next_stage.data = current_stage.context.results
+            next_stage.data = current_stage.graph_context.results
 
             next_stage.previous_stage = current_stage.name
 
@@ -285,7 +285,7 @@ async def execute_to_wait_transition(current_stage: Stage, next_stage: Stage):
             current_stage.state = StageStates.EXECUTING
 
             current_stage, next_stage = await execute_transition(current_stage, next_stage, logger)
-            next_stage.data = current_stage.context.results[current_stage.name]
+            next_stage.data = current_stage.graph_context.results[current_stage.name]
 
             next_stage.previous_stage = current_stage.name
 

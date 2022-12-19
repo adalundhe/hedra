@@ -15,3 +15,5 @@ class HookType(Enum):
     TASK='TASK'
     CHANNEL='CHANNEL'
     EVENT='EVENT'
+    CONTEXT='CONTEXT'
+    RECEIVE='RECEIVE'

@@ -69,7 +69,6 @@ class Validate(Stage):
         events: List[Event]= []
         for stages_types in stages.values():
             for stage in stages_types.values():
-                stage.context = self.context
 
                 events.extend([
                     event for event in stage.hooks[HookType.EVENT] if isinstance(event, Event) and event.as_hook is False
@@ -95,7 +94,6 @@ class Validate(Stage):
 
                     except AssertionError:
                         raise ReservedMethodError(stage, reserved_hook_name)
-
                     
                     await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Found internal Hook - {hook.name}:{hook.hook_id}- for stage - {base_stage_name}')
 
@@ -124,7 +122,6 @@ class Validate(Stage):
                         except AssertionError as hook_validation_error:
                             raise HookValidationError(stage, str(hook_validation_error))
 
-                        hook.stage = stage.name
                         self.hooks[hook.hook_type].append(hook)
 
                         hooks_by_name[hook.name] = hook
@@ -355,7 +352,7 @@ class Validate(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.VALIDATE.name.capitalize()} - hooks')
 
-            events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
+            events: List[Event] = [event for event in self.hooks[HookType.EVENT] if hasattr(self, event.shortname)]
             pre_events = [
                 event for event in events if isinstance(event, Event) and event.pre
             ]

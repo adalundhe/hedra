@@ -117,7 +117,9 @@ class TransitionAssembler:
                         f'{self._graph_metadata_log_string} - Appendng Event - {event_hook.name}:{event_hook.hook_id} - to target Stage - {target_hook.stage}:{target_hook.stage_instance.stage_id} Event Hooks'
                     )
                     
-                    target_hook.stage_instance.hooks[HookType.EVENT].append(Event(target_hook, event_hook))
+                    event = Event(target_hook, event_hook)
+                    target_hook.stage_instance.hooks[HookType.EVENT].append(event)
+                    registrar.all[event.name] = event
                
 
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Successfully generated - {stages_count} - stages')
@@ -247,15 +249,14 @@ class TransitionAssembler:
         
         idle_stages = self.instances_by_type.get(StageTypes.IDLE)
         for idle_stage in idle_stages:
-            idle_stage.context = SimpleContext()
-            idle_stage.context.stages = {}
-            idle_stage.context.visited = []
-            idle_stage.context.results = {}
-            idle_stage.context.results_stages = []
-            idle_stage.context.summaries = {}
-            idle_stage.context.paths = {}
-            idle_stage.context.path_lengths = {}
-            idle_stage.context.sem = asyncio.Semaphore(self.cpus)
+            idle_stage.graph_context = SimpleContext()
+            idle_stage.graph_context.stages = {}
+            idle_stage.graph_context.visited = []
+            idle_stage.graph_context.results = {}
+            idle_stage.graph_context.results_stages = []
+            idle_stage.graph_context.summaries = {}
+            idle_stage.graph_context.paths = {}
+            idle_stage.graph_context.path_lengths = {}
             
         idle_stage_name = idle_stage.__class__.__name__
 
@@ -263,7 +264,7 @@ class TransitionAssembler:
 
         for stage_type in StageTypes:
 
-            idle_stage.context.stages[stage_type] = {}
+            idle_stage.graph_context.stages[stage_type] = {}
 
             for stage in self.instances_by_type.get(stage_type, []):
 
@@ -276,14 +277,14 @@ class TransitionAssembler:
                 )
 
                 if has_path:
-                    idle_stage.context.stages[stage_type][stage_name] = stage
+                    idle_stage.graph_context.stages[stage_type][stage_name] = stage
                     paths = networkx.all_shortest_paths(graph, stage_name, complete_stage.name)
                 
                     stage_paths = []
                     for path in paths:
                         stage_paths.extend(path)
                     
-                    idle_stage.context.paths[stage_name] = stage_paths
+                    idle_stage.graph_context.paths[stage_name] = stage_paths
 
                     path_lengths = networkx.all_pairs_shortest_path_length(graph)
 
@@ -293,7 +294,11 @@ class TransitionAssembler:
                         del path_lengths_set[path_stage_name]
                         stage_path_lengths[path_stage_name] = path_lengths_set
 
-                    idle_stage.context.path_lengths[stage_name] = stage_path_lengths.get(stage_name)
+                    idle_stage.graph_context.path_lengths[stage_name] = stage_path_lengths.get(stage_name)
+
+        for stage in self.generated_stages.values():
+            for idle_stage in idle_stages:
+                stage.graph_context = idle_stage.graph_context
 
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')

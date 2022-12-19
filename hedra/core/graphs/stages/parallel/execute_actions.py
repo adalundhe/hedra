@@ -61,7 +61,6 @@ async def start_execution(parallel_config: Dict[str, Any]):
     actions = {}
     for hook_action in execution_hooks:
         hook_type = hook_action.get('hook_type', HookType.ACTION)
-        action_name = hook_action.get('name')
 
         hook = Hook(
             hook_action.get('hook_name'),
