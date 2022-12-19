@@ -1,10 +1,11 @@
 import functools
-from .hook_types import HookType
+from typing import Any, Optional
+from .hook_type import HookType
 from hedra.core.graphs.hooks.registry.registrar import registrar
 
 
-@registrar(HookType.EVENT)
-def event(*names, pre: bool=False):
+@registrar(HookType.METRIC)
+def metric(group: Optional[str]='user_metrics'):
     
     def wrapper(func):
 

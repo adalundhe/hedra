@@ -1,7 +1,8 @@
 import asyncio
 from typing import Any
-from hedra.core.graphs.hooks.types.hook_types import HookType
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.stages.stage import Stage
+from hedra.core.graphs.stages.checkpoint import Checkpoint
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.transitions.exceptions import (
@@ -17,8 +18,8 @@ async def teardown_transition(current_stage: Stage, next_stage: Stage):
     logger.initialize()
 
     teardown_hooks = []
-    execute_stages = current_stage.graph_context.stages.get(StageTypes.EXECUTE).values()
-    paths = current_stage.graph_context.paths
+    execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE).values()
+    paths = current_stage.context.paths
 
     valid_states = [
         StageStates.EXECUTED
@@ -64,7 +65,7 @@ async def teardown_transition(current_stage: Stage, next_stage: Stage):
         await logger.spinner.system.debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
         await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
 
-    next_stage.graph_context = current_stage.graph_context
+    next_stage.context = current_stage.context
 
 
 async def teardown_to_analyze_transition(current_stage: Stage, next_stage: Stage):
@@ -82,12 +83,11 @@ async def teardown_to_analyze_transition(current_stage: Stage, next_stage: Stage
     return None, StageTypes.ANALYZE
 
 
-async def teardown_to_checkpoint_transition(current_stage: Stage, next_stage: Stage):
+async def teardown_to_checkpoint_transition(current_stage: Stage, next_stage: Checkpoint):
 
     try:
 
-        next_stage.previous_stage = current_stage.name
-        next_stage.graph_context = current_stage.graph_context
+        await teardown_transition(current_stage, next_stage)
 
     except Exception as stage_execution_error:
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR

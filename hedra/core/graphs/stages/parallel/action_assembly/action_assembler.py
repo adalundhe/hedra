@@ -1,7 +1,7 @@
 from typing import Dict, Any, Awaitable
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.common.types import RequestTypes
-from hedra.core.graphs.hooks.types.hook import Hook
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.personas.types.default_persona import DefaultPersona
 from .assemble_graphql_action import assemble_graphql_action
 from .assemble_graphql_http2_action import assemble_graphql_http2_action

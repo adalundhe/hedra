@@ -1,5 +1,5 @@
 import functools
-from .hook_types import HookType
+from .hook_type import HookType
 from hedra.core.graphs.hooks.registry.registrar import registrar
 
 

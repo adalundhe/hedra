@@ -5,8 +5,8 @@ import os
 import time
 from typing import Dict, Any, List
 from hedra.core.engines.client.config import Config
-from hedra.core.graphs.hooks.types.hook import Hook
-from hedra.core.graphs.hooks.types.hook_types import HookType
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.registry import RequestTypes
 from hedra.core.personas import get_persona

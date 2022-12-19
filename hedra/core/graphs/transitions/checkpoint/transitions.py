@@ -36,7 +36,23 @@ async def checkpoint_transition(current_stage: Stage, next_stage: Stage):
         await logger.spinner.system.debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
         await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
 
-    next_stage.graph_context = current_stage.graph_context
+    next_stage.context = current_stage.context
+
+
+async def checkpoint_to_checkpoint_transition(current_stage: Stage, next_stage: Stage):
+
+    try:
+
+        await checkpoint_transition(current_stage, next_stage)
+        
+    except asyncio.TimeoutError:
+        return StageTimeoutError(current_stage), StageTypes.ERROR
+
+    except Exception as stage_execution_error:
+        return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
+
+    else:
+        return None, StageTypes.CHECKPOINT
 
 
 async def checkpoint_to_setup_transition(current_stage: Stage, next_stage: Stage):
@@ -46,21 +62,9 @@ async def checkpoint_to_setup_transition(current_stage: Stage, next_stage: Stage
         await checkpoint_transition(current_stage, next_stage)
         
     except asyncio.TimeoutError:
-        if current_stage._save_file.closed is False:
-            current_stage._loop.run_in_executor(
-                current_stage._executor,
-                current_stage._save_file.close
-            )
-
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
-        if current_stage._save_file.closed is False:
-            current_stage._loop.run_in_executor(
-                current_stage._executor,
-                current_stage._save_file.close
-            )
-
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     else:
@@ -74,25 +78,9 @@ async def checkpoint_to_optimize_transition(current_stage: Stage, next_stage: St
         await checkpoint_transition(current_stage, next_stage)
         
     except asyncio.TimeoutError:
-        if current_stage._save_file.closed is False:
-            current_stage._loop.run_in_executor(
-                current_stage._executor,
-                current_stage._save_file.close
-            )
-
-            
-
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
-        if current_stage._save_file.closed is False:
-            current_stage._loop.run_in_executor(
-                current_stage._executor,
-                current_stage._save_file.close
-            )
-
-            
-
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     else:
@@ -106,25 +94,9 @@ async def checkpoint_to_execute_transition(current_stage: Stage, next_stage: Sta
         await checkpoint_transition(current_stage, next_stage)
         
     except asyncio.TimeoutError:
-        if current_stage._save_file.closed is False:
-            current_stage._loop.run_in_executor(
-                current_stage._executor,
-                current_stage._save_file.close
-            )
-
-            
-
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
-        if current_stage._save_file.closed is False:
-            current_stage._loop.run_in_executor(
-                current_stage._executor,
-                current_stage._save_file.close
-            )
-
-            
-
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     else:
@@ -138,25 +110,9 @@ async def checkpoint_to_teardown_transition(current_stage: Stage, next_stage: St
         await checkpoint_transition(current_stage, next_stage)
         
     except asyncio.TimeoutError:
-        if current_stage._save_file.closed is False:
-            current_stage._loop.run_in_executor(
-                current_stage._executor,
-                current_stage._save_file.close
-            )
-
-            
-
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
-        if current_stage._save_file.closed is False:
-            current_stage._loop.run_in_executor(
-                current_stage._executor,
-                current_stage._save_file.close
-            )
-
-            
-
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     else:
@@ -170,25 +126,9 @@ async def checkpoint_to_analyze_transition(current_stage: Stage, next_stage: Sta
         await checkpoint_transition(current_stage, next_stage)
         
     except asyncio.TimeoutError:
-        if current_stage._save_file.closed is False:
-            current_stage._loop.run_in_executor(
-                current_stage._executor,
-                current_stage._save_file.close
-            )
-
-            
-
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
-        if current_stage._save_file.closed is False:
-            current_stage._loop.run_in_executor(
-                current_stage._executor,
-                current_stage._save_file.close
-            )
-
-            
-
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     else:
@@ -202,25 +142,9 @@ async def checkpoint_to_submit_transition(current_stage: Stage, next_stage: Stag
         await checkpoint_transition(current_stage, next_stage), StageTypes.ERROR
         
     except asyncio.TimeoutError:
-        if current_stage._save_file.closed is False:
-            current_stage._loop.run_in_executor(
-                current_stage._executor,
-                current_stage._save_file.close
-            )
-
-            
-
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
-        if current_stage._save_file.closed is False:
-            current_stage._loop.run_in_executor(
-                current_stage._executor,
-                current_stage._save_file.close
-            )
-
-            
-
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     else:
@@ -234,25 +158,9 @@ async def checkpoint_to_complete_transition(current_stage: Stage, next_stage: St
         await checkpoint_transition(current_stage, next_stage), StageTypes.ERROR
         
     except asyncio.TimeoutError:
-        if current_stage._save_file.closed is False:
-            current_stage._loop.run_in_executor(
-                current_stage._executor,
-                current_stage._save_file.close
-            )
-
-            
-
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
-        if current_stage._save_file.closed is False:
-            current_stage._loop.run_in_executor(
-                current_stage._executor,
-                current_stage._save_file.close
-            )
-
-            
-
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     else:
@@ -266,25 +174,9 @@ async def checkpoint_to_wait_transition(current_stage: Stage, next_stage: Stage)
         await checkpoint_transition(current_stage, next_stage), StageTypes.ERROR
         
     except asyncio.TimeoutError:
-        if current_stage._save_file.closed is False:
-            current_stage._loop.run_in_executor(
-                current_stage._executor,
-                current_stage._save_file.close
-            )
-
-            
-
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
-        if current_stage._save_file.closed is False:
-            current_stage._loop.run_in_executor(
-                current_stage._executor,
-                current_stage._save_file.close
-            )
-
-            
-
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     else:

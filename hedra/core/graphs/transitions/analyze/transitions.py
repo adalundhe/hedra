@@ -22,9 +22,9 @@ async def analyze_transition(current_stage: Stage, next_stage: Stage):
         
         current_stage.state = StageStates.ANALYZING
 
-        raw_results = current_stage.graph_context.results
-        execute_stages = current_stage.graph_context.stages.get(StageTypes.EXECUTE)
-        paths = current_stage.graph_context.paths
+        raw_results = current_stage.context.results
+        execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE)
+        paths = current_stage.context.paths
 
         valid_states = [
             StageStates.EXECUTED, 
@@ -50,11 +50,11 @@ async def analyze_transition(current_stage: Stage, next_stage: Stage):
         else:
             summary = await current_stage.run()
 
-        current_stage.graph_context.summaries.update(summary)
+        current_stage.context.summaries.update(summary)
 
         current_stage.state = StageStates.ANALYZED
 
-        next_stage.graph_context = current_stage.graph_context
+        next_stage.context = current_stage.context
 
         await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
         await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
@@ -76,7 +76,7 @@ async def analyze_to_checkpoint_transition(current_stage: Stage, next_stage: Sta
     except Exception as stage_runtime_error:
         return StageExecutionError(current_stage, next_stage, str(stage_runtime_error)), StageTypes.ERROR
 
-    next_stage.data = dict(current_stage.graph_context.summaries)
+    next_stage.data = dict(current_stage.context.summaries)
     next_stage.previous_stage = current_stage.name
 
     current_stage = None

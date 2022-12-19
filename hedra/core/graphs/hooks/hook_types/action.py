@@ -1,15 +1,16 @@
 import functools
 from typing import Coroutine, Dict, List, Union
-from .hook_types import HookType
-from .hook import Hook
+from .hook_type import HookType
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.graphs.hooks.registry.registrar import registrar
 
 
-@registrar(HookType.TASK)
-def task(
+@registrar(HookType.ACTION)
+def action(
     weight: int=1, 
     order: int=1, 
-    metadata: Dict[str, Union[str, int]]={}, checks: List[Coroutine]=[],
+    metadata: Dict[str, Union[str, int]]={}, 
+    checks: List[Coroutine]=[], 
     notify: List[str]=[], 
     listen: List[str]=[]
 ):

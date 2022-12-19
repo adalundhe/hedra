@@ -1,6 +1,6 @@
 import asyncio
 from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.core.graphs.hooks.types.internal import Internal
+from hedra.core.graphs.hooks.hook_types.internal import Internal
 from .stage import Stage
 
 

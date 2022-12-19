@@ -4,7 +4,7 @@ from hedra.core.engines import registered_engines
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.common.timeouts import Timeouts
-from hedra.core.graphs.hooks.types.hook import Hook
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.engine.action import Action

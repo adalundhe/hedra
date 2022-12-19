@@ -1,7 +1,7 @@
 from asyncio import Task
-from hedra.core.graphs.hooks.types.hook_types import HookType
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.personas.batching.batch import Batch
-from hedra.core.graphs.hooks.types.hook import Hook
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 
 
 class CompletedCounter:

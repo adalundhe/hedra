@@ -3,9 +3,10 @@ import inspect
 from typing import List
 from hedra.core.graphs.events import Event
 from hedra.core.graphs.hooks.registry.registrar import registrar
-from hedra.core.graphs.hooks.types.internal import Internal
-from hedra.core.graphs.hooks.types.hook import Hook
-from hedra.core.graphs.hooks.types.hook_types import HookType
+from hedra.core.graphs.hooks.hook_types.internal import Internal
+from hedra.core.graphs.hooks.registry.registry_types import EventHook
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from .stage import Stage
 
@@ -16,14 +17,14 @@ class Teardown(Stage):
     def __init__(self) -> None:
         super().__init__()
         self.actions = []
-        self.accepted_hook_types = [HookType.EVENT]
+        self.accepted_hook_types = [ HookType.EVENT, HookType.CONTEXT ]
 
     @Internal()
     async def run(self):
 
         events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
         pre_events = [
-            event for event in events if isinstance(event, Event) and event.pre
+            event for event in events if isinstance(event, EventHook) and event.config.pre
         ]
         
         if len(pre_events) > 0:
@@ -60,7 +61,7 @@ class Teardown(Stage):
             await asyncio.gather(*[ hook.call() for hook in teardown_hooks])
 
         post_events = [
-            event for event in events if isinstance(event, Event) and event.pre is False
+            event for event in events if isinstance(event, EventHook) and event.config.pre is False
         ]
 
         if len(post_events) > 0:
@@ -74,5 +75,6 @@ class Teardown(Stage):
             ], timeout=self.stage_timeout)
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Teardown complete.')
-        
 
+        for context_hook in self.hooks[HookType.CONTEXT]:
+            self.context[context_hook.config.context_key] = await context_hook.call()

@@ -1,10 +1,10 @@
 import functools
-from .hook_types import HookType
+from .hook_type import HookType
 from hedra.core.graphs.hooks.registry.registrar import registrar
 
 
-@registrar(HookType.BEFORE)
-def before(*names):
+@registrar(HookType.RESTORE)
+def restore(key: str=None, checkpoint_filepath: str=None):
     
     def wrapper(func):
 

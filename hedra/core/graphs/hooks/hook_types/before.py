@@ -1,11 +1,10 @@
 import functools
-from typing import Any, Optional
-from .hook_types import HookType
+from .hook_type import HookType
 from hedra.core.graphs.hooks.registry.registrar import registrar
 
 
-@registrar(HookType.METRIC)
-def metric(group: Optional[str]='user_metrics'):
+@registrar(HookType.BEFORE)
+def before(*names):
     
     def wrapper(func):
 

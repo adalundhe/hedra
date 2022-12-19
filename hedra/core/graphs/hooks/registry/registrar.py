@@ -1,8 +1,27 @@
+import inspect
 from collections import defaultdict
 from types import FunctionType
 from typing import Any, Dict, List, Union, Coroutine
-from hedra.core.graphs.hooks.types.hook import Hook, Metadata
-from hedra.core.graphs.hooks.types.hook_types import HookType
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, Metadata
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from .registry_types import (
+    ActionHook,
+    AfterHook,
+    BeforeHook,
+    ChannelHook,
+    CheckHook,
+    ContextHook,
+    EventHook,
+    MetricHook,
+    RestoreHook,
+    SaveHook,
+    SetupHook,
+    TaskHook,
+    TeardownHook,
+    ValidateHook
+)
+
+
 
 
 class Registrar:
@@ -11,195 +30,55 @@ class Registrar:
     module_paths: Dict[str, str] = {}
 
     def __init__(self, hook_type) -> None:
-
         self.hook_type = hook_type
+        self.hook_types = hook_types = {
+            HookType.ACTION: lambda *args, **kwargs: ActionHook(*args, **kwargs),
+            HookType.AFTER: lambda *args, **kwargs:  AfterHook(*args, **kwargs),
+            HookType.BEFORE: lambda *args, **kwargs:  BeforeHook(*args, **kwargs),
+            HookType.CHANNEL: lambda *args, **kwargs:  ChannelHook(*args, **kwargs),
+            HookType.CHECK: lambda *args, **kwargs:  CheckHook(*args, **kwargs),
+            HookType.CONTEXT: lambda *args, **kwargs:  ContextHook(*args, **kwargs),
+            HookType.EVENT: lambda *args, **kwargs:  EventHook(*args, **kwargs),
+            HookType.METRIC: lambda *args, **kwargs:  MetricHook(*args, **kwargs),
+            HookType.RESTORE: lambda *args, **kwargs:  RestoreHook(*args, **kwargs),
+            HookType.SAVE: lambda *args, **kwargs:  SaveHook(*args, **kwargs),
+            HookType.SETUP: lambda *args, **kwargs:  SetupHook(*args, **kwargs),
+            HookType.TASK: lambda *args, **kwargs:  TaskHook(*args, **kwargs),
+            HookType.TEARDOWN: lambda *args, **kwargs:  TeardownHook(*args, **kwargs),
+            HookType.VALIDATE: lambda *args, **kwargs:  ValidateHook(*args, **kwargs)
+        }
 
     def __call__(self, hook: FunctionType) -> Any:
         self.module_paths[hook.__name__] = hook.__module__
         return self.add_hook(self.hook_type)
 
     def add_hook(self, hook_type: str):
-        if hook_type == HookType.SETUP or hook_type == HookType.TEARDOWN:
 
-            def wrap_hook(metadata: Dict[str, Union[str, int]]={}):
+        def wrap_hook(*args, **kwargs):
 
-                def wrapped_method(func):
+            def wrapped_method(func):
 
-                    hook_name = func.__qualname__
-                    hook_shortname = func.__name__
+                hook_name = func.__qualname__
+                hook_shortname = func.__name__
 
+                hook = self.hook_types[hook_type]
 
-                    self.all[hook_name] = Hook(
-                        hook_name, 
-                        hook_shortname,
-                        func, 
-                        hook_type=hook_type,
-                        metadata=Metadata(
-                            **metadata
-                        )
-                    )
+                self.all[hook_name] = hook(
+                    hook_name,
+                    hook_shortname,
+                    func,
+                    *args,
+                    **kwargs
+                )
 
-                    return func
-                
-                return wrapped_method
-
-        elif hook_type in [HookType.METRIC]:
-            def wrap_hook(group: str='user_metrics'):
-                def wrapped_method(func):
-
-                    hook_name = func.__qualname__
-                    hook_shortname = func.__name__
-
-
-                    self.all[hook_name] = Hook(
-                        hook_name, 
-                        hook_shortname,
-                        func, 
-                        hook_type=hook_type,
-                        metadata=Metadata(),
-                        group=group
-                    )
-
-                    return func
-                
-                return wrapped_method
-
-        elif hook_type in [HookType.BEFORE, HookType.AFTER, HookType.CHECK]:
+                return func
             
-            def wrap_hook(*names):
-                def wrapped_method(func):
-                    hook_name = func.__qualname__
-                    hook_shortname = func.__name__
-
-                    self.all[hook_name] = Hook(
-                        hook_name, 
-                        hook_shortname,
-                        func, 
-                        hook_type=hook_type,
-                        names=names
-                    )
-
-                    return func
-                
-                return wrapped_method
-
-        elif hook_type == HookType.EVENT:
-            def wrap_hook(*names, pre: bool=False):
-                def wrapped_method(func):
-                    hook_name = func.__qualname__
-                    hook_shortname = func.__name__
-
-                    self.all[hook_name] = Hook(
-                        hook_name, 
-                        hook_shortname,
-                        func, 
-                        hook_type=hook_type,
-                        names=names,
-                        metadata=Metadata(pre=pre)
-                    )
-
-                    return func
-                
-                return wrapped_method
-
-        elif hook_type == HookType.VALIDATE:
-
-            def wrap_hook(stage: str, *names):
-                def wrapped_method(func):
-                    hook_name = func.__qualname__
-                    hook_shortname = func.__name__
-
-                    target_hook_names = [f'{stage}.{name}' for name in names]
-
-                    self.all[hook_name] = Hook(
-                        hook_name, 
-                        hook_shortname,
-                        func, 
-                        stage=stage,
-                        hook_type=hook_type,
-                        names=target_hook_names
-                    )
-
-                    return func
-                
-                return wrapped_method
-
-        elif hook_type == HookType.CHANNEL:
-
-            def wrap_hook():
-                def wrapped_method(func):
-                    hook_name = func.__qualname__
-                    hook_shortname = func.__name__
-
-                    self.all[hook_name] = Hook(
-                        hook_name, 
-                        hook_shortname,
-                        func, 
-                        hook_type=hook_type
-                    )
-
-                    return func
-                    
-                return wrapped_method
-
-        elif hook_type == HookType.SAVE:
-
-            def wrap_hook(checkpoint_filepath: str):
-                def wrapped_method(func):
-                    hook_name = func.__qualname__
-                    hook_shortname = func.__name__
-
-                    self.all[hook_name] = Hook(
-                        hook_name, 
-                        hook_shortname,
-                        func, 
-                        hook_type=hook_type,
-                        metadata=Metadata(path=checkpoint_filepath)
-                    )
-
-                    return func
-                
-                return wrapped_method
-
-        else:
-
-            def wrap_hook(
-                weight: int=1, 
-                order: int=1, 
-                metadata: Dict[str, Union[str, int]]={}, 
-                checks: List[Coroutine]=[],
-                notify: List[str]=[],
-                listen: List[str]=[]
-            ):
-                def wrapped_method(func):
-
-                    hook_name = func.__qualname__
-                    hook_shortname = func.__name__
-
-                    self.all[hook_name] = Hook(
-                        hook_name, 
-                        hook_shortname,
-                        func, 
-                        hook_type=hook_type,
-                        notify=notify,
-                        listen=listen,
-                        metadata=Metadata(
-                            weight=weight,
-                            order=order,
-                            **metadata
-                        ),
-                        checks=checks
-                    )
-
-                    return func
-
-                return wrapped_method
+            return wrapped_method
 
         return wrap_hook
         
 
 def makeRegistrar():
-
     return Registrar
 
 

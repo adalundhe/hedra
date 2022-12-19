@@ -6,5 +6,6 @@ from .transitions import (
     checkpoint_to_analyze_transition,
     checkpoint_to_complete_transition,
     checkpoint_to_submit_transition,
-    checkpoint_to_wait_transition
+    checkpoint_to_wait_transition,
+    checkpoint_to_checkpoint_transition
 )

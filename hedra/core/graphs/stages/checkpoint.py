@@ -1,17 +1,17 @@
-import functools
-import json
 import os
-import psutil
 import asyncio
+import aiofiles
 from typing import List
 from datetime import datetime
-from typing import TextIO
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
 from hedra.core.graphs.events import Event
-from hedra.core.graphs.hooks.types.hook import Hook
-from hedra.core.graphs.hooks.types.internal import Internal
-from hedra.core.graphs.hooks.types.hook_types import HookType
+from hedra.core.graphs.hooks.registry.registry_types import (
+    EventHook, 
+    SaveHook,
+    RestoreHook
+)
+from hedra.core.graphs.hooks.hook_types.internal import Internal
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from .stage import Stage
 
@@ -21,10 +21,14 @@ class Checkpoint(Stage):
 
     def __init__(self) -> None:
         super().__init__()
-        self.data = {}
         self.previous_stage = None
-        self.accepted_hook_types = [ HookType.SAVE, HookType.EVENT ]
-        self._save_file: TextIO = None
+        self.accepted_hook_types = [ 
+            HookType.CONTEXT ,
+            HookType.EVENT, 
+            HookType.RESTORE,
+            HookType.SAVE, 
+        ]
+
         self.requires_shutdown = True
 
     @Internal()
@@ -32,7 +36,7 @@ class Checkpoint(Stage):
 
         events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
         pre_events = [
-            event for event in events if isinstance(event, Event) and event.pre
+            event for event in events if isinstance(event, EventHook) and event.config.pre
         ]
         
         if len(pre_events) > 0:
@@ -45,51 +49,39 @@ class Checkpoint(Stage):
                 asyncio.create_task(event.call()) for event in pre_events
             ], timeout=self.stage_timeout)
 
-        loop = asyncio.get_event_loop()
-        executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         timestamp = datetime.now().timestamp()
 
-        save_hooks = self.hooks[HookType.SAVE]
+        restore_hooks: List[RestoreHook] = self.hooks[HookType.RESTORE]
+        if len(restore_hooks) > 0:
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing Save checkpoints for - {len(restore_hooks)} - items')
 
-        await self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Executing checkpoints for - {len(save_hooks)} - items')
+        for restore_hook in restore_hooks:
+            async with aiofiles.open(restore_hook.config.path, 'r') as restore_file:
+                self.context[restore_hook.config.context_key] = await restore_hook.call(
+                    await restore_file.read()
+                )
+
+        save_hooks: List[SaveHook] = self.hooks[HookType.SAVE]
+        if len(save_hooks) > 0:
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing Save checkpoints for - {len(save_hooks)} - items')
         
         for save_hook in save_hooks:
-            checkpoint_data = await save_hook.call(self.data)
-
-            await self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Executing checkpoint - {save_hook.name}')
-
-            if save_hook.config.path is None:
-
-                save_hook.config.path = f'{os.getcwd()}/{self.previous_stage}_{timestamp}.json'
-
-            if os.path.exists(save_hook.config.path):
-
-                checkpoint_filename = Path(save_hook.config.path).stem
-                path_dir = str(Path(save_hook.config.path).parent.resolve())
-
-                save_hook.config.path = f'{path_dir}/{checkpoint_filename}_{timestamp}.json'
-
-            self._save_file = open(save_hook.config.path, 'w')
-
-            await loop.run_in_executor(
-                executor,
-                functools.partial(
-                    json.dump,
-                    checkpoint_data,
-                    self._save_file,
-                    indent=4
-                )
+            checkpoint_data = await save_hook.call(
+                self.context.get(save_hook.config.context_key)
             )
 
-            await loop.run_in_executor(
-                executor,
-                self._save_file.close
-            )
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing checkpoint - {save_hook.name}')
 
-            await self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Checkpoint - {save_hook.name} - complete')
+            async with aiofiles.open(save_hook.config.path, 'w') as checkpoint_file:
+                await checkpoint_file.write(checkpoint_data)
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Checkpoint - {save_hook.name} - complete')
+
+            if self.context.get(save_hook.config.context_key):
+                self.context[save_hook.config.context_key] = None
         
         post_events = [
-            event for event in events if isinstance(event, Event) and event.pre is False
+            event for event in events if isinstance(event, EventHook) and event.config.pre is False
         ]
 
         if len(post_events) > 0:
@@ -103,9 +95,9 @@ class Checkpoint(Stage):
             ], timeout=self.stage_timeout)
 
 
-        await self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Completed checkpoints for - {len(save_hooks)} - items')
-        
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed checkpoints for - {len(save_hooks)} - items')
 
-        self._shutdown_task = loop.run_in_executor(None, executor.shutdown)
+        for context_hook in self.hooks[HookType.CONTEXT]:
+            self.context[context_hook.config.context_key] = await context_hook.call()
         
 

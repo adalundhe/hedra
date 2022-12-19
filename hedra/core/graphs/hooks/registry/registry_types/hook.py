@@ -1,6 +1,6 @@
 import uuid
 from typing import Coroutine, List, Optional, Any, Dict
-from hedra.core.graphs.hooks.types.hook_types import HookType
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 
 
 class Metadata:
@@ -13,7 +13,8 @@ class Metadata:
         user: str = None, 
         path: str = None,
         tags: List[str] = [],
-        pre: bool=False
+        pre: bool=False,
+        context_key: str=None
     ) -> None:
         self.weight = weight
         self.order = order
@@ -22,6 +23,7 @@ class Metadata:
         self.path = path
         self.tags = tags
         self.pre = pre
+        self.context_key = context_key
 
 class Hook:
 

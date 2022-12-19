@@ -1,8 +1,9 @@
 import asyncio
 from typing import Generic, TypeVar, List
 from hedra.core.graphs.events import Event
-from hedra.core.graphs.hooks.types.hook_types import HookType
-from hedra.core.graphs.hooks.types.internal import Internal
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.core.graphs.hooks.hook_types.internal import Internal
+from hedra.core.graphs.hooks.registry.registry_types import EventHook
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting import (
@@ -56,14 +57,14 @@ class Submit(Stage, Generic[T]):
         self.summaries = {}
         self.events = []
         self.reporter: Reporter = None
-        self.accepted_hook_types = [HookType.EVENT]
+        self.accepted_hook_types = [ HookType.EVENT, HookType.CONTEXT ]
 
     @Internal()
     async def run(self):
 
         events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
         pre_events = [
-            event for event in events if isinstance(event, Event) and event.pre
+            event for event in events if isinstance(event, EventHook) and event.config.pre
         ]
         
         if len(pre_events) > 0:
@@ -127,7 +128,7 @@ class Submit(Stage, Generic[T]):
         await self.reporter.close()
 
         post_events = [
-            event for event in events if isinstance(event, Event) and event.pre is False
+            event for event in events if isinstance(event, EventHook) and event.config.pre is False
         ]
 
         if len(post_events) > 0:
@@ -144,4 +145,5 @@ class Submit(Stage, Generic[T]):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {reporter_name}:{self.reporter.reporter_id} - Completed Metrics submission')
         await self.logger.spinner.set_default_message(f'Successfully submitted the results for {session_total} actions via {reporter_name} reporter')
         
-
+        for context_hook in self.hooks[HookType.CONTEXT]:
+            self.context[context_hook.config.context_key] = await context_hook.call()

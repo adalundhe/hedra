@@ -8,9 +8,10 @@ from collections import defaultdict
 from inspect import iscoroutinefunction
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.events import Event
-from hedra.core.graphs.hooks.types.hook import Hook
-from hedra.core.graphs.hooks.types.hook_types import HookType
-from hedra.core.graphs.hooks.types.internal import Internal
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.core.graphs.hooks.hook_types.internal import Internal
+from hedra.core.graphs.hooks.registry.registry_types import EventHook
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from .stage import Stage
 from .exceptions import (
@@ -50,7 +51,7 @@ class Validate(Stage):
         for hook_type in HookType:
             self.hooks[hook_type] = []
 
-        self.accepted_hook_types = [ HookType.VALIDATE, HookType.INTERNAL, HookType.EVENT ]
+        self.accepted_hook_types = [ HookType.VALIDATE, HookType.INTERNAL, HookType.EVENT, HookType.CONTEXT ]
 
     @Internal()
     async def run(self):
@@ -249,8 +250,34 @@ class Validate(Stage):
                     
                     assert hook.call.__code__.co_argcount > 1, f"Missing required argument 'data' for @save hook {hook.name}:{hook.hook_id}"
                     assert hook.call.__code__.co_argcount < 3, f"Too many args. - @save hook {hook.name}:{hook.hook_id} only requires 'data' as additional args."
+                    assert hook.config.context_key is not None, f"Missing required keyword arg. - @save hook {hook.name}:{hook.hook_id} requires a valid string for 'key'"
+                    assert hook.config.path is not None, f"Missing required keyword arg. - @save hook {hook.name}:{hook.hook_id} requires a valid string for 'checkpoint_filepath'"
                     assert isinstance(hook.config.path, str), f"Invalid path type - @save hook {hook.name}:{hook.hook_id} path must be a valid string."
                     assert os.path.exists(hook_path_dir), f"Invalid path - @save hook {hook.name}:{hook.hook_id} path {hook_path_dir} must exist."
+                
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validated {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.RESTORE.name.capitalize()} - hooks')
+
+            for hook in self.hooks[HookType.RESTORE]:
+                
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
+
+                assert hook.hook_type is HookType.RESTORE, f"Hook type mismatch - hook {hook.name}:{hook.hook_id} is a {hook.hook_type.name} hook, but Hedra expected a {HookType.RESTORE.name} hook."
+                assert hook.shortname in hook.name, f"Shortname {hook.shortname} must be contained in full Hook name {hook.name}:{hook.hook_id} for @restore hook {hook.name}:{hook.hook_id}."
+                
+                assert hook.call is not None, f"Method is not not found on stage or was not supplied to @restore hook - {hook.name}:{hook.hook_id}"
+                assert 'self' in hook.call.__code__.co_varnames
+
+                if hook.config.path:
+                    hook_path_dir = str(Path(hook.config.path).parent.resolve())
+                    
+                    assert hook.call.__code__.co_argcount > 1, f"Missing required argument 'data' for @restore hook {hook.name}:{hook.hook_id}"
+                    assert hook.call.__code__.co_argcount < 3, f"Too many args. - @restore hook {hook.name}:{hook.hook_id} only requires 'data' as additional args."
+                    assert hook.config.context_key is not None, f"Missing required keyword arg. - @restore hook {hook.name}:{hook.hook_id} requires a valid string for 'key'"
+                    assert hook.config.path is not None, f"Missing required keyword arg. - @restore hook {hook.name}:{hook.hook_id} requires a valid string for 'checkpoint_filepath'"
+                    assert isinstance(hook.config.path, str), f"Invalid path type - @restore hook {hook.name}:{hook.hook_id} path must be a valid string."
+                    assert os.path.exists(hook_path_dir), f"Invalid path - @restore hook {hook.name}:{hook.hook_id} path {hook_path_dir} must exist."
                 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validated {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -354,7 +381,7 @@ class Validate(Stage):
 
             events: List[Event] = [event for event in self.hooks[HookType.EVENT] if hasattr(self, event.shortname)]
             pre_events = [
-                event for event in events if isinstance(event, Event) and event.pre
+                event for event in events if isinstance(event, EventHook) and event.config.pre
             ]
             
             if len(pre_events) > 0:
@@ -391,7 +418,7 @@ class Validate(Stage):
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validated {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
             post_events = [
-                event for event in events if isinstance(event, Event) and event.pre is False
+                event for event in events if isinstance(event, EventHook) and event.config.pre is False
             ]
 
             if len(post_events) > 0:
@@ -406,7 +433,9 @@ class Validate(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validation for stages - {validation_stage_names} - complete')
             await self.logger.spinner.set_default_message(f'Validated - {len(stages)} stages')
-            
+
+            for context_hook in self.hooks[HookType.CONTEXT]:
+                self.context[context_hook.config.context_key] = await context_hook.call()
 
         except AssertionError as hook_validation_error:
             raise HookValidationError(stage, str(hook_validation_error))

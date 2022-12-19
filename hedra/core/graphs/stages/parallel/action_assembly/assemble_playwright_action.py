@@ -11,7 +11,7 @@ from hedra.core.engines.types.playwright import (
     Options,
     MercuryPlaywrightClient
 )
-from hedra.core.graphs.hooks.types.hook import Hook
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.logging import HedraLogger

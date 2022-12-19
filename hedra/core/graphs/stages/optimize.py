@@ -3,9 +3,10 @@ import dill
 import time
 from typing import Dict, List, Tuple
 from hedra.core.graphs.events import Event
-from hedra.core.graphs.hooks.types.hook_types import HookType
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.core.graphs.hooks.registry.registry_types import EventHook
 from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.core.graphs.hooks.types.internal import Internal
+from hedra.core.graphs.hooks.hook_types.internal import Internal
 from hedra.core.engines.client.time_parser import TimeParser
 from hedra.core.engines.types.registry import registered_engines
 from hedra.core.personas.persona_registry import registered_personas
@@ -38,14 +39,14 @@ class Optimize(Stage):
         self.allow_parallel = True
 
         self.optimization_execution_time = 0
-        self.accepted_hook_types = [HookType.EVENT]
+        self.accepted_hook_types = [ HookType.EVENT, HookType.CONTEXT ]
 
     @Internal()
     async def run(self, stages: Dict[str, Execute]):
 
         events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
         pre_events = [
-            event for event in events if isinstance(event, Event) and event.pre
+            event for event in events if isinstance(event, EventHook) and event.config.pre
             ]
         
         if len(pre_events) > 0:
@@ -199,7 +200,7 @@ class Optimize(Stage):
         ])
 
         post_events = [
-            event for event in events if isinstance(event, Event) and event.pre is False
+            event for event in events if isinstance(event, EventHook) and event.config.pre is False
         ]
 
         if len(post_events) > 0:
@@ -214,6 +215,9 @@ class Optimize(Stage):
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Optimization complete for stages - {stage_names} - over - {self.optimization_execution_time} - seconds')
         await self.logger.spinner.set_default_message(f'Optimized - batch sizes for stages - {optimized_batch_sizes} - over {self.optimization_execution_time} seconds')
+
+        for context_hook in self.hooks[HookType.CONTEXT]:
+            self.context[context_hook.config.context_key] = await context_hook.call()
 
         return [
             result.get('params') for result in optimization_results

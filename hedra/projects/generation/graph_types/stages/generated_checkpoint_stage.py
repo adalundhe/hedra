@@ -2,7 +2,7 @@ import os
 from typing import Dict, List, Any
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.core.graphs.stages import Checkpoint
-from hedra.core.graphs.hooks.types import save
+from hedra.core.graphs.hooks.hook_types import save
 
 
 class CheckpointStage(Checkpoint):

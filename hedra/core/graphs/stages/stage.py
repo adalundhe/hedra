@@ -4,9 +4,10 @@ import os
 import uuid
 from collections import defaultdict
 from typing import Any, Dict, List, Union
-from hedra.core.graphs.hooks.types.hook import Hook
-from hedra.core.graphs.hooks.types.internal import Internal
-from hedra.core.graphs.hooks.types.hook_types import HookType
+from hedra.core.graphs.simple_context import SimpleContext
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.hooks.hook_types.internal import Internal
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.engines.client.time_parser import TimeParser
@@ -44,8 +45,7 @@ class Stage:
         self.plugins_by_type: Dict[PluginType, Dict[str, Union[EnginePlugin, ReporterPlugin]]] = {}
 
         self.core_config = {}
-        # self.context = {}
-        self.graph_context: Any = None
+        self.context = SimpleContext()
 
         self.logger: HedraLogger = HedraLogger()
         self.logger.initialize()

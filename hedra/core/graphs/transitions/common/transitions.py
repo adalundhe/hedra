@@ -13,7 +13,7 @@ async def idle_transition(current_stage: Stage, next_stage: Stage):
     await logger.spinner.system.debug(f'{current_stage.metadata_string} - NoOp transition from {current_stage.name} to {next_stage.name}')
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - NoOp transition from {current_stage.name} to {next_stage.name}')
 
-    next_stage.graph_context = current_stage.graph_context
+    next_stage.context = current_stage.context
 
     return None, StageTypes.IDLE
 
@@ -31,8 +31,8 @@ async def exit_transition(current_stage: Stage, next_stage: Stage):
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
 
     await current_stage.run()
-    next_stage.graph_context = None
-    current_stage.graph_context = None
+    next_stage.context = None
+    current_stage.context = None
 
     await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
@@ -48,8 +48,8 @@ async def error_transition(current_stage: Stage, next_stage: Stage):
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
 
     await next_stage.run()
-    next_stage.graph_context = None
-    current_stage.graph_context = None
+    next_stage.context = None
+    current_stage.context = None
 
     await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')

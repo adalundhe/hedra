@@ -1,11 +1,11 @@
 import functools
-from .hook_types import HookType
-from .hook import Hook
+from .hook_type import HookType
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.graphs.hooks.registry.registrar import registrar
 
 
-@registrar(HookType.CONTEXT)
-def context(key: str):
+@registrar(HookType.CHECK)
+def check(*names):
     
     def wrapper(func) -> Hook:
 

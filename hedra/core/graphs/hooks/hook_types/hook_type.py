@@ -16,4 +16,4 @@ class HookType(Enum):
     CHANNEL='CHANNEL'
     EVENT='EVENT'
     CONTEXT='CONTEXT'
-    RECEIVE='RECEIVE'
+    RESTORE='RESTORE'

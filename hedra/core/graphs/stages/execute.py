@@ -9,8 +9,9 @@ from typing_extensions import TypeVarTuple, Unpack
 from hedra.core.graphs.events import Event
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.registry import registered_engines
-from hedra.core.graphs.hooks.types.hook_types import HookType
-from hedra.core.graphs.hooks.types.internal import Internal
+from hedra.core.graphs.hooks.registry.registry_types import EventHook
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.core.graphs.hooks.hook_types.internal import Internal
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.engines.types.playwright import (
     MercuryPlaywrightClient,
@@ -47,7 +48,8 @@ class Execute(Stage, Generic[Unpack[T]]):
             HookType.TEARDOWN,
             HookType.CHECK,
             HookType.CHANNEL, 
-            HookType.EVENT
+            HookType.EVENT,
+            HookType.CONTEXT
         ]
 
         self.concurrent_pool_aware_stages = 0
@@ -62,7 +64,7 @@ class Execute(Stage, Generic[Unpack[T]]):
 
         events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
         pre_events = [
-            event for event in events if isinstance(event, Event) and event.pre
+            event for event in events if isinstance(event, EventHook) and event.config.pre
         ]
         
         if len(pre_events) > 0:
@@ -202,7 +204,7 @@ class Execute(Stage, Generic[Unpack[T]]):
             total_elapsed = persona.total_elapsed
 
         post_events = [
-            event for event in events if isinstance(event, Event) and event.pre is False
+            event for event in events if isinstance(event, EventHook) and event.config.pre is False
         ]
 
         if len(post_events) > 0:
@@ -218,6 +220,9 @@ class Execute(Stage, Generic[Unpack[T]]):
 
         await self.logger.filesystem.aio['hedra.core'].info( f'{self.metadata_string} - Completed - {total_results} actions at  {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
         await self.logger.spinner.set_default_message(f'Stage - {self.name} completed {total_results} actions at {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
+
+        for context_hook in self.hooks[HookType.CONTEXT]:
+            self.context[context_hook.config.context_key] = await context_hook.call()
         
         return {
             'results': results,

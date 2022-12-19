@@ -3,8 +3,8 @@ import asyncio
 import time
 import inspect
 from typing import Dict, Generic, List, TypeVar
-from hedra.core.graphs.hooks.types.hook_types import HookType
-from hedra.core.graphs.hooks.types.hook import Hook
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.plugins.types.common.plugin_hook import PluginHook
 from hedra.plugins.types.common.types import PluginHooks
 from hedra.plugins.types.plugin_types import PluginType

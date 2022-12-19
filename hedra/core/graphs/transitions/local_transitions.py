@@ -62,7 +62,8 @@ from .checkpoint import (
     checkpoint_to_analyze_transition,
     checkpoint_to_complete_transition,
     checkpoint_to_submit_transition,
-    checkpoint_to_wait_transition
+    checkpoint_to_wait_transition,
+    checkpoint_to_checkpoint_transition
 )
 
 from .submit import (
@@ -206,7 +207,7 @@ local_transitions = {
         (StageTypes.ANALYZE, StageTypes.ERROR): error_transition,
 
         # State: Checkpoint
-        (StageTypes.CHECKPOINT, StageTypes.CHECKPOINT): invalid_transition,
+        (StageTypes.CHECKPOINT, StageTypes.CHECKPOINT): checkpoint_to_checkpoint_transition,
         (StageTypes.CHECKPOINT, StageTypes.IDLE): invalid_transition,
         (StageTypes.CHECKPOINT, StageTypes.WAIT): checkpoint_to_wait_transition,
         (StageTypes.CHECKPOINT, StageTypes.SETUP): checkpoint_to_setup_transition,

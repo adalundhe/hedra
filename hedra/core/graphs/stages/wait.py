@@ -1,4 +1,4 @@
-from hedra.core.graphs.hooks.types.internal import Internal
+from hedra.core.graphs.hooks.hook_types.internal import Internal
 from .types.stage_types import StageTypes
 from .stage import Stage
 

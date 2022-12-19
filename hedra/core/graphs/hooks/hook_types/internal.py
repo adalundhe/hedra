@@ -1,7 +1,7 @@
 from typing import Callable
-from hedra.core.graphs.hooks.types.hook_types import HookType
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.registry.registrar import registrar
-from .hook import Hook
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 
 
 class Internal:

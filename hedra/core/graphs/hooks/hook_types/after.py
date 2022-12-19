@@ -1,12 +1,13 @@
 import functools
-from .hook_types import HookType
+from .hook_type import HookType
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.graphs.hooks.registry.registrar import registrar
 
 
-@registrar(HookType.SAVE)
-def save(checkpoint_filepath: str):
+@registrar(HookType.AFTER)
+def after(*names):
     
-    def wrapper(func):
+    def wrapper(func) -> Hook:
 
         @functools.wraps(func)
         def decorator(*args, **kwargs):

@@ -8,9 +8,10 @@ from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.events import EventsGroup
 from hedra.reporting.metric import MetricsSet
 from hedra.core.graphs.events import Event
-from hedra.core.graphs.hooks.types.internal import Internal
-from hedra.core.graphs.hooks.types.hook import Hook
-from hedra.core.graphs.hooks.types.hook_types import HookType
+from hedra.core.graphs.hooks.hook_types.internal import Internal
+from hedra.core.graphs.hooks.registry.registry_types import EventHook
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.reporting.events import results_types
@@ -39,7 +40,7 @@ class Analyze(Stage):
         super().__init__()
         self.raw_results = {}
 
-        self.accepted_hook_types = [ HookType.METRIC, HookType.EVENT ]
+        self.accepted_hook_types = [ HookType.METRIC, HookType.EVENT, HookType.CONTEXT ]
         self.requires_shutdown = True
         self.allow_parallel = True
         self.analysis_execution_time = 0
@@ -49,7 +50,7 @@ class Analyze(Stage):
 
         events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
         pre_events = [
-            event for event in events if isinstance(event, Event) and event.pre
+            event for event in events if isinstance(event, EventHook) and event.config.pre
         ]
         
         if len(pre_events) > 0:
@@ -259,7 +260,7 @@ class Analyze(Stage):
         )
 
         post_events = [
-            event for event in events if isinstance(event, Event) and event.pre is False
+            event for event in events if isinstance(event, EventHook) and event.config.pre is False
         ]
 
         if len(post_events) > 0:
@@ -272,6 +273,8 @@ class Analyze(Stage):
                 asyncio.create_task(event.call()) for event in post_events
             ], timeout=self.stage_timeout)
 
+        for context_hook in self.hooks[HookType.CONTEXT]:
+            self.context[context_hook.config.context_key] = await context_hook.call()
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed results analysis for - {stages_count} - stages in - {self.analysis_execution_time} seconds')
         await self.logger.spinner.set_default_message(f'Completed results analysis for {total_group_results} actions and {stages_count} stages over {self.analysis_execution_time} seconds')

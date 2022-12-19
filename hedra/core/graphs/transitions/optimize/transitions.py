@@ -19,10 +19,10 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
     await logger.spinner.system.debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
 
-    execute_stages = current_stage.graph_context.stages.get(StageTypes.EXECUTE).items()
-    paths = current_stage.graph_context.paths.get(current_stage.name)
+    execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE).items()
+    paths = current_stage.context.paths.get(current_stage.name)
 
-    visited = current_stage.graph_context.visited
+    visited = current_stage.context.visited
 
     execute_stages = {
         stage_name: stage for stage_name, stage in execute_stages if stage_name in paths and stage_name not in visited
@@ -37,7 +37,7 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
 
     for stage_name, stage in execute_stages.items():
 
-        if stage_name in current_stage.graph_context.paths and stage.state in valid_states:
+        if stage_name in current_stage.context.paths and stage.state in valid_states:
             stage.state = StageStates.OPTIMIZING
             optimization_candidates[stage_name] = stage
 
@@ -50,13 +50,13 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
     else:
         optimization_results = await current_stage.run(optimization_candidates)
 
-    next_stage.graph_context.optimized_params = optimization_results
+    next_stage.context.optimized_params = optimization_results
     next_stage.state = StageStates.OPTIMIZED
 
     await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
 
-    next_stage.graph_context = current_stage.graph_context
+    next_stage.context = current_stage.context
 
 
 async def optimize_to_execute_transition(current_stage: Stage, next_stage: Stage):
@@ -85,7 +85,7 @@ async def optimize_to_checkpoint_transition(current_stage: Stage, next_stage: St
 
         await optimize_transition(current_stage, next_stage)
 
-        next_stage.data = next_stage.graph_context.optimized_params
+        next_stage.data = next_stage.context.optimized_params
             
     except asyncio.TimeoutError:
         return StageTimeoutError(current_stage), StageTypes.ERROR
@@ -106,7 +106,7 @@ async def optimize_to_wait_transition(current_stage: Stage, next_stage: Stage):
         
         await optimize_transition(current_stage, next_stage)
 
-        next_stage.data = next_stage.graph_context.optimized_params
+        next_stage.data = next_stage.context.optimized_params
             
     except asyncio.TimeoutError:
         return StageTimeoutError(current_stage), StageTypes.ERROR

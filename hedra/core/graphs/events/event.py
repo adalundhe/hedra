@@ -1,5 +1,5 @@
 from typing import Any
-from hedra.core.graphs.hooks.types.hook import Hook
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 
 
 class Event:

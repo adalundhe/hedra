@@ -4,14 +4,15 @@ import traceback
 from typing_extensions import TypeVarTuple, Unpack
 from typing import Dict, Generic, List, Any, Union
 from hedra.core.graphs.events import Event
-from hedra.core.graphs.hooks.types.hook import Hook
-from hedra.core.graphs.hooks.types.hook_types import HookType
-from hedra.core.graphs.hooks.types.internal import Internal
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.core.graphs.hooks.hook_types.internal import Internal
 from hedra.core.engines.client.client import Client
 from hedra.core.engines.client.config import Config
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.engines.types.common.base_action import BaseAction
 from hedra.core.engines.types.task.task import Task
+from hedra.core.graphs.hooks.registry.registry_types import EventHook
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.personas.types import PersonaTypesMap
 from hedra.logging import HedraLogger
@@ -91,7 +92,7 @@ class Setup(Stage, Generic[Unpack[T]]):
         super().__init__()
         self.generation_setup_candidates = 0
         self.stages: Dict[str, Execute] = {}
-        self.accepted_hook_types = [ HookType.SETUP, HookType.EVENT ]
+        self.accepted_hook_types = [ HookType.SETUP, HookType.EVENT, HookType.CONTEXT ]
         self.persona_types = PersonaTypesMap()
         self.config = Config(
             log_level=self.log_level,
@@ -134,7 +135,7 @@ class Setup(Stage, Generic[Unpack[T]]):
 
         events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
         pre_events = [
-            event for event in events if isinstance(event, Event) and event.pre
+            event for event in events if isinstance(event, EventHook) and event.config.pre
         ]
         
         if len(pre_events) > 0:
@@ -313,7 +314,7 @@ class Setup(Stage, Generic[Unpack[T]]):
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Generated - {tasks_generated_count} - Tasks for Execute stage - {execute_stage_name}')
 
         post_events = [
-            event for event in events if isinstance(event, Event) and event.pre is False
+            event for event in events if isinstance(event, EventHook) and event.config.pre is False
         ]
 
         if len(post_events) > 0:
@@ -329,6 +330,9 @@ class Setup(Stage, Generic[Unpack[T]]):
 
         await self.logger.spinner.set_default_message(f'Setup for - {execute_stage_names} - complete')
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed setup')
+
+        for context_hook in self.hooks[HookType.CONTEXT]:
+            self.context[context_hook.config.context_key] = await context_hook.call()
 
         return self.stages
 
