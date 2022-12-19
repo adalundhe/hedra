@@ -14,6 +14,7 @@ class Teardown(Stage):
     def __init__(self) -> None:
         super().__init__()
         self.actions = []
+        self.accepted_hook_types = [HookType.EVENT]
 
     @Internal()
     async def run(self):
@@ -29,7 +30,7 @@ class Teardown(Stage):
             if hook:
                 self.hooks[hook.hook_type].append(hook)
 
-        teardown_hooks = self.hooks.get(HookType.TEARDOWN)
+        teardown_hooks = self.hooks[HookType.TEARDOWN]
 
         if teardown_hooks:
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 import threading
 import os
 import uuid
+from collections import defaultdict
 from typing import Any, Dict, List, Union
 from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.graphs.hooks.types.internal import Internal
@@ -31,7 +32,7 @@ class Stage:
 
         self.state = StageStates.INITIALIZED
         self.next_stage: str = None
-        self.hooks: Dict[HookType, List[Hook]] = {}
+        self.hooks: Dict[HookType, List[Hook]] = defaultdict(list)
         self.accepted_hook_types = []
         self.workers: int = None
         self.worker_id: int = 1

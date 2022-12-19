@@ -102,4 +102,4 @@ class BaseClient(Generic[S, A, R]):
             self.waiter = loop.create_future()
             await self.waiter
 
-        return self.session.execute_prepared_request(action)
+        return await self.session.execute_prepared_request(action)

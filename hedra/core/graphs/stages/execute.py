@@ -44,7 +44,8 @@ class Execute(Stage, Generic[Unpack[T]]):
             HookType.AFTER,
             HookType.TEARDOWN,
             HookType.CHECK,
-            HookType.CHANNEL
+            HookType.CHANNEL, 
+            HookType.EVENT
         ]
 
         self.concurrent_pool_aware_stages = 0
@@ -89,7 +90,7 @@ class Execute(Stage, Generic[Unpack[T]]):
                     'weight': hook.config.weight,
                     'order': hook.config.order,
                     **hook.action.to_serializable()
-                } for hook in self.hooks.get(HookType.ACTION, [])
+                } for hook in self.hooks[HookType.ACTION]
             ]
 
             hooks.extend([
@@ -103,7 +104,7 @@ class Execute(Stage, Generic[Unpack[T]]):
                     'weight': hook.config.weight,
                     'order': hook.config.order,
                     **hook.action.to_serializable()
-                } for hook in self.hooks.get(HookType.TASK, [])
+                } for hook in self.hooks[HookType.TASK]
             ])
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting execution for - {self.workers} workers')             
@@ -145,8 +146,8 @@ class Execute(Stage, Generic[Unpack[T]]):
             persona.setup(self.hooks, self.metadata_string)
 
             action_and_task_hooks = [
-                *self.hooks.get(HookType.ACTION, []),
-                *self.hooks.get(HookType.TASK, [])
+                *self.hooks[HookType.ACTION],
+                *self.hooks[HookType.TASK]
             ]
 
             for hook in action_and_task_hooks:

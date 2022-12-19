@@ -10,5 +10,6 @@ from .types import (
     save,
     validate,
     task,
-    channel
+    channel,
+    event
 )

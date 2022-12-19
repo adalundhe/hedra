@@ -1,5 +1,4 @@
 import uuid
-import asyncio
 from typing import Coroutine, List, Optional, Any, Dict
 from hedra.core.graphs.hooks.types.hook_types import HookType
 
@@ -52,6 +51,8 @@ class Hook:
         self.group = group
         self.notify = notify
         self.listen = listen
+        self.events: Dict[str, Coroutine] = {}
+        self.stage_instance: Any = None
         
         self.notifiers: List[str] = []
         self.listeners: List[str] = []

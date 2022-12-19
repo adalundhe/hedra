@@ -111,7 +111,7 @@ class EnginePlugin(Generic[A, R], Plugin):
         )
 
     async def close(self):
-        close_hook = self.hooks.get(PluginHooks.ON_CLOSE)
+        close_hook = self.hooks.get(PluginHooks.ON_ENGINE_CLOSE)
         await close_hook.call()
 
 

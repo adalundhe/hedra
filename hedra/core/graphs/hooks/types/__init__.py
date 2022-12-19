@@ -11,3 +11,4 @@ from .save import save
 from .validate import validate
 from .internal import Internal  
 from .channel import channel
+from .event import event

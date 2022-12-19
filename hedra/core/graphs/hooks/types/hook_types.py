@@ -14,3 +14,4 @@ class HookType(Enum):
     SAVE='SAVE'
     TASK='TASK'
     CHANNEL='CHANNEL'
+    EVENT='EVENT'

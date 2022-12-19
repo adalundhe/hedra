@@ -37,7 +37,7 @@ class Analyze(Stage):
         super().__init__()
         self.raw_results = {}
 
-        self.accepted_hook_types = [ HookType.METRIC ]
+        self.accepted_hook_types = [ HookType.METRIC, HookType.EVENT ]
         self.requires_shutdown = True
         self.allow_parallel = True
         self.analysis_execution_time = 0
@@ -64,7 +64,7 @@ class Analyze(Stage):
             'stages': {}
         }
 
-        metric_hook_names = [hook.name for hook in self.hooks.get(HookType.METRIC)]
+        metric_hook_names = [hook.name for hook in self.hooks[HookType.METRIC]]
 
         batches = self.executor.partion_stage_batches(all_results)
         total_group_results = 0

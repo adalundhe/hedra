@@ -10,7 +10,8 @@ from .core.graphs.hooks import (
     metric,
     validate,
     task,
-    channel
+    channel,
+    event
 )
 
 from .core.graphs.stages import (

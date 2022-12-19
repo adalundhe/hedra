@@ -37,6 +37,7 @@ class Optimize(Stage):
         self.allow_parallel = True
 
         self.optimization_execution_time = 0
+        self.accepted_hook_types = [HookType.EVENT]
 
     @Internal()
     async def run(self, stages: Dict[str, Execute]):
@@ -91,8 +92,8 @@ class Optimize(Stage):
 
             for worker_idx in range(assigned_workers_count):
                 
-                execute_stage_actions = [hook.name for hook in stage.hooks.get(HookType.ACTION)]
-                execute_stage_tasks = [hook.name for hook in stage.hooks.get(HookType.TASK)]
+                execute_stage_actions = [hook.name for hook in stage.hooks[HookType.ACTION]]
+                execute_stage_tasks = [hook.name for hook in stage.hooks[HookType.TASK]]
 
                 configs.append({
                     'graph_name': self.graph_name,
@@ -159,7 +160,7 @@ class Optimize(Stage):
             stage = stages.get(stage_name)
             stage.client._config = optimized_config
 
-            for hook in stage.hooks.get(HookType.ACTION):
+            for hook in stage.hooks[HookType.ACTION]:
                 hook.session.pool.size = optimized_batch_size
                 hook.session.sem = asyncio.Semaphore(optimized_config.batch_size)
                 hook.session.pool.connections = []

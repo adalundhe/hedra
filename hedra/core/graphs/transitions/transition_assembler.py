@@ -3,7 +3,9 @@ import networkx
 import inspect
 import threading
 import os
-from typing import Coroutine, Dict, List, Tuple, Union, Any
+from typing import List, Dict, Union, Any, Tuple, Coroutine
+from collections import defaultdict
+from hedra.core.graphs.events import Event
 from hedra.core.graphs.stages.stage import Stage
 from hedra.core.graphs.stages.error import Error
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -46,6 +48,7 @@ class TransitionAssembler:
         self.cpus = cpus
         self.worker_id = worker_id
         self.loop = asyncio.get_event_loop()
+        self.hooks_by_type: Dict[HookType, Dict[str, Hook]] = defaultdict(dict)
 
         self.logging = HedraLogger()
         self.logging.initialize()
@@ -96,7 +99,21 @@ class TransitionAssembler:
                     hook.call = hook.call.__get__(stage, stage.__class__)
                     setattr(stage, hook.shortname, hook.call)
 
+                    hook.stage = stage.name
+                    hook.stage_instance: Stage = stage
+                    
+                    self.hooks_by_type[hook.hook_type][hook.name] = hook
+                    stage.hooks[hook.hook_type].append(hook)
+            
             self.instances_by_type[stage.stage_type].append(stage)
+
+        for event_hook in self.hooks_by_type.get(HookType.EVENT, {}).values():
+            for target_hook_name in event_hook.names:
+                
+                target_hook = registrar.all.get(target_hook_name)
+                if target_hook:
+                    target_hook.stage_instance.hooks[HookType.EVENT].append(Event(target_hook, event_hook))
+               
 
             self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Successfully generated - {stages_count} - stages')
             self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Successfully generated - {stages_count} - stages')
@@ -273,7 +290,6 @@ class TransitionAssembler:
 
                     idle_stage.context.path_lengths[stage_name] = stage_path_lengths.get(stage_name)
 
-            
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')
     
@@ -296,4 +312,3 @@ class TransitionAssembler:
             from_stage,
             error_stage
         )
-                    

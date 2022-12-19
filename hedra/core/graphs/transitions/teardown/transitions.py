@@ -37,7 +37,7 @@ async def teardown_transition(current_stage: Stage, next_stage: Stage):
             if stage.state in valid_states and in_path:
                 stage.state = StageStates.TEARDOWN_INITIALIZED
 
-                stage_teardown_hooks = stage.hooks.get(HookType.TEARDOWN)
+                stage_teardown_hooks = stage.hooks[HookType.TEARDOWN]
                 if stage_teardown_hooks:
                     teardown_hooks.extend(stage_teardown_hooks)
 

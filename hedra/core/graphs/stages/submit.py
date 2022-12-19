@@ -1,4 +1,5 @@
 from typing import Generic, TypeVar
+from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.graphs.hooks.types.internal import Internal
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.plugins.types.plugin_types import PluginType
@@ -54,6 +55,7 @@ class Submit(Stage, Generic[T]):
         self.summaries = {}
         self.events = []
         self.reporter: Reporter = None
+        self.accepted_hook_types = [HookType.EVENT]
 
     @Internal()
     async def run(self):

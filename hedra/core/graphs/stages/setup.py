@@ -90,8 +90,37 @@ class Setup(Stage, Generic[Unpack[T]]):
         super().__init__()
         self.generation_setup_candidates = 0
         self.stages: Dict[str, Execute] = {}
-        self.accepted_hook_types = [ HookType.SETUP ]
+        self.accepted_hook_types = [ HookType.SETUP, HookType.EVENT ]
         self.persona_types = PersonaTypesMap()
+        self.config = Config(
+            log_level=self.log_level,
+            persona_type=self.persona_types[self.persona_type],
+            total_time=self.total_time,
+            batch_size=self.batch_size,
+            batch_interval=self.batch_interval,
+            action_interval=self.action_interval,
+            batch_gradient=self.batch_gradient,
+            cpus=self.cpus,
+            no_run_visuals=self.no_run_visuals,
+            connect_timeout=self.connect_timeout,
+            request_timeout=self.request_timeout,
+            graceful_stop=self.graceful_stop,
+            reset_connections=self.reset_connections,
+            browser_type=self.browser_type,
+            device_type=self.device_type,
+            locale=self.locale,
+            geolocation=self.geolocation,
+            permissions=self.permissions,
+            playwright_options=self.playwright_options
+        )
+
+        self.client = Client(
+            self.graph_name,
+            self.graph_id,
+            self.name,
+            self.stage_id
+        )
+        self.client._config = self.config
 
         self.internal_hooks.extend([
             'get_hook',
@@ -101,19 +130,19 @@ class Setup(Stage, Generic[Unpack[T]]):
 
     @Internal()
     async def run(self):
-
+        
         bypass_connection_validation = self.core_config.get('bypass_connection_validation', False)
         connection_validation_retries = self.core_config.get('connection_validation_retries', 3)
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting setup')
 
-        setup_hooks = self.hooks.get(HookType.SETUP)
+        setup_hooks = self.hooks[HookType.SETUP]
         setup_hook_names = ', '.join([hook.name for hook in setup_hooks])
         
         if len(setup_hooks) > 0:
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Runnning Setup hooks for stage - {setup_hook_names}')
         
-        await asyncio.gather(*[hook.call() for hook in self.hooks.get(HookType.SETUP)])
+        await asyncio.gather(*[hook.call() for hook in setup_hooks])
         execute_stage_id = 1
 
         stages = dict(self.stages)
@@ -135,28 +164,6 @@ class Setup(Stage, Generic[Unpack[T]]):
             for plugin_name in persona_plugins.keys():
                 self.persona_types.types[plugin_name] = plugin_name
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Persona plugin - {plugin.name} - for Execute stae - {execute_stage_name}')
-
-            config = Config(
-                log_level=self.log_level,
-                persona_type=self.persona_types[self.persona_type],
-                total_time=self.total_time,
-                batch_size=self.batch_size,
-                batch_interval=self.batch_interval,
-                action_interval=self.action_interval,
-                batch_gradient=self.batch_gradient,
-                cpus=self.cpus,
-                no_run_visuals=self.no_run_visuals,
-                connect_timeout=self.connect_timeout,
-                request_timeout=self.request_timeout,
-                graceful_stop=self.graceful_stop,
-                reset_connections=self.reset_connections,
-                browser_type=self.browser_type,
-                device_type=self.device_type,
-                locale=self.locale,
-                geolocation=self.geolocation,
-                permissions=self.permissions,
-                playwright_options=self.playwright_options
-            )
    
             client = Client(
                 self.graph_name,
@@ -169,7 +176,7 @@ class Setup(Stage, Generic[Unpack[T]]):
             engine_plugins: Dict[str, EnginePlugin] = self.plugins_by_type.get(PluginType.ENGINE)
 
             for plugin_name, plugin in engine_plugins.items():
-                client.plugin[plugin_name] = plugin(config)
+                client.plugin[plugin_name] = plugin(self.config)
                 plugin.name = plugin_name
                 self.plugins_by_type[plugin_name] = plugin
 
@@ -177,9 +184,9 @@ class Setup(Stage, Generic[Unpack[T]]):
 
 
             execute_stage.client = client
-            execute_stage.client._config = config
+            execute_stage.client._config = self.config
 
-            for hook in execute_stage.hooks.get(HookType.ACTION, []):
+            for hook in execute_stage.hooks[HookType.ACTION]:
 
                 execute_stage.client.next_name = hook.name
                 execute_stage.client.intercept = True
@@ -252,7 +259,7 @@ class Setup(Stage, Generic[Unpack[T]]):
                     hook.session = session
                     hook.action = action    
 
-            for hook in execute_stage.hooks.get(HookType.TASK, []):
+            for hook in execute_stage.hooks[HookType.TASK]:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Loading Task hook - {hook.name}:{hook.hook_id} - to Execute stage - {execute_stage_name}')
 
@@ -276,15 +283,15 @@ class Setup(Stage, Generic[Unpack[T]]):
             execute_stage.client.intercept = False
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Client intercept set to {execute_stage.client.intercept} - Action calls for client id - {execute_stage.client.client_id} - will not be suspended on execution')
 
-            for setup_hook in execute_stage.hooks.get(HookType.SETUP):
+            for setup_hook in execute_stage.hooks[HookType.SETUP]:
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing Setup hook - {setup_hook.name} - for Execute stage - {execute_stage_name}')
 
                 await setup_hook.call()
 
             self.stages[execute_stage_name] = execute_stage
 
-            actions_generated_count = len(execute_stage.hooks.get(HookType.ACTION, []))
-            tasks_generated_count = len(execute_stage.hooks.get(HookType.TASK, []))
+            actions_generated_count = len(execute_stage.hooks[HookType.ACTION])
+            tasks_generated_count = len(execute_stage.hooks[HookType.TASK])
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Generated - {actions_generated_count} - Actions for Execute stage - {execute_stage_name}')
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Generated - {tasks_generated_count} - Tasks for Execute stage - {execute_stage_name}')
@@ -319,10 +326,10 @@ class Setup(Stage, Generic[Unpack[T]]):
     async def get_channels(self, execute_stage: Execute):
         listeners: Dict[str, Hook] = {}
         notifiers: Dict[str, Hook] = {}
-        channels: Dict[str, Hook] = {channel.shortname: channel for channel in execute_stage.hooks.get(HookType.CHANNEL, [])}
+        channels: Dict[str, Hook] = {channel.shortname: channel for channel in execute_stage.hooks[HookType.CHANNEL]}
 
-        actions_and_tasks = execute_stage.hooks.get(HookType.ACTION, [])
-        actions_and_tasks.extend(execute_stage.hooks.get(HookType.TASK, []))
+        actions_and_tasks = execute_stage.hooks[HookType.ACTION]
+        actions_and_tasks.extend(execute_stage.hooks[HookType.TASK])
 
         for hook in actions_and_tasks:
             action: Union[BaseAction, Task] = hook.action
@@ -353,7 +360,7 @@ class Setup(Stage, Generic[Unpack[T]]):
 
     @Internal()
     async def setup(self):
-        for setup_hook in self.hooks.get(HookType.SETUP):
+        for setup_hook in self.hooks[HookType.SETUP]:
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing Setup hook - {setup_hook.name}')
 
             await setup_hook()

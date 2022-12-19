@@ -3,10 +3,11 @@ import inspect
 import os
 from pathlib import Path
 from types import MethodType
-from typing import Dict
+from typing import Dict, List
 from collections import defaultdict
 from inspect import iscoroutinefunction
 from hedra.core.graphs.hooks.registry.registrar import registrar
+from hedra.core.graphs.events import Event
 from hedra.core.graphs.hooks.types.hook import Hook
 from hedra.core.graphs.hooks.types.hook_types import HookType
 from hedra.core.graphs.hooks.types.internal import Internal
@@ -49,7 +50,7 @@ class Validate(Stage):
         for hook_type in HookType:
             self.hooks[hook_type] = []
 
-        self.accepted_hook_types = [ HookType.VALIDATE, HookType.INTERNAL ]
+        self.accepted_hook_types = [ HookType.VALIDATE, HookType.INTERNAL, HookType.EVENT ]
 
     @Internal()
     async def run(self):
@@ -65,9 +66,14 @@ class Validate(Stage):
         
         hooks_by_name: Dict[str, Hook] = defaultdict(dict)
 
+        events: List[Event]= []
         for stages_types in stages.values():
             for stage in stages_types.values():
                 stage.context = self.context
+
+                events.extend([
+                    event for event in stage.hooks[HookType.EVENT] if isinstance(event, Event)
+                ])
 
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating stage - {stage.name} - of stage type - {stage.stage_type.name}')
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Checking internal Hooks for stage - {stage.name} - of type - {stage.stage_type.name}')
@@ -95,9 +101,6 @@ class Validate(Stage):
 
                 methods = inspect.getmembers(stage, predicate=inspect.ismethod)
 
-                for hook_type in HookType:
-                    stage.hooks[hook_type] = [] 
-
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Checking Hooks for stage - {stage.name} - of type - {stage.stage_type}')
 
                 for _, method in methods:
@@ -122,13 +125,19 @@ class Validate(Stage):
                             raise HookValidationError(stage, str(hook_validation_error))
 
                         hook.stage = stage.name
-                        stage.hooks[hook.hook_type].append(hook)
                         self.hooks[hook.hook_type].append(hook)
 
                         hooks_by_name[hook.name] = hook
 
                         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Found Hook - {hook.name}:{hook.hook_id}- of type - {hook.hook_type.name.capitalize()} - for stage - {base_stage_name}')
 
+        for event in events:
+            stage: Stage = event.target.stage_instance
+            
+            for idx, hook in enumerate(stage.hooks[event.target.hook_type]):
+                if hook.name == event.target.name:
+                    stage.hooks[event.target.hook_type][idx] = event
+                    
         methods = inspect.getmembers(self, predicate=inspect.ismethod)
         for _, method in methods:
             method_name = method.__qualname__
@@ -136,14 +145,13 @@ class Validate(Stage):
                         
             if hook and hook.hook_type is HookType.VALIDATE:
                 self.hooks[HookType.VALIDATE].append(hook)
-
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Validation hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
         try:
             
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.SETUP.name.capitalize()} - hooks')
 
-            for hook in self.hooks.get(HookType.SETUP):
+            for hook in self.hooks[HookType.SETUP]:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -157,7 +165,7 @@ class Validate(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.BEFORE.name.capitalize()} - hooks')
 
-            for hook in self.hooks.get(HookType.BEFORE):
+            for hook in self.hooks[HookType.BEFORE]:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -180,7 +188,7 @@ class Validate(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.ACTION.name.capitalize()} - hooks')
 
-            for hook in self.hooks.get(HookType.ACTION):
+            for hook in self.hooks[HookType.ACTION]:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -197,7 +205,7 @@ class Validate(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.AFTER.name.capitalize()} - hooks')
 
-            for hook in self.hooks.get(HookType.AFTER):
+            for hook in self.hooks[HookType.AFTER]:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -220,7 +228,7 @@ class Validate(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.TEARDOWN.name.capitalize()} - hooks')
 
-            for hook in self.hooks.get(HookType.TEARDOWN):
+            for hook in self.hooks[HookType.TEARDOWN]:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -236,7 +244,7 @@ class Validate(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.SAVE.name.capitalize()} - hooks')
 
-            for hook in self.hooks.get(HookType.SAVE):
+            for hook in self.hooks[HookType.SAVE]:
                 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -258,7 +266,7 @@ class Validate(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.CHECK.name.capitalize()} - hooks')
 
-            for hook in self.hooks.get(HookType.CHECK):
+            for hook in self.hooks[HookType.CHECK]:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -280,7 +288,7 @@ class Validate(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.METRIC.name.capitalize()} - hooks')
 
-            for hook in self.hooks.get(HookType.METRIC):
+            for hook in self.hooks[HookType.METRIC]:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -296,7 +304,27 @@ class Validate(Stage):
             
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.CHANNEL.name.capitalize()} - hooks')
 
-            for hook in self.hooks.get(HookType.CHANNEL):
+            for hook in self.hooks[HookType.EVENT]:
+
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
+
+                assert hook.hook_type is HookType.EVENT, f"Hook type mismatch - hook {hook.name}:{hook.hook_id} is a {hook.hook_type.name} hook, but Hedra expected a {HookType.EVENT.name} hook."
+                assert hook.shortname in hook.name, f"Shortname {hook.shortname} must be contained in full Hook name {hook.name}:{hook.hook_id} for @event hook {hook.name}:{hook.hook_id}."
+                assert hook.call is not None, f"Method is not not found on stage or was not supplied to @event hook - {hook.name}:{hook.hook_id}"
+                assert hook.call.__code__.co_argcount > 1, f"Missing required argument 'result' for @event hook {hook.name}:{hook.hook_id}"
+                assert hook.call.__code__.co_argcount < 3, f"Too many args. - @event hook {hook.name}:{hook.hook_id} only requires 'result' as an additional arg."
+                assert len(hook.names) > 0, f"No target hook names provided for @event hook {hook.name}:{hook.hook_id}. Please specify at least one hook to validate."
+                assert 'self' in hook.call.__code__.co_varnames
+
+                for name in hook.names:
+                    hook_for_validation = hooks_by_name.get(name)
+
+                    assert hook_for_validation is not None, f"Specified hook {name} for stage {hook.stage} not found for @event hook {hook.name}:{hook.hook_id}"
+                
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validated {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
+
+
+            for hook in self.hooks[HookType.CHANNEL]:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -310,8 +338,8 @@ class Validate(Stage):
                 stage_actions = list(filter(
                     lambda action_or_task: action_or_task.stage == hook.stage,
                     [
-                        *self.hooks.get(HookType.ACTION),
-                        *self.hooks.get(HookType.TASK)
+                        *self.hooks[HookType.ACTION],
+                        *self.hooks[HookType.TASK]
                     ]
                 ))
 
@@ -330,7 +358,7 @@ class Validate(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.VALIDATE.name.capitalize()} - hooks')
 
-            for hook in self.hooks.get(HookType.VALIDATE):
+            for hook in self.hooks[HookType.VALIDATE]:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -356,7 +384,6 @@ class Validate(Stage):
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validation for stages - {validation_stage_names} - complete')
             await self.logger.spinner.set_default_message(f'Validated - {len(stages)} stages')
             
-
 
         except AssertionError as hook_validation_error:
             raise HookValidationError(stage, str(hook_validation_error))

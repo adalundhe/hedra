@@ -21,7 +21,7 @@ class Checkpoint(Stage):
         super().__init__()
         self.data = {}
         self.previous_stage = None
-        self.accepted_hook_types = [ HookType.SAVE ]
+        self.accepted_hook_types = [ HookType.SAVE, HookType.EVENT ]
         self._save_file: TextIO = None
         self.requires_shutdown = True
 
@@ -32,7 +32,7 @@ class Checkpoint(Stage):
         executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         timestamp = datetime.now().timestamp()
 
-        save_hooks = self.hooks.get(HookType.SAVE)
+        save_hooks = self.hooks[HookType.SAVE]
 
         await self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Executing checkpoints for - {len(save_hooks)} - items')
         
