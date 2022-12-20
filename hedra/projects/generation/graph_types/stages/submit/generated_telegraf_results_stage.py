@@ -3,12 +3,12 @@ from hedra.core.graphs.stages import (
 )
 
 from hedra.reporting.types import (
-    DogStatsDConfig
+    TelegrafConfig
 )
 
 
-class SubmitDogStatsDResultsStage(Submit):
-    config=DogStatsDConfig(
+class SubmitTelegrafResultsStage(Submit):
+    config=TelegrafConfig(
         host='localhost',
-        port=8125
+        port=8094
     )

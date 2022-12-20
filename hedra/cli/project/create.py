@@ -12,6 +12,7 @@ from hedra.logging import (
 
 def create_project(
     url: str, 
+    project_name: str,
     path: str,
     username: str, 
     password: str,
@@ -44,13 +45,20 @@ def create_project(
 
         logger['console'].sync.info('No project found! Creating project directories and files.')
 
-        tests_directory = os.path.join(path, 'tests')
+        project_directory = os.path.join(path, project_name)
+        if os.path.exists(project_directory) is False:
+            os.mkdir(project_directory)
+        
+        package_file = open(f'{project_directory}/__init__.py', 'w')
+        package_file.close()
+
+        tests_directory = os.path.join(project_directory, 'tests')
         os.mkdir(tests_directory)
 
         package_file = open(f'{tests_directory}/__init__.py', 'w')
         package_file.close()
 
-        plugins_directory = os.path.join(tests_directory, 'plugins')
+        plugins_directory = os.path.join(project_directory, 'plugins')
         os.mkdir(plugins_directory)
 
         package_file = open(f'{plugins_directory}/__init__.py', 'w')
@@ -90,7 +98,8 @@ def create_project(
         logger['console'].sync.info(f'Linking project to remote at - {url}.')
 
         workflow_actions = [
-            'initialize'
+            'initialize',
+            'create-gitignore'
         ]
 
         manager.execute_workflow(workflow_actions)

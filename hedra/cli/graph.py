@@ -84,11 +84,6 @@ def check(path: str, log_level: str):
     help='Engine to use in generated graph'
 )
 @click.option(
-    '--persona',
-    default='default',
-    help='Persona to use in generated graph'
-)
-@click.option(
     '--reporter',
     default='json',
     help='Reporter to use in generated graph'
@@ -102,7 +97,6 @@ def create(
     path: str, 
     stages: str, 
     engine: str,
-    persona: str,
     reporter: str,
     log_level: str
 ):
@@ -110,7 +104,6 @@ def create(
         path, 
         stages, 
         engine,
-        persona,
         reporter,
         log_level
     )

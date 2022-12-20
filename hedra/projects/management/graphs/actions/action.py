@@ -14,8 +14,8 @@ class RepoAction:
     def __init__(self, config: RepoConfig, discovered_files: List[str]) -> None:
         self.action_id = str(uuid.uuid4())
         self.config = config
-        self.repo = None
-        self.remote = None
+        self.repo: Repo = None
+        self.remote: Remote = None
         self.branch = None
         self.git = None
         self.discovered_files = discovered_files

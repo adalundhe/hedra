@@ -13,7 +13,8 @@ from .actions import (
     Fetch,
     Syncrhonize,
     Initialize,
-    RepoConfig
+    RepoConfig,
+    CreateGitignore
 )
 
 from .exceptions import InvalidActionError
@@ -26,7 +27,8 @@ class GraphManager:
         self._actions = {
             'initialize': Initialize,
             'synchronize': Syncrhonize,
-            'fetch': Fetch   
+            'fetch': Fetch,
+            'create-gitignore': CreateGitignore
         }
 
         self.discovered_graphs: Dict[str, str] = {}

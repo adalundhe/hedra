@@ -10,6 +10,6 @@ from hedra.reporting.types import (
 
 class SubmitDatadogResultsStage(Submit):
     config=DatadogConfig(
-        api_key=os.getenv('DATADOG_API_KEY'),
-        app_key=os.getenv('DATADOG_APP_KEY')
+        api_key=os.getenv('DATADOG_API_KEY', ''),
+        app_key=os.getenv('DATADOG_APP_KEY', '')
     )

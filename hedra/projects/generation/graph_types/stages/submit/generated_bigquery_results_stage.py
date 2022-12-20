@@ -10,7 +10,7 @@ from hedra.reporting.types import (
 
 class SubmitBigQueryResultsStage(Submit):
     config=BigQueryConfig(
-        service_account_json_path=os.getenv('GOOGLE_CLOUD_ACCOUNT_JSON_PATH'),
+        service_account_json_path=os.getenv('GOOGLE_CLOUD_ACCOUNT_JSON_PATH', ''),
         project_name='test',
         dataset_name='results',
         events_table='events',

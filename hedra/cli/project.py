@@ -17,6 +17,11 @@ def project():
 )
 @click.argument('url')
 @click.option(
+    '--project-name',
+    default='hedra_tests',
+    help='Name of project to create.'
+)
+@click.option(
     '--path',
     default=os.getcwd(),
     help='Path to graph repository.'
@@ -48,6 +53,7 @@ def project():
 )
 def create(
     url: str, 
+    project_name: str,
     path: str,
     username: str, 
     password: str,
@@ -57,6 +63,7 @@ def create(
 ):
     create_project(
         url,
+        project_name,
         path,
         username,
         password,

@@ -15,7 +15,6 @@ def create_graph(
     path: str, 
     stages: Optional[str], 
     engine: str,
-    persona: str,
     reporter: str,
     log_level: str
 ):
@@ -68,7 +67,6 @@ def create_graph(
             generator.generate_graph(
                 stages_list,
                 engine=engine,
-                persona=persona,
                 reporter=reporter
             )
         )

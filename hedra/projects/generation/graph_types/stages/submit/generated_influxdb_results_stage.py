@@ -11,7 +11,7 @@ from hedra.reporting.types import (
 class SubmitInfluxDBResultsStage(Submit):
     config=InfluxDBConfig(
         host='localhost:8006',
-        token=os.getenv('INFLUXDB_API_TOKEN'),
+        token=os.getenv('INFLUXDB_API_TOKEN', ''),
         organization='<organization_here>',
         events_bucket='events',
         metrics_bucket='metrics'

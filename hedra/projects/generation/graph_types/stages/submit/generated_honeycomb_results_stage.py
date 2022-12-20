@@ -10,6 +10,6 @@ from hedra.reporting.types import (
 
 class SubmitHoneycombResultsStage(Submit):
     config=HoneycombConfig(
-        api_key=os.getenv('HONEYCOMB_API_KEY'),
+        api_key=os.getenv('HONEYCOMB_API_KEY', ''),
         dataset='results'
     )
