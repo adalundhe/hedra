@@ -1,29 +1,7 @@
 import uuid
-from typing import Coroutine, List, Optional, Any, Dict
+from typing import Coroutine, Any
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 
-
-class Metadata:
-
-    def __init__(
-        self, 
-        weight: int = 1, 
-        order: int = 1, 
-        env: str = None, 
-        user: str = None, 
-        path: str = None,
-        tags: List[str] = [],
-        pre: bool=False,
-        context_key: str=None
-    ) -> None:
-        self.weight = weight
-        self.order = order
-        self.env = env
-        self.user = user
-        self.path = path
-        self.tags = tags
-        self.pre = pre
-        self.context_key = context_key
 
 class Hook:
 
@@ -33,13 +11,7 @@ class Hook:
         shortname: str,
         call: Coroutine, 
         stage: str = None,
-        hook_type=HookType.ACTION,
-        names: List[str] = [], 
-        metadata: Metadata = Metadata(), 
-        checks: List[Coroutine]=[],
-        group: Optional[str]=None,
-        notify: List[str] = [],
-        listen: List[str] = []
+        hook_type=HookType.ACTION
     ) -> None:
         self.hook_id = str(uuid.uuid4())
         self.name = name
@@ -47,17 +19,5 @@ class Hook:
         self.call = call
         self.stage = stage
         self.hook_type = hook_type
-        self.names = list(set(names))
-        self.config = metadata
-        self.checks = checks
-        self.session: Any = None
-        self.action: Any = None
-        self.group = group
-        self.notify = notify
-        self.listen = listen
-        self.events: Dict[str, Coroutine] = {}
         self.stage_instance: Any = None
         
-        self.notifiers: List[str] = []
-        self.listeners: List[str] = []
-

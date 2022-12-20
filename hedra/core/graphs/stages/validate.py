@@ -3,15 +3,30 @@ import inspect
 import os
 from pathlib import Path
 from types import MethodType
-from typing import Dict, List
+from typing import Dict, List, Union
 from collections import defaultdict
 from inspect import iscoroutinefunction
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.events import Event
+from hedra.core.graphs.hooks.registry.registry_types import (
+   ActionHook,
+   AfterHook,
+   BeforeHook,
+   ChannelHook,
+   CheckHook,
+   ContextHook,
+   EventHook,
+   MetricHook,
+   RestoreHook,
+   SaveHook,
+   SetupHook,
+   TaskHook,
+   TeardownHook,
+   ValidateHook
+)
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.hook_types.internal import Internal
-from hedra.core.graphs.hooks.registry.registry_types import EventHook
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from .stage import Stage
 from .exceptions import (
@@ -142,7 +157,8 @@ class Validate(Stage):
             
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.SETUP.name.capitalize()} - hooks')
 
-            for hook in self.hooks[HookType.SETUP]:
+            setup_hooks: List[SetupHook] = self.hooks[HookType.SETUP]
+            for hook in setup_hooks:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -156,7 +172,8 @@ class Validate(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.BEFORE.name.capitalize()} - hooks')
 
-            for hook in self.hooks[HookType.BEFORE]:
+            before_hooks: List[BeforeHook] = self.hooks[HookType.BEFORE]
+            for hook in before_hooks:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -179,7 +196,8 @@ class Validate(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.ACTION.name.capitalize()} - hooks')
 
-            for hook in self.hooks[HookType.ACTION]:
+            action_hooks: List[ActionHook] = self.hooks[HookType.ACTION]
+            for hook in action_hooks:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -189,14 +207,15 @@ class Validate(Stage):
                 assert hook.call.__code__.co_argcount == 1, f"Too many args. - @action hook {hook.name}:{hook.hook_id} requires no additional args."
                 assert 'self' in hook.call.__code__.co_varnames
 
-                for notify_action in hook.notify:
-                    assert notify_action not in hook.listen, f"Notify/listen loopback. - @action hook {hook.name}:{hook.hook_id} cannot notify and listen on same channel."
+                for notify_action in hook.notifiers:
+                    assert notify_action not in hook.listeners, f"Notify/listen loopback. - @action hook {hook.name}:{hook.hook_id} cannot notify and listen on same channel."
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validated {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.AFTER.name.capitalize()} - hooks')
 
-            for hook in self.hooks[HookType.AFTER]:
+            after_hooks: List[AfterHook] = self.hooks[HookType.AFTER]
+            for hook in after_hooks:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -219,7 +238,8 @@ class Validate(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.TEARDOWN.name.capitalize()} - hooks')
 
-            for hook in self.hooks[HookType.TEARDOWN]:
+            teardown_hooks: List[TeardownHook] = self.hooks[HookType.TEARDOWN]
+            for hook in teardown_hooks:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -235,7 +255,8 @@ class Validate(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.SAVE.name.capitalize()} - hooks')
 
-            for hook in self.hooks[HookType.SAVE]:
+            save_hooks: List[SaveHook] = self.hooks[HookType.SAVE]
+            for hook in save_hooks:
                 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -245,21 +266,22 @@ class Validate(Stage):
                 assert hook.call is not None, f"Method is not not found on stage or was not supplied to @save hook - {hook.name}:{hook.hook_id}"
                 assert 'self' in hook.call.__code__.co_varnames
 
-                if hook.config.path:
-                    hook_path_dir = str(Path(hook.config.path).parent.resolve())
+                if hook.save_path:
+                    hook_path_dir = str(Path(hook.save_path).parent.resolve())
                     
                     assert hook.call.__code__.co_argcount > 1, f"Missing required argument 'data' for @save hook {hook.name}:{hook.hook_id}"
                     assert hook.call.__code__.co_argcount < 3, f"Too many args. - @save hook {hook.name}:{hook.hook_id} only requires 'data' as additional args."
-                    assert hook.config.context_key is not None, f"Missing required keyword arg. - @save hook {hook.name}:{hook.hook_id} requires a valid string for 'key'"
-                    assert hook.config.path is not None, f"Missing required keyword arg. - @save hook {hook.name}:{hook.hook_id} requires a valid string for 'checkpoint_filepath'"
-                    assert isinstance(hook.config.path, str), f"Invalid path type - @save hook {hook.name}:{hook.hook_id} path must be a valid string."
+                    assert hook.context_key is not None, f"Missing required keyword arg. - @save hook {hook.name}:{hook.hook_id} requires a valid string for 'key'"
+                    assert hook.save_path is not None, f"Missing required keyword arg. - @save hook {hook.name}:{hook.hook_id} requires a valid string for 'checkpoint_filepath'"
+                    assert isinstance(hook.save_path, str), f"Invalid path type - @save hook {hook.name}:{hook.hook_id} path must be a valid string."
                     assert os.path.exists(hook_path_dir), f"Invalid path - @save hook {hook.name}:{hook.hook_id} path {hook_path_dir} must exist."
                 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validated {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.RESTORE.name.capitalize()} - hooks')
 
-            for hook in self.hooks[HookType.RESTORE]:
+            restore_hooks: List[RestoreHook] = self.hooks[HookType.RESTORE]
+            for hook in restore_hooks:
                 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -269,21 +291,22 @@ class Validate(Stage):
                 assert hook.call is not None, f"Method is not not found on stage or was not supplied to @restore hook - {hook.name}:{hook.hook_id}"
                 assert 'self' in hook.call.__code__.co_varnames
 
-                if hook.config.path:
-                    hook_path_dir = str(Path(hook.config.path).parent.resolve())
+                if hook.restore_path:
+                    hook_path_dir = str(Path(hook.restore_path).parent.resolve())
                     
                     assert hook.call.__code__.co_argcount > 1, f"Missing required argument 'data' for @restore hook {hook.name}:{hook.hook_id}"
                     assert hook.call.__code__.co_argcount < 3, f"Too many args. - @restore hook {hook.name}:{hook.hook_id} only requires 'data' as additional args."
-                    assert hook.config.context_key is not None, f"Missing required keyword arg. - @restore hook {hook.name}:{hook.hook_id} requires a valid string for 'key'"
-                    assert hook.config.path is not None, f"Missing required keyword arg. - @restore hook {hook.name}:{hook.hook_id} requires a valid string for 'checkpoint_filepath'"
-                    assert isinstance(hook.config.path, str), f"Invalid path type - @restore hook {hook.name}:{hook.hook_id} path must be a valid string."
+                    assert hook.context_key is not None, f"Missing required keyword arg. - @restore hook {hook.name}:{hook.hook_id} requires a valid string for 'key'"
+                    assert hook.restore_path is not None, f"Missing required keyword arg. - @restore hook {hook.name}:{hook.hook_id} requires a valid string for 'checkpoint_filepath'"
+                    assert isinstance(hook.restore_path, str), f"Invalid path type - @restore hook {hook.name}:{hook.hook_id} path must be a valid string."
                     assert os.path.exists(hook_path_dir), f"Invalid path - @restore hook {hook.name}:{hook.hook_id} path {hook_path_dir} must exist."
                 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validated {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.CHECK.name.capitalize()} - hooks')
 
-            for hook in self.hooks[HookType.CHECK]:
+            check_hooks: List[CheckHook] = self.hooks[HookType.CHECK]
+            for hook in check_hooks:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -305,7 +328,8 @@ class Validate(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.METRIC.name.capitalize()} - hooks')
 
-            for hook in self.hooks[HookType.METRIC]:
+            metric_hooks: List[MetricHook] = self.hooks[HookType.METRIC]
+            for hook in metric_hooks:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -320,8 +344,9 @@ class Validate(Stage):
 
             
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.CHANNEL.name.capitalize()} - hooks')
-
-            for hook in self.hooks[HookType.EVENT]:
+            
+            event_hooks: List[EventHook] = self.hooks[HookType.EVENT]
+            for hook in event_hooks:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -330,7 +355,7 @@ class Validate(Stage):
                 assert hook.call is not None, f"Method is not not found on stage or was not supplied to @event hook - {hook.name}:{hook.hook_id}"
                 assert 'self' in hook.call.__code__.co_varnames
 
-                if hook.config.pre is False and len(hook.names) > 0:
+                if hook.pre is False and len(hook.names) > 0:
                     assert hook.call.__code__.co_argcount > 1, f"Missing required argument 'result' for @event hook {hook.name}:{hook.hook_id}"
                     assert hook.call.__code__.co_argcount < 3, f"Too many args. - @event hook {hook.name}:{hook.hook_id} only requires 'result' as an additional arg."
 
@@ -344,8 +369,8 @@ class Validate(Stage):
                 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validated {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
-
-            for hook in self.hooks[HookType.CHANNEL]:
+            channel_hooks: List[ChannelHook] = self.hooks[HookType.CHANNEL]
+            for hook in channel_hooks:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -356,7 +381,7 @@ class Validate(Stage):
                 assert hook.call.__code__.co_argcount < 4, f"Too many args. - @channel hook {hook.name}:{hook.hook_id} only requires 'result' and 'actions' as additional args."
                 assert 'self' in hook.call.__code__.co_varnames
 
-                stage_actions = list(filter(
+                stage_actions: List[Union[ActionHook, TaskHook]] = list(filter(
                     lambda action_or_task: action_or_task.stage == hook.stage,
                     [
                         *self.hooks[HookType.ACTION],
@@ -366,11 +391,11 @@ class Validate(Stage):
 
                 stage_notifiers = []
                 for action in stage_actions:
-                    stage_notifiers.extend(action.notify)
+                    stage_notifiers.extend(action.notifiers)
 
                 stage_listeners = []
                 for action in stage_actions:
-                    stage_listeners.extend(action.listen)
+                    stage_listeners.extend(action.listeners)
 
                 assert hook.shortname in stage_notifiers, f"No notifiers found. - @channel hook {hook.name}:{hook.hook_id} requires at least one action with a notify list containing its name"
                 assert hook.shortname in stage_listeners, f"No listeners found. - @channel hook {hook.name}:{hook.hook_id} requires at least one action with a listeners list containing its name"
@@ -379,9 +404,9 @@ class Validate(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating - {HookType.VALIDATE.name.capitalize()} - hooks')
 
-            events: List[Event] = [event for event in self.hooks[HookType.EVENT] if hasattr(self, event.shortname)]
-            pre_events = [
-                event for event in events if isinstance(event, EventHook) and event.config.pre
+            events: List[Union[EventHook, Event]] = [event for event in self.hooks[HookType.EVENT] if hasattr(self, event.shortname)]
+            pre_events: List[EventHook] = [
+                event for event in events if isinstance(event, EventHook) and event.pre
             ]
             
             if len(pre_events) > 0:
@@ -394,7 +419,8 @@ class Validate(Stage):
                     asyncio.create_task(event.call()) for event in pre_events
                 ], timeout=self.stage_timeout)
 
-            for hook in self.hooks[HookType.VALIDATE]:
+            validate_hooks: List[ValidateHook] = self.hooks[HookType.VALIDATE]
+            for hook in validate_hooks:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
@@ -417,8 +443,8 @@ class Validate(Stage):
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validated {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
-            post_events = [
-                event for event in events if isinstance(event, EventHook) and event.config.pre is False
+            post_events: List[EventHook] = [
+                event for event in events if isinstance(event, EventHook) and event.pre is False
             ]
 
             if len(post_events) > 0:
@@ -431,11 +457,12 @@ class Validate(Stage):
                     asyncio.create_task(event.call()) for event in post_events
                 ], timeout=self.stage_timeout)
 
+            context_hooks: List[ContextHook] = self.hooks[HookType.CONTEXT]
+            for context_hook in context_hooks:
+                self.context[context_hook.context_key] = await context_hook.call()
+
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validation for stages - {validation_stage_names} - complete')
             await self.logger.spinner.set_default_message(f'Validated - {len(stages)} stages')
-
-            for context_hook in self.hooks[HookType.CONTEXT]:
-                self.context[context_hook.config.context_key] = await context_hook.call()
 
         except AssertionError as hook_validation_error:
             raise HookValidationError(stage, str(hook_validation_error))

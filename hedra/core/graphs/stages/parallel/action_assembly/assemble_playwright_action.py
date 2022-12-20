@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Union
 from hedra.core.engines import registered_engines
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.engines.client.config import Config
@@ -11,14 +11,14 @@ from hedra.core.engines.types.playwright import (
     Options,
     MercuryPlaywrightClient
 )
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.logging import HedraLogger
 
 
 async def assemble_playwright_command(
-    hook: Hook,
+    hook: Union[ActionHook, TaskHook],
     hook_action: Dict[str, Any],
     persona: DefaultPersona,
     config: Config,

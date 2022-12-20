@@ -2,14 +2,17 @@ import time
 import asyncio
 import psutil
 import uuid
-from typing import Dict, List
+from typing import Dict, List, Union
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.tools.helpers import awaitable
 from asyncio import Task
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.personas.batching.batch import Batch
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.hooks.registry.registry_types import (
+    ActionHook,
+    TaskHook
+)
 from hedra.core.personas.batching import Batch
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.types.types import PersonaTypes
@@ -70,7 +73,7 @@ class DefaultPersona:
         self.workers = 1
 
         self.actions = []
-        self._hooks: List[Hook] = []
+        self._hooks: List[Union[ActionHook, TaskHook]] = []
         self.batch = Batch(config)
         self.thread_pool = ThreadPoolExecutor(self.workers)
 
@@ -94,7 +97,7 @@ class DefaultPersona:
         self.current_action_idx = 0
         self.optimized_params = None
 
-    def setup(self, hooks: Dict[HookType, List[Hook]], metadata_string: str):
+    def setup(self, hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]], metadata_string: str):
 
         self.metadata_string = f'{metadata_string} Persona: {self.type.capitalize()}:{self.persona_id} - '
 

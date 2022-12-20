@@ -2,17 +2,26 @@ import asyncio
 import psutil
 import traceback
 from typing_extensions import TypeVarTuple, Unpack
-from typing import Dict, Generic, List, Any, Union
+from typing import Dict, Generic, List, Any, Union, Coroutine
 from hedra.core.graphs.events import Event
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.hook_types.internal import Internal
 from hedra.core.engines.client.client import Client
 from hedra.core.engines.client.config import Config
-from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.engines.types.common.base_action import BaseAction
 from hedra.core.engines.types.task.task import Task
-from hedra.core.graphs.hooks.registry.registry_types import EventHook
+from hedra.core.graphs.hooks.registry.registry_types import (
+    ActionHook,
+    AfterHook,
+    BeforeHook,
+    ChannelHook,
+    CheckHook,
+    ContextHook,
+    EventHook,
+    SetupHook,
+    TaskHook
+)
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.personas.types import PersonaTypesMap
 from hedra.logging import HedraLogger
@@ -133,9 +142,9 @@ class Setup(Stage, Generic[Unpack[T]]):
     @Internal()
     async def run(self):
 
-        events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
-        pre_events = [
-            event for event in events if isinstance(event, EventHook) and event.config.pre
+        events: List[Union[EventHook, Event]] = [event for event in self.hooks[HookType.EVENT]]
+        pre_events: List[EventHook] = [
+            event for event in events if isinstance(event, EventHook) and event.pre
         ]
         
         if len(pre_events) > 0:
@@ -153,7 +162,7 @@ class Setup(Stage, Generic[Unpack[T]]):
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting setup')
 
-        setup_hooks = self.hooks[HookType.SETUP]
+        setup_hooks: List[SetupHook] = self.hooks[HookType.SETUP]
         setup_hook_names = ', '.join([hook.name for hook in setup_hooks])
         
         if len(setup_hooks) > 0:
@@ -203,7 +212,8 @@ class Setup(Stage, Generic[Unpack[T]]):
             execute_stage.client = client
             execute_stage.client._config = self.config
 
-            for hook in execute_stage.hooks[HookType.ACTION]:
+            action_hooks: List[ActionHook] = execute_stage.hooks[HookType.ACTION]
+            for hook in action_hooks:
 
                 execute_stage.client.next_name = hook.name
                 execute_stage.client.intercept = True
@@ -276,16 +286,17 @@ class Setup(Stage, Generic[Unpack[T]]):
                     hook.session = session
                     hook.action = action    
 
-            for hook in execute_stage.hooks[HookType.TASK]:
+            task_hooks: List[TaskHook] = execute_stage.hooks[HookType.TASK]
+            for hook in task_hooks:
 
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Loading Task hook - {hook.name}:{hook.hook_id} - to Execute stage - {execute_stage_name}')
 
                 execute_stage.client.next_name = hook.name
                 task, session = execute_stage.client.task.call(
                     hook.call,
-                    env=hook.config.env,
-                    user=hook.config.user,
-                    tags=hook.config.tags
+                    env=hook.metadata.env,
+                    user=hook.metadata.user,
+                    tags=hook.metadata.tags
                 )
 
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved task and session for Task - {task.name}:{task.action_id} - Execute stage - {execute_stage_name}')
@@ -313,8 +324,8 @@ class Setup(Stage, Generic[Unpack[T]]):
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Generated - {actions_generated_count} - Actions for Execute stage - {execute_stage_name}')
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Generated - {tasks_generated_count} - Tasks for Execute stage - {execute_stage_name}')
 
-        post_events = [
-            event for event in events if isinstance(event, EventHook) and event.config.pre is False
+        post_events: List[EventHook] = [
+            event for event in events if isinstance(event, EventHook) and event.pre is False
         ]
 
         if len(post_events) > 0:
@@ -331,25 +342,28 @@ class Setup(Stage, Generic[Unpack[T]]):
         await self.logger.spinner.set_default_message(f'Setup for - {execute_stage_names} - complete')
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed setup')
 
-        for context_hook in self.hooks[HookType.CONTEXT]:
-            self.context[context_hook.config.context_key] = await context_hook.call()
+        context_hooks: List[ContextHook] = self.hooks[HookType.CONTEXT]
+        for context_hook in context_hooks:
+            self.context[context_hook.context_key] = await context_hook.call()
+
 
         return self.stages
 
     @Internal()
-    async def get_hook(self, execute_stage: Execute, shortname: str, hook_type: str):
-        for hook in execute_stage.hooks[hook_type]:
+    async def get_hook(self, execute_stage: Execute, shortname: str, hook_type: str) -> Coroutine:
+        hooks: List[Union[ActionHook, BeforeHook]] = execute_stage.hooks[hook_type]
+        for hook in hooks:
             if shortname in hook.names:
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Adding Hook - {hook.name}:{hook.hook_id} - of type - {hook.hook_type.name.capitalize()} - to Action - {shortname} - for Execute stage - {execute_stage.name}')
 
                 return hook.call
 
     @Internal()
-    async def get_checks(self, execute_stage: Execute, shortname: str):
+    async def get_checks(self, execute_stage: Execute, shortname: str) -> List[Coroutine]:
 
         checks = []
-
-        for hook in execute_stage.hooks[HookType.CHECK]:
+        checks_hooks: List[CheckHook] = execute_stage.hooks[HookType.CHECK]
+        for hook in checks_hooks:
             if shortname in hook.names:
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Adding Check - {hook.name}:{hook.hook_id} - to Action or Task - {shortname} - for Execute stage - {execute_stage.name}')
                 
@@ -358,44 +372,43 @@ class Setup(Stage, Generic[Unpack[T]]):
         return checks
 
     @Internal()
-    async def get_channels(self, execute_stage: Execute):
-        listeners: Dict[str, Hook] = {}
-        notifiers: Dict[str, Hook] = {}
-        channels: Dict[str, Hook] = {channel.shortname: channel for channel in execute_stage.hooks[HookType.CHANNEL]}
+    async def get_channels(self, execute_stage: Execute) -> None:
+        listeners: Dict[str, Union[ActionHook, TaskHook]] = {}
+        notifiers: Dict[str, Union[ActionHook, TaskHook]] = {}
+        channels: Dict[str, ChannelHook] = {channel.shortname: channel for channel in execute_stage.hooks[HookType.CHANNEL]}
 
-        actions_and_tasks = execute_stage.hooks[HookType.ACTION]
+        actions_and_tasks: List[Union[ActionHook, TaskHook]] = execute_stage.hooks[HookType.ACTION]
         actions_and_tasks.extend(execute_stage.hooks[HookType.TASK])
 
         for hook in actions_and_tasks:
             action: Union[BaseAction, Task] = hook.action
-            if len(hook.listen) > 0:
-                action.hooks.listen = True
+            if hook.is_listener:
                 listeners[hook.name] = hook
 
-                for channel_name in hook.listen:
-                    channel: Hook = channels.get(channel_name)
+                for channel_name in hook.listeners:
+                    channel: ChannelHook = channels.get(channel_name)
                     action.hooks.channels.append(channel.call)
                     channel.listeners.append(hook.name)
 
-            if len(hook.notify) > 0:
-                action.hooks.notify = True
+            if hook.is_notifier:
                 notifiers[hook.name] = hook
 
-                for channel_name in hook.notify:
-                    channel: Hook = channels.get(channel_name)
+                for channel_name in hook.notifiers:
+                    channel: ChannelHook = channels.get(channel_name)
                     action.hooks.channels.append(channel.call)
                     channel.notifiers.append(hook.name)
 
         for channel in channels.values():
             for notifier_name in channel.notifiers:
-                notifier: Hook = notifiers.get(notifier_name)
+                notifier: Union[ActionHook, TaskHook] = notifiers.get(notifier_name)
                 action: Union[BaseAction, Task] = notifier.action
                 
                 action.hooks.listeners: List[Hook] = [listeners.get(listener_name) for listener_name in channel.listeners]
 
     @Internal()
-    async def setup(self):
-        for setup_hook in self.hooks[HookType.SETUP]:
+    async def setup(self) -> None:
+        setup_hooks: List[SetupHook] = self.hooks[HookType.SETUP]
+        for setup_hook in setup_hooks:
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing Setup hook - {setup_hook.name}')
 
             await setup_hook()

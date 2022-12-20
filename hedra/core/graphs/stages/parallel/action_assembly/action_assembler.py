@@ -1,7 +1,7 @@
-from typing import Dict, Any, Awaitable
+from typing import Dict, Any, Awaitable, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.common.types import RequestTypes
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
 from hedra.core.personas.types.default_persona import DefaultPersona
 from .assemble_graphql_action import assemble_graphql_action
 from .assemble_graphql_http2_action import assemble_graphql_http2_action
@@ -19,7 +19,7 @@ class ActionAssembler:
 
     def __init__(
         self,
-        hook: Hook,
+        hook: Union[ActionHook, TaskHook],
         hook_action: Dict[str, Any],
         persona: DefaultPersona,
         config: Config,
@@ -44,7 +44,7 @@ class ActionAssembler:
 
         self.metadata_string = metadata_string
 
-    def assemble(self, action_type: RequestTypes) -> Awaitable[Hook]:
+    def assemble(self, action_type: RequestTypes) -> Awaitable[Union[ActionHook, TaskHook]]:
         return self._assembler_types.get(
             action_type,
             assemble_plugin_action

@@ -1,9 +1,12 @@
 import asyncio
-from typing import Generic, TypeVar, List
+from typing import Generic, TypeVar, List, Union
 from hedra.core.graphs.events import Event
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.hook_types.internal import Internal
-from hedra.core.graphs.hooks.registry.registry_types import EventHook
+from hedra.core.graphs.hooks.registry.registry_types import (
+    EventHook,
+    ContextHook
+)
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting import (
@@ -62,9 +65,9 @@ class Submit(Stage, Generic[T]):
     @Internal()
     async def run(self):
 
-        events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
-        pre_events = [
-            event for event in events if isinstance(event, EventHook) and event.config.pre
+        events: List[Union[EventHook, Event]] = [event for event in self.hooks[HookType.EVENT]]
+        pre_events: List[EventHook] = [
+            event for event in events if isinstance(event, EventHook) and event.pre
         ]
         
         if len(pre_events) > 0:
@@ -127,8 +130,8 @@ class Submit(Stage, Generic[T]):
         await self.reporter.submit_custom(metrics)
         await self.reporter.close()
 
-        post_events = [
-            event for event in events if isinstance(event, EventHook) and event.config.pre is False
+        post_events: List[EventHook] = [
+            event for event in events if isinstance(event, EventHook) and event.pre is False
         ]
 
         if len(post_events) > 0:
@@ -141,9 +144,10 @@ class Submit(Stage, Generic[T]):
                 asyncio.create_task(event.call()) for event in post_events
             ], timeout=self.stage_timeout)
 
+        context_hooks: List[ContextHook] = self.hooks[HookType.CONTEXT]
+        for context_hook in context_hooks:
+            self.context[context_hook.context_key] = await context_hook.call()
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {reporter_name}:{self.reporter.reporter_id} - Completed Metrics submission')
         await self.logger.spinner.set_default_message(f'Successfully submitted the results for {session_total} actions via {reporter_name} reporter')
         
-        for context_hook in self.hooks[HookType.CONTEXT]:
-            self.context[context_hook.config.context_key] = await context_hook.call()

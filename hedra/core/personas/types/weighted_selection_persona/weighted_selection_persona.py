@@ -3,9 +3,9 @@ import time
 import asyncio
 import uuid
 import psutil
-from typing import Dict, List
+from typing import Dict, List, Union
 from hedra.core.personas.types.default_persona import DefaultPersona
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.types.types import PersonaTypes
@@ -38,7 +38,7 @@ class WeightedSelectionPersona(DefaultPersona):
         argument. You may specify a wait between batches (between each step) by specifying an integer number of seconds via the --batch-interval argument.
         '''
 
-    def setup(self, hooks: Dict[HookType, List[Hook]], metadata_string: str):
+    def setup(self, hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]], metadata_string: str):
 
         self.metadata_string = f'{metadata_string} Persona: {self.type.capitalize()}:{self.persona_id} - '
         
@@ -48,7 +48,7 @@ class WeightedSelectionPersona(DefaultPersona):
         )
         self.actions_count = len(actions)
 
-        self.weights = [action.config.weight for action in actions]
+        self.weights = [action.metadata.weight for action in actions]
         self.indexes = [idx for idx in range(self.actions_count)]
 
         self.sample = random.choices(

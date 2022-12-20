@@ -1,10 +1,15 @@
 import asyncio
 import dill
 import time
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 from hedra.core.graphs.events import Event
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.hooks.registry.registry_types import EventHook
+from hedra.core.graphs.hooks.registry.registry_types import (
+    EventHook, 
+    ContextHook,
+    ActionHook,
+    TaskHook
+)
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.hooks.hook_types.internal import Internal
 from hedra.core.engines.client.time_parser import TimeParser
@@ -44,9 +49,9 @@ class Optimize(Stage):
     @Internal()
     async def run(self, stages: Dict[str, Execute]):
 
-        events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
-        pre_events = [
-            event for event in events if isinstance(event, EventHook) and event.config.pre
+        events: List[Union[EventHook, Event]] = [event for event in self.hooks[HookType.EVENT]]
+        pre_events: List[EventHook] = [
+            event for event in events if isinstance(event, EventHook) and event.pre
             ]
         
         if len(pre_events) > 0:
@@ -109,8 +114,8 @@ class Optimize(Stage):
 
             for worker_idx in range(assigned_workers_count):
                 
-                execute_stage_actions = [hook.name for hook in stage.hooks[HookType.ACTION]]
-                execute_stage_tasks = [hook.name for hook in stage.hooks[HookType.TASK]]
+                execute_stage_actions: List[ActionHook] = [hook.name for hook in stage.hooks[HookType.ACTION]]
+                execute_stage_tasks: List[TaskHook] = [hook.name for hook in stage.hooks[HookType.TASK]]
 
                 configs.append({
                     'graph_name': self.graph_name,
@@ -177,7 +182,8 @@ class Optimize(Stage):
             stage = stages.get(stage_name)
             stage.client._config = optimized_config
 
-            for hook in stage.hooks[HookType.ACTION]:
+            action_hooks: List[ActionHook] = stage.hooks[HookType.ACTION]
+            for hook in action_hooks:
                 hook.session.pool.size = optimized_batch_size
                 hook.session.sem = asyncio.Semaphore(optimized_config.batch_size)
                 hook.session.pool.connections = []
@@ -199,8 +205,8 @@ class Optimize(Stage):
             f'{stage_name}: {optimized_batch_size}' for stage_name, optimized_batch_size in stage_optimzations.items()
         ])
 
-        post_events = [
-            event for event in events if isinstance(event, EventHook) and event.config.pre is False
+        post_events: List[EventHook] = [
+            event for event in events if isinstance(event, EventHook) and event.pre is False
         ]
 
         if len(post_events) > 0:
@@ -216,8 +222,9 @@ class Optimize(Stage):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Optimization complete for stages - {stage_names} - over - {self.optimization_execution_time} - seconds')
         await self.logger.spinner.set_default_message(f'Optimized - batch sizes for stages - {optimized_batch_sizes} - over {self.optimization_execution_time} seconds')
 
-        for context_hook in self.hooks[HookType.CONTEXT]:
-            self.context[context_hook.config.context_key] = await context_hook.call()
+        context_hooks: List[ContextHook] = self.hooks[HookType.CONTEXT]
+        for context_hook in context_hooks:
+            self.context[context_hook.context_key] = await context_hook.call()
 
         return [
             result.get('params') for result in optimization_results

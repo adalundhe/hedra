@@ -9,8 +9,8 @@ from hedra.core.graphs.events import Event
 from hedra.core.graphs.stages.stage import Stage
 from hedra.core.graphs.stages.error import Error
 from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.hooks.registry.registrar import registrar
+from hedra.core.graphs.hooks.registry.registry_types import EventHook
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, HookType
 from hedra.core.graphs.stages.parallel.batch_executor import BatchExecutor
 from hedra.core.graphs.transitions.exceptions.exceptions import IsolatedStageError
@@ -107,7 +107,8 @@ class TransitionAssembler:
             
             self.instances_by_type[stage.stage_type].append(stage)
 
-        for event_hook in self.hooks_by_type.get(HookType.EVENT, {}).values():
+        event_hooks: List[EventHook] = list(self.hooks_by_type.get(HookType.EVENT, {}).values())
+        for event_hook in event_hooks:
             for target_hook_name in event_hook.names:    
                 target_hook = registrar.all.get(target_hook_name)
                 

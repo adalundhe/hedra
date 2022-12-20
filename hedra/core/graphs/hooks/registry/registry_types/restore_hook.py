@@ -1,6 +1,7 @@
 from typing import Coroutine, Optional
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, Metadata
+from .hook import Hook
+
 
 class RestoreHook(Hook):
 
@@ -16,9 +17,8 @@ class RestoreHook(Hook):
             name, 
             shortname, 
             call, 
-            hook_type=HookType.RESTORE, 
-            metadata=Metadata(
-                context_key=key,
-                path=restore_filepath
-            )
+            hook_type=HookType.RESTORE
         )
+
+        self.context_key = key
+        self.restore_path = restore_filepath

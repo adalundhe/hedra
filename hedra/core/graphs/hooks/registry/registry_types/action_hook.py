@@ -1,6 +1,7 @@
-from typing import Coroutine, List, Union, Dict
+from typing import Coroutine, List, Union, Dict, Any
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, Metadata
+from .hook import Hook
+from .hook_metadata import HookMetadata
 
 class ActionHook(Hook):
 
@@ -20,13 +21,18 @@ class ActionHook(Hook):
             name, 
             shortname, 
             call, 
-            hook_type=HookType.ACTION, 
-            notify=notify,
-            listen=listen,
-            checks=checks,
-            metadata=Metadata(
-                weight=weight,
-                order=order,
-                **metadata
-            )
+            hook_type=HookType.ACTION
+        )
+
+        self.session: Any = None
+        self.action: Any = None
+        self.checks = checks
+        self.is_notifier = len(notify) > 0
+        self.is_listener = len(listen) > 0
+        self.notifiers: List[str] = notify
+        self.listeners: List[str] = listen
+        self.metadata = HookMetadata(
+            weight=weight,
+            order=order,
+            **metadata
         )

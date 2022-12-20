@@ -1,7 +1,6 @@
 import asyncio
-from typing import Generic, TypeVar
-from collections import defaultdict
-from typing import Coroutine, List, Dict
+from typing import Generic, TypeVar, Union
+from typing import Coroutine, List
 
 A = TypeVar('A')
 
@@ -25,9 +24,9 @@ class Hooks(Generic[A]):
         after: Coroutine = None,
         checks: List[Coroutine] = []
     ) -> None:
-        self.before = before
-        self.after = after
-        self.checks = checks
+        self.before: Coroutine = before
+        self.after: Coroutine = after
+        self.checks: List[Union[str, Coroutine]] = checks
         self.notify = False
         self.listen = False
         self.channel_events: List[asyncio.Event] = []

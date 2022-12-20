@@ -1,6 +1,7 @@
 from typing import Coroutine, Dict, Any
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, Metadata
+from .hook import Hook
+
 
 class ContextHook(Hook):
 
@@ -15,6 +16,7 @@ class ContextHook(Hook):
             name, 
             shortname, 
             call, 
-            hook_type=HookType.CONTEXT, 
-            metadata=Metadata(context_key=key)
+            hook_type=HookType.CONTEXT
         )
+
+        self.context_key = key

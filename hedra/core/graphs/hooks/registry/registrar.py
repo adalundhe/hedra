@@ -1,8 +1,7 @@
-import inspect
 from collections import defaultdict
 from types import FunctionType
-from typing import Any, Dict, List, Union, Coroutine
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, Metadata
+from typing import Any, Dict
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from .registry_types import (
     ActionHook,

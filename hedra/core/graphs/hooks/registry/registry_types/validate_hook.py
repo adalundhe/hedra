@@ -1,6 +1,7 @@
 from typing import Coroutine, List
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from .hook import Hook
+
 
 class ValidateHook(Hook):
 
@@ -9,12 +10,13 @@ class ValidateHook(Hook):
         name: str, 
         shortname: str, 
         call: Coroutine, 
-        *names: List[str]
+        *names: str
     ) -> None:
         super().__init__(
             name, 
             shortname, 
             call, 
-            names=names,
-            hook_type=HookType.VALIDATE, 
+            hook_type=HookType.VALIDATE
         )
+
+        self.names = list(set(names))

@@ -3,13 +3,18 @@ import dill
 import time
 import asyncio
 import statistics
-from typing import Generic, List
+from typing import Generic, List, Union
 from hedra.core.engines.client import Client
 from typing_extensions import TypeVarTuple, Unpack
 from hedra.core.graphs.events import Event
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.registry import registered_engines
-from hedra.core.graphs.hooks.registry.registry_types import EventHook
+from hedra.core.graphs.hooks.registry.registry_types import (
+    ActionHook,
+    EventHook, 
+    ContextHook,
+    TaskHook
+)
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.hook_types.internal import Internal
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -62,9 +67,9 @@ class Execute(Stage, Generic[Unpack[T]]):
     @Internal()
     async def run(self):
 
-        events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
-        pre_events = [
-            event for event in events if isinstance(event, EventHook) and event.config.pre
+        events: List[Union[EventHook, Event]] = [event for event in self.hooks[HookType.EVENT]]
+        pre_events: List[EventHook] = [
+            event for event in events if isinstance(event, EventHook) and event.pre
         ]
         
         if len(pre_events) > 0:
@@ -98,6 +103,7 @@ class Execute(Stage, Generic[Unpack[T]]):
 
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Provisioning execution over - {self.workers} - workers')
 
+            action_hooks: List[ActionHook] = self.hooks[HookType.ACTION]
             hooks = [
                 {
                     'timeouts': hook.session.timeouts,
@@ -106,12 +112,13 @@ class Execute(Stage, Generic[Unpack[T]]):
                     'hook_shortname': hook.shortname,
                     'hook_type': hook.hook_type,
                     'stage': hook.stage,
-                    'weight': hook.config.weight,
-                    'order': hook.config.order,
+                    'weight': hook.metadata.weight,
+                    'order': hook.metadata.order,
                     **hook.action.to_serializable()
-                } for hook in self.hooks[HookType.ACTION]
+                } for hook in action_hooks
             ]
 
+            task_hooks: List[TaskHook] = self.hooks[HookType.TASK]
             hooks.extend([
                 {
                     'timeouts': hook.session.timeouts,
@@ -120,10 +127,10 @@ class Execute(Stage, Generic[Unpack[T]]):
                     'hook_shortname': hook.shortname,
                     'hook_type': hook.hook_type,
                     'stage': hook.stage,
-                    'weight': hook.config.weight,
-                    'order': hook.config.order,
+                    'weight': hook.metadata.weight,
+                    'order': hook.metadata.order,
                     **hook.action.to_serializable()
-                } for hook in self.hooks[HookType.TASK]
+                } for hook in task_hooks
             ])
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting execution for - {self.workers} workers')             
@@ -164,7 +171,7 @@ class Execute(Stage, Generic[Unpack[T]]):
             persona = get_persona(persona_config)
             persona.setup(self.hooks, self.metadata_string)
 
-            action_and_task_hooks = [
+            action_and_task_hooks: List[Union[ActionHook, TaskHook]] = [
                 *self.hooks[HookType.ACTION],
                 *self.hooks[HookType.TASK]
             ]
@@ -203,8 +210,8 @@ class Execute(Stage, Generic[Unpack[T]]):
             total_results = len(results)
             total_elapsed = persona.total_elapsed
 
-        post_events = [
-            event for event in events if isinstance(event, EventHook) and event.config.pre is False
+        post_events: List[EventHook] = [
+            event for event in events if isinstance(event, EventHook) and event.pre is False
         ]
 
         if len(post_events) > 0:
@@ -221,8 +228,9 @@ class Execute(Stage, Generic[Unpack[T]]):
         await self.logger.filesystem.aio['hedra.core'].info( f'{self.metadata_string} - Completed - {total_results} actions at  {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
         await self.logger.spinner.set_default_message(f'Stage - {self.name} completed {total_results} actions at {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
 
-        for context_hook in self.hooks[HookType.CONTEXT]:
-            self.context[context_hook.config.context_key] = await context_hook.call()
+        context_hooks: List[ContextHook] = self.hooks[HookType.CONTEXT]
+        for context_hook in context_hooks:
+            self.context[context_hook.context_key] = await context_hook.call()
         
         return {
             'results': results,

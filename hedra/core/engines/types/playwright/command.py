@@ -1,5 +1,5 @@
 import uuid
-from typing import Coroutine, Dict, List, Any
+from typing import Dict, List, Any
 from hedra.core.engines.types.common.metadata import Metadata
 from .hooks import Hooks
 

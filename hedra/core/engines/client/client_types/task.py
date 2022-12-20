@@ -4,8 +4,6 @@ from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.task import MercuryTaskRunner, Task, TaskResult
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common import Timeouts
-from hedra.core.engines.client.store import ActionsStore
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.logging import HedraLogger
 from .base_client import BaseClient
 

@@ -1,6 +1,7 @@
 from typing import Coroutine, Optional
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, Metadata
+from .hook import Hook
+
 
 class MetricHook(Hook):
 
@@ -15,7 +16,7 @@ class MetricHook(Hook):
             name, 
             shortname, 
             call, 
-            hook_type=HookType.METRIC, 
-            metadata=Metadata(), 
-            group=group
+            hook_type=HookType.METRIC
         )
+
+        self.group = group

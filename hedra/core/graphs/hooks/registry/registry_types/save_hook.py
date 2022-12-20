@@ -1,6 +1,7 @@
 from typing import Coroutine, Optional
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, Metadata
+from .hook import Hook
+
 
 class SaveHook(Hook):
 
@@ -16,9 +17,8 @@ class SaveHook(Hook):
             name, 
             shortname, 
             call, 
-            hook_type=HookType.SAVE, 
-            metadata=Metadata(
-                context_key=key,
-                path=checkpoint_filepath
-            )
+            hook_type=HookType.SAVE
         )
+
+        self.context_key = key
+        self.save_path = checkpoint_filepath

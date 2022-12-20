@@ -1,10 +1,11 @@
 from typing import Any
+from hedra.core.graphs.hooks.registry.registry_types import EventHook
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 
 
 class Event:
 
-    def __init__(self, target: Hook, source: Hook) -> None:
+    def __init__(self, target: Hook, source: EventHook) -> None:
         self.target = target
         self.source = source
         self.target_name = None
@@ -14,7 +15,7 @@ class Event:
             self.target_name = self.target.name
             self.target_shortname = self.target.shortname
 
-        self.pre = source.config.pre
+        self.pre = source.pre
         self.as_hook = False
 
     def __getattribute__(self, name: str) -> Any:
@@ -29,12 +30,11 @@ class Event:
         return object.__getattribute__(self, name)
 
     async def call(self, *args, **kwargs):
-        
-        if self.pre and self.target:
+        if self.source.pre is True and self.target:
             await self.source.call()
             result = await self.target.call(*args, **kwargs)
 
-        elif self.pre is False and self.target:
+        elif self.source.pre is False and self.target:
             result = await self.target.call(*args, **kwargs)
             await self.source.call(result)
 

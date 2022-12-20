@@ -3,9 +3,9 @@ import dill
 import threading
 import os
 import time
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Union
 from hedra.core.engines.client.config import Config
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.registry import RequestTypes
@@ -53,7 +53,7 @@ async def start_execution(parallel_config: Dict[str, Any]):
         f'{metadata_string} - Executing {execution_hooks_count} actions with a batch size of {persona_config.batch_size} for {persona_config.total_time} seconds using Persona - {persona.type.capitalize()}'
     )
 
-    hooks: Dict[HookType, List[Hook]] = {
+    hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]] = {
         HookType.ACTION: [],
         HookType.TASK: [],
     }
@@ -62,14 +62,23 @@ async def start_execution(parallel_config: Dict[str, Any]):
     for hook_action in execution_hooks:
         hook_type = hook_action.get('hook_type', HookType.ACTION)
 
-        hook = Hook(
-            hook_action.get('hook_name'),
-            hook_action.get('hook_shortname'),
-            None,
-            hook_action.get('stage'),
-            hook_type=HookType.ACTION
+        if hook_type == HookType.ACTION:
 
-        )
+            hook = ActionHook(
+                hook_action.get('hook_name'),
+                hook_action.get('hook_shortname'),
+                None
+            )
+
+        else:
+            
+            hook = TaskHook(
+                hook_action.get('hook_name'),
+                hook_action.get('hook_shortname'),
+                None
+            )
+
+        hook.stage = hook_action.get('stage')
 
         action_type: str = hook_action.get('type')
         action_assembler = ActionAssembler(

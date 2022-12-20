@@ -1,6 +1,7 @@
-from typing import Coroutine, Tuple
+from typing import Coroutine, Dict
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, Metadata
+from .hook import Hook
+
 
 class EventHook(Hook):
 
@@ -16,7 +17,9 @@ class EventHook(Hook):
             name, 
             shortname, 
             call, 
-            names=names,
-            hook_type=HookType.EVENT, 
-            metadata=Metadata(pre=pre)
+            hook_type=HookType.EVENT
         )
+
+        self.names = list(set(names))
+        self.pre = pre
+        self.events: Dict[str, Coroutine] = {}

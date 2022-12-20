@@ -3,13 +3,17 @@ import time
 import statistics
 import asyncio
 from collections import defaultdict
-from typing import Union, List, Dict
+from typing import Union, List, Dict, Union
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.events import EventsGroup
 from hedra.reporting.metric import MetricsSet
 from hedra.core.graphs.events import Event
 from hedra.core.graphs.hooks.hook_types.internal import Internal
-from hedra.core.graphs.hooks.registry.registry_types import EventHook
+from hedra.core.graphs.hooks.registry.registry_types import (
+    EventHook, 
+    ContextHook,
+    MetricHook,
+)
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.registry.registrar import registrar
@@ -48,9 +52,9 @@ class Analyze(Stage):
     @Internal()
     async def run(self):
 
-        events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
-        pre_events = [
-            event for event in events if isinstance(event, EventHook) and event.config.pre
+        events: List[Union[EventHook, Event]] = [event for event in self.hooks[HookType.EVENT]]
+        pre_events: List[EventHook] = [
+            event for event in events if isinstance(event, EventHook) and event.pre
         ]
         
         if len(pre_events) > 0:
@@ -82,7 +86,7 @@ class Analyze(Stage):
             'stages': {}
         }
 
-        metric_hook_names = [hook.name for hook in self.hooks[HookType.METRIC]]
+        metric_hook_names: List[str] = [hook.name for hook in self.hooks[HookType.METRIC]]
 
         batches = self.executor.partion_stage_batches(all_results)
         total_group_results = 0
@@ -102,7 +106,7 @@ class Analyze(Stage):
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Calculating stats for - {total_group_results} - actions over a median stage execution time of {median_execution_time} seconds')
 
-        custom_metric_hooks: List[Hook] = []
+        custom_metric_hooks: List[MetricHook] = []
         for metric_hook_name in metric_hook_names:
             custom_metric_hook = registrar.all.get(metric_hook_name)
             custom_metric_hooks.append(custom_metric_hook)
@@ -259,8 +263,8 @@ class Analyze(Stage):
             time.monotonic() - analysis_execution_time_start
         )
 
-        post_events = [
-            event for event in events if isinstance(event, EventHook) and event.config.pre is False
+        post_events: List[EventHook] = [
+            event for event in events if isinstance(event, EventHook) and event.pre is False
         ]
 
         if len(post_events) > 0:
@@ -273,8 +277,9 @@ class Analyze(Stage):
                 asyncio.create_task(event.call()) for event in post_events
             ], timeout=self.stage_timeout)
 
-        for context_hook in self.hooks[HookType.CONTEXT]:
-            self.context[context_hook.config.context_key] = await context_hook.call()
+        context_hooks: List[ContextHook] = self.hooks[HookType.CONTEXT]
+        for context_hook in context_hooks:
+            self.context[context_hook.context_key] = await context_hook.call()
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed results analysis for - {stages_count} - stages in - {self.analysis_execution_time} seconds')
         await self.logger.spinner.set_default_message(f'Completed results analysis for {total_group_results} actions and {stages_count} stages over {self.analysis_execution_time} seconds')

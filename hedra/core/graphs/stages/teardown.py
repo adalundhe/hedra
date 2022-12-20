@@ -1,10 +1,14 @@
 import asyncio
 import inspect
-from typing import List
+from typing import List, Union
 from hedra.core.graphs.events import Event
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.hooks.hook_types.internal import Internal
-from hedra.core.graphs.hooks.registry.registry_types import EventHook
+from hedra.core.graphs.hooks.registry.registry_types import (
+    EventHook,
+    ContextHook,
+    TeardownHook
+)
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -22,9 +26,9 @@ class Teardown(Stage):
     @Internal()
     async def run(self):
 
-        events: List[Event] = [event for event in self.hooks[HookType.EVENT]]
-        pre_events = [
-            event for event in events if isinstance(event, EventHook) and event.config.pre
+        events: List[Union[EventHook, Event]] = [event for event in self.hooks[HookType.EVENT]]
+        pre_events: List[EventHook] = [
+            event for event in events if isinstance(event, EventHook) and event.pre
         ]
         
         if len(pre_events) > 0:
@@ -51,7 +55,7 @@ class Teardown(Stage):
             if hook:
                 self.hooks[hook.hook_type].append(hook)
 
-        teardown_hooks = self.hooks[HookType.TEARDOWN]
+        teardown_hooks: List[TeardownHook] = self.hooks[HookType.TEARDOWN]
 
         if teardown_hooks:
 
@@ -60,8 +64,8 @@ class Teardown(Stage):
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Running teardown hooks - {teardown_hook_names}')           
             await asyncio.gather(*[ hook.call() for hook in teardown_hooks])
 
-        post_events = [
-            event for event in events if isinstance(event, EventHook) and event.config.pre is False
+        post_events: List[EventHook] = [
+            event for event in events if isinstance(event, EventHook) and event.pre is False
         ]
 
         if len(post_events) > 0:
@@ -76,5 +80,6 @@ class Teardown(Stage):
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Teardown complete.')
 
-        for context_hook in self.hooks[HookType.CONTEXT]:
-            self.context[context_hook.config.context_key] = await context_hook.call()
+        context_hooks: List[ContextHook] = self.hooks[HookType.CONTEXT]
+        for context_hook in context_hooks:
+            self.context[context_hook.context_key] = await context_hook.call()

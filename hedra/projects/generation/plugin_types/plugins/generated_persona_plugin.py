@@ -1,8 +1,8 @@
 import time
 import asyncio
-from typing import AsyncIterable, Dict, List
+from typing import AsyncIterable, Dict, List, Union
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
 from hedra.plugins.types.persona import (
     PersonaPlugin,
     setup,
@@ -14,7 +14,7 @@ from hedra.plugins.types.persona import (
 class CustomPersona(PersonaPlugin):
 
     @setup()
-    async def setup(self, hooks: Dict[HookType, List[Hook]]):
+    async def setup(self, hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]]):
         return super().setup(hooks)
 
     @generate()

@@ -1,6 +1,7 @@
 from typing import Coroutine, List, Optional
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, Metadata
+from .hook import Hook
+
 
 class CheckHook(Hook):
 
@@ -15,7 +16,7 @@ class CheckHook(Hook):
             name, 
             shortname, 
             call, 
-            names=names,
-            hook_type=HookType.CHECK, 
-            metadata=Metadata()
+            hook_type=HookType.CHECK
         )
+
+        self.names = list(set(names))

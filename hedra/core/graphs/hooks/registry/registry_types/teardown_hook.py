@@ -1,6 +1,8 @@
 from typing import Coroutine, Optional, Any, Dict
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, Metadata
+from .hook import Hook
+from .hook_metadata import HookMetadata
+
 
 class TeardownHook(Hook):
 
@@ -19,6 +21,7 @@ class TeardownHook(Hook):
             name, 
             shortname, 
             call, 
-            hook_type=HookType.TEARDOWN, 
-            metadata=Metadata(**metadata)
+            hook_type=HookType.TEARDOWN
         )
+
+        self.metadata = HookMetadata(**metadata)
