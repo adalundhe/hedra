@@ -31,7 +31,7 @@ class Registrar:
 
     def __init__(self, hook_type) -> None:
         self.hook_type = hook_type
-        self.hook_types = hook_types = {
+        self.hook_types = {
             HookType.ACTION: lambda *args, **kwargs: ActionHook(*args, **kwargs),
             HookType.AFTER: lambda *args, **kwargs:  AfterHook(*args, **kwargs),
             HookType.BEFORE: lambda *args, **kwargs:  BeforeHook(*args, **kwargs),
@@ -63,11 +63,17 @@ class Registrar:
 
                 hook = self.hook_types[hook_type]
 
+                hook_args = args
+                args_count = len(args)
+                
+                if args_count < 1:
+                    hook_args = []
+
                 self.all[hook_name] = hook(
                     hook_name,
                     hook_shortname,
                     func,
-                    *args,
+                    *hook_args,
                     **kwargs
                 )
 

@@ -9,15 +9,8 @@ class ValidateHook(Hook):
         name: str, 
         shortname: str, 
         call: Coroutine, 
-        names: List[str]=[]
+        *names: List[str]
     ) -> None:
-
-        if names is None:
-            names = []
-
-        elif isinstance(names, str):
-            names = [names]
-
         super().__init__(
             name, 
             shortname, 

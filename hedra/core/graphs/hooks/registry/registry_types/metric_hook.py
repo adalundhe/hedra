@@ -10,14 +10,7 @@ class MetricHook(Hook):
         shortname: str, 
         call: Coroutine, 
         group: Optional[str] = None
-    ) -> None:
-        
-        if names is None:
-            names = []
-
-        elif isinstance(names, str):
-            names = [names]
-
+    ) -> None:        
         super().__init__(
             name, 
             shortname, 

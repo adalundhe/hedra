@@ -70,6 +70,9 @@ def run_graph(
     if connection_validation_retries:
         hedra_core_config['connection_validation_retries'] = connection_validation_retries
     
+    if path in hedra_graphs:
+        path = hedra_graphs.get(path)
+    
     package_dir = Path(path).resolve().parent
     package_dir_path = str(package_dir)
     package_dir_module = package_dir_path.split('/')[-1]
@@ -99,9 +102,6 @@ def run_graph(
         with open(hedra_config_filepath, 'w') as hedra_config_file:
             hedra_config['graphs'] = hedra_graphs
             json.dump(hedra_config, hedra_config_file, indent=4)   
-
-    if path in hedra_graphs:
-        path = hedra_graphs.get(path)
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
