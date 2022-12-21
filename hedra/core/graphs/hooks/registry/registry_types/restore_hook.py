@@ -1,7 +1,7 @@
-import aiofiles
 from typing import Callable, Awaitable, Any
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.tools.filesystem import open
 from .hook import Hook
 
 
@@ -26,7 +26,10 @@ class RestoreHook(Hook):
         self.restore_path = restore_filepath
 
     async def call(self, context: SimpleContext) -> None:
-        async with aiofiles.open(self.restore_path, 'r') as restore_file:
-            context[self.context_key] = await self._call(
-                await restore_file.read()
-            )
+
+        restore_file = await open(self.restore_path, 'r')
+        context[self.context_key] = await self._call(
+            await restore_file.read()
+        )
+
+        await restore_file.close()

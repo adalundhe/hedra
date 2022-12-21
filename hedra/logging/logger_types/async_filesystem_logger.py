@@ -1,12 +1,12 @@
 import os
 import asyncio
 import datetime
-import aiofiles
 from typing import Dict
 from pathlib import Path
 from aiologger.levels import LogLevel
 from aiologger.formatters.base import Formatter
-from aiologger.handlers.files import AsyncTimedRotatingFileHandler, RolloverInterval
+from hedra.tools.filesystem import open
+from .handers.async_file_handler import AsyncTimedRotatingFileHandler, RolloverInterval
 from .logger_types import LoggerTypes
 from .async_logger import AsyncLogger
 
@@ -91,7 +91,7 @@ class AsyncFilesystemLogger:
         )
         
         if path_exists is False:
-            async with aiofiles.open(filepath, 'w') as logfile:
+            async with open(filepath, 'w') as logfile:
                 await logfile.close()
 
             self.update_files(filepath)

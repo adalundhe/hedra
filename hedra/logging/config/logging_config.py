@@ -3,7 +3,7 @@ import datetime
 import signal
 from typing import Any, List, Dict, Coroutine
 from aiologger.levels import LogLevel
-from aiologger.handlers.files import RolloverInterval
+from hedra.logging.logger_types.handers.async_file_handler import RolloverInterval
 from yaspin.spinners import Spinners
 from hedra.logging.logger_types.logger_types import LoggerTypes
 from hedra.logging.spinner import ProgressText

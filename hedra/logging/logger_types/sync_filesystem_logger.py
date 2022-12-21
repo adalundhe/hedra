@@ -5,7 +5,7 @@ from typing import Dict
 from pathlib import Path
 from aiologger.levels import LogLevel
 from logging.handlers import TimedRotatingFileHandler
-from aiologger.handlers.files import RolloverInterval
+from hedra.logging.logger_types.handers.async_file_handler import RolloverInterval
 from .logger_types import LoggerTypes
 from .sync_logger import SyncLogger
 

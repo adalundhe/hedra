@@ -1,5 +1,4 @@
 import asyncio
-import aiofiles
 from typing import List, Union
 from datetime import datetime
 from hedra.core.graphs.events import Event

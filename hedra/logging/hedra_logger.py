@@ -1,7 +1,7 @@
 import datetime
 from typing import Dict, Type, Union
 from aiologger.levels import LogLevel
-from aiologger.handlers.files import RolloverInterval
+from .logger_types.handers.async_file_handler import RolloverInterval
 from .logger_types import (
     Logger, 
     LoggerTypes, 

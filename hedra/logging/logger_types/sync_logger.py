@@ -19,6 +19,7 @@ class SyncLogger(logging.Logger):
         self.logger_type = logger_type
         self.log_level = log_level
         self.logger_enabled = logger_enabled
+        self.handler = None
 
     def initialize(self, pattern: str, datefmt_pattern: str=None):
         stream_handler = logging.StreamHandler(stream=sys.stdout)

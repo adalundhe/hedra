@@ -1,6 +1,6 @@
 import click
 import os
-from typing import List, Union
+from typing import List, Union, Optional, Callable, Any
 from importlib.metadata import version
 from art import text2art
 from hedra.logging import HedraLogger
@@ -17,14 +17,34 @@ class CLI(click.MultiCommand):
     }
     logger = HedraLogger()
 
-    def list_commands(self, ctx: click.Context) -> List[str]:
+    def __init__(
+        self, 
+        name: Optional[str] = None, 
+        invoke_without_command: bool = False, 
+        no_args_is_help: Optional[bool] = None, 
+        subcommand_metavar: Optional[str] = None, 
+        chain: bool = False, 
+        result_callback: Optional[Callable[..., Any]] = None, 
+        **attrs: Any
+    ) -> None:
+        super().__init__(
+            name, 
+            invoke_without_command, 
+            no_args_is_help, 
+            subcommand_metavar, 
+            chain, 
+            result_callback, 
+            **attrs
+        )
+
         self.logger.initialize()
 
         header_text = text2art(f'hedra', font='alligator').strip('\n')
         hedra_version = version('hedra')
 
-        self.logger['console'].sync.info(f'\n{header_text} {hedra_version}\n\n')
+        self.logger.console.sync.info(f'\n{header_text} {hedra_version}\n\n')
 
+    def list_commands(self, ctx: click.Context) -> List[str]:
         rv = []
         for filename in self.command_files.values():
             rv.append(filename[:-3])
@@ -32,12 +52,6 @@ class CLI(click.MultiCommand):
         return rv
 
     def get_command(self, ctx: click.Context, name: str) -> Union[click.Command, None]:
-        self.logger.initialize()
-
-        header_text = text2art(f'hedra', font='alligator').strip('\n')
-        hedra_version = version('hedra')
-
-        self.logger['console'].sync.info(f'\n{header_text} {hedra_version}\n\n')
 
         ns = {}
         

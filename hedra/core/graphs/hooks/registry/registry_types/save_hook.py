@@ -1,8 +1,7 @@
-import aiofiles
-import traceback
 from typing import Type, Callable, Awaitable, Any
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.tools.filesystem import open
 from .hook import Hook
 
 
@@ -28,12 +27,16 @@ class SaveHook(Hook):
 
 
     async def call(self, context: SimpleContext) -> None:
-        async with aiofiles.open(self.save_path, 'w') as save_file:
-                await save_file.write(
-                    await self._call(
-                        context.get(self.context_key)
-                    )
-                )
+
+        save_file = await open(self.save_path, 'w')
+        await save_file.write(
+            await self._call(
+                context.get(self.context_key)
+            )
+        )
+
+        await save_file.close()
+
 
         if context.get(self.context_key):
             context[self.context_key] = None
