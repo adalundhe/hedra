@@ -7,7 +7,7 @@ from hedra.core import Executor
 from hedra.core.graphs.hooks import (
     Execute
 )
-from hedra.core.graphs.stages.stage import Stage
+from hedra.core.graphs.stages.base.stage import Stage
 
 
 def run_job(config):

@@ -1,4 +1,4 @@
-from typing import Coroutine, Optional
+from typing import Type, Callable, Awaitable, Any, Optional
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from .hook import Hook
 
@@ -9,7 +9,7 @@ class MetricHook(Hook):
         self, 
         name: str, 
         shortname: str, 
-        call: Coroutine, 
+        call: Callable[..., Awaitable[Any]], 
         group: Optional[str] = None
     ) -> None:        
         super().__init__(
@@ -19,4 +19,5 @@ class MetricHook(Hook):
             hook_type=HookType.METRIC
         )
 
+        self.call: Type[self._call] = self._call
         self.group = group

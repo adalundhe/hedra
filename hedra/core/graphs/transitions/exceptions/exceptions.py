@@ -1,4 +1,4 @@
-from hedra.core.graphs.stages.stage import Stage
+from hedra.core.graphs.stages.base.stage import Stage
 
 
 class InvalidTransitionError(Exception):

@@ -1,6 +1,6 @@
 from hedra.core.graphs.hooks.hook_types.internal import Internal
 from .types.stage_types import StageTypes
-from .stage import Stage
+from .base.stage import Stage
 
 
 class Wait(Stage):

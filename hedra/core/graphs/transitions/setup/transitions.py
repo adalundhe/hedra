@@ -1,6 +1,6 @@
 import asyncio
 from typing import Dict, List
-from hedra.core.graphs.stages.stage import Stage
+from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.setup import Setup
 from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.types.stage_states import StageStates

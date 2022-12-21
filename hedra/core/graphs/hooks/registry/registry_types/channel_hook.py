@@ -1,4 +1,4 @@
-from typing import Coroutine, List
+from typing import List, Type, Callable, Awaitable, Any
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from .hook import Hook
 
@@ -9,7 +9,7 @@ class ChannelHook(Hook):
         self, 
         name: str, 
         shortname: str, 
-        call: Coroutine
+        call: Callable[..., Awaitable[Any]]
     ) -> None:
         super().__init__(
             name, 
@@ -18,5 +18,6 @@ class ChannelHook(Hook):
             hook_type=HookType.CHANNEL
         )
 
+        self.call: Type[self._call] = self._call
         self.notifiers: List[str] = []
         self.listeners: List[str] = []

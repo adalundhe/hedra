@@ -7,7 +7,7 @@ import os
 import time
 from yaspin.spinners import Spinners
 from typing import Dict, List, Any
-from hedra.core.graphs.stages.stage import Stage
+from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.transitions.transition import Transition
 from hedra.logging import HedraLogger

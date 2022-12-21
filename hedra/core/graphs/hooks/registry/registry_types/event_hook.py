@@ -1,4 +1,4 @@
-from typing import Coroutine, Dict
+from typing import Coroutine, Dict, Any, Callable, Awaitable, Type
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from .hook import Hook
 
@@ -9,7 +9,7 @@ class EventHook(Hook):
         self, 
         name: str, 
         shortname: str, 
-        call: Coroutine, 
+        call: Callable[..., Awaitable[Any]], 
         *names: str,
         pre: bool=False
     ) -> None:
@@ -20,6 +20,7 @@ class EventHook(Hook):
             hook_type=HookType.EVENT
         )
 
+        self.call: Type[self._call] = self._call
         self.names = list(set(names))
         self.pre = pre
         self.events: Dict[str, Coroutine] = {}

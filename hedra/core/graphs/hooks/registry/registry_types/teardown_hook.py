@@ -1,4 +1,4 @@
-from typing import Coroutine, Optional, Any, Dict
+from typing import Any, Dict, Type, Callable, Awaitable, Any
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from .hook import Hook
 from .hook_metadata import HookMetadata
@@ -10,7 +10,7 @@ class TeardownHook(Hook):
         self, 
         name: str, 
         shortname: str, 
-        call: Coroutine, 
+        call: Callable[..., Awaitable[Any]], 
         metadata: Dict[str, Any]={}
     ) -> None:
 
@@ -24,4 +24,5 @@ class TeardownHook(Hook):
             hook_type=HookType.TEARDOWN
         )
 
+        self.call: Type[self._call] = self._call
         self.metadata = HookMetadata(**metadata)

@@ -6,13 +6,13 @@ import os
 from typing import List, Dict, Union, Any, Tuple, Coroutine
 from collections import defaultdict
 from hedra.core.graphs.events import Event
-from hedra.core.graphs.stages.stage import Stage
+from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.error import Error
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.hooks.registry.registry_types import EventHook
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, HookType
-from hedra.core.graphs.stages.parallel.batch_executor import BatchExecutor
+from hedra.core.graphs.stages.base.parallel.batch_executor import BatchExecutor
 from hedra.core.graphs.transitions.exceptions.exceptions import IsolatedStageError
 from hedra.logging import HedraLogger
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
@@ -86,8 +86,8 @@ class TransitionAssembler:
             stage.worker_id = self.worker_id
 
             for hook_shortname, hook in registrar.reserved[stage.name].items():
-                    hook.call = hook.call.__get__(stage, stage.__class__)
-                    setattr(stage, hook_shortname, hook.call)
+                    hook._call = hook._call.__get__(stage, stage.__class__)
+                    setattr(stage, hook_shortname, hook._call)
 
             methods = inspect.getmembers(stage, predicate=inspect.ismethod) 
 
@@ -96,8 +96,12 @@ class TransitionAssembler:
                 hook: Hook = registrar.all.get(method_name)
                 
                 if hook:
-                    hook.call = hook.call.__get__(stage, stage.__class__)
-                    setattr(stage, hook.shortname, hook.call)
+                    hook._call = hook._call.__get__(stage, stage.__class__)
+                    setattr(stage, hook.shortname, hook._call)
+
+                    if inspect.ismethod(hook.call) is False:
+                        hook.call = hook.call.__get__(stage, stage.__class__)
+                        setattr(stage, hook.shortname, hook.call)
 
                     hook.stage = stage.name
                     hook.stage_instance: Stage = stage

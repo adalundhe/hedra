@@ -6,7 +6,7 @@ import ntpath
 import inspect
 from pathlib import Path
 from typing import List, Union, Dict
-from hedra.core.graphs.stages.stage import Stage
+from hedra.core.graphs.stages.base.stage import Stage
 from hedra.logging import HedraLogger
 from hedra.plugins.types.common.plugin import Plugin
 from .actions import (

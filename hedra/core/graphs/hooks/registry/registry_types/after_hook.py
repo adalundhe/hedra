@@ -1,4 +1,4 @@
-from typing import Coroutine, List, Dict
+from typing import Any, List, Type, Callable, Awaitable
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from .hook import Hook
 
@@ -9,7 +9,7 @@ class AfterHook(Hook):
         self, 
         name: str, 
         shortname: str, 
-        call: Coroutine, 
+        call: Callable[..., Awaitable[Any]], 
         *names: List[str]
     ) -> None:
         super().__init__(
@@ -19,6 +19,7 @@ class AfterHook(Hook):
             hook_type=HookType.AFTER
         )
 
+        self.call: Type[self._call] = self._call
         self.names = list(set(names))
 
 

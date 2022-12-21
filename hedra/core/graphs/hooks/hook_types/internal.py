@@ -1,7 +1,7 @@
 from typing import Callable
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.registry.registrar import registrar
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.hooks.registry.registry_types import InternallHook
 
 
 class Internal:
@@ -10,12 +10,12 @@ class Internal:
     def __init__(self) -> None:
         pass
 
-    def __call__(self, call: Callable=None) -> Hook:
+    def __call__(self, call: Callable=None) -> InternallHook:
 
         hook_fullname = call.__qualname__
         stage_name, hook_shortname = hook_fullname.split('.')
 
-        hook = Hook(
+        hook = InternallHook(
             hook_fullname,
             call.__name__,
             call,

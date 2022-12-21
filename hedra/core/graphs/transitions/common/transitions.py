@@ -1,5 +1,5 @@
 from typing import Any
-from hedra.core.graphs.stages.stage import Stage
+from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.transitions.exceptions import InvalidTransitionError
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.logging import HedraLogger

@@ -1,4 +1,5 @@
-from typing import Coroutine, Dict, Any
+from typing import Any, Callable, Awaitable
+from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from .hook import Hook
 
@@ -9,7 +10,7 @@ class ContextHook(Hook):
         self, 
         name: str, 
         shortname: str, 
-        call: Coroutine, 
+        call: Callable[..., Awaitable[Any]], 
         key: str=None
     ) -> None:
         super().__init__(
@@ -18,5 +19,8 @@ class ContextHook(Hook):
             call, 
             hook_type=HookType.CONTEXT
         )
-
+        
         self.context_key = key
+
+    async def call(self, context: SimpleContext) -> None:
+        context[self.context_key] = await self._call()

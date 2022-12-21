@@ -1,4 +1,4 @@
-from ..stages.stage import Stage
+from ..stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from .common import (
     idle_transition,

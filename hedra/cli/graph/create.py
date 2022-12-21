@@ -1,7 +1,7 @@
 import inspect
 from typing import Optional
 from hedra.projects.generation import GraphGenerator
-from hedra.core.graphs.stages.stage import Stage
+from hedra.core.graphs.stages.base.stage import Stage
 from hedra.cli.exceptions.graph.create import InvalidStageType
 from hedra.logging import HedraLogger
 from hedra.logging import (

@@ -5,6 +5,7 @@ from .channel_hook import ChannelHook
 from .check_hook import CheckHook
 from .context_hook import ContextHook
 from .event_hook import EventHook
+from .internal_hook import InternallHook
 from .metric_hook import MetricHook
 from .restore_hook import RestoreHook
 from .save_hook import SaveHook
