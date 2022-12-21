@@ -11,7 +11,7 @@ with open(os.path.join(current_directory, 'README.md'), "r") as readme:
 
 setup(
     name="hedra",
-    version="0.6.1",
+    version="0.6.2",
     description="Powerful performance testing made easy.",
     long_description=package_description,
     long_description_content_type="text/markdown",
@@ -26,7 +26,6 @@ setup(
     ],
     install_requires=[
         'aiologger',
-        'aiologger[aiofiles]',
         'yaspin',
         'attr',
         'networkx',
@@ -35,7 +34,6 @@ setup(
         'click',
         'psutil',
         'fastapi',
-        'alive-progress',
         'dill',
         'scipy',
         'art',

@@ -1,7 +1,6 @@
 
 import asyncio
 import sys
-from types import coroutine
 
 from io import (
     FileIO,
@@ -17,9 +16,7 @@ from .binary import (
     AsyncBufferedIOBase,
     AsyncBufferedReader,
     AsyncFileIO,
-    AsyncIndirectBufferedIOBase,
-    AsyncIndirectBufferedReader,
-    AsyncIndirectFileIO,
+    AsyncIndirectBufferedIOBase
 )
 from .text import AsyncTextIOWrapper, AsyncTextIndirectIOWrapper
 

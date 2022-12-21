@@ -10,7 +10,6 @@ eventlet
 psutil
 flask
 uwsgi
-alive-progress
 dill
 scipy
 art
@@ -19,5 +18,4 @@ uvloop
 tdigest
 GitPython
 aiologger
-aiologger[aiofiles]
 yaspin
