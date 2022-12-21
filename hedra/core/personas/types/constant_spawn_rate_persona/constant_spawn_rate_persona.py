@@ -41,9 +41,9 @@ class ConstantSpawnPersona(DefaultPersona):
             idx += 1
 
             if idx%self.batch.size == 0:
-                action_idx = (action_idx + 1)%self.actions_count
                 await asyncio.sleep(self.batch.interval)
 
+            action_idx = (action_idx + 1)%self.actions_count
             if self._hooks[action_idx].session.active%max_pool_size == 0:
                     try:
                         max_wait = total_time - elapsed

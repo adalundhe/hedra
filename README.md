@@ -1,28 +1,273 @@
-# Hedra - Powerful performance testing made easy
 
-Hedra is a Python-based performance testing framework that offers a multitude of run options, powerful reporting capabilities, and comprehensive suite of integrations to facilitate testing of a wide array of target types.:
+# <b>Hedra - Testng at scale </b>
+
+| Package     | Hedra                                                           |
+| ----------- | -----------                                                     |
+| Version     | 0.6.2                                                           |
+| Web         | TBD                                                             |
+| Download    | TBD                                                             | 
+| Source      | https://github.com/scorbettUM/hedra                             |
+| Keywords    | performance, testing, async, distributed, graph, DAG, workflow  |
+
+Hedra is a Python preformance and scalable unit/integration testing framework that makes creating and running complex test workflows easy.
+
+These workflows are written as directed acrylic graphs in Python, where each graph is specified as a collection of Python classes referred to as <b>Stages</b>. Each Stage may then specify async Python methods which are then wrapped in Python decorators (referred to as <b>Hooks</b>), which that Stage will then execute. The Hook wrapping a method tells hedra both what the action does and when to execute it. In combination, Stages and Hooks allow you to craft test workflows that can mimic real-world user behavior, optimize framework performance, or interact with a variety of Hedra's powerful integrations.
 
 <br/>
 
 ___________
 
-## <b>Requirements </b>
+## <b> Why Hedra? </b>
 
-Currently, `hedra` requires Python version 3.8.6+. Please ensure this version of Python is installed on your system before proceeding. 
+The benefits of understanding the performance characteristics of an application under load are well known, however tooling to provide this inforation is often difficult to setup or operate. Likewise, performance test tooling often lacks the abiliity to simulate complex user interactions at scale, or forces users to implement complex APIs or CI/CD jobs to do so. Hedra was built to solve these problems, adopting the following core tenants:
+
+<br/>
+
+### <u>Speed and efficiency by default</u> 
+
+Regardless of whether running on your personal laptop or distributed across a cluster, Hedra is *fast*, capable of generating millions of requests or interactions per minute and without consuming excessive memory. Hedra pushes the limits of Python to achieve this, embracing the latest in Python async and multiprocessing language features to achieve optimal execution performance.
+
+<br/>
+
+### <u>Run with ease anywhere</u>
+
+Hedra is simple to set up regardless of how you're choosing to run it, and authoring/managing test workflows is easy. Hedra includes integrations with Git to facilitate easy management of collections of graphs via <b>Projects</b>, the ability to generate flexible starter test templates, and an API that is both fast and intuitive to understand. Distributed use almost exactly mirrors local operation, reducing the learning curve for running and managing tests over more complex deployments.
+
+<br/>
+
+### <u>Painless flexiblity and extensibility</u>
+Hedra ships supporting HTTP, HTTP2, Websockets, and UDP out of the box. GraphQL, GRPC, and Playwright are available simply by installing the (optional) dependency packages. Hedra offers JSON and CSV results output by default, with 28 additional results reporting options readily available by likewise just installing the required dependencies.
+
+Likewise, Hedra offers a comprehensive plugin system. You can easily write plugins to load test your Postgresql database or integrate a third party service, with CLI-generated templates to guide you and full Typehints support throughout. Unlike other frameworks, no addtional compilation or build steps required - just write your plugin, import it, and include it in the appropriate Stage your test graph.
+
+<br/>
 
 ___________
 
-## <b>Installing Hedra </b>
+## <b>Requirements and Getting Started</b>
 
-To start, ensure you have the Hedra installed. This requires Python 3.8.6 or later, and should be done in a virtual environment:
+Hedra has been tested on Python versions 3.8.6+, though we recommend using Python 3.10+. You should likewise have the latest LTS version of OpenSSL, build-essential, and other commmon Unix dependencies installed (if running on a Unix-based OS).
 
-```
-python3 -m venv ~/.performance && \
-source ~/.performance/bin/activate
-```
+*<b>Warning</b>*: Hedra has currently only been tested on the latest LTS versions of Ubuntu and Debian. Other official OS support is coming Mar. 2023. 
 
-Install Hedra via pip:
+<br/>
 
+### <u>Installing</u> 
+
+To install Hedra run:
 ```
 pip install hedra
 ```
+Verify the installation was was successful by running the command:
+```
+hedra --help
+```
+
+which should output
+
+![Output of the hedra --help command](images/hedra_help_output.png?raw=true "Verifyin Install")
+
+<br/>
+
+### <u>Creating your first graph</u> 
+
+Get started by running Hedra's:
+```
+hedra graph create <path/to/graph_name.py>
+```
+command in an empty directory to generate a basic test from a template. For example, run:
+```
+hedra graph create example.py
+```
+which will output the following:
+
+![Output of the hedra graph create example.py command](images/hedra_graph_create.png?raw=true "Creating a Graph")
+
+and generate the the test below in the specified `example.py` file:
+```python
+from hedra import (
+	Setup,
+	Execute,
+	action,
+	Analyze,
+	JSONConfig,
+	Submit,
+	depends,
+)
+
+class SetupStage(Setup):
+    batch_size=1000
+    total_time='1m'
+
+
+@depends(SetupStage)
+class ExecuteHTTPStage(Execute):
+
+    @action()
+    async def http_get(self):
+        return await self.client.http.get('https://<url_here>')
+
+
+@depends(ExecuteHTTPStage)
+class AnalyzeStage(Analyze):
+    pass
+
+
+@depends(AnalyzeStage)
+class SubmitJSONResultsStage(Submit):
+    config=JSONConfig(
+        events_filepath='./events.json',
+        metrics_filepath='./metrics.json'
+    )
+
+```
+
+We'll explain this graph below, but for now  - replace the string `'https://<url_here>'` with `'https://httpbin.org/get'`.
+
+<br/>
+Before running our test, if on a Unix system, we may need to set the maximum number of open files above its current limit. This can be done
+by running:
+
+```
+ulimit -n 256000
+```
+
+note that you can provide any number here, as long as it is greater than the `batch_size` specified in the `SetupStage` Stage. With that, we're ready run our first test by executing:
+```
+hedra graph run example.py
+```
+
+Hedra will load the test graph file, parse/validate/setup the stages specified, then begin executing your test:
+
+![Output of the hedra graph run example.py command](images/hedra_graph_run_example.png?raw=true "Running a Graph")
+
+The test will take a minute or two to run, but once complete you should see:
+
+![Output of hedra from a completed graph run](images/hedra_graph_complete.png?raw=true "A Complete Graph Run")
+
+You have offically created and run your first test graph!
+
+<br/>
+
+___________
+
+## <b>Engines, Personas, Algorithms, and Reporters</b>
+
+Much of Hedra's extensibility comes in the form of both extensive integrations/options and plugin capabilties for four main framework features:
+<br/>
+
+### <u>Engines</u> 
+Engines are the underlying protocol or library integrations required for Hedra to performance test your application (for example HTTP, UDP, Playwright). Hedra currently supports the following Engines, with additional install requirements shown if necessary:
+
+| Engine        | Additional Install Option                                       |  Dependencies                 |
+| -----------   | -----------                                                     |------------                   |
+| HTTP          | N/A                                                             | N/A                           |
+| HTTP2         | N/A                                                             | h2, hpack                     |
+| UDP           | N/A                                                             | N/A                           |
+| Websocket     | N/A                                                             | N/A                           |
+| GRPC          | pip install hedra[grpc]                                         | grpcio grpco-tools, h2, hpack |
+| GraphQL       | pip install hedra[graphql]                                      | gql                           |
+| GraphQL-HTTP2 | pip install hedra[graphql]                                      | gql, h2, hpack                |
+| Playwright    | pip install hedra[playwright] && playwright install             | playwright                    |
+
+
+<br/>
+
+### <u>Personas</u>
+
+Personas are responsible for scheduling when indvidual `@action()` or `@task()` hooks execute over the speciied Execute stage's test duration. No addtional install dependencies are required for Personas, and the following personas are currently supported out-of-box:
+
+| Persona               | Setup Config Name       | Description                                                                                                                                                                                                    |
+| ----------            | ----------------        | -----------------                                                                                                                                                                                              |
+| Batched               | batched                 | Executes each action or task hook in batches of the specified size, with an optional wait inbetween each batch spawning                                                                                        |
+| Constant Arrival Rate | constant-arrival        | Hedra automatically adjusts the batch size after each batch spawns based upon the number of hooks that have completed, attempting to achieve `batch_size` completions per batch                                |
+| Constant Spawn Rate   | constant-spawn          | Like `Batched`, but cycles through actions before waiting `batch_interval` time.                                                                                                                               |
+| Default               | N/A                     | Cycles through all action/task hooks in the Execute stage, resulting in a (mostly) even distribution of execution                                                                                              |
+| No-Wait               | N/A                     | Cycles through all action/task hooks in the Execute stage, resulting in a (mostly) even distribution of execution. __WARNING__: This persona may cause OOM as it does not use the memory management algorithm. |    
+| Ramped                | ramped                  | Starts at a batch size of  `batch_gradient` * `batch_size`. Batch size increases by the gradient each batch with an optional wait inbetween each batch spawning                                                |
+| Ramped Interval       | ramped-interval         | Executes `batch_size` hooks before waiting `batch_gradient` * `batch_interval` time. Interval increases by the gradient each batch                                                                             |
+| Sorted                | sorted                  | Executes each action/task hook in batches of the specified size and in the order provided to each hook's (optional) `order` parameter                                                                          |
+| Weighted              | weighted                | Executes action/task hooks in batches of the specified size, with each batch being generated from a sampled distribution based upon that action's weight                                                       |
+
+<br/>
+
+### <u>Algorithms</u>
+
+Algorithms are used by Hedra `Optimize` stages to calculate maximal test config options like `batch_size`, `batch_gradient`, and/or `batch_interval`. All out-of-box supported algorithms use `scikit-learn` and include:
+
+| Algorithm               | Setup Config Name   | Description                                                                           |
+| ----------              | ----------------    | -----------------                                                                     |
+| SHG                     | shg                 | Uses `scikit-learn`'s Simple Global Homology (SHGO) global optimization algorithm     |
+| Dual Annealing          | dual-annealing      | Uses `scikit-learn`'s Dual Annealing global optimization algorithm                    |
+| Differential Evolution  | diff-evolution      | Uses `scikit-learn`'s Differential Evolution global optimization algorithm            |
+
+<br/>
+
+### <u>Reporters</u>
+
+Reporters are the integrations Hedra uses for submitting aggregated and unaggregated results (for example, to a MySQL database via the MySQL reporter). Hedra currently supports the following Reporters, with additional install requirements shown if necessary:
+
+| Engine               | Additional Install Option                                 |  Dependencies                            |
+| -----------          | -----------                                               |------------                              |
+| AWS Lambda           | pip install hedra[aws]                                    | boto3                                    |
+| AWS Timestream       | pip install hedra[aws]                                    | boto3                                    |
+| Big Query            | pip install hedra[google]                                 | google-cloud-bigquery                    |
+| Big Table            | pip install hedra[google]                                 | google-cloud-bigtable                    |
+| Cassandra            | pip install hedra[cassandra]                              | cassandra-driver                         |
+| Cloudwatch           | pip install hedra[aws]                                    | boto3                                    |
+| CosmosDB             | pip install hedra[azure]                                  | azure-cosmos                             |
+| CSV                  | N/A                                                       | N/A                                      |
+| Datadog              | pip install hedra[datadog]                                | datadog                                  |
+| DogStatsD            | pip install hedra[statsd]                                 | aio_statsd                               |
+| Google Cloud Storage | pip install hedra[google]                                 | google-cloud-storage                     |
+| Graphite             | pip install hedra[statsd]                                 | aio_statsd                               |
+| Honeycomb            | pip install hedra[honeycomb]                              | libhoney                                 |
+| InfluxDB             | pip install hedra[influxdb]                               | influxdb_client                          |
+| JSON                 | N/A                                                       | N/A                                      |
+| Kafka                | pip install hedra[kafka]                                  | aiokafka                                 |
+| MongoDB              | pip install hedra[mongodb]                                | motor                                    |
+| MySQL                | pip install hedra[sql]                                    | aiomysql, sqlalchemy                     |
+| NetData              | pip install hedra[statsd]                                 | aio_statsd                               |
+| New Relic            | pip install hedra[newrelic]                               | newrelic                                 |
+| Postgresql           | pip install hedra[sql]                                    | aiopg, psycopg2-binary, sqlalchemy       |
+| Prometheus           | pip install hedra[prometheus]                             | prometheus-client, prometheus-client-api |
+| Redis                | pip install hedra[redis]                                  | redis, aioredis                          |
+| S3                   | pip install hedra[aws]                                    | boto3                                    |
+| Snowflake            | pip install hedra[snowflake]                              | snowflake-connector-python, sqlalchemy   |
+| SQLite3              | pip install hedra[sql]                                    | sqlalchemy                               |
+| StatsD               | pip install hedra[statsd]                                 | aio_statsd                               |
+| Telegraf             | pip install hedra[statsd]                                 | aio_statsd                               |
+| TelegrafStatsD       | pip install hedra[statsd]                                 | aio_statsd                               |
+| TimescaleDB          | pip install hedra[sql]                                    | aiopg, psycopg2-binary, sqlalchemy       |
+
+<br/>
+
+___________
+
+## <b>Resources</b>
+
+Hedra's official and full documentation is currently being written and will be lined here soon!
+
+___________
+
+## <b>License</b>
+
+This software is licensed under the MIT License. See the LICENSE file in the top distribution directory for the full license text.
+
+___________
+
+## <b>Contributing</b>
+
+Hedra will be open to general contributions starting Fall, 2023 (once the distributed rewrite and general testing is complete). Until then, feel
+free to use Hedra on your local machine and report any bugs or issues you find!
+
+___________
+
+## <b>Code of Conduct</b>
+
+Hedra had adopted and follows the [Apache Software Foundation code of conduct](https://www.apache.org/foundation/policies/conduct.html).
+If you observe behavior that violates those rules please report to:
+
+| Name            | Email                       | Twitter                                      |
+|-------          |--------                     |----------                                    |
+| Sean Corbett    | sean.corbett@umontana.edu   | [@sc_codeum](https://twitter.com/sc_codeUM/) |

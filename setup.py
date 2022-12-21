@@ -104,6 +104,7 @@ setup(
             'gql'
         ],
         'snowflake': [
+            'sqlalchemy',
             'snowflake-connector-python'
         ],
         'google': [

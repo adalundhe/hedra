@@ -10,7 +10,6 @@ dist
 secret.yaml
 secret.yml
 chromedriver
-*.png
 .eggs
 .vscode
 kube_config

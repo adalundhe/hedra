@@ -48,8 +48,9 @@ class RampedPersona(DefaultPersona):
                     self._hooks[action_idx].session.extend_pool(increase_amount)
                     generation_batch_size = next_batch_size
                 
-                action_idx = (action_idx + 1) % self.actions_count
                 await asyncio.sleep(self.batch.interval)
+            
+            action_idx = (action_idx + 1) % self.actions_count
 
             if self._hooks[action_idx].session.active%max_pool_size == 0:
                     try:
