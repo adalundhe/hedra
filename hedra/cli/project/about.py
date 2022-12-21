@@ -35,7 +35,6 @@ def about_project(
         logger.console.sync.error(f'No project found at path - {path}\n')
         exit(0)
 
-
     project_name = hedra_config.get('name')
     logger.console.sync.info(f'Project - {project_name}')
 
@@ -55,7 +54,6 @@ def about_project(
     if len(hedra_plugins) > 0:
         for plugin_name, plugin_path in hedra_plugins.items():
             logger.console.sync.info(f' - {plugin_name} at {plugin_path}')
-
 
     else:
         logger.console.sync.info(' - No plugins registered')
