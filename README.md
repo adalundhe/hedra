@@ -149,6 +149,26 @@ You have offically created and run your first test graph!
 
 <br/>
 
+
+___________
+
+## <b>Development</b>
+
+Local development requires at-minimum Python 3.8.6, though 3.10.0+ is recommended. To setup your environment run:
+
+```
+python3 -m venv ~/.hedra && \
+source ~/.hedra/bin/activate && \
+git clone https://github.com/scorbettUM/hedra.git && \
+cd hedra && \
+pip install --no-cache -r requirements.in && \
+python setup.py develop
+```
+
+To develop or work with any of the additional provided engines, references the dependency tables below.
+
+<br/>
+
 ___________
 
 ## <b>Engines, Personas, Algorithms, and Reporters</b>
