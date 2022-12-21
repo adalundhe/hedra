@@ -3,7 +3,8 @@ import click
 from hedra.cli.project import (
     create_project,
     sync_project,
-    get_project
+    get_project,
+    about_project
 )
 
 
@@ -213,3 +214,16 @@ def get(
         log_level
     )
  
+
+@project.command(
+    help="Describe the project at the specified path"
+)
+@click.option(
+    '--path',
+    default=os.getcwd(),
+    help='Path to graph repository.'
+)
+def about(
+    path: str
+):
+    about_project(path)

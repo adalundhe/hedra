@@ -105,6 +105,7 @@ def create_project(
         manager.execute_workflow(workflow_actions)
 
         hedra_config = {
+            "name": project_name,
             "core": {
                 "bypass_connection_validation": bypass_connection_validation,
                 "connection_validation_retries": connection_validation_retries
