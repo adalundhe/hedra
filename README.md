@@ -31,7 +31,7 @@ Regardless of whether running on your personal laptop or distributed across a cl
 
 ### <u>Run with ease anywhere</u>
 
-Hedra is simple to set up regardless of how you're choosing to run it, and authoring/managing test workflows is easy. Hedra includes integrations with Git to facilitate easy management of collections of graphs via <b>Projects</b>, the ability to generate flexible starter test templates, and an API that is both fast and intuitive to understand. Distributed use almost exactly mirrors local operation, reducing the learning curve for running and managing tests over more complex deployments.
+Hedra is simple to set up regardless of how you're choosing to run it, and authoring/managing/running test workflows is easy. Hedra includes integrations with Git to facilitate easy management of collections of graphs via <b>Projects</b>, the ability to generate flexible starter test templates, and an API that is both fast and intuitive to understand. Distributed use almost exactly mirrors local operation, reducing the learning curve for more complex deployments.
 
 <br/>
 
