@@ -1,6 +1,6 @@
 
 # <b>Hedra - Testing at scale </b>
-
+[![PyPI version](https://badge.fury.io/py/hedra.svg)](https://badge.fury.io/py/hedra)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](code_of_conduct.md)
 
 
