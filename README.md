@@ -1,14 +1,14 @@
 
 # <b>Hedra - Testing at scale </b>
-[![PyPI version](https://badge.fury.io/py/hedra.svg)](https://badge.fury.io/py/hedra)
-[![License](https://img.shields.io/github/license/scorbettUM/hedra)](https://img.shields.io/github/license/scorbettUM/hedra)
+[![PyPI version](https://img.shields.io/pypi/v/hedra?color=gre)](https://pypi.org/project/hedra/)
+[![License](https://img.shields.io/github/license/scorbettUM/hedra)](https://github.com/scorbettUM/hedra/blob/main/LICENSE)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](code_of_conduct.md)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/hedra)](https://img.shields.io/pypi/pyversions/hedra)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/hedra)](https://pypi.org/project/hedra/)
 
 
 | Package     | Hedra                                                           |
 | ----------- | -----------                                                     |
-| Version     | 0.6.14                                                          |
+| Version     | 0.6.15                                                          |
 | Web         | TBD                                                             |
 | Download    | https://pypi.org/project/hedra/                                 | 
 | Source      | https://github.com/scorbettUM/hedra                             |
