@@ -23,19 +23,19 @@ Understanding how your application performs under load can provide valuable insi
 
 <br/>
 
-### <u>Speed and efficiency by default</u> 
+### __Speed and efficiency by default__ 
 
 Regardless of whether running on your personal laptop or distributed across a cluster, Hedra is *fast*, capable of generating millions of requests or interactions per minute and without consuming excessive memory. Hedra pushes the limits of Python to achieve this, embracing the latest in Python async and multiprocessing language features to achieve optimal execution performance.
 
 <br/>
 
-### <u>Run with ease anywhere</u>
+### __Run with ease anywhere__
 
 Hedra is simple to set up regardless of how you're choosing to run it, and authoring/managing/running test workflows is easy. Hedra includes integrations with Git to facilitate easy management of collections of graphs via <b>Projects</b>, the ability to generate flexible starter test templates, and an API that is both fast and intuitive to understand. Distributed use almost exactly mirrors local operation, reducing the learning curve for more complex deployments.
 
 <br/>
 
-### <u>Painless flexibility and extensibility</u>
+### __Painless flexibility and extensibility__
 Hedra ships with support for HTTP, HTTP2, Websockets, and UDP out of the box. GraphQL, GRPC, and Playwright are available simply by installing the (optional) dependency packages. Hedra offers JSON and CSV results output by default, with 28 additional results reporting options readily available by likewise installing the required dependencies.
 
 Likewise, Hedra offers a comprehensive plugin system. You can easily write a plugin to test your Postgresql database or integrate a third party service, with CLI-generated templates to guide you and full type hints support throughout. Unlike other frameworks, no additional compilation or build steps are required - just write your plugin, import it, and include it in the appropriate Stage in your test graph.
@@ -52,7 +52,7 @@ Hedra has been tested on Python versions 3.8.6+, though we recommend using Pytho
 
 <br/>
 
-### <u>Installing</u> 
+### __Installing__ 
 
 To install Hedra run:
 ```
@@ -69,7 +69,7 @@ which should output
 
 <br/>
 
-### <u>Creating your first graph</u> 
+### __Creating your first graph__ 
 
 Get started by running Hedra's:
 ```
@@ -176,7 +176,7 @@ ___________
 Much of Hedra's extensibility comes in the form of both extensive integrations/options and plugin capabilities for four main framework features:
 <br/>
 
-### <u>Engines</u> 
+### __Engines__ 
 Engines are the underlying protocol or library integrations required for Hedra to performance test your application (for example HTTP, UDP, Playwright). Hedra currently supports the following Engines, with additional install requirements shown if necessary:
 
 | Engine        | Additional Install Option                                       |  Dependencies                 |
@@ -193,7 +193,7 @@ Engines are the underlying protocol or library integrations required for Hedra t
 
 <br/>
 
-### <u>Personas</u>
+### __Personas__
 
 Personas are responsible for scheduling when `@action()` or `@task()` hooks execute over the specified Execute stage's test duration. No additional install dependencies are required for Personas, and the following personas are currently supported out-of-box:
 
@@ -211,7 +211,7 @@ Personas are responsible for scheduling when `@action()` or `@task()` hooks exec
 
 <br/>
 
-### <u>Algorithms</u>
+### __Algorithms__
 
 Algorithms are used by Hedra `Optimize` stages to calculate maximal test config options like `batch_size`, `batch_gradient`, and/or `batch_interval`. All out-of-box supported algorithms use `scikit-learn` and include:
 
@@ -223,7 +223,7 @@ Algorithms are used by Hedra `Optimize` stages to calculate maximal test config 
 
 <br/>
 
-### <u>Reporters</u>
+### __Reporters__
 
 Reporters are the integrations Hedra uses for submitting aggregated and unaggregated results (for example, to a MySQL database via the MySQL reporter). Hedra currently supports the following Reporters, with additional install requirements shown if necessary:
 
