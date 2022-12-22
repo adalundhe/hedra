@@ -1,5 +1,6 @@
 import asyncio
 import os
+import json
 import inspect
 import uvloop
 uvloop.install()
@@ -29,8 +30,33 @@ def check_graph(path: str, log_level: str):
 
     logger = HedraLogger()
     logger.initialize()
+    logging_manager.logfiles_directory = os.getcwd()
 
-    logger['console'].sync.info(f'Validating graph at - {path}.')
+    graph_name = path
+    if os.path.isfile(graph_name):
+        graph_name = Path(graph_name).stem
+
+
+    logger['console'].sync.info(f'Validating graph - {graph_name} - at - {path}.\n')
+
+    hedra_config_filepath = os.path.join(
+        os.getcwd(),
+        '.hedra.json'
+    )
+
+    hedra_config = {}
+    if os.path.exists(hedra_config_filepath):
+        with open(hedra_config_filepath, 'r') as hedra_config_file:
+            hedra_config = json.load(hedra_config_file)
+
+    hedra_graphs = hedra_config.get('graphs', {})
+    hedra_core_config = hedra_config.get('core', {
+        'bypass_connection_validation': False,
+        'connection_validation_retries': 3
+    })
+    
+    if path in hedra_graphs:
+        path = hedra_graphs.get(path)
     
     package_dir = Path(path).resolve().parent
     package_dir_path = str(package_dir)
@@ -64,14 +90,20 @@ def check_graph(path: str, log_level: str):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    pipeline = Graph(
+    graph = Graph(
+        graph_name,
         list(discovered.values()),
+        config={
+            **hedra_core_config,
+            'graph_module': module.__name__
+        },
         cpus=1
     )
 
-    pipeline.validate()
-    loop.run_until_complete(pipeline.check(path))
+    graph.assemble()
 
-    logger['console'].sync.info('Validation complete!\n')
+    loop.run_until_complete(graph.check(path))
+
+    logger['console'].sync.info('\nValidation complete!\n')
 
     os._exit(0)
