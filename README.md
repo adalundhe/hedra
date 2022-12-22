@@ -19,7 +19,7 @@ ___________
 
 ## <b> Why Hedra? </b>
 
-Understanding how your application performs under load can provide valuable insights - allowing you to spot issues with latency, memory usage, and stability. However, performance test tools providing these insights are often difficult to use and lack the ability to simulate complex user interaction at scale. Hedra was built to solve these problems, adopting the following core tenants:
+Understanding how your application performs under load can provide valuable insights - allowing you to spot issues with latency, memory usage, and stability. However, performance test tools providing these insights are often difficult to use and lack the ability to simulate complex user interaction at scale. Hedra was built to solve these problems by allowing developers and test engineers the ability to author sophisticated and scalable test workflows. Hedra adheres to the following tenants:
 
 <br/>
 
