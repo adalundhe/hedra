@@ -3,11 +3,19 @@ import asyncio
 import time
 from hedra.tools.data_structures import AsyncList
 from typing import List, Dict, Any
-from playwright.async_api import async_playwright
-from playwright.async_api import Geolocation
 from .command import PlaywrightCommand
 from .result import PlaywrightResult
 from .command_librarian import CommandLibrarian
+
+
+try:
+    
+    from playwright.async_api import async_playwright
+    from playwright.async_api import Geolocation
+
+except Exception:
+    async_playwright = lambda: None
+    Geolocation = None
 
 class ContextGroup:
 

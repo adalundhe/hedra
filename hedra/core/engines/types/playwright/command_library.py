@@ -1,7 +1,14 @@
-import uuid
-from playwright.async_api import Page
-from hedra.tools.helpers import awaitable
+
 from .command import PlaywrightCommand
+
+try:
+    
+    from playwright.async_api import Page
+
+except Exception:
+    async_playwright = lambda: None
+    Geolocation = None
+
 
 
 class CommandLibrary:

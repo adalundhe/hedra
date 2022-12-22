@@ -1,7 +1,6 @@
 attr
 networkx
 aiodns
-playwright
 h2
 click
 pytz

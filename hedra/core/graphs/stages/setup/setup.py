@@ -27,10 +27,17 @@ from hedra.core.personas.types import PersonaTypesMap
 from hedra.logging import HedraLogger
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.plugin_types import PluginType
-from playwright.async_api import Geolocation
 from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.base.stage import Stage
 from .exceptions import HookSetupError
+
+try:
+
+    from playwright.async_api import Geolocation
+
+except Exception:
+    Geolocation = None
+
 
 T = TypeVarTuple('T')
 
@@ -350,7 +357,7 @@ class Setup(Stage, Generic[Unpack[T]]):
 
     @Internal()
     async def get_hook(self, execute_stage: Execute, shortname: str, hook_type: str) -> Coroutine:
-        hooks: List[Union[ActionHook, BeforeHook]] = execute_stage.hooks[hook_type]
+        hooks: List[Union[AfterHook, BeforeHook]] = execute_stage.hooks[hook_type]
         for hook in hooks:
             if shortname in hook.names:
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Adding Hook - {hook.name}:{hook.hook_id} - of type - {hook.hook_type.name.capitalize()} - to Action - {shortname} - for Execute stage - {execute_stage.name}')
