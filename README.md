@@ -173,7 +173,7 @@ ___________
 
 ## <b>Engines, Personas, Algorithms, and Reporters</b>
 
-Much of Hedra's extensibility comes in the form of both extensive integrations/options and plugin capabilties for four main framework features:
+Much of Hedra's extensibility comes in the form of both extensive integrations/options and plugin capabilities for four main framework features:
 <br/>
 
 ### <u>Engines</u> 
