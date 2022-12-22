@@ -36,7 +36,7 @@ Hedra is simple to set up regardless of how you're choosing to run it, and autho
 <br/>
 
 ### <u>Painless flexibility and extensibility</u>
-Hedra ships supporting HTTP, HTTP2, Websockets, and UDP out of the box. GraphQL, GRPC, and Playwright are available simply by installing the (optional) dependency packages. Hedra offers JSON and CSV results output by default, with 28 additional results reporting options readily available by likewise installing the required dependencies.
+Hedra ships with support for HTTP, HTTP2, Websockets, and UDP out of the box. GraphQL, GRPC, and Playwright are available simply by installing the (optional) dependency packages. Hedra offers JSON and CSV results output by default, with 28 additional results reporting options readily available by likewise installing the required dependencies.
 
 Likewise, Hedra offers a comprehensive plugin system. You can easily write a plugin to test your Postgresql database or integrate a third party service, with CLI-generated templates to guide you and full Typehints support throughout. Unlike other frameworks, no addtional compilation or build steps required - just write your plugin, import it, and include it in the appropriate Stage your test graph.
 
