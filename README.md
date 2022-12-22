@@ -6,7 +6,7 @@
 
 | Package     | Hedra                                                           |
 | ----------- | -----------                                                     |
-| Version     | 0.6.2                                                           |
+| Version     | 0.6.7                                                           |
 | Web         | TBD                                                             |
 | Download    | TBD                                                             | 
 | Source      | https://github.com/scorbettUM/hedra                             |
