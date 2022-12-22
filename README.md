@@ -6,9 +6,9 @@
 
 | Package     | Hedra                                                           |
 | ----------- | -----------                                                     |
-| Version     | 0.6.7                                                           |
+| Version     | 0.6.8                                                           |
 | Web         | TBD                                                             |
-| Download    | TBD                                                             | 
+| Download    | https://pypi.org/project/hedra/                                 | 
 | Source      | https://github.com/scorbettUM/hedra                             |
 | Keywords    | performance, testing, async, distributed, graph, DAG, workflow  |
 
