@@ -38,6 +38,8 @@ def sync_project(
 
     logger = HedraLogger()
     logger.initialize()
+    logging_manager.logfiles_directory = os.getcwd()
+    
     logger['console'].sync.info(f'Running project sync at - {path}...')
 
     hedra_config_filepath = os.path.join(

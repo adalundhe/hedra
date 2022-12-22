@@ -35,6 +35,8 @@ def get_project(
 
     logger = HedraLogger()
     logger.initialize()
+    logging_manager.logfiles_directory = os.getcwd()
+    
     logger['console'].sync.info(f'Fetching project at - {url} - and saving at - {path}...')
 
     hedra_config_filepath = os.path.join(

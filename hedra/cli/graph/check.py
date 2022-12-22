@@ -36,7 +36,6 @@ def check_graph(path: str, log_level: str):
     if os.path.isfile(graph_name):
         graph_name = Path(graph_name).stem
 
-
     logger['console'].sync.info(f'Validating graph - {graph_name} - at - {path}.\n')
 
     hedra_config_filepath = os.path.join(

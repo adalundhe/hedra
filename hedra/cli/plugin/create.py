@@ -1,3 +1,4 @@
+import os
 from hedra.projects.generation import PluginGenerator
 from hedra.cli.exceptions.plugin.create import InvalidPluginType
 from hedra.logging import HedraLogger
@@ -21,6 +22,7 @@ def create_plugin(plugin_type: str, path: str, log_level: str):
 
     logger = HedraLogger()
     logger.initialize()
+    logging_manager.logfiles_directory = os.getcwd()
 
     logger['console'].sync.info(f'Creating new - {plugin_type} - plugin at - {path}.')
 

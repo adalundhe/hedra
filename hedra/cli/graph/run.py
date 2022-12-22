@@ -26,6 +26,9 @@ def run_graph(
     connection_validation_retries: int,
 ):
 
+    if logfiles_directory is None:
+        logfiles_directory = os.getcwd()
+
     logging_manager.disable(
         LoggerTypes.DISTRIBUTED,
         LoggerTypes.DISTRIBUTED_FILESYSTEM

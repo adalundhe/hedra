@@ -1,4 +1,5 @@
 import inspect
+import os
 from typing import Optional
 from hedra.projects.generation import GraphGenerator
 from hedra.core.graphs.stages.base.stage import Stage
@@ -29,6 +30,7 @@ def create_graph(
 
     logger = HedraLogger()
     logger.initialize()
+    logging_manager.logfiles_directory = os.getcwd()
 
     logger['console'].sync.info(f'Creating new graph at - {path}.')
 

@@ -32,6 +32,7 @@ def create_project(
 
     logger = HedraLogger()
     logger.initialize()
+    logging_manager.logfiles_directory = os.getcwd()
 
     hedra_config_filepath = os.path.join(
         path,

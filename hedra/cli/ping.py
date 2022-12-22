@@ -2,10 +2,10 @@ import uvloop
 import traceback
 uvloop.install()
 
-
-from typing import TypeVar
+import os
 import click
 import asyncio
+from typing import TypeVar
 from hedra.core.engines.types.registry import registered_engines
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common.timeouts import Timeouts
@@ -53,6 +53,7 @@ def ping(uri: str, engine: str, timeout: int, log_level: str):
 
     logger = HedraLogger()
     logger.initialize()
+    logging_manager.logfiles_directory = os.getcwd()
 
     engine_types_map = {
         'http': RequestTypes.HTTP,
