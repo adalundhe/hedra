@@ -145,7 +145,7 @@ The test will take a minute or two to run, but once complete you should see:
 
 ![Output of hedra from a completed graph run](images/hedra_graph_complete.png?raw=true "A Complete Graph Run")
 
-You have offically created and run your first test graph!
+You have officially created and run your first test graph!
 
 <br/>
 
