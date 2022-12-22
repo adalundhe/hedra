@@ -65,7 +65,7 @@ hedra --help
 
 which should output
 
-![Output of the hedra --help command](images/hedra_help_output.png?raw=true "Verifyin Install")
+![Output of the hedra --help command](https://github.com/scorbettUM/hedra/blob/main/images/hedra_help_output.png?raw=true "Verifyin Install")
 
 <br/>
 
@@ -81,7 +81,7 @@ hedra graph create example.py
 ```
 which will output the following:
 
-![Output of the hedra graph create example.py command](images/hedra_graph_create.png?raw=true "Creating a Graph")
+![Output of the hedra graph create example.py command](https://github.com/scorbettUM/hedra/blob/main/images/hedra_graph_create.png?raw=true "Creating a Graph")
 
 and generate the the test below in the specified `example.py` file:
 ```python
@@ -139,11 +139,11 @@ hedra graph run example.py
 
 Hedra will load the test graph file, parse/validate/setup the stages specified, then begin executing your test:
 
-![Output of the hedra graph run example.py command](images/hedra_graph_run_example.png?raw=true "Running a Graph")
+![Output of the hedra graph run example.py command](https://github.com/scorbettUM/hedra/blob/main/images/hedra_graph_run_example.png?raw=true "Running a Graph")
 
 The test will take a minute or two to run, but once complete you should see:
 
-![Output of hedra from a completed graph run](images/hedra_graph_complete.png?raw=true "A Complete Graph Run")
+![Output of hedra from a completed graph run](https://github.com/scorbettUM/hedra/blob/main/images/hedra_graph_complete.png?raw=true "A Complete Graph Run")
 
 You have officially created and run your first test graph!
 
