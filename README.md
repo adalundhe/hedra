@@ -2,13 +2,13 @@
 # <b>Hedra - Testing at scale </b>
 [![PyPI version](https://img.shields.io/pypi/v/hedra?color=gre)](https://pypi.org/project/hedra/)
 [![License](https://img.shields.io/github/license/scorbettUM/hedra)](https://github.com/scorbettUM/hedra/blob/main/LICENSE)
-[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](code_of_conduct.md)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](https://github.com/scorbettUM/hedra/blob/main/CODE_OF_CONDUCT.md)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/hedra)](https://pypi.org/project/hedra/)
 
 
 | Package     | Hedra                                                           |
 | ----------- | -----------                                                     |
-| Version     | 0.6.15                                                          |
+| Version     | 0.6.16                                                          |
 | Web         | TBD                                                             |
 | Download    | https://pypi.org/project/hedra/                                 | 
 | Source      | https://github.com/scorbettUM/hedra                             |
