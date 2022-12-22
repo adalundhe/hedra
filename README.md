@@ -19,7 +19,7 @@ ___________
 
 ## <b> Why Hedra? </b>
 
-The benefits of understanding the performance characteristics of an application under load are well known, however tooling to provide this inforation is often difficult to setup or operate. Likewise, performance test tooling often lacks the ability to simulate complex user interactions at scale, or forces users to implement complex APIs or CI/CD jobs to do so. Hedra was built to solve these problems, adopting the following core tenants:
+The benefits of understanding the performance characteristics of an application under load are well known, however tooling to provide this information is often difficult to setup or operate. Likewise, performance test tooling often lacks the ability to simulate complex user interactions at scale, or forces users to implement complex APIs or CI/CD jobs to do so. Hedra was built to solve these problems, adopting the following core tenants:
 
 <br/>
 
