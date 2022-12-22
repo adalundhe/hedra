@@ -9,9 +9,13 @@ current_directory = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(current_directory, 'README.md'), "r") as readme:
     package_description = readme.read()
 
+version_string = ""
+with open (os.path.join(current_directory, ".version"), 'r') as version_file:
+    version_string = version_file.read()
+
 setup(
     name="hedra",
-    version="0.6.4",
+    version=version_string,
     description="Performance testing at scale.",
     long_description=package_description,
     long_description_content_type="text/markdown",
