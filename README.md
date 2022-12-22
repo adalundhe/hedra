@@ -1,6 +1,9 @@
 
 # <b>Hedra - Testing at scale </b>
 
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](code_of_conduct.md)
+
+
 | Package     | Hedra                                                           |
 | ----------- | -----------                                                     |
 | Version     | 0.6.2                                                           |
@@ -285,7 +288,7 @@ ___________
 
 ## <b>Code of Conduct</b>
 
-Hedra has adopted and follows the [Apache Software Foundation code of conduct](https://www.apache.org/foundation/policies/conduct.html).
+Hedra has adopted and follows the [Contributor Covenant code of conduct](https://www.contributor-covenant.org/version/2/1/code_of_conduct/code_of_conduct.md).
 If you observe behavior that violates those rules please report to:
 
 | Name            | Email                       | Twitter                                      |
