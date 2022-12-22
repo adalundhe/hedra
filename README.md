@@ -195,7 +195,7 @@ Engines are the underlying protocol or library integrations required for Hedra t
 
 ### <u>Personas</u>
 
-Personas are responsible for scheduling when individual `@action()` or `@task()` hooks execute over the speciied Execute stage's test duration. No additional install dependencies are required for Personas, and the following personas are currently supported out-of-box:
+Personas are responsible for scheduling when `@action()` or `@task()` hooks execute over the specified Execute stage's test duration. No additional install dependencies are required for Personas, and the following personas are currently supported out-of-box:
 
 | Persona               | Setup Config Name       | Description                                                                                                                                                                                                    |
 | ----------            | ----------------        | -----------------                                                                                                                                                                                              |
@@ -266,7 +266,7 @@ ___________
 
 ## <b>Resources</b>
 
-Hedra's official and full documentation is currently being written and will be lined here soon!
+Hedra's official and full documentation is currently being written and will be linked here soon!
 
 ___________
 
