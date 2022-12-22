@@ -49,8 +49,66 @@ setup(
         ],
     },
     extras_require = {
-        'playwright': [
+        'all': [
+            'grpcio',
+            'grpcio-tools',
+            'gql',
             'playwright',
+            'azure-cosmos',
+            'libhoney',
+            'influxdb_client',
+            'newrelic',
+            'aio_statsd',
+            'prometheus-client',
+            'prometheus-api-client',
+            'cassandra-driver',
+            'datadog',
+            'motor',
+            'redis',
+            'aioredis',
+            'aiomysql',
+            'psycopg2-binary',
+            'aiopg',
+            'sqlalchemy',
+            'boto3',
+            'snowflake-connector-python',
+            'google-cloud-bigquery',
+            'google-cloud-bigtable',
+            'google-cloud-storage',
+        ],
+        'all-engines': [
+            'grpcio',
+            'grpcio-tools',
+            'gql',
+            'playwright'
+
+        ],
+        'all-reporters': [
+            'azure-cosmos',
+            'libhoney',
+            'influxdb_client',
+            'newrelic',
+            'aio_statsd',
+            'prometheus-client',
+            'prometheus-api-client',
+            'cassandra-driver',
+            'datadog',
+            'motor',
+            'redis',
+            'aioredis',
+            'aiomysql',
+            'psycopg2-binary',
+            'aiopg',
+            'sqlalchemy',
+            'boto3',
+            'snowflake-connector-python',
+            'google-cloud-bigquery',
+            'google-cloud-bigtable',
+            'google-cloud-storage',
+
+        ],
+        'playwright': [
+            'playwright'
         ],
         'azure': [
             'azure-cosmos'
@@ -69,7 +127,7 @@ setup(
         ],
         'prometheus': [
             'prometheus-client',
-            'prometheus-api-client',
+            'prometheus-api-client'
         ],
         'cassandra': [
             'cassandra-driver'
@@ -91,7 +149,7 @@ setup(
             'aiomysql',
             'psycopg2-binary',
             'aiopg',
-            'sqlalchemy',
+            'sqlalchemy'
         ],
         'aws': [
             'boto3'
