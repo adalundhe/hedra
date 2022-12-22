@@ -1,5 +1,5 @@
 
-# <b>Hedra - Testng at scale </b>
+# <b>Hedra - Testing at scale </b>
 
 | Package     | Hedra                                                           |
 | ----------- | -----------                                                     |
@@ -9,9 +9,9 @@
 | Source      | https://github.com/scorbettUM/hedra                             |
 | Keywords    | performance, testing, async, distributed, graph, DAG, workflow  |
 
-Hedra is a Python preformance and scalable unit/integration testing framework that makes creating and running complex test workflows easy.
+Hedra is a Python performance and scalable unit/integration testing framework that makes creating and running complex test workflows easy.
 
-These workflows are written as directed acrylic graphs in Python, where each graph is specified as a collection of Python classes referred to as <b>Stages</b>. Each Stage may then specify async Python methods which are then wrapped in Python decorators (referred to as <b>Hooks</b>), which that Stage will then execute. The Hook wrapping a method tells hedra both what the action does and when to execute it. In combination, Stages and Hooks allow you to craft test workflows that can mimic real-world user behavior, optimize framework performance, or interact with a variety of Hedra's powerful integrations.
+These workflows are written as directed acrylic graphs in Python, where each graph is specified as a collection of Python classes referred to as <b>Stages</b>. Each Stage may then specify async Python methods which are then wrapped in Python decorators (referred to as <b>Hooks</b>), which that Stage will then execute. The Hook wrapping a method tells Hedra both what the action does and when to execute it. In combination, Stages and Hooks allow you to craft test workflows that can mimic real-world user behavior, optimize framework performance, or interact with a variety of Hedra's powerful integrations.
 
 <br/>
 
@@ -35,7 +35,7 @@ Hedra is simple to set up regardless of how you're choosing to run it, and autho
 
 <br/>
 
-### <u>Painless flexiblity and extensibility</u>
+### <u>Painless flexibility and extensibility</u>
 Hedra ships supporting HTTP, HTTP2, Websockets, and UDP out of the box. GraphQL, GRPC, and Playwright are available simply by installing the (optional) dependency packages. Hedra offers JSON and CSV results output by default, with 28 additional results reporting options readily available by likewise just installing the required dependencies.
 
 Likewise, Hedra offers a comprehensive plugin system. You can easily write plugins to load test your Postgresql database or integrate a third party service, with CLI-generated templates to guide you and full Typehints support throughout. Unlike other frameworks, no addtional compilation or build steps required - just write your plugin, import it, and include it in the appropriate Stage your test graph.
@@ -46,7 +46,7 @@ ___________
 
 ## <b>Requirements and Getting Started</b>
 
-Hedra has been tested on Python versions 3.8.6+, though we recommend using Python 3.10+. You should likewise have the latest LTS version of OpenSSL, build-essential, and other commmon Unix dependencies installed (if running on a Unix-based OS).
+Hedra has been tested on Python versions 3.8.6+, though we recommend using Python 3.10+. You should likewise have the latest LTS version of OpenSSL, build-essential, and other common Unix dependencies installed (if running on a Unix-based OS).
 
 *<b>Warning</b>*: Hedra has currently only been tested on the latest LTS versions of Ubuntu and Debian. Other official OS support is coming Mar. 2023. 
 
@@ -195,16 +195,16 @@ Engines are the underlying protocol or library integrations required for Hedra t
 
 ### <u>Personas</u>
 
-Personas are responsible for scheduling when indvidual `@action()` or `@task()` hooks execute over the speciied Execute stage's test duration. No addtional install dependencies are required for Personas, and the following personas are currently supported out-of-box:
+Personas are responsible for scheduling when individual `@action()` or `@task()` hooks execute over the speciied Execute stage's test duration. No additional install dependencies are required for Personas, and the following personas are currently supported out-of-box:
 
 | Persona               | Setup Config Name       | Description                                                                                                                                                                                                    |
 | ----------            | ----------------        | -----------------                                                                                                                                                                                              |
-| Batched               | batched                 | Executes each action or task hook in batches of the specified size, with an optional wait inbetween each batch spawning                                                                                        |
+| Batched               | batched                 | Executes each action or task hook in batches of the specified size, with an optional wait between each batch spawning                                                                                          |
 | Constant Arrival Rate | constant-arrival        | Hedra automatically adjusts the batch size after each batch spawns based upon the number of hooks that have completed, attempting to achieve `batch_size` completions per batch                                |
 | Constant Spawn Rate   | constant-spawn          | Like `Batched`, but cycles through actions before waiting `batch_interval` time.                                                                                                                               |
 | Default               | N/A                     | Cycles through all action/task hooks in the Execute stage, resulting in a (mostly) even distribution of execution                                                                                              |
 | No-Wait               | N/A                     | Cycles through all action/task hooks in the Execute stage, resulting in a (mostly) even distribution of execution. __WARNING__: This persona may cause OOM as it does not use the memory management algorithm. |    
-| Ramped                | ramped                  | Starts at a batch size of  `batch_gradient` * `batch_size`. Batch size increases by the gradient each batch with an optional wait inbetween each batch spawning                                                |
+| Ramped                | ramped                  | Starts at a batch size of  `batch_gradient` * `batch_size`. Batch size increases by the gradient each batch with an optional wait between each batch spawning                                                  |
 | Ramped Interval       | ramped-interval         | Executes `batch_size` hooks before waiting `batch_gradient` * `batch_interval` time. Interval increases by the gradient each batch                                                                             |
 | Sorted                | sorted                  | Executes each action/task hook in batches of the specified size and in the order provided to each hook's (optional) `order` parameter                                                                          |
 | Weighted              | weighted                | Executes action/task hooks in batches of the specified size, with each batch being generated from a sampled distribution based upon that action's weight                                                       |
