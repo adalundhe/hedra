@@ -11,14 +11,24 @@ with open(os.path.join(current_directory, 'README.md'), "r") as readme:
 
 setup(
     name="hedra",
-    version="0.6.2",
-    description="Powerful performance testing made easy.",
+    version="{{VERSION_PLACEHOLDER}}",
+    description="Performance testing at scale.",
     long_description=package_description,
     long_description_content_type="text/markdown",
     author="Sean Corbett",
     author_email="sean.corbett@umconnect.edu",
     url="https://github.com/scorbettUM/hedra",
     packages=find_packages(),
+    keywords=[
+        'pypi', 
+        'cicd', 
+        'python',
+        'performance',
+        'testing',
+        'dag',
+        'graph',
+        'workflow'
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
