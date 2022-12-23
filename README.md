@@ -8,7 +8,7 @@
 
 | Package     | Hedra                                                           |
 | ----------- | -----------                                                     |
-| Version     | 0.6.20                                                          |
+| Version     | 0.6.21                                                          |
 | Web         | TBD                                                             |
 | Download    | https://pypi.org/project/hedra/                                 | 
 | Source      | https://github.com/scorbettUM/hedra                             |
@@ -40,7 +40,7 @@ Authoring, managing, and running test workflows is easy. Hedra includes integrat
 
 <br/>
 
-### __Painless flexibility and extensibility__
+### __Flexibility and and painless extensibility__
 Hedra ships with support for HTTP, HTTP2, Websockets, and UDP out of the box. GraphQL, GRPC, and Playwright are available simply by installing the (optional) dependency packages. Hedra offers JSON and CSV results output by default, with 28 additional results reporting options readily available by likewise installing the required dependencies.
 
 Likewise, Hedra offers a comprehensive plugin system. You can easily write a plugin to test your Postgresql database or integrate a third party service, with CLI-generated templates to guide you and full type hints support throughout. Unlike other frameworks, no additional compilation or build steps are required - just write your plugin, import it, and include it in the appropriate Stage in your test graph.
