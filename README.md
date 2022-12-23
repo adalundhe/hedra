@@ -8,7 +8,7 @@
 
 | Package     | Hedra                                                           |
 | ----------- | -----------                                                     |
-| Version     | 0.6.19                                                          |
+| Version     | 0.6.20                                                          |
 | Web         | TBD                                                             |
 | Download    | https://pypi.org/project/hedra/                                 | 
 | Source      | https://github.com/scorbettUM/hedra                             |
@@ -36,7 +36,7 @@ Regardless of whether running on your personal laptop or distributed across a cl
 
 ### __Run with ease anywhere__
 
-Hedra is simple to set up regardless of how you're choosing to run it, and authoring/managing/running test workflows is easy. Hedra includes integrations with Git to facilitate easy management of collections of graphs via <b>Projects</b>, the ability to generate flexible starter test templates, and an API that is both fast and intuitive to understand. Distributed use almost exactly mirrors local operation, reducing the learning curve for more complex deployments.
+Authoring, managing, and running test workflows is easy. Hedra includes integrations with Git to facilitate easy management of collections of graphs via <b>Projects</b>, the ability to generate flexible starter test templates, and an API that is both fast and intuitive to understand. Distributed use almost exactly mirrors local operation, reducing the learning curve for more complex deployments.
 
 <br/>
 
