@@ -1,5 +1,7 @@
 import inspect
 import os
+import json
+from pathlib import Path
 from typing import Optional
 from hedra.projects.generation import GraphGenerator
 from hedra.core.graphs.stages.base.stage import Stage
@@ -72,5 +74,27 @@ def create_graph(
                 reporter=reporter
             )
         )
+
+    graph_name = path
+    if os.path.isfile(graph_name):
+        graph_name = Path(graph_name).stem
+
+    hedra_config_filepath = os.path.join(
+        os.getcwd(),
+        '.hedra.json'
+    )
+
+    hedra_config = {}
+    if os.path.exists(hedra_config_filepath):
+        with open(hedra_config_filepath, 'r') as hedra_config_file:
+            hedra_config = json.load(hedra_config_file)
+
+    hedra_graphs = hedra_config.get('graphs', {})
+
+    if hedra_graphs.get(graph_name) is None:
+        hedra_graphs[graph_name] = str(Path(path).absolute().resolve())
+        with open(hedra_config_filepath, 'w') as hedra_config_file:
+            hedra_config['graphs'] = hedra_graphs
+            json.dump(hedra_config, hedra_config_file, indent=4)   
 
     logger['console'].sync.info('\nGraph generated!\n')
