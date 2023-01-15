@@ -11,6 +11,8 @@ from hedra.core.engines.types.common.types import RequestTypes
 class UDPAction(BaseAction):
 
     __slots__ = (
+        'action_id',
+        'protocols',
         'wait_for_response',
         'type',
         'url',

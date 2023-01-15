@@ -59,10 +59,10 @@ def get_project(
         url = hedra_project_config.get('project_url')
     
     if username is None:
-        username = hedra_project_config.get('project_username')
+        username = hedra_project_config.get('project_username', "")
 
     if password is None:
-        password = hedra_project_config.get('project_password')
+        password = hedra_project_config.get('project_password', "")
 
     if branch is None:
         branch = hedra_project_config.get('project_branch', 'main')
@@ -75,20 +75,6 @@ def get_project(
             path,
             'url',
             '--url'
-        )
-
-    if username is None:
-        raise NotSetError(
-            path,
-            'username',
-            '--username'
-        )
-
-    if password is None:
-        raise NotSetError(
-            path,
-            'password',
-            '--password'
         )
 
     parsed_url = urlparse(url)

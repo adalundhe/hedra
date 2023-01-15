@@ -27,7 +27,7 @@ def graph():
 @click.option(
     '--log-directory',
     default=f'{os.getcwd()}/logs',
-    help='Set log level.'
+    help='Output directory for logfiles. If the directory does not exist it will be created.'
 )
 @click.option(
     '--bypass-connection-validation',
