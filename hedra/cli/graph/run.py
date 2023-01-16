@@ -102,9 +102,15 @@ def run_graph(
 
     if hedra_graphs.get(graph_name) is None:
         hedra_graphs[graph_name] = module.__file__
-        with open(hedra_config_filepath, 'w') as hedra_config_file:
-            hedra_config['graphs'] = hedra_graphs
-            json.dump(hedra_config, hedra_config_file, indent=4)   
+
+
+    hedra_config['logging'] = {
+        'logfiles_directory': logfiles_directory,
+        'log_level': log_level
+    }    
+    with open(hedra_config_filepath, 'w') as hedra_config_file:
+        hedra_config['graphs'] = hedra_graphs
+        json.dump(hedra_config, hedra_config_file, indent=4)   
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

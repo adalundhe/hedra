@@ -1,7 +1,7 @@
 import asyncio
 from concurrent.futures import ProcessPoolExecutor
 import math
-import dill
+import multiprocessing
 from types import FunctionType
 import psutil
 from typing import Any, Coroutine, Dict, List, Tuple, Union
@@ -58,13 +58,18 @@ class BatchExecutor:
         execution_task: FunctionType,
         configs: List[Any]
     ):
-        results = await asyncio.gather(*[
-            self.loop.run_in_executor(
-                self.pool,
-                execution_task,
-                config
-            ) for config in configs
-        ])
+
+        # For compatability and stability reasons, we ue spawn instead of fork.
+
+        pool = multiprocessing.get_context('spawn').Pool(processes=len(configs))
+
+        results = await self.loop.run_in_executor(
+            None,
+            pool.map,
+            execution_task,
+            configs
+            
+        )
         
         return results
 

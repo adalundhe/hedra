@@ -1,4 +1,4 @@
-import asyncio
+import json
 import dill
 import threading
 import os
@@ -7,21 +7,59 @@ from typing import Any, Dict, List, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.stages.optimize.optimization import Optimizer
-from hedra.logging import HedraLogger
+from hedra.logging import (
+    HedraLogger,
+    LoggerTypes,
+    logging_manager
+)
 from hedra.core.personas import get_persona
 
 
 def optimize_stage(serialized_config: str):
 
+    import asyncio
+    import uvloop
+    uvloop.install()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    hedra_config_filepath = os.path.join(
+        os.getcwd(),
+        '.hedra.json'
+    )
+
+    hedra_config = {}
+    if os.path.exists(hedra_config_filepath):
+        with open(hedra_config_filepath, 'r') as hedra_config_file:
+            hedra_config = json.load(hedra_config_file)
+
+    logging_config = hedra_config.get('logging', {})
+    logfiles_directory = logging_config.get(
+        'logfiles_directory',
+        os.getcwd()
+    )
+
+    log_level = logging_config.get('log_level', 'info')
+
+    logging_manager.disable(
+        LoggerTypes.DISTRIBUTED,
+        LoggerTypes.DISTRIBUTED_FILESYSTEM
+    )
+
+    logging_manager.update_log_level(log_level)
+    logging_manager.logfiles_directory = logfiles_directory
+
+
     logger = HedraLogger()
     logger.initialize()
+    logger.filesystem.sync.create_logfile('hedra.core.log')
     logger.filesystem.sync.create_logfile('hedra.optimize.log')
+
+    logger.filesystem.create_filelogger('hedra.core.log')
+    logger.filesystem.create_filelogger('hedra.optimize.log')
 
     thread_id = threading.current_thread().ident
     process_id = os.getpid()
-
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
 
     optimization_config: Dict[str, Union[str, int, Any]] = dill.loads(serialized_config)
 
