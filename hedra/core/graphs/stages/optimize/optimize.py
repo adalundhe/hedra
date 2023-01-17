@@ -1,6 +1,7 @@
 import asyncio
 import dill
 import time
+from collections import defaultdict
 from typing import Dict, List, Tuple, Union
 from hedra.core.graphs.events import Event
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
@@ -72,30 +73,6 @@ class Optimize(Stage):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Optimizing stages {stage_names} using {self.algorithm} algorithm')
         await self.logger.spinner.append_message(f'Optimizer - {self.name} optimizing stages {stage_names} using {self.algorithm} algorithm')
 
-        plugins = {
-            PluginType.OPTIMIZER: [],
-            PluginType.ENGINE: [],
-            PluginType.PERSONA: []
-        }
-
-        optimizer_plugins = self.plugins_by_type.get(PluginType.OPTIMIZER)
-        for plugin_name, plugin in optimizer_plugins.items():            
-            registered_algorithms[plugin_name] = plugin
-            plugins[PluginType.OPTIMIZER].append(plugin_name)
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Optimizer plugin - {plugin_name}')
-
-        engine_plugins = self.plugins_by_type.get(PluginType.ENGINE)
-        for plugin_name, plugin in engine_plugins.items():
-            registered_engines[plugin_name] = lambda config: plugin(config)
-            plugins[PluginType.ENGINE].append(plugin_name)
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Engine plugin - {plugin_name}')
-
-        persona_plugins = self.plugins_by_type.get(PluginType.PERSONA)
-        for plugin_name, plugin in persona_plugins.items():
-            registered_personas[plugin_name] = lambda config: plugin(config)
-            plugins[PluginType.PERSONA].append(plugin_name)
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Persona plugin - {plugin_name}')
-
         optimization_results = []
 
         # We may have less workers available during the optimize stage than assigned
@@ -126,6 +103,11 @@ class Optimize(Stage):
                 execute_stage_actions: List[ActionHook] = [hook.name for hook in stage.hooks[HookType.ACTION]]
                 execute_stage_tasks: List[TaskHook] = [hook.name for hook in stage.hooks[HookType.TASK]]
 
+                execute_stage_plugins = defaultdict(list)
+
+                for plugin in stage.plugins.values():
+                    execute_stage_plugins[plugin.type].append(plugin.name)
+
                 configs.append({
                     'graph_name': self.graph_name,
                     'graph_path': self.graph_path,
@@ -139,9 +121,9 @@ class Optimize(Stage):
                     'execute_stage_id': stage.execution_stage_id,
                     'execute_stage_config': stage_config,
                     'execute_stage_batch_size': batch_size,
+                    'execute_stage_plugins': execute_stage_plugins,
                     'optimizer_iterations': self.optimize_iterations,
                     'optimizer_algorithm': self.algorithm,
-                    'plugins': plugins,
                     'execute_stage_hooks': [
                         *execute_stage_actions,
                         *execute_stage_tasks

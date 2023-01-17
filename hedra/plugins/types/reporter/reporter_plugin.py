@@ -17,6 +17,7 @@ T = TypeVar('T')
 class ReporterPlugin(Generic[T], Plugin):
     type=PluginType.REPORTER
     config: T = None
+    name: str=None
 
     def __init__(self, config: T) -> None:
         
@@ -29,7 +30,6 @@ class ReporterPlugin(Generic[T], Plugin):
         self.executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
 
         self.hooks: Dict[PluginHooks, PluginHook] = {}
-        self.name: str = None
     
         self.config = config
 

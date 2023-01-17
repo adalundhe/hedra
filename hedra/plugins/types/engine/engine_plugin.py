@@ -28,6 +28,7 @@ class EnginePlugin(Generic[A, R], Plugin):
     security_context: Any = None
     initialized: bool = False
     type=PluginType.ENGINE
+    name: str=None
 
     def __init__(self, config: Config) -> None:
 
@@ -37,7 +38,6 @@ class EnginePlugin(Generic[A, R], Plugin):
         ).__init__()
 
         self.hooks = {}
-        self.name: str = None
         self.request_type = self.__class__.__name__
         self.next_name = None
         self.intercept = False

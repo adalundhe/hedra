@@ -3,6 +3,9 @@ import asyncio
 import psutil
 from hedra.core.personas.types.default_persona.default_persona import DefaultPersona
 from hedra.core.personas.batching.param_type import ParamType
+from hedra.core.engines.client.config import Config
+from hedra.core.personas.types.default_persona import DefaultPersona
+from hedra.core.personas.batching.batch import Batch
 from typing import Dict, List, Tuple, Union
 
 
@@ -10,17 +13,16 @@ class BaseAlgorithm:
 
     def __init__(
         self, 
-        config: Dict[str, Union[List[Tuple[Union[int, float]]], int]]
+        config: Dict[str, Union[List[Tuple[Union[int, float]]], int, Config]]
     ) -> None:
-        self.persona: DefaultPersona = config.get('persona', DefaultPersona)
+        self.stage_config: Config = config.get('stage_config')
         self.max_iter = config.get('iterations', 10)
         self.params = config.get('params', {})
-        self.persona_total_time = self.persona.total_time
+        self.persona_total_time = self.stage_config.total_time
+        self.batch = Batch(self.stage_config)
         self.current_params = {}
 
-        self.batch_time = self.persona.total_time/self.max_iter
-
-        self.persona.total_time = self.batch_time
+        self.batch_time = self.stage_config.total_time/self.max_iter
 
         self.param_names = []
         self.bounds = []
@@ -69,26 +71,28 @@ class BaseAlgorithm:
         self.iters = 0
 
     def get_params(self):
-        return self.persona.batch.to_params()
+        return self.batch.to_params()
 
-    def update_params(self):
+    def update_params(self, persona: DefaultPersona) -> DefaultPersona:
+
+        persona.total_time = self.batch_time
 
         batch_size = int(self.current_params.get(
             'batch_size',
-            self.persona.batch.size
+            persona.batch.size
         ))
 
         batch_interval = float(self.current_params.get(
             'batch_interval',
-            self.persona.batch.interval
+            persona.batch.interval
         ))
 
         batch_gradient = float(self.current_params.get(
             'batch_gradient',
-            self.persona.batch.gradient
+            persona.batch.gradient
         ))
 
-        for hook in self.persona._hooks:
+        for hook in persona._hooks:
 
             if batch_size <= psutil.cpu_count():
                 batch_size = 1000
@@ -98,9 +102,11 @@ class BaseAlgorithm:
             hook.session.pool.connections = []
             hook.session.pool.create_pool()
 
-        self.persona.batch.size = batch_size
-        self.persona.batch.interval = batch_interval
-        self.persona.batch.gradient = batch_gradient
+        persona.batch.size = batch_size
+        persona.batch.interval = batch_interval
+        persona.batch.gradient = batch_gradient
+
+        return persona
 
     def optimize(self, func):
         raise NotImplementedError(

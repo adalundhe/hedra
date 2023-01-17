@@ -12,10 +12,10 @@ from hedra.plugins.types.common.registrar import plugin_registrar
 
 class OptimizerPlugin(BaseAlgorithm, Plugin):
     type=PluginType.OPTIMIZER
+    name: str=None
 
     def __init__(self, config: Dict[str, Any]) -> None:
         self.hooks: Dict[PluginHooks, PluginHook] = {}
-        self.name: str = None
         
         methods = inspect.getmembers(self, predicate=inspect.ismethod) 
         for _, method in methods:

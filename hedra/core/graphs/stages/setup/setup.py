@@ -26,6 +26,7 @@ from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.personas.types import PersonaTypesMap
 from hedra.logging import HedraLogger
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
+from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.base.stage import Stage
@@ -191,9 +192,12 @@ class Setup(Stage, Generic[Unpack[T]]):
 
             execute_stage_id += 1
 
-            persona_plugins = self.plugins_by_type.get(PluginType.PERSONA)
-            for plugin_name in persona_plugins.keys():
-                self.persona_types.types[plugin_name] = plugin_name
+            persona_plugins: Dict[str, PersonaPlugin] = self.plugins_by_type[PluginType.PERSONA]
+            for plugin_name, plugin in persona_plugins.items():
+                plugin.name = plugin_name
+                self.persona_types.types[plugin_name] = plugin
+                execute_stage.plugins[plugin_name] = plugin
+                
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Persona plugin - {plugin.name} - for Execute stae - {execute_stage_name}')
    
             client = Client(
@@ -204,11 +208,12 @@ class Setup(Stage, Generic[Unpack[T]]):
             )
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Created Client, id - {client.client_id} - for Execute stage - {execute_stage_name}')
 
-            engine_plugins: Dict[str, EnginePlugin] = self.plugins_by_type.get(PluginType.ENGINE)
+            engine_plugins: Dict[str, EnginePlugin] = self.plugins_by_type[PluginType.ENGINE]
 
             for plugin_name, plugin in engine_plugins.items():
                 client.plugin[plugin_name] = plugin(self.config)
                 plugin.name = plugin_name
+                execute_stage.plugins[plugin_name] = plugin
                 self.plugins_by_type[plugin_name] = plugin
 
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Engine plugin - {plugin.name} - for Execute stage - {execute_stage_name}')

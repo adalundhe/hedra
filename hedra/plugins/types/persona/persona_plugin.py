@@ -20,6 +20,7 @@ T = TypeVar('T')
 
 class PersonaPlugin(DefaultPersona, Generic[T], Plugin):
     type=PluginType.PERSONA
+    name: str=None
     
     def __init__(self, config: Config):
         super().__init__(config)

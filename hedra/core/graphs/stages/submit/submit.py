@@ -94,14 +94,14 @@ class Submit(Stage, Generic[T]):
                 self.config.reporter_type = plugin_name
             
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Reporter plugin - {plugin_name}')
-        
+
         self.reporter = Reporter(self.config)
         self.reporter.graph_name = self.graph_name
         self.reporter.graph_id = self.graph_id
         self.reporter.stage_name = self.name
         self.reporter.stage_id = self.stage_id
-        
-        reporter_name = self.reporter.reporter_type.name.capitalize()
+
+        reporter_name = self.reporter.reporter_type_name
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Submitting results via - {reporter_name}:{self.reporter.reporter_id} - reporter')
         await self.logger.spinner.append_message(f'Submitting results via - {reporter_name} - reporter')

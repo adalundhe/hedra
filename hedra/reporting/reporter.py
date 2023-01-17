@@ -153,7 +153,14 @@ class Reporter:
             reporter_config = JSONConfig()
 
         self.reporter_type = reporter_config.reporter_type
-        self.reporter_type_name = self.reporter_type.name.capitalize()
+
+
+        if isinstance(self.reporter_type, ReporterTypes):
+            self.reporter_type_name = self.reporter_type.name.capitalize()
+
+        elif isinstance(self.reporter_type, str):
+            self.reporter_type_name = self.reporter_type.capitalize()
+            
         self.reporter_config = reporter_config
         
         selected_reporter = self.reporters.get(self.reporter_type)

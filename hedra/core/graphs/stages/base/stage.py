@@ -12,8 +12,7 @@ from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.engines.client.time_parser import TimeParser
 from hedra.logging import HedraLogger
-from hedra.plugins.types.engine.engine_plugin import EnginePlugin
-from hedra.plugins.types.reporter.reporter_plugin import ReporterPlugin
+from hedra.plugins.types.common.plugin import Plugin
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.core.graphs.stages.base.parallel.batch_executor import BatchExecutor
 
@@ -24,7 +23,7 @@ class Stage:
     all_dependencies: List[Stage]=[]
     next_context: Any = None
     stage_timeout=None
-    plugins: Dict[str, Union[EnginePlugin, ReporterPlugin]] = {}
+    plugins: Dict[str, Plugin] = {}
 
     def __init__(self) -> None:
         self.name = self.__class__.__name__
@@ -43,7 +42,7 @@ class Stage:
         self.requires_shutdown = False
         self.allow_parallel = False
         self.executor: BatchExecutor = None
-        self.plugins_by_type: Dict[PluginType, Dict[str, Union[EnginePlugin, ReporterPlugin]]] = defaultdict(dict)
+        self.plugins_by_type: Dict[PluginType, Dict[str, Plugin]] = defaultdict(dict)
 
         self.core_config = {}
         self.context = SimpleContext()

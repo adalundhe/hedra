@@ -9,6 +9,12 @@ from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.registry import RequestTypes
+from hedra.core.engines.types.registry import registered_engines
+from hedra.core.personas.persona_registry import registered_personas
+from hedra.plugins.types.plugin_types import PluginType
+from hedra.plugins.types.engine.engine_plugin import EnginePlugin
+from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
+from hedra.core.graphs.stages.base.import_tools import import_stages, import_plugins
 from hedra.core.personas import get_persona
 from hedra.logging import (
     HedraLogger,
@@ -56,8 +62,10 @@ async def start_execution(parallel_config: Dict[str, Any]):
     start = time.monotonic()
 
     graph_name = parallel_config.get('graph_name')
+    graph_path: str= parallel_config.get('graph_path')
     graph_id = parallel_config.get('graph_id')
     source_stage_name = parallel_config.get('source_stage_name')
+    source_stage_plugins = parallel_config.get('source_stage_plugins')
     source_stage_id = parallel_config.get('source_stage_id')
     thread_id = threading.current_thread().ident
     process_id = os.getpid()
@@ -78,6 +86,24 @@ async def start_execution(parallel_config: Dict[str, Any]):
         
         else:
             persona_config.batch_size = int(persona_config.batch_size/workers)
+
+    plugins_by_type = import_plugins(graph_path)
+
+    stage_persona_plugins: List[str] = source_stage_plugins[PluginType.PERSONA]
+    persona_plugins: Dict[str, PersonaPlugin] = plugins_by_type[PluginType.PERSONA]
+
+    stage_engine_plugins: List[str] = source_stage_plugins[PluginType.ENGINE]
+    engine_plugins: Dict[str, EnginePlugin] = plugins_by_type[PluginType.ENGINE]
+    
+    for plugin_name in stage_persona_plugins:
+        plugin = persona_plugins.get(plugin_name)
+        plugin.name = plugin_name
+        registered_personas[plugin_name] = lambda config: plugin(config)
+    
+    for plugin_name in stage_engine_plugins:
+        plugin = engine_plugins.get(plugin_name)
+        plugin.name = plugin_name
+        registered_engines[plugin_name] = lambda config: plugin(config)
 
     persona = get_persona(persona_config)
     persona.workers = workers
@@ -130,9 +156,7 @@ async def start_execution(parallel_config: Dict[str, Any]):
             f'{metadata_string} - Assembled hook - {hook.name}:{hook.hook_id} - using {action_type.capitalize()} Engine'
         )
 
-
         hooks[hook_type].append(assembled_hook)
-
 
     actions_and_tasks = [
         *hooks.get(HookType.ACTION, []),

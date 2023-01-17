@@ -3,6 +3,7 @@ import dill
 import time
 import asyncio
 import statistics
+from collections import defaultdict
 from typing import Generic, List, Union
 from hedra.core.engines.client import Client
 from typing_extensions import TypeVarTuple, Unpack
@@ -103,6 +104,10 @@ class Execute(Stage, Generic[Unpack[T]]):
 
         if self.workers > 1:
 
+            source_stage_plugins = defaultdict(list)
+            for plugin in self.plugins.values():
+                source_stage_plugins[plugin.type].append(plugin.name)
+
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Provisioning execution over - {self.workers} - workers')
 
             action_hooks: List[ActionHook] = self.hooks[HookType.ACTION]
@@ -142,9 +147,11 @@ class Execute(Stage, Generic[Unpack[T]]):
                 [
                     dill.dumps({
                         'graph_name': self.graph_name,
+                        'graph_path': self.graph_path,
                         'graph_id': self.graph_id,
                         'source_stage_name': self.name,
                         'source_stage_id': self.stage_id,
+                        'source_stage_plugins': source_stage_plugins,
                         'partition_method': PartitionMethod.BATCHES,
                         'workers': self.workers,
                         'worker_id': idx + 1,

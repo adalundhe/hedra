@@ -17,8 +17,10 @@ from hedra.core.graphs.stages.setup.setup import Setup
 from hedra.core.engines.types.registry import registered_engines
 from hedra.core.personas.persona_registry import registered_personas
 from hedra.plugins.types.plugin_types import PluginType
+from hedra.plugins.types.engine.engine_plugin import EnginePlugin
+from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
 from hedra.core.graphs.stages.execute import Execute
-from hedra.core.graphs.stages.base.stage import Stage
+from hedra.core.graphs.stages.base.import_tools import import_stages, import_plugins
 from hedra.core.graphs.stages.optimize.optimization.algorithms import registered_algorithms
 from hedra.logging import (
     HedraLogger,
@@ -54,13 +56,6 @@ def optimize_stage(serialized_config: str):
         os.getcwd()
     )
 
-    hedra_core_config = hedra_config.get('core', {
-        'connection_validation_retries': 3
-    })
-
-    connection_validation_retries: int = hedra_core_config.get('connection_validation_retries')
-    bypass_connection_validation: str = hedra_core_config.get('bypass_connection_validation')
-
     log_level = logging_config.get('log_level', 'info')
 
     logging_manager.disable(
@@ -92,39 +87,16 @@ def optimize_stage(serialized_config: str):
     source_stage_id: str = optimization_config.get('source_stage_id')
     execute_stage_name: str = optimization_config.get('execute_stage_name')
     execute_stage_config: Config = optimization_config.get('execute_stage_config')
+    execute_stage_plugins: Dict[PluginType, List[str]] = optimization_config.get('execute_stage_plugins')
     optimize_params: List[str] = optimization_config.get('optimize_params')
     optimize_iterations: int = optimization_config.get('optimizer_iterations')
     optimizer_algorithm: str = optimization_config.get('optimizer_algorithm')
-    plugins: Dict[PluginType, List[str]] = optimization_config.get('plugins')
     time_limit: int = optimization_config.get('time_limit')
     batch_size: int = optimization_config.get('execute_stage_batch_size')
 
     metadata_string = f'Graph - {graph_name}:{graph_id} - thread:{thread_id} - process:{process_id} - Stage: {source_stage_name}:{source_stage_id} - '
 
-    package_dir = Path(graph_path).resolve().parent
-    package_dir_path = str(package_dir)
-    package_dir_module = package_dir_path.split('/')[-1]
-    
-    package = ntpath.basename(graph_path)
-    package_slug = package.split('.')[0]
-    spec = importlib.util.spec_from_file_location(f'{package_dir_module}.{package_slug}', graph_path)
-    
-    if graph_path not in sys.path:
-        sys.path.append(str(package_dir.parent))
-
-    module = importlib.util.module_from_spec(spec)
-
-    sys.modules[module.__name__] = module
-
-    spec.loader.exec_module(module)
-    
-    direct_decendants = list({cls.__name__: cls for cls in Stage.__subclasses__()}.values())
-
-    discovered = {}
-    for name, stage_candidate in inspect.getmembers(module):
-        if inspect.isclass(stage_candidate) and issubclass(stage_candidate, Stage) and stage_candidate not in direct_decendants:
-            discovered[name] = stage_candidate
-
+    discovered = import_stages(graph_path)
 
     execute_stage: Stage = discovered.get(execute_stage_name)()
 
@@ -143,41 +115,46 @@ def optimize_stage(serialized_config: str):
         execute_stage_actions[hook.hook_type].append(hook)
 
     execute_stage.hooks.update(execute_stage_actions)
-
     execute_stage_config.batch_size = batch_size
 
-    persona_plugins = {}
-    for plugin_name in plugins.get(PluginType.PERSONA):
-        persona_plugins[plugin_name] = registered_personas.get(plugin_name)
+    plugins_by_type = import_plugins(graph_path)
 
+    stage_persona_plugins: List[str] = execute_stage_plugins[PluginType.PERSONA]
+    persona_plugins: Dict[str, PersonaPlugin] = plugins_by_type[PluginType.PERSONA]
+
+    stage_engine_plugins: List[str] = execute_stage_plugins[PluginType.ENGINE]
+    engine_plugins: Dict[str, EnginePlugin] = plugins_by_type[PluginType.ENGINE]
     
-    engine_plugins = {}
-    for plugin_name in plugins.get(PluginType.ENGINE):
-        engine_plugins[plugin_name] = registered_engines.get(plugin_name)
+    for plugin_name in stage_persona_plugins:
+        plugin = persona_plugins.get(plugin_name)
+        plugin.name = plugin_name
+        registered_personas[plugin_name] = lambda config: plugin(config)
+    
+    for plugin_name in stage_engine_plugins:
+        plugin = engine_plugins.get(plugin_name)
+        plugin.name = plugin_name
+        registered_engines[plugin_name] = lambda config: plugin(config)
 
-    optimizer_plugins = {}
-    for plugin_name in plugins.get(PluginType.OPTIMIZER):
-        optimizer_plugins[plugin_name] = registered_algorithms.get(plugin_name)
+
+    print(registered_personas)
+    print(registered_engines)
+    print(execute_stage_plugins)
+    exit(0)
+
+    for plugin_name, plugin in plugins_by_type[PluginType.OPTIMIZER].items():
+        registered_algorithms[plugin_name] = plugin
 
     setup_stage = Setup()
-    setup_stage.plugins_by_type = {
-        PluginType.PERSONA: persona_plugins,
-        PluginType.ENGINE: engine_plugins
-    }
+    setup_stage.plugins_by_type = plugins_by_type
     setup_stage.generation_setup_candidates = 1
     setup_stage.stages[execute_stage.name] = execute_stage
     setup_stage.config = execute_stage_config
 
-    stages = loop.run_until_complete(setup_stage.run()
-    )
+    stages = loop.run_until_complete(setup_stage.run())
     
     setup_execute_stage: Execute = stages.get(execute_stage_name)
 
     logger.filesystem.sync['hedra.optimize'].info(f'{metadata_string} - Setting up Optimization')
-
-
-    persona = get_persona(setup_stage.config)
-    persona.setup(setup_execute_stage.hooks, metadata_string)
 
     optimizer = Optimizer({
         'graph_name': graph_name,
@@ -186,18 +163,18 @@ def optimize_stage(serialized_config: str):
         'source_stage_id': source_stage_id,
         'params': optimize_params,
         'stage_name': execute_stage_name,
+        'stage_config': execute_stage_config,
+        'stage_hooks': setup_execute_stage.hooks,
         'iterations': optimize_iterations,
         'algorithm': optimizer_algorithm,
-        'persona': persona,
         'time_limit': time_limit
     })
 
     results = optimizer.optimize(loop)
-    optimized_batch_size = results.get('optimized_batch_size')
 
-    execute_stage_config.batch_size = optimized_batch_size
-    loop.stop()
-    loop.close()
+    execute_stage_config.batch_size = results.get('optimized_batch_size', execute_stage_config.batch_size)
+    execute_stage_config.batch_interval = results.get('optimized_batch_interval', execute_stage_config.batch_gradient)
+    execute_stage_config.batch_gradient = results.get('optimized_batch_gradient', execute_stage_config.batch_gradient)
 
     logger.filesystem.sync['hedra.optimize'].info(f'{optimizer.metadata_string} - Optimization complete')
 
