@@ -135,12 +135,6 @@ def optimize_stage(serialized_config: str):
         plugin.name = plugin_name
         registered_engines[plugin_name] = lambda config: plugin(config)
 
-
-    print(registered_personas)
-    print(registered_engines)
-    print(execute_stage_plugins)
-    exit(0)
-
     for plugin_name, plugin in plugins_by_type[PluginType.OPTIMIZER].items():
         registered_algorithms[plugin_name] = plugin
 
