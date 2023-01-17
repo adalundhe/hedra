@@ -1,9 +1,26 @@
 import asyncio
+import psutil
 import time
 import uuid
+import statistics
+from typing import List, Dict, Union, Any
+from asyncio import Task
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.types.types import PersonaTypes
+
+
+
+async def cancel_pending(pend: Task):
+    try:
+        pend.cancel()
+        if not pend.cancelled():
+            await pend
+
+        return pend
+    
+    except asyncio.CancelledError as cancelled_error:
+        return cancelled_error
 
 
 class CyclicNoWaitPersona(DefaultPersona):
@@ -25,4 +42,3 @@ class CyclicNoWaitPersona(DefaultPersona):
             await asyncio.sleep(0)
             elapsed = time.monotonic() - start
             idx += 1
-            

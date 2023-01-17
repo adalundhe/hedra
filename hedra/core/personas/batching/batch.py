@@ -46,7 +46,7 @@ class Batch:
         if size is None:
             size = self.size
 
-        interval = values.get('batch_internval')
+        interval = values.get('batch_interval')
         if interval is None:
             interval = self.interval
 

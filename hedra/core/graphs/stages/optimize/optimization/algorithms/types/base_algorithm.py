@@ -1,5 +1,6 @@
 import math
 import asyncio
+import psutil
 from hedra.core.personas.types.default_persona.default_persona import DefaultPersona
 from hedra.core.personas.batching.param_type import ParamType
 from typing import Dict, List, Tuple, Union
@@ -39,6 +40,7 @@ class BaseAlgorithm:
         for param_name in optimize_params:
             min_range, max_range = self.params.get(param_name)
             param = self.param_values.get(param_name, {})
+            value = param.get('value')
             params_type = param.get('type')
 
             self.param_names.append(param_name)
@@ -49,13 +51,19 @@ class BaseAlgorithm:
                 )
 
             if params_type == ParamType.INTEGER:
-                min_range = math.floor(min_range)
-                max_range = math.ceil(max_range)
+                min_range = math.floor(min_range * value)
+                max_range = math.ceil(max_range * value)
 
+            else:
+                min_range = min_range * value
+                max_range = max_range * value
+            
             self.bounds.append((
                 min_range,
                 max_range
             ))
+
+            self.current_params[param_name] = value
             
         self.fixed_iters = False
         self.iters = 0
@@ -65,27 +73,32 @@ class BaseAlgorithm:
 
     def update_params(self):
 
-        batch_size = self.current_params.get(
+        batch_size = int(self.current_params.get(
             'batch_size',
             self.persona.batch.size
-        )
+        ))
 
-        batch_interval = self.current_params.get(
+        batch_interval = float(self.current_params.get(
             'batch_interval',
             self.persona.batch.interval
-        )
+        ))
 
-        batch_gradient = self.current_params.get(
+        batch_gradient = float(self.current_params.get(
             'batch_gradient',
             self.persona.batch.gradient
-        )
+        ))
 
         for hook in self.persona._hooks:
+
+            if batch_size <= psutil.cpu_count():
+                batch_size = 1000
+
             hook.session.pool.size = batch_size
             hook.session.sem = asyncio.Semaphore(batch_size)
             hook.session.pool.connections = []
             hook.session.pool.create_pool()
 
+        self.persona.batch.size = batch_size
         self.persona.batch.interval = batch_interval
         self.persona.batch.gradient = batch_gradient
 

@@ -1,6 +1,7 @@
 import asyncio
 from sys import path
 import traceback
+import uuid
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -36,27 +37,30 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
     ]
 
     for stage_name, stage in execute_stages.items():
-
         if stage_name in current_stage.context.paths and stage.state in valid_states:
             stage.state = StageStates.OPTIMIZING
             optimization_candidates[stage_name] = stage
 
-    current_stage.generation_optimization_candidates = len(optimization_candidates)
+    
+    next_stage.context = current_stage.context
 
+    if len(optimization_candidates) > 0:
+   
+        current_stage.generation_optimization_candidates = len(optimization_candidates)
 
-    if current_stage.timeout:
-        optimization_results = await asyncio.wait_for(current_stage.run(optimization_candidates), timeout=current_stage.timeout)
+        if current_stage.timeout:
+            optimization_results = await asyncio.wait_for(current_stage.run(optimization_candidates), timeout=current_stage.timeout)
 
-    else:
-        optimization_results = await current_stage.run(optimization_candidates)
+        else:
+            optimization_results = await current_stage.run(optimization_candidates)
 
-    next_stage.context.optimized_params = optimization_results
+        next_stage.context.optimized_params = optimization_results
+
     next_stage.state = StageStates.OPTIMIZED
 
     await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
 
-    next_stage.context = current_stage.context
 
 
 async def optimize_to_execute_transition(current_stage: Stage, next_stage: Stage):

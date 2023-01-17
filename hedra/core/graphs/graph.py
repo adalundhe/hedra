@@ -31,6 +31,7 @@ class Graph:
         self.core_config = config
 
         self.graph_name = graph_name
+        self.graph_path = config.get('graph_path')
         self.graph_id = str(uuid.uuid4())
         self.status = GraphStatus.INITIALIZING
         self.graph = networkx.DiGraph()
@@ -89,6 +90,7 @@ class Graph:
         self.runner = TransitionAssembler(
             local_transitions,
             graph_name=self.graph_name,
+            graph_path=self.graph_path,
             graph_id=self.graph_id,
             cpus=cpus,
             worker_id=worker_id,

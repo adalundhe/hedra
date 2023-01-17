@@ -33,6 +33,7 @@ class TransitionAssembler:
         self, 
         transition_types, 
         graph_name: str=None,
+        graph_path: str=None,
         graph_id: str=None,
         cpus: int=None, 
         worker_id: int=None,
@@ -41,6 +42,7 @@ class TransitionAssembler:
         self.transition_types: Dict[Tuple[StageTypes, StageTypes], Coroutine] = transition_types
         self.core_config = core_config
         self.graph_name = graph_name
+        self.graph_path = graph_path
         self.graph_id = graph_id
         self.generated_stages = {}
         self.transitions = {}
@@ -80,6 +82,7 @@ class TransitionAssembler:
         for stage in self.generated_stages.values():
             stage.core_config = self.core_config
             stage.graph_name = self.graph_name
+            stage.graph_path = self.graph_path
             stage.graph_id = self.graph_id
 
             stage.workers = self.cpus

@@ -112,23 +112,21 @@ class MercuryHTTP2Client:
 
     def extend_pool(self, increased_capacity: int):
         self.pool.size += increased_capacity
-        for _ in range(increased_capacity):
-            self.pool.pipes.append(
-                HTTP2Pipe(self.pool.reset_connections)
-            )
-        
+        self.pool.create_pool()
+    
         self.sem = Semaphore(self.pool.size)
 
     def shrink_pool(self, decrease_capacity: int):
         self.pool.size -= decrease_capacity
-        self.pool.pipes = self.pool.pipes[:self.pool.size]
+        self.pool.create_pool()
+
         self.sem = Semaphore(self.pool.size)
 
     async def execute_prepared_request(self, action: HTTP2Action) -> HTTP2ResponseFuture:
         response = HTTP2Result(action)
         response.wait_start = time.monotonic()
-        self.active += 1
-
+        self.active = len(self.sem._waiters)
+        
         async with self.sem:
 
             pipe = self.pool.pipes.pop()

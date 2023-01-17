@@ -3,11 +3,25 @@ import time
 import asyncio
 import threading
 import os
+from asyncio import Task
 from typing import Any, Dict
 from hedra.core.personas.batching.param_type import ParamType
 from hedra.logging import HedraLogger
 from hedra.tools.data_structures import AsyncList
 from .algorithms import get_algorithm
+
+
+async def cancel_pending(pend: Task):
+    try:
+        pend.cancel()
+        if not pend.cancelled():
+            await pend
+
+        return pend
+    
+    except asyncio.CancelledError as cancelled_error:
+        return cancelled_error
+
 
 
 class Optimizer:
@@ -48,6 +62,9 @@ class Optimizer:
         self.optimized_results = {}
         self._max_aps = 0
         self._event_loop: asyncio.AbstractEventLoop = None
+        self.current_params = {}
+        self.start = 0
+        self.elapsed = 00
         
 
     def optimize(self, loop):
@@ -61,12 +78,12 @@ class Optimizer:
         self.logger.filesystem.sync['hedra.optimize'].info(f'{self.metadata_string} - Optimization config: Batch Time - {self.algorithm.batch_time}')
         self.logger.filesystem.sync['hedra.optimize'].info(f'{self.metadata_string} - Optimization config: Max Iter - {self.algorithm.max_iter}')
 
-        start = time.time()
+        self.start = time.time()
         
         results = self.algorithm.optimize(self._run_optimize)
         optimized_batch_size = int(results.x[0])
 
-        self.total_optimization_time = time.time() - start
+        self.total_optimization_time = time.time() - self.start
 
         self.logger.filesystem.sync['hedra.optimize'].info(f'{self.metadata_string} - Optimization took - {round(self.total_optimization_time, 2)} - seconds')
         self.logger.filesystem.sync['hedra.optimize'].info(f'{self.metadata_string} - Optimization - max actions per second - {self._max_aps}')
@@ -85,30 +102,36 @@ class Optimizer:
 
         return self.optimized_results
 
-    async def _optimize(self, *params):
-
-        self.current_params = {}
-        for idx, param in enumerate(params):
-            param_name = self.algorithm.param_names[idx]
-            self.current_params[param_name] = param
+    async def _optimize(self):
 
         if self._current_iter < self.algorithm.max_iter:
 
             await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter}')
 
-            self.algorithm.update_params()
-
             await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Batch Size - {self.algorithm.persona.batch.size}')
             await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Batch Interval - {self.algorithm.persona.batch.interval}')
             await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Batch Gradient - {self.algorithm.persona.batch.gradient}')
 
+            completed_count = 0
             try:
-                completed = await asyncio.wait_for(
-                    self.algorithm.persona.execute(), 
+                completed, pending = await asyncio.wait(
+                    [
+                        asyncio.create_task(
+                            self.algorithm.persona.execute()
+                        )
+                    ], 
                     timeout=self.algorithm.batch_time * 2
                 )
 
-                completed_count = len([complete for complete in completed if complete.error is None])
+                results = await asyncio.gather(*completed)
+
+                await asyncio.gather(*[
+                    asyncio.create_task(cancel_pending(pend)) for pend in pending])
+
+                completed_count = 0
+                for batch in results:
+                    completed_count += len([result for result in batch if result.error is None])
+
             except asyncio.TimeoutError:
                 completed_count = 1
 
@@ -117,17 +140,20 @@ class Optimizer:
             await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - took - {round(elapsed, 2)} - seconds')
        
             if completed_count < 1:
-                completed_count = elapsed
+                completed_count = 1
 
-            await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - actions per second - {round(completed/elapsed)}')
-            await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Inverted APS score- {elapsed/completed}')
-
+            await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - actions per second - {round(completed_count/elapsed)}')
+            await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Inverted APS score- {elapsed/completed_count}')
+            
             return elapsed/completed_count
 
         return 0
 
     def _run_optimize(self, xargs):
 
+        if self.elapsed > self._optimization_time_limit:
+            return 0
+           
         for idx, param in enumerate(xargs):
             param_name = self.algorithm.param_names[idx]
             param = self.algorithm.param_values.get(param_name, {})
@@ -136,11 +162,21 @@ class Optimizer:
             if param_type == ParamType.INTEGER:
                 xargs[idx] = int(xargs[idx])
 
+            else:
+                xargs[idx] = float(xargs[idx])
+
+            param['value'] = xargs[idx]
+
+            self.current_params[param_name] = xargs[idx]
+            self.algorithm.current_params[param_name] = xargs[idx]
+            self.algorithm.update_params()
+
         inverse_actions_per_second = self._event_loop.run_until_complete(
-            self._optimize(*xargs)
+            self._optimize()
         )
 
         self._current_iter += 1
+        self.elapsed = time.time() - self.start
 
 
         return inverse_actions_per_second

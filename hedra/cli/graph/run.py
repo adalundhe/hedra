@@ -123,6 +123,7 @@ def run_graph(
         list(discovered.values()),
         config={
             **hedra_core_config,
+            'graph_path': path,
             'graph_module': module.__name__
         },
         cpus=cpus

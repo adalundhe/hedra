@@ -39,6 +39,7 @@ class HTTP2Pool:
             ) for _ in range(0, self.size * 2, 2)
         ]
 
+
     def reset(self):
         self.pipes.append(HTTP2Pipe(self.size))
 

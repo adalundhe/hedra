@@ -73,7 +73,7 @@ class ConstantArrivalPersona(DefaultPersona):
             asyncio.create_task(
                 cancel_pending(pend)
             ) for pend in pending
-        ])
+        ], return_exceptions=True)
 
         cleanup_elapsed = time.monotonic() - cleanup_start
         await self.logger.filesystem.aio['hedra.core'].info(
@@ -103,7 +103,7 @@ class ConstantArrivalPersona(DefaultPersona):
         elapsed = 0
         idx = 0
         action_idx = 0
-        max_pool_size = int(self.batch.size * (psutil.cpu_count(logical=False) * 2)/self.workers)
+        max_pool_size = math.ceil(self.batch.size * (psutil.cpu_count(logical=False) * 2)/self.workers)
         self.completed_counter.last_batch_size = self.batch.size
 
         start = time.time()
@@ -143,7 +143,7 @@ class ConstantArrivalPersona(DefaultPersona):
                 await asyncio.sleep(self.batch.interval)
 
             action_idx = (action_idx + 1) % self.actions_count
-            if self._hooks[action_idx].session.active%max_pool_size == 0:
+            if self._hooks[action_idx].session.active > max_pool_size:
                     try:
                         max_wait = total_time - elapsed
                         await asyncio.wait_for(

@@ -2,6 +2,7 @@ import time
 import asyncio
 import psutil
 import uuid
+import math
 from typing import Dict, List, Union
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
@@ -100,7 +101,7 @@ class DefaultPersona:
     def setup(self, hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]], metadata_string: str):
 
         self.metadata_string = f'{metadata_string} Persona: {self.type.capitalize()}:{self.persona_id} - '
-
+        
         self._hooks = hooks.get(HookType.ACTION)
         self._hooks.extend(
             hooks.get(HookType.TASK, [])
@@ -149,7 +150,7 @@ class DefaultPersona:
             asyncio.create_task(
                 cancel_pending(pend)
             ) for pend in pending
-        ])
+        ], return_exceptions=True)
 
         cleanup_elapsed = time.monotonic() - cleanup_start
         await self.logger.filesystem.aio['hedra.core'].info(
@@ -177,7 +178,7 @@ class DefaultPersona:
 
     async def generator(self, total_time):
         elapsed = 0
-        max_pool_size = int(self.batch.size * (psutil.cpu_count(logical=False) * 2)/self.workers)
+        max_pool_size = math.ceil(self.batch.size * (psutil.cpu_count(logical=False) * 2)/self.workers)
         action_idx = 0
 
         start = time.monotonic()
@@ -186,7 +187,7 @@ class DefaultPersona:
             await asyncio.sleep(0)
             elapsed = time.monotonic() - start
 
-            if self._hooks[action_idx].session.active%max_pool_size == 0:
+            if self._hooks[action_idx].session.active > max_pool_size:
                 try:
                     max_wait = total_time - elapsed
                     await asyncio.wait_for(
@@ -195,7 +196,7 @@ class DefaultPersona:
                     )
                 except asyncio.TimeoutError:
                     pass
-
+            
             action_idx = (action_idx+1)%self.actions_count
 
     async def start_updates(self):

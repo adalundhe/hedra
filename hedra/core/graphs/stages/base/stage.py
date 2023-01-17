@@ -28,6 +28,7 @@ class Stage:
 
     def __init__(self) -> None:
         self.name = self.__class__.__name__
+        self.graph_path: str = None
         self.stage_id = str(uuid.uuid4())
 
         self.state = StageStates.INITIALIZED
@@ -42,7 +43,7 @@ class Stage:
         self.requires_shutdown = False
         self.allow_parallel = False
         self.executor: BatchExecutor = None
-        self.plugins_by_type: Dict[PluginType, Dict[str, Union[EnginePlugin, ReporterPlugin]]] = {}
+        self.plugins_by_type: Dict[PluginType, Dict[str, Union[EnginePlugin, ReporterPlugin]]] = defaultdict(dict)
 
         self.core_config = {}
         self.context = SimpleContext()

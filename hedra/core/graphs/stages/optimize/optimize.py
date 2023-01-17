@@ -72,19 +72,28 @@ class Optimize(Stage):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Optimizing stages {stage_names} using {self.algorithm} algorithm')
         await self.logger.spinner.append_message(f'Optimizer - {self.name} optimizing stages {stage_names} using {self.algorithm} algorithm')
 
+        plugins = {
+            PluginType.OPTIMIZER: [],
+            PluginType.ENGINE: [],
+            PluginType.PERSONA: []
+        }
+
         optimizer_plugins = self.plugins_by_type.get(PluginType.OPTIMIZER)
         for plugin_name, plugin in optimizer_plugins.items():            
             registered_algorithms[plugin_name] = plugin
+            plugins[PluginType.OPTIMIZER].append(plugin_name)
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Optimizer plugin - {plugin_name}')
 
         engine_plugins = self.plugins_by_type.get(PluginType.ENGINE)
         for plugin_name, plugin in engine_plugins.items():
             registered_engines[plugin_name] = lambda config: plugin(config)
+            plugins[PluginType.ENGINE].append(plugin_name)
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Engine plugin - {plugin_name}')
 
         persona_plugins = self.plugins_by_type.get(PluginType.PERSONA)
         for plugin_name, plugin in persona_plugins.items():
             registered_personas[plugin_name] = lambda config: plugin(config)
+            plugins[PluginType.PERSONA].append(plugin_name)
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Persona plugin - {plugin_name}')
 
         optimization_results = []
@@ -119,6 +128,7 @@ class Optimize(Stage):
 
                 configs.append({
                     'graph_name': self.graph_name,
+                    'graph_path': self.graph_path,
                     'graph_id': self.graph_id,
                     'optimize_params': self.optimize_params,
                     'worker_idx': worker_idx,
@@ -131,6 +141,7 @@ class Optimize(Stage):
                     'execute_stage_batch_size': batch_size,
                     'optimizer_iterations': self.optimize_iterations,
                     'optimizer_algorithm': self.algorithm,
+                    'plugins': plugins,
                     'execute_stage_hooks': [
                         *execute_stage_actions,
                         *execute_stage_tasks
