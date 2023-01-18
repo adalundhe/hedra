@@ -168,7 +168,9 @@ class Graph:
 
         for transition_group in self._transitions:
 
-            current_stages = ', '.join([transition.from_stage.name for transition in transition_group])
+            current_stages = ', '.join(
+                list(set([transition.from_stage.name for transition in transition_group]))
+            )
 
             async with self.logger.spinner as status_spinner:
                 

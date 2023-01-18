@@ -59,8 +59,8 @@ class MercuryGraphQLClient(MercuryHTTPClient):
                     action.url.ip_addr,
                     action.url.port,
                     action.url.socket_config,
-                    timeout=self.timeouts.connect_timeout,
-                    ssl=action.ssl_context
+                    ssl=action.ssl_context,
+                    timeout=self.timeouts.connect_timeout
                 )
 
                 response.connect_end = time.monotonic()

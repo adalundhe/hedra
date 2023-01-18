@@ -10,19 +10,6 @@ from hedra.core.engines.client.config import Config
 from hedra.core.personas.types.types import PersonaTypes
 
 
-
-async def cancel_pending(pend: Task):
-    try:
-        pend.cancel()
-        if not pend.cancelled():
-            await pend
-
-        return pend
-    
-    except asyncio.CancelledError as cancelled_error:
-        return cancelled_error
-
-
 class CyclicNoWaitPersona(DefaultPersona):
 
     def __init__(self, config: Config):

@@ -164,11 +164,12 @@ def optimize_stage(serialized_config: str):
         'time_limit': time_limit
     })
 
-    results = optimizer.optimize(loop)
+    results = optimizer.optimize()
 
     execute_stage_config.batch_size = results.get('optimized_batch_size', execute_stage_config.batch_size)
     execute_stage_config.batch_interval = results.get('optimized_batch_interval', execute_stage_config.batch_gradient)
     execute_stage_config.batch_gradient = results.get('optimized_batch_gradient', execute_stage_config.batch_gradient)
+
 
     logger.filesystem.sync['hedra.optimize'].info(f'{optimizer.metadata_string} - Optimization complete')
 

@@ -3,7 +3,7 @@ import time
 import asyncio
 import uuid
 import psutil
-from asyncio import Task
+from asyncio import Future
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.types.default_persona.default_persona import DefaultPersona
 from hedra.core.personas.types.types import PersonaTypes
@@ -12,11 +12,25 @@ from .completed_counter import CompletedCounter
 
 async def cancel_pending(pend: Task):
     try:
+        if pend.done():
+            pend.exception()
+
+            return pend
+
         pend.cancel()
-        await pend
+        if not pend.cancelled():
+            await pend
+
+        return pend
     
-    except asyncio.CancelledError:
-        pass
+    except asyncio.CancelledError as cancelled_error:
+        return cancelled_error
+
+    except asyncio.TimeoutError as timeout_error:
+        return timeout_error
+
+    except asyncio.InvalidStateError as invalid_state:
+        return invalid_state
 
 
 class ConstantArrivalPersona(DefaultPersona):
@@ -49,7 +63,7 @@ class ConstantArrivalPersona(DefaultPersona):
 
         self.start = time.monotonic()
         completed, pending = await asyncio.wait([
-            asyncio.create_task(
+            asyncio.ensure_future(
                 self.completed_counter.execute_action(
                     self._hooks[action_idx]
                 )
@@ -69,11 +83,18 @@ class ConstantArrivalPersona(DefaultPersona):
 
         cleanup_start = time.monotonic()
 
-        await asyncio.gather(*[
-            asyncio.create_task(
-                cancel_pending(pend)
-            ) for pend in pending
-        ])
+        try:
+            await asyncio.gather(*[
+                asyncio.create_task(
+                    cancel_pending(pend)
+                ) for pend in pending
+            ])
+
+        except asyncio.CancelledError:
+            pass
+
+        except asyncio.TimeoutError:
+            pass
 
         cleanup_elapsed = time.monotonic() - cleanup_start
         await self.logger.filesystem.aio['hedra.core'].info(

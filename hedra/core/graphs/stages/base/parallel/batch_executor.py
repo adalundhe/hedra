@@ -1,9 +1,9 @@
 import asyncio
-from concurrent.futures import ProcessPoolExecutor
 import math
 import multiprocessing
-from types import FunctionType
 import psutil
+from types import FunctionType
+from multiprocessing.pool import Pool
 from typing import Any, Coroutine, Dict, List, Tuple, Union
 from hedra.core.engines.types.common.base_result import BaseResult
 from .synchronization import BatchedSemaphore
@@ -14,12 +14,15 @@ class BatchExecutor:
 
     def __init__(
         self, 
-        max_workers: int = psutil.cpu_count(logical=False)
+        max_workers: int = psutil.cpu_count(logical=False),
+        start_method: str='fork'
     ) -> None:
         self.max_workers = max_workers
         self.loop = asyncio.get_event_loop()
+        self.start_method = start_method
+
         self.sem = BatchedSemaphore(max_workers)
-        self.pool = ProcessPoolExecutor(max_workers=max_workers)
+        self.pool = multiprocessing.get_context(start_method).Pool(processes=max_workers)
         self.shutdown_task = None
 
     async def execute_batches(self, batched_stages: List[Tuple[int, List[Any]]], execution_task: FunctionType) -> List[Tuple[str, Any]]:
@@ -59,13 +62,9 @@ class BatchExecutor:
         configs: List[Any]
     ):
 
-        # For compatability and stability reasons, we ue spawn instead of fork.
-
-        pool = multiprocessing.get_context('spawn').Pool(processes=len(configs))
-
         results = await self.loop.run_in_executor(
             None,
-            pool.map,
+            self.pool.map,
             execution_task,
             configs
             
@@ -144,4 +143,3 @@ class BatchExecutor:
                 ))
 
         return batches
-

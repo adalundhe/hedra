@@ -146,7 +146,8 @@ class MercuryWebsocketClient:
                     action.name,
                     action.url.ip_addr,
                     action.url.port,
-                    ssl=action.ssl_context
+                    ssl=action.ssl_context,
+                    timeout=self.timeouts.connect_timeout
                 )
 
                 response.connect_end = time.monotonic()

@@ -158,6 +158,14 @@ class HTTP2Pipe:
             except asyncio.TimeoutError as timeout:
                 response._status = 408 
                 response.error = str(timeout)
+                done = True
+                
+                return response
+
+            except asyncio.CancelledError as cancelled:
+                response._status = 408 
+                response.error = str(cancelled)
+                done = True
                 
                 return response
 

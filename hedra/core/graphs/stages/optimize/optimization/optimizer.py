@@ -63,14 +63,15 @@ class Optimizer:
         self._current_iter = 0
         self.optimized_results = {}
         self._max_aps = 0
-        self._event_loop: asyncio.AbstractEventLoop = None
+        self._event_loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._event_loop) 
+
         self.current_params = {}
         self.start = 0
         self.elapsed = 00
         
 
-    def optimize(self, loop):
-        self._event_loop = loop
+    def optimize(self):
 
         results = None
 
@@ -149,10 +150,7 @@ class Optimizer:
 
             completed_count = 0
             try:
-                results = await asyncio.wait_for(
-                    persona.execute(),
-                    timeout=persona.total_time * 2
-                )
+                results = await persona.execute()
                 completed_count = len([result for result in results if result.error is None])
 
             except Exception:
@@ -183,6 +181,5 @@ class Optimizer:
 
         self._current_iter += 1
         self.elapsed = time.time() - self.start
-
-
+ 
         return inverse_actions_per_second

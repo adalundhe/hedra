@@ -218,9 +218,11 @@ def execute_actions(parallel_config: str):
         
         parallel_config: Dict[str, Any] = dill.loads(parallel_config)
 
-        return loop.run_until_complete(
+        result = loop.run_until_complete(
             start_execution(parallel_config)
         )
+
+        return result
 
     except Exception as e:
         raise e

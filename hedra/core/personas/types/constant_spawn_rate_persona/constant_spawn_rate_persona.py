@@ -9,15 +9,6 @@ from hedra.core.personas.types.default_persona.default_persona import DefaultPer
 from hedra.core.personas.types.types import PersonaTypes
 
 
-async def cancel_pending(pend: Task):
-    try:
-        pend.cancel()
-        await pend
-    
-    except asyncio.CancelledError:
-        pass
-
-
 class ConstantSpawnPersona(DefaultPersona):
 
     def __init__(self, config: Config):

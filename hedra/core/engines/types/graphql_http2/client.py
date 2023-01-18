@@ -37,7 +37,7 @@ class MercuryGraphQLHTTP2Client(MercuryHTTP2Client):
         self.active += 1
 
         async with self.sem:
-            stream = self.pool.streams.pop()
+            pipe = self.pool.pipes.pop()
             connection = self.pool.connections.pop()
         
             try:
@@ -54,27 +54,30 @@ class MercuryGraphQLHTTP2Client(MercuryHTTP2Client):
 
                 response.start = time.monotonic()
 
-                reader_writer = await asyncio.wait_for(stream.connect(
+                stream = await connection.connect(
                     action.url.hostname,
                     action.url.ip_addr,
                     action.url.port,
                     action.url.socket_config,
-                    ssl=action.ssl_context
-                ), self.timeouts.connect_timeout)
+                    ssl=action.ssl_context,
+                    timeout=self.timeouts.connect_timeout
+                )
 
-                reader_writer.encoder = action.hpack_encoder
-                connection.connect(reader_writer)
-
+                stream.encoder = action.hpack_encoder
+     
                 response.connect_end = time.monotonic()
 
-                connection.send_request_headers(action, reader_writer)
-
+                pipe.send_request_headers(action, stream)
+  
                 if action.encoded_data is not None:
-                    await connection.submit_request_body(action, reader_writer)
+                    await pipe.submit_request_body(action, stream)
 
                 response.write_end = time.monotonic()
 
-                await connection.receive_response(response, reader_writer)
+                await asyncio.wait_for(
+                    pipe.receive_response(response, stream), 
+                    timeout=self.timeouts.total_timeout
+                )
 
                 response.complete = time.monotonic()
 
@@ -94,10 +97,9 @@ class MercuryGraphQLHTTP2Client(MercuryHTTP2Client):
                             listener.setup()
                             event = listener.hooks.channel_events.pop()
                             if not event.is_set():
-                                event.set()       
+                                event.set()      
 
-            
-                self.pool.streams.append(stream)
+                self.pool.pipes.append(pipe)
                 self.pool.connections.append(connection)
                 
             except Exception as e:

@@ -151,7 +151,8 @@ class MercuryHTTP2Client:
                     action.url.ip_addr,
                     action.url.port,
                     action.url.socket_config,
-                    ssl=action.ssl_context
+                    ssl=action.ssl_context,
+                    timeout=self.timeouts.connect_timeout
                 )
 
                 stream.encoder = action.hpack_encoder

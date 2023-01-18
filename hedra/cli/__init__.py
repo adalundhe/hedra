@@ -1,5 +1,6 @@
 from .base import CLI
-
+import warnings
+warnings.simplefilter("ignore")
 
 import click
 from .base import CLI

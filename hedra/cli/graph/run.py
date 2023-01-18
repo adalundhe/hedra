@@ -1,8 +1,8 @@
 import asyncio
 import os
 import inspect
-import uvloop
 import json
+import uvloop
 uvloop.install()
 import sys
 import importlib
@@ -132,6 +132,9 @@ def run_graph(
     graph.assemble()
 
     loop.run_until_complete(graph.run())
+
+    loop.stop()
+    loop.close()
 
     logger.filesystem.sync['hedra.core'].info(f'{graph.metadata_string} - Completed - {graph.logger.spinner.display.total_timer.elapsed_message}\n')
     logger.console.sync.info(f'\nGraph - {graph_name.capitalize()} - completed! {graph.logger.spinner.display.total_timer.elapsed_message}\n')
