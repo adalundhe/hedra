@@ -8,8 +8,8 @@
 
 | Package     | Hedra                                                           |
 | ----------- | -----------                                                     |
-| Version     | 0.6.28                                                          |
-| Web         | TBD                                                             |
+| Version     | 0.6.29                                                          |
+| Web         | https://hedra.dev                                               |
 | Download    | https://pypi.org/project/hedra/                                 | 
 | Source      | https://github.com/scorbettUM/hedra                             |
 | Keywords    | performance, testing, async, distributed, graph, DAG, workflow  |
