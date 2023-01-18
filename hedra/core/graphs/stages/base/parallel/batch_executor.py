@@ -15,7 +15,7 @@ class BatchExecutor:
     def __init__(
         self, 
         max_workers: int = psutil.cpu_count(logical=False),
-        start_method: str='fork'
+        start_method: str=multiprocessing.get_start_method()
     ) -> None:
         self.max_workers = max_workers
         self.loop = asyncio.get_event_loop()

@@ -3,7 +3,7 @@ import time
 import asyncio
 import uuid
 import psutil
-from asyncio import Future
+from asyncio import Task
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.types.default_persona.default_persona import DefaultPersona
 from hedra.core.personas.types.types import PersonaTypes
