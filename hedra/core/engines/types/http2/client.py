@@ -125,7 +125,7 @@ class MercuryHTTP2Client:
     async def execute_prepared_request(self, action: HTTP2Action) -> HTTP2ResponseFuture:
         response = HTTP2Result(action)
         response.wait_start = time.monotonic()
-        self.active = len(self.sem._waiters)
+        self.active += 1
         
         async with self.sem:
 
