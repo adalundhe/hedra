@@ -139,7 +139,7 @@ class Optimizer:
                 self.current_params[param_name] = xargs[idx]
                 self.algorithm.current_params[param_name] = xargs[idx]
             
-            self.algorithm.update_params(persona)
+            persona = self.algorithm.update_params(persona)
 
             await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter}')
 
@@ -147,9 +147,17 @@ class Optimizer:
             await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Batch Interval - {persona.batch.interval}')
             await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Batch Gradient - {persona.batch.gradient}')
 
-            
-            results = await persona.execute()
-            completed_count = len([result for result in results if result.error is None])
+            completed_count = 0
+            try:
+                results = await asyncio.wait_for(
+                    persona.execute(),
+                    timeout=persona.total_time * 2
+                )
+                completed_count = len([result for result in results if result.error is None])
+
+            except Exception:
+                pass
+
             elapsed = persona.end - persona.start
 
             await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - took - {round(elapsed, 2)} - seconds')

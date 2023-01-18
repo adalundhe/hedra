@@ -1,6 +1,7 @@
 import asyncio
 import time
 import uuid
+import traceback
 from typing import Awaitable, Dict, Set, Tuple
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.http2.pipe import HTTP2Pipe
@@ -194,7 +195,7 @@ class MercuryHTTP2Client:
                 
             except Exception as e:
                 response.complete = time.monotonic()
-                response.response_code = 400
+                response._status = 400
                 response.error = str(e)
 
                 self.pool.reset()

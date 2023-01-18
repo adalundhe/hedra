@@ -132,7 +132,7 @@ class HTTP2Result(BaseResult):
 
     @property
     def status(self) -> Union[int, None]:
-        if len(self.headers) == 0 and self.deferred_headers:
+        if self._status is None and len(self.headers) == 0 and self.deferred_headers:
             self.headers = self._parse_headers()
             self._status = int(self.headers.get(b'status', 400))
         

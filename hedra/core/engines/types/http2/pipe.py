@@ -148,8 +148,18 @@ class HTTP2Pipe:
 
         done = False
         while done is False:
+
+            data = b''
             
-            data = await asyncio.wait_for(stream.read(), timeout=stream.timeouts.socket_read_timeout)
+            try:
+
+                data = await asyncio.wait_for(stream.read(), timeout=stream.timeouts.socket_read_timeout)
+
+            except asyncio.TimeoutError as timeout:
+                response._status = 408 
+                response.error = str(timeout)
+                
+                return response
 
             stream.frame_buffer.data.extend(data)
             stream.frame_buffer.max_frame_size = stream.max_outbound_frame_size
@@ -352,6 +362,9 @@ class HTTP2Pipe:
 
                 if conn_increment:
                     stream.write_window_update_frame(0, conn_increment)
+
+                if event.data is None:
+                    event.data = b''
 
                 response.body.extend(event.data)
 

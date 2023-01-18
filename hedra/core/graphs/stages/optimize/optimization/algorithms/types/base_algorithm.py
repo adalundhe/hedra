@@ -18,11 +18,12 @@ class BaseAlgorithm:
         self.stage_config: Config = config.get('stage_config')
         self.max_iter = config.get('iterations', 10)
         self.params = config.get('params', {})
+        self.time_limit = config.get('time_limit', 60)
         self.persona_total_time = self.stage_config.total_time
         self.batch = Batch(self.stage_config)
         self.current_params = {}
 
-        self.batch_time = self.stage_config.total_time/self.max_iter
+        self.batch_time = self.time_limit/self.max_iter
 
         self.param_names = []
         self.bounds = []

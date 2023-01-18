@@ -73,7 +73,7 @@ class ConstantArrivalPersona(DefaultPersona):
             asyncio.create_task(
                 cancel_pending(pend)
             ) for pend in pending
-        ], return_exceptions=True)
+        ])
 
         cleanup_elapsed = time.monotonic() - cleanup_start
         await self.logger.filesystem.aio['hedra.core'].info(

@@ -86,6 +86,9 @@ class WindowManager:
             or ``None``.
         :rtype: ``int`` or ``None``
         """
+
+        if size is None:
+            size = 0
         
         self._bytes_processed += size
         if not self._bytes_processed:
