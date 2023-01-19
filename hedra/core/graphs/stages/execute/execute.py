@@ -113,6 +113,9 @@ class Execute(Stage, Generic[Unpack[T]]):
             action_hooks: List[ActionHook] = self.hooks[HookType.ACTION]
             hooks = [
                 {
+                    'graph_name': self.graph_name,
+                    'graph_path': self.graph_path,
+                    'stage': hook.stage,
                     'timeouts': hook.session.timeouts,
                     'reset_connections': hook.session.pool.reset_connections,
                     'hook_name': hook.name,
@@ -128,6 +131,9 @@ class Execute(Stage, Generic[Unpack[T]]):
             task_hooks: List[TaskHook] = self.hooks[HookType.TASK]
             hooks.extend([
                 {
+                    'graph_name': self.graph_name,
+                    'graph_path': self.graph_path,
+                    'stage': hook.stage,
                     'timeouts': hook.session.timeouts,
                     'reset_connections': False,
                     'hook_name': hook.name,
@@ -152,6 +158,7 @@ class Execute(Stage, Generic[Unpack[T]]):
                         'source_stage_name': self.name,
                         'source_stage_id': self.stage_id,
                         'source_stage_plugins': source_stage_plugins,
+                        'source_stage_config': self.client._config,
                         'partition_method': PartitionMethod.BATCHES,
                         'workers': self.workers,
                         'worker_id': idx + 1,

@@ -1,3 +1,4 @@
+import inspect
 from typing import Dict, Any, Union
 from hedra.core.engines import registered_engines
 from hedra.core.graphs.hooks.registry.registrar import registrar
@@ -6,6 +7,7 @@ from hedra.core.engines.types.task import Task, MercuryTaskRunner
 from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core.graphs.stages.base.stage import Stage
 from hedra.logging import HedraLogger
 
 
@@ -14,13 +16,16 @@ async def assemble_task(
     hook_action: Dict[str, Any],
     persona: DefaultPersona,
     config: Config,
-    metadata_string: str
+    metadata_string: str,
+    execute_stage: Stage
 ):
 
     logger = HedraLogger()
     logger.initialize()
 
     hook_type_name = RequestTypes.TASK.capitalize()
+    task_graph_path = hook_action.get('graph_path')
+    task_stage_name = hook_action.get('stage')
     task_name = hook_action.get('name')
     
     await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - Assembling {hook_type_name} Hook - {task_name}')
@@ -64,15 +69,23 @@ async def assemble_task(
         timeouts=hook_action.get('timeouts')
     )
 
-    task_hook = registrar.all.get(task_name)
+    task_hook: TaskHook = registrar.all.get(task_name)
 
     hook.action: Task = Task(
         task_name,
         task_hook.call,
-        source=hook.config.env,
-        user=hook.config.user,
-        tags=hook.config.tags
+        source=hook.metadata.env,
+        user=hook.metadata.user,
+        tags=hook.metadata.tags
     )
+
+
+    hook.action.execute = hook.action.execute.__get__(execute_stage, execute_stage.__class__)
+    setattr(execute_stage, task_hook.shortname, hook.action.execute)
+
+    if inspect.ismethod(task_hook.call) is False:
+        hook.call = task_hook.call.__get__(execute_stage, execute_stage.__class__)
+        setattr(execute_stage, task_hook.shortname, task_hook.call)
 
 
     await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - {hook_type_name} Hook - {task_name} - Env: {hook.action.source}')

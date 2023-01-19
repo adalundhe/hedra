@@ -8,6 +8,7 @@ from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.engine.action import Action
+from hedra.core.graphs.stages.base.stage import Stage
 from hedra.logging import HedraLogger
 
 
@@ -16,7 +17,8 @@ async def assemble_plugin_action(
     hook_action: Dict[str, Any],
     persona: DefaultPersona,
     config: Config,
-    metadata_string: str
+    metadata_string: str,
+    execute_stage: Stage
 ):
 
     logger = HedraLogger()

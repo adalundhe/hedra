@@ -1,10 +1,12 @@
 import asyncio
 import time
 import uuid
+import traceback
 from typing import Awaitable, Dict
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.concurrency import Semaphore
 from hedra.core.engines.types.common.base_result import BaseResult
+from hedra.core.graphs.simple_context import SimpleContext
 from .task import Task
 from .result import TaskResult
 
@@ -12,6 +14,7 @@ from .result import TaskResult
 class MercuryTaskRunner:
 
     __slots__ = (
+        'pool',
         'session_id',
         'timeouts',
         'concurrency',
@@ -31,6 +34,9 @@ class MercuryTaskRunner:
 
         self.registered: Dict[str, Task] = {}
         self.closed = False
+        self.pool = SimpleContext()
+        self.pool.size = concurrency
+        self.pool.reset_connections = False
 
         self.sem = asyncio.Semaphore(value=concurrency)
         self.active = 0
@@ -43,7 +49,6 @@ class MercuryTaskRunner:
 
     def extend_pool(self, increased_capacity: int):
         self.concurrency += increased_capacity
-        
         self.sem = Semaphore(self.concurrency)
 
     def shrink_pool(self, decrease_capacity: int):
@@ -67,11 +72,13 @@ class MercuryTaskRunner:
 
                 start = time.monotonic()
 
-                result: BaseResult = await asyncio.wait_for(
-                    task.execute(),
-                    timeout=self.timeouts.total_timeout
-                )
+                result: BaseResult = await task.execute()
                 
+                result.name = task.name
+                result.source = task.source
+                result.user = task.metadata.user
+                result.tags = task.metadata.tags
+                result.checks = task.hooks.checks
                 result.wait_start = wait_start
                 result.start = start
                 result.complete = time.monotonic()

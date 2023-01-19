@@ -28,7 +28,6 @@ from hedra.logging import HedraLogger
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
 from hedra.plugins.types.plugin_types import PluginType
-from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.base.stage import Stage
 from .exceptions import HookSetupError
 
@@ -106,7 +105,7 @@ class Setup(Stage, Generic[Unpack[T]]):
     def __init__(self) -> None:
         super().__init__()
         self.generation_setup_candidates = 0
-        self.stages: Dict[str, Execute] = {}
+        self.stages: Dict[str, Stage] = {}
         self.accepted_hook_types = [ HookType.SETUP, HookType.EVENT, HookType.CONTEXT ]
         self.persona_types = PersonaTypesMap()
         self.config = Config(
@@ -361,7 +360,7 @@ class Setup(Stage, Generic[Unpack[T]]):
         return self.stages
 
     @Internal()
-    async def get_hook(self, execute_stage: Execute, shortname: str, hook_type: str) -> Coroutine:
+    async def get_hook(self, execute_stage: Stage, shortname: str, hook_type: str) -> Coroutine:
         hooks: List[Union[AfterHook, BeforeHook]] = execute_stage.hooks[hook_type]
         for hook in hooks:
             if shortname in hook.names:
@@ -370,7 +369,7 @@ class Setup(Stage, Generic[Unpack[T]]):
                 return hook.call
 
     @Internal()
-    async def get_checks(self, execute_stage: Execute, shortname: str) -> List[Coroutine]:
+    async def get_checks(self, execute_stage: Stage, shortname: str) -> List[Coroutine]:
 
         checks = []
         checks_hooks: List[CheckHook] = execute_stage.hooks[HookType.CHECK]
@@ -383,7 +382,7 @@ class Setup(Stage, Generic[Unpack[T]]):
         return checks
 
     @Internal()
-    async def get_channels(self, execute_stage: Execute) -> None:
+    async def get_channels(self, execute_stage: Stage) -> None:
         listeners: Dict[str, Union[ActionHook, TaskHook]] = {}
         notifiers: Dict[str, Union[ActionHook, TaskHook]] = {}
         channels: Dict[str, ChannelHook] = {channel.shortname: channel for channel in execute_stage.hooks[HookType.CHANNEL]}

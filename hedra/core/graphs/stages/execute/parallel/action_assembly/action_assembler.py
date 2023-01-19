@@ -3,6 +3,7 @@ from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
 from hedra.core.personas.types.default_persona import DefaultPersona
+from hedra.core.graphs.stages.base.stage import Stage
 from .assemble_graphql_action import assemble_graphql_action
 from .assemble_graphql_http2_action import assemble_graphql_http2_action
 from .assemble_grpc_action import assemble_grpc_action
@@ -44,7 +45,7 @@ class ActionAssembler:
 
         self.metadata_string = metadata_string
 
-    def assemble(self, action_type: RequestTypes) -> Awaitable[Union[ActionHook, TaskHook]]:
+    def assemble(self, action_type: RequestTypes, execute_stage: Stage) -> Awaitable[Union[ActionHook, TaskHook]]:
         return self._assembler_types.get(
             action_type,
             assemble_plugin_action
@@ -53,5 +54,6 @@ class ActionAssembler:
             self.hook_action,
             self.persona,
             self.config,
-            self.metadata_string
+            self.metadata_string,
+            execute_stage
         )

@@ -14,6 +14,7 @@ from hedra.core.personas.persona_registry import registered_personas
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
+from hedra.core.graphs.stages.setup.setup import Setup
 from hedra.core.graphs.stages.base.import_tools import import_stages, import_plugins
 from hedra.core.personas import get_persona
 from hedra.logging import (
@@ -62,10 +63,11 @@ async def start_execution(parallel_config: Dict[str, Any]):
     start = time.monotonic()
 
     graph_name = parallel_config.get('graph_name')
-    graph_path: str= parallel_config.get('graph_path')
+    graph_path: str= parallel_config.get('graph_path') 
     graph_id = parallel_config.get('graph_id')
     source_stage_name = parallel_config.get('source_stage_name')
     source_stage_plugins = parallel_config.get('source_stage_plugins')
+    source_stage_config = parallel_config.get('source_stage_config')
     source_stage_id = parallel_config.get('source_stage_id')
     thread_id = threading.current_thread().ident
     process_id = os.getpid()
@@ -78,6 +80,10 @@ async def start_execution(parallel_config: Dict[str, Any]):
     workers = parallel_config.get('workers')
     worker_id = parallel_config.get('worker_id')
 
+    stages = import_stages(graph_path)
+    plugins_by_type = import_plugins(graph_path)
+    execute_stage = stages.get(source_stage_name)()
+
     execution_hooks_count = len(execution_hooks)
 
     if partition_method == PartitionMethod.BATCHES and persona_config.optimized is False:
@@ -87,7 +93,6 @@ async def start_execution(parallel_config: Dict[str, Any]):
         else:
             persona_config.batch_size = int(persona_config.batch_size/workers)
 
-    plugins_by_type = import_plugins(graph_path)
 
     stage_persona_plugins: List[str] = source_stage_plugins[PluginType.PERSONA]
     persona_plugins: Dict[str, PersonaPlugin] = plugins_by_type[PluginType.PERSONA]
@@ -131,7 +136,6 @@ async def start_execution(parallel_config: Dict[str, Any]):
             )
 
         else:
-            
             hook = TaskHook(
                 hook_action.get('hook_name'),
                 hook_action.get('hook_shortname'),
@@ -149,7 +153,7 @@ async def start_execution(parallel_config: Dict[str, Any]):
             metadata_string
         )
 
-        assembled_hook = await action_assembler.assemble(action_type)
+        assembled_hook = await action_assembler.assemble(action_type, execute_stage)
         actions[assembled_hook.name] = assembled_hook.action
         
         await logger.filesystem.aio['hedra.core'].info(
@@ -157,20 +161,28 @@ async def start_execution(parallel_config: Dict[str, Any]):
         )
 
         hooks[hook_type].append(assembled_hook)
-
+    
     actions_and_tasks = [
         *hooks.get(HookType.ACTION, []),
         *hooks.get(HookType.TASK, [])
     ]
+
+    setup_stage = Setup()
+    setup_stage.plugins_by_type = plugins_by_type
+    setup_stage.generation_setup_candidates = 1
+    setup_stage.stages[execute_stage.name] = execute_stage
+    setup_stage.config = source_stage_config
+
+    stages = await setup_stage.run()
+    setup_execute_stage = stages.get(source_stage_name)
 
     for hook in actions_and_tasks:
         if hook.action.hooks.notify:
             for idx, listener_name in enumerate(hook.action.hooks.listeners):
                 hook.action.hooks.listeners[idx] = actions.get(listener_name)
 
-    persona.setup(hooks, metadata_string)
 
-    if action_type == RequestTypes.PLAYWRIGHT and isinstance(hook.session, MercuryPlaywrightClient):
+        if hook.action.type == RequestTypes.PLAYWRIGHT and isinstance(hook.session, MercuryPlaywrightClient):
 
             await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Setting up Playwright Session')
 
@@ -191,6 +203,8 @@ async def start_execution(parallel_config: Dict[str, Any]):
                 options=persona_config.playwright_options
             ))
 
+
+    persona.setup(hooks, metadata_string)
 
     await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Starting execution')
 

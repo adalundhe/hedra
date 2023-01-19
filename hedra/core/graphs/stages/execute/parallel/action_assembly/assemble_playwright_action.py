@@ -14,6 +14,7 @@ from hedra.core.engines.types.playwright import (
 from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core.graphs.stages.base.stage import Stage
 from hedra.logging import HedraLogger
 
 
@@ -22,7 +23,8 @@ async def assemble_playwright_command(
     hook_action: Dict[str, Any],
     persona: DefaultPersona,
     config: Config,
-    metadata_string: str
+    metadata_string: str,
+    execute_stage: Stage
 ):
     logger = HedraLogger()
     logger.initialize()
