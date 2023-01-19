@@ -8,6 +8,7 @@ from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.events import EventsGroup
 from hedra.reporting.metric import MetricsSet
 from hedra.core.graphs.events import Event
+from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.graphs.hooks.hook_types.internal import Internal
 from hedra.core.graphs.hooks.registry.registry_types import (
     EventHook, 
@@ -93,10 +94,10 @@ class Analyze(Stage):
 
         elapsed_times = []
         for stage_name, _, _ in batches:
-            stage_results = self.raw_results.get(stage_name)
-            total_group_results += stage_results.get('total_results', 0)
+            stage_results: ResultsSet = self.raw_results.get(stage_name)
+            total_group_results += stage_results.total_results
             elapsed_times.append(
-                stage_results.get('total_elapsed', 0)
+                stage_results.total_elapsed
             )
 
         await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Paritioned {len(batches)} batches of results')
@@ -121,8 +122,8 @@ class Analyze(Stage):
             stage_batches = []
 
             stage_results = self.raw_results.get(stage_name)
-            results = stage_results.get('results')
-            stage_total_time = stage_results.get('total_elapsed')
+            results = stage_results.results
+            stage_total_time = stage_results.total_elapsed
             
             stage_total_times[stage_name] = stage_total_time
 
@@ -242,7 +243,7 @@ class Analyze(Stage):
 
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Convererted stats for stage - {stage_name} to metrics set')
         
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Calculated results for - {events_group.total} - actions from stage - {stage_name}')
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Calculated results for - {stage_total} - actions from stage - {stage_name}')
 
             processed_results.append({
                 'stage_metrics': {

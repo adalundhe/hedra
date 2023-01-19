@@ -37,6 +37,7 @@ class MercuryTaskRunner:
         self.pool = SimpleContext()
         self.pool.size = concurrency
         self.pool.reset_connections = False
+        self.pool.create_pool = lambda: None
 
         self.sem = asyncio.Semaphore(value=concurrency)
         self.active = 0

@@ -3,6 +3,7 @@ import dill
 import threading
 import os
 import time
+import traceback
 from typing import Dict, Any, List, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
@@ -173,8 +174,7 @@ async def start_execution(parallel_config: Dict[str, Any]):
     setup_stage.stages[execute_stage.name] = execute_stage
     setup_stage.config = source_stage_config
 
-    stages = await setup_stage.run()
-    setup_execute_stage = stages.get(source_stage_name)
+    await setup_stage.run()
 
     for hook in actions_and_tasks:
         if hook.action.hooks.notify:
@@ -239,4 +239,5 @@ def execute_actions(parallel_config: str):
         return result
 
     except Exception as e:
+        print(traceback.format_exc())
         raise e

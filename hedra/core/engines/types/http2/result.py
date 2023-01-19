@@ -64,35 +64,6 @@ class HTTP2Result(BaseResult):
         self._version = None
         self._reason = None
         self._status = None
-        
-    def to_dict(self):
-
-        encoded_headers = {
-            str(header_name.decode()): str(header_value.decode()) for header_name, header_value in self.headers.items()
-        }
-
-        data = self.data
-        if isinstance(data, bytes) or isinstance(data, bytearray):
-            data = str(data.decode())
-
-        base_result_dict = super().to_dict()
-
-        return {
-            'url': self.url,
-            'method': self.method,
-            'path': self.path,
-            'params': self.params,
-            'query': self.query,
-            'type': self.type,
-            'headers': encoded_headers,
-            'data': data,
-            'tags': self.tags,
-            'user': self.user,
-            'error': str(self.error),
-            'status': self.status,
-            'reason': self.reason,
-            **base_result_dict
-        }
 
     @property
     def content_type(self):
@@ -199,6 +170,10 @@ class HTTP2Result(BaseResult):
 
         return data
 
+    @data.setter
+    def data(self, value):
+        self.body = value
+
     def _parse_headers(self):
         try:
             status, decoded_headers = self.deferred_headers.parse()
@@ -207,3 +182,63 @@ class HTTP2Result(BaseResult):
 
         except Exception:
             return {}
+
+    def to_dict(self):
+
+        if len(self.headers) == 0 and self.deferred_headers:
+            self.headers = self._parse_headers()
+
+        encoded_headers = {
+            str(header_name.decode()): str(header_value.decode()) for header_name, header_value in self.headers.items()
+        }
+
+        data = self.data
+        if isinstance(data, bytes) or isinstance(data, bytearray):
+            data = str(data.decode())
+
+        base_result_dict = super().to_dict()
+
+        return {
+            'url': self.url,
+            'method': self.method,
+            'path': self.path,
+            'params': self.params,
+            'query': self.query,
+            'type': self.type,
+            'headers': encoded_headers,
+            'data': data,
+            'tags': self.tags,
+            'user': self.user,
+            'error': str(self.error),
+            'status': self.status,
+            'reason': self.reason,
+            **base_result_dict
+        }
+
+    @classmethod
+    def from_dict(cls, results_dict: Dict[str, Union[int, float, str,]]):
+        
+        action = HTTP2Action(
+            results_dict.get('name'),
+            results_dict.get('url'),
+            method=results_dict.get('method'),
+            user=results_dict.get('user'),
+            tags=results_dict.get('tags'),
+        )
+
+        response = HTTP2Result(action, error=results_dict.get('error'))
+        
+
+        response.headers.update(results_dict.get('headers', {}))
+        response.data = results_dict.get('data')
+        response.status = results_dict.get('status')
+        response.reason = results_dict.get('reason')
+        response.checks = results_dict.get('checks')
+     
+        response.wait_start = results_dict.get('wait_start')
+        response.start = results_dict.get('start')
+        response.connect_end = results_dict.get('connect_end')
+        response.write_end = results_dict.get('write_end')
+        response.complete = results_dict.get('complete')
+
+        return response

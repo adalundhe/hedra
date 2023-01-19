@@ -1,7 +1,6 @@
-from ensurepip import version
 import json
 from gzip import decompress as gzip_decompress
-from typing import List, Union
+from typing import List, Union, Dict
 from zlib import decompress as zlib_decompress
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common.base_result import BaseResult
@@ -96,6 +95,10 @@ class HTTPResult(BaseResult):
 
         return data
 
+    @data.setter
+    def data(self, value):
+        self.body = value
+
     @property
     def version(self) -> Union[str, None]:
         try:
@@ -174,3 +177,31 @@ class HTTPResult(BaseResult):
             'reason': self.reason,
             **base_result_dict
         }
+
+    @classmethod
+    def from_dict(cls, results_dict: Dict[str, Union[int, float, str,]]):
+
+        action = HTTPAction(
+            results_dict.get('name'),
+            results_dict.get('url'),
+            method=results_dict.get('method'),
+            user=results_dict.get('user'),
+            tags=results_dict.get('tags'),
+        )
+
+        response = HTTPResult(action, error=results_dict.get('error'))
+        
+
+        response.headers.update(results_dict.get('headers', {}))
+        response.data = results_dict.get('data')
+        response.status = results_dict.get('status')
+        response.reason = results_dict.get('reason')
+        response.checks = results_dict.get('checks')
+     
+        response.wait_start = results_dict.get('wait_start')
+        response.start = results_dict.get('start')
+        response.connect_end = results_dict.get('connect_end')
+        response.write_end = results_dict.get('write_end')
+        response.complete = results_dict.get('complete')
+
+        return response

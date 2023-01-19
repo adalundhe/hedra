@@ -139,6 +139,7 @@ def optimize_stage(serialized_config: str):
         registered_algorithms[plugin_name] = plugin
 
     setup_stage = Setup()
+    setup_stage.logger.spinner.logger.log_level = 'critical'
     setup_stage.plugins_by_type = plugins_by_type
     setup_stage.generation_setup_candidates = 1
     setup_stage.stages[execute_stage.name] = execute_stage

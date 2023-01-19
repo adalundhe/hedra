@@ -60,5 +60,6 @@ class BaseResult:
             'start': float(self.start),
             'connect_end': float(self.connect_end),
             'write_end': float(self.write_end),
-            'complete': float(self.complete)
+            'complete': float(self.complete),
+            'checks': self.checks
         }

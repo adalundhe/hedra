@@ -1,6 +1,7 @@
 import asyncio
 import traceback
 from typing import Dict, List, Union
+from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -34,19 +35,13 @@ async def execute_transition(current_stage: Stage, next_stage: Stage, logger: He
     else:
         execution_results: Dict[str, Union[List[BaseResult], int, float]] = await current_stage.run()
 
-    if current_stage.context.results.get(current_stage.name) is None:
-        current_stage.context.results[current_stage.name] = {
-            'results': execution_results.get('results'),
-            'total_results': execution_results.get('total_results'),
-            'total_elapsed': execution_results.get('total_elapsed')
-        }
-    
-    else:
-        current_stage.context.results[current_stage.name].update({
+    current_stage.context.results.update({
+        current_stage.name: ResultsSet({
             'results': execution_results.get('results'),
             'total_results': execution_results.get('total_results'),
             'total_elapsed': execution_results.get('total_elapsed')
         })
+    })
 
     current_stage.context.results_stages.append(current_stage)
     current_stage.context.visited.append(current_stage.name)
@@ -225,6 +220,7 @@ async def execute_to_analyze_transition(current_stage: Stage, next_stage: Stage)
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
+        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     current_stage = None
