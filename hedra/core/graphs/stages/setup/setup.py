@@ -173,7 +173,10 @@ class Setup(Stage, Generic[Unpack[T]]):
         if len(setup_hooks) > 0:
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Runnning Setup hooks for stage - {setup_hook_names}')
         
-        await asyncio.gather(*[hook.call() for hook in setup_hooks])
+        results = await asyncio.gather(*[setup_hook.call(self.context) for setup_hook in setup_hooks])
+        for result in results:
+            self.context = result
+
         execute_stage_id = 1
 
         stages = dict(self.stages)
@@ -323,7 +326,7 @@ class Setup(Stage, Generic[Unpack[T]]):
             for setup_hook in execute_stage.hooks[HookType.SETUP]:
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing Setup hook - {setup_hook.name} - for Execute stage - {execute_stage_name}')
 
-                await setup_hook.call()
+                execute_stage.context = await setup_hook.call(self.context)
 
             self.stages[execute_stage_name] = execute_stage
 

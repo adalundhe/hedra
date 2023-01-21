@@ -100,6 +100,7 @@ def run_graph(
         if inspect.isclass(stage_candidate) and issubclass(stage_candidate, Stage) and stage_candidate not in direct_decendants:
             discovered[name] = stage_candidate
 
+
     if hedra_graphs.get(graph_name) is None:
         hedra_graphs[graph_name] = module.__file__
 

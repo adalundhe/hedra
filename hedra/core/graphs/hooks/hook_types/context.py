@@ -5,8 +5,8 @@ from hedra.core.graphs.hooks.registry.registrar import registrar
 
 
 @registrar(HookType.CONTEXT)
-def context(key: str):
-    
+def context(store_key: str, load_key: str=None):
+
     def wrapper(func) -> Hook:
 
         @functools.wraps(func)

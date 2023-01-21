@@ -41,9 +41,6 @@ class Teardown(Stage):
                 asyncio.create_task(event.call()) for event in pre_events
             ], timeout=self.stage_timeout)
 
-        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing PRE events - {pre_event_names}')
-        await asyncio.wait([asyncio.create_task(event.call()) for event in pre_events], timeout=self.stage_timeout)
-
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting Teardown stage.')
 
         methods = inspect.getmembers(self, predicate=inspect.ismethod) 
@@ -62,7 +59,9 @@ class Teardown(Stage):
             teardown_hook_names = ', '.join([hook.name for hook in teardown_hooks])
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Running teardown hooks - {teardown_hook_names}')           
-            await asyncio.gather(*[ hook.call() for hook in teardown_hooks])
+            results = await asyncio.gather(*[teardown_hook.call(self.context) for teardown_hook in teardown_hooks])
+            for result in results:
+                self.context = result
 
         post_events: List[EventHook] = [
             event for event in events if isinstance(event, EventHook) and event.pre is False

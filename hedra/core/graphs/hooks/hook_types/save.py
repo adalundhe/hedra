@@ -4,7 +4,7 @@ from hedra.core.graphs.hooks.registry.registrar import registrar
 
 
 @registrar(HookType.SAVE)
-def save(key: str=None, checkpoint_filepath: str=None):
+def save(key: str, checkpoint_filepath: str):
     
     def wrapper(func):
 

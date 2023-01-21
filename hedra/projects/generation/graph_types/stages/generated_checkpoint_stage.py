@@ -7,7 +7,7 @@ from hedra.core.graphs.hooks.hook_types import save
 
 class CheckpointStage(Checkpoint):
 
-    @save(f'{os.getcwd()}/checkpoint.json')
+    @save('results', f'{os.getcwd()}/checkpoint.json')
     async def save_results(self, data: List[BaseResult]) -> List[Dict[str, Any]]:
         return [
             {

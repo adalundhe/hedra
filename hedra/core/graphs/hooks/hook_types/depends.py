@@ -1,4 +1,8 @@
+from hedra.core.graphs.hooks.validation_types.depends import DependsValidator
+
+
 def depends(*stages):
+    DependsValidator(stages=stages)
 
     def wrapper(cls):
 
