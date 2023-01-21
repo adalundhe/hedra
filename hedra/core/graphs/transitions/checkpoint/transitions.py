@@ -82,7 +82,6 @@ async def checkpoint_to_optimize_transition(current_stage: Stage, next_stage: St
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
-        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     else:
