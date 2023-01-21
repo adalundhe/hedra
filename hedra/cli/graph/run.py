@@ -15,6 +15,9 @@ from hedra.logging import (
     LoggerTypes,
     logging_manager
 )
+import signal
+import os
+
 
 
 def run_graph(
@@ -130,12 +133,28 @@ def run_graph(
         cpus=cpus
     )
 
+    def handle_loop_stop(signame):
+        try:
+            loop.close()
+        except RuntimeError:
+            logger.console.sync.critical('\n\nAborted.\n')
+            os._exit(1)
+
     graph.assemble()
+    for signame in ('SIGINT', 'SIGTERM'):
+        loop.add_signal_handler(
+            getattr(signal, signame),
+            lambda signame=signame: handle_loop_stop(signame)
+        )
 
-    loop.run_until_complete(graph.run())
+    try:
+        loop.run_until_complete(graph.run())
+        
+    except BrokenPipeError:
+        pass
 
-    loop.stop()
-    loop.close()
+    except RuntimeError:
+        pass
 
     logger.filesystem.sync['hedra.core'].info(f'{graph.metadata_string} - Completed - {graph.logger.spinner.display.total_timer.elapsed_message}\n')
     logger.console.sync.info(f'\nGraph - {graph_name.capitalize()} - completed! {graph.logger.spinner.display.total_timer.elapsed_message}\n')

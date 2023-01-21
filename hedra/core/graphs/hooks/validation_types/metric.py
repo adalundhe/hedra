@@ -1,8 +1,13 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictStr
 
 
-class MetricVaidator(BaseModel):
-    group: str=Field(..., min_length=1)
+class MetricHookValidator(BaseModel):
+    group: StrictStr=Field(..., min_length=1)
+
+
+class MetricValidator:
 
     def __init__(__pydantic_self__,  group: str) -> None:
-        super().__init__(group=group)
+        MetricHookValidator(
+            group=group
+        )

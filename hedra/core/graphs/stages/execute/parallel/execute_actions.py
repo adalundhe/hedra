@@ -3,7 +3,7 @@ import dill
 import threading
 import os
 import time
-import traceback
+import signal
 from typing import Dict, Any, List, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
@@ -222,13 +222,25 @@ async def start_execution(parallel_config: Dict[str, Any]):
 
 
 def execute_actions(parallel_config: str):
+    import asyncio
+    import uvloop
+    uvloop.install()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    def handle_loop_stop(signame):
+        try:
+            loop.close()
+        except RuntimeError:
+            os._exit(1)
+
+    for signame in ('SIGINT', 'SIGTERM'):
+        loop.add_signal_handler(
+            getattr(signal, signame),
+            lambda signame=signame: handle_loop_stop(signame)
+        )
 
     try:
-        import asyncio
-        import uvloop
-        uvloop.install()
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         
         parallel_config: Dict[str, Any] = dill.loads(parallel_config)
 
@@ -238,6 +250,14 @@ def execute_actions(parallel_config: str):
 
         return result
 
+    except BrokenPipeError:
+        
+        try:
+            loop.close()
+        except RuntimeError:
+            pass
+
+        return {}
+
     except Exception as e:
-        print(traceback.format_exc())
         raise e

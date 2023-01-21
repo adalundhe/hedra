@@ -6,6 +6,7 @@ import dill
 import json
 import threading
 import os
+import signal
 from collections import defaultdict
 from typing import Any, Dict, List
 from hedra.core.engines.types.common.base_result import BaseResult
@@ -117,6 +118,18 @@ def process_results_batch(config: Dict[str, Any]):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
+    def handle_loop_stop(signame):
+        try:
+            loop.close()
+        except RuntimeError:
+            os._exit(1)
+
+    for signame in ('SIGINT', 'SIGTERM'):
+        loop.add_signal_handler(
+            getattr(signal, signame),
+            lambda signame=signame: handle_loop_stop(signame)
+        )
+
     try:
         return loop.run_until_complete(
             process_batch(
@@ -126,6 +139,15 @@ def process_results_batch(config: Dict[str, Any]):
                 meetadata_string
             )
         )
+
+    except BrokenPipeError:
+
+        try:
+            loop.close()
+        except RuntimeError:
+            pass
+
+        return b''
 
     except Exception as e:
         raise e

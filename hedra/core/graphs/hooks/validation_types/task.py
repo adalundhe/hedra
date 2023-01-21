@@ -1,18 +1,23 @@
 from typing import List, Optional, Dict, Union, Coroutine
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, StrictStr, StrictInt, StrictFloat, validator
 
 
-class TaskValidator(BaseModel):
-    weight: Optional[int]=Field(1, gt=0)
-    order: Optional[int]=Field(1, gt=0)
-    metadata: Optional[Dict[str, Union[str, int, float]]]
-    checks: Optional[List[str]]
-    notify: Optional[List[str]]
-    listen: Optional[List[str]]
-
+class TaskHookValidator(BaseModel):
+    weight: StrictInt
+    order: StrictInt
+    metadata: Optional[Dict[str, Union[StrictStr, StrictInt, StrictFloat]]]
+    checks: Optional[List[StrictStr]]
+    notify: Optional[List[StrictStr]]
+    listen: Optional[List[StrictStr]]
 
     class Config:
         arbitrary_types_allowed = True
+
+    @validator('weight', 'order')
+    def validate_weight_and_order(cls, val):
+        assert val > 0
+
+class TaskValidator(BaseModel):
 
     def __init__(
         __pydantic_self__, 
@@ -23,7 +28,7 @@ class TaskValidator(BaseModel):
         notify: Optional[List[str]]=[],
         listen: Optional[List[str]]=[]
     ) -> None:
-        super().__init__(
+        TaskHookValidator(
             weight=weight,
             order=order,
             metadata=metadata,
