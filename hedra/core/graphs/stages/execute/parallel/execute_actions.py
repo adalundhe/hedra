@@ -16,6 +16,7 @@ from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
 from hedra.core.graphs.stages.setup.setup import Setup
+from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.base.import_tools import import_stages, import_plugins
 from hedra.core.personas import get_persona
 from hedra.logging import (
@@ -67,6 +68,7 @@ async def start_execution(parallel_config: Dict[str, Any]):
     graph_path: str= parallel_config.get('graph_path') 
     graph_id = parallel_config.get('graph_id')
     source_stage_name = parallel_config.get('source_stage_name')
+    source_stage_context: Dict[str, Any] = parallel_config.get('source_stage_context')
     source_stage_plugins = parallel_config.get('source_stage_plugins')
     source_stage_config = parallel_config.get('source_stage_config')
     source_stage_id = parallel_config.get('source_stage_id')
@@ -83,7 +85,9 @@ async def start_execution(parallel_config: Dict[str, Any]):
 
     stages = import_stages(graph_path)
     plugins_by_type = import_plugins(graph_path)
-    execute_stage = stages.get(source_stage_name)()
+    execute_stage: Stage = stages.get(source_stage_name)()
+
+    execute_stage.context.update(source_stage_context)
 
     execution_hooks_count = len(execution_hooks)
 
@@ -231,6 +235,10 @@ def execute_actions(parallel_config: str):
     def handle_loop_stop(signame):
         try:
             loop.close()
+
+        except BrokenPipeError:
+            os._exit(1)
+                
         except RuntimeError:
             os._exit(1)
 

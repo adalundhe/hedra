@@ -1,5 +1,7 @@
 import json
+from typing import Any
 from hedra.core.engines.types.udp import UDPResult
+from hedra.core.graphs.stages.base.stage import Any
 from .base_event import BaseEvent
 
 
@@ -20,8 +22,11 @@ class UDPEvent(BaseEvent):
         'timings'
     )
 
-    def __init__(self, result: UDPResult) -> None:
-        super(UDPEvent, self).__init__(result)
+    def __init__(self, stage: Any, result: UDPResult) -> None:
+        super(UDPEvent, self).__init__(
+            stage,
+            result
+        )
 
         self.url = result.url
         self.ip_addr = result.ip_addr

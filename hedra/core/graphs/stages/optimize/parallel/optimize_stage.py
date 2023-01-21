@@ -2,13 +2,11 @@ import json
 import dill
 import threading
 import os
-import importlib
 import inspect
 import signal
 import os
 from collections import defaultdict
 from typing import Any, Dict, List, Union
-from pathlib import Path
 from hedra.core.engines.client.config import Config
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.stages.optimize.optimization import Optimizer
@@ -86,6 +84,7 @@ def optimize_stage(serialized_config: str):
         graph_id: str = optimization_config.get('graph_id')
         source_stage_name: str = optimization_config.get('source_stage_name')
         source_stage_id: str = optimization_config.get('source_stage_id')
+        source_stage_context: Dict[str, Any] = optimization_config.get('source_stage_context')
         execute_stage_name: str = optimization_config.get('execute_stage_name')
         execute_stage_config: Config = optimization_config.get('execute_stage_config')
         execute_stage_plugins: Dict[PluginType, List[str]] = optimization_config.get('execute_stage_plugins')
@@ -100,7 +99,7 @@ def optimize_stage(serialized_config: str):
         discovered = import_stages(graph_path)
 
         execute_stage: Stage = discovered.get(execute_stage_name)()
-
+        execute_stage.context.update(source_stage_context)
 
         execute_stage_actions = defaultdict(list)
         for hook_name in optimization_config.get('execute_stage_hooks'):
@@ -170,6 +169,10 @@ def optimize_stage(serialized_config: str):
             try:
                 optimizer._event_loop.stop()
                 optimizer._event_loop.close()
+
+            except BrokenPipeError:
+                os._exit(1)
+                
             except RuntimeError:
                 os._exit(1)
 

@@ -1,4 +1,6 @@
+from typing import Any
 from hedra.core.engines.types.playwright import PlaywrightResult
+from hedra.core.graphs.stages.base.stage import Stage
 from .base_event import BaseEvent
 
 
@@ -17,11 +19,14 @@ class PlaywrightEvent(BaseEvent):
         'timings'
     )
 
-    def __init__(self, result: PlaywrightResult) -> None:
+    def __init__(self, stage: Any, result: PlaywrightResult) -> None:
         super(
             PlaywrightEvent,
             self
-        ).__init__(result)
+        ).__init__(
+            stage,
+            result
+        )
 
         self.url = result.url
         self.headers = result.headers

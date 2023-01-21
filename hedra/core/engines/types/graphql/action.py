@@ -23,7 +23,7 @@ class GraphQLAction(HTTPAction):
         data: Union[str, dict, Iterator, bytes, None] = None, 
         user: str=None, 
         tags: List[Dict[str, str]] = [],
-        redirects: int=10
+        redirects: int=3
     ) -> None:
 
         super(

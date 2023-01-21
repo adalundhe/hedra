@@ -1,4 +1,5 @@
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.core.graphs.events.event import Event
 from hedra.core.graphs.hooks.registry.registry_types import SetupHook
 from hedra.core.graphs.stages.validate.exceptions import HookValidationError
 from .base_hook_validator import BaseHookVaidator
@@ -15,13 +16,19 @@ class SetupHookVaidator(BaseHookVaidator):
     async def validate(self, hook: SetupHook):
 
         try:
+            
+            call = hook._call
+            if isinstance(hook, Event):
+                call = hook.target._call
 
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
             assert hook.hook_type is HookType.SETUP, f"Hook type mismatch - hook {hook.name}:{hook.hook_id} is a {hook.hook_type.name} hook, but Hedra expected a {HookType.SETUP.name} hook."
             assert hook.shortname in hook.name, f"Shortname {hook.shortname} must be contained in full Hook name {hook.name}:{hook.hook_id} for @setup hook {hook.name}:{hook.hook_id}."
-            assert hook.call is not None, f"Method is not not found on stage or was not supplied to @setup hook - {hook.name}:{hook.hook_id}"
-            assert hook.call.__code__.co_argcount == 1, f"Too many args. - @setup hook {hook.name}:{hook.hook_id} requires no additional args."
+            assert call is not None, f"Method is not not found on stage or was not supplied to @setup hook - {hook.name}:{hook.hook_id}"
+            assert call.__code__.co_argcount > 0, f"Too few args. - @setup hook {hook.name}:{hook.hook_id} requires no additional args."
+            assert call.__code__.co_argcount < 2, f"Too many args. - @setup hook {hook.name}:{hook.hook_id} requires no additional args"
+
             assert 'self' in hook.call.__code__.co_varnames
 
             

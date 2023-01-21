@@ -1,9 +1,22 @@
-from typing import Any, Optional, List
+from __future__ import annotations
+from typing import Any, Optional, List, Union, Dict
 
 
 class SimpleContext:
 
     def __init__(self, **kwargs) -> None:
+
+        self.known_keys = [
+            'stages',
+            'visited',
+            'results',
+            'results_stages',
+            'summaries',
+            'paths',
+            'path_lengths',
+            'known_keys'
+        ]
+
         for kwarg_name, kwarg in kwargs.items():
             object.__setattr__(self, kwarg_name, kwarg)
 
@@ -38,7 +51,7 @@ class SimpleContext:
     def keys(self) -> List[str]: 
         return [key for key in self.__dict__.keys() if key.startswith('__') is False]
 
-    def valuses(self) -> List[Any]:
+    def values(self) -> List[Any]:
         return [value for key, value in self.__dict__.items() if key.startswith('__') is False]
     
     def items(self):
@@ -52,4 +65,9 @@ class SimpleContext:
     def remove(self, name: str):
         if name.startswith('__') is False:
             object.__delattr__(self, name)
+
+    def update(self, update_context: Union[SimpleContext, Dict[str, Any]]):
+        for context_key, context_value in update_context.items():
+            object.__setattr__(self, context_key, context_value)
+            
     

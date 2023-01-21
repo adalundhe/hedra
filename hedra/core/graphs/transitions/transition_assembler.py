@@ -114,6 +114,15 @@ class TransitionAssembler:
             
             self.instances_by_type[stage.stage_type].append(stage)
 
+
+            event_hooks = []
+            stage_event_hooks: List[EventHook] = stage.hooks[HookType.EVENT]
+            for event_hook in stage_event_hooks:
+                if event_hook.names is None or len(event_hook.names)  == 0:
+                    event_hooks.append(event_hook)
+
+            stage.hooks[HookType.EVENT] = event_hooks
+
         event_hooks: List[EventHook] = list(self.hooks_by_type.get(HookType.EVENT, {}).values())
         for event_hook in event_hooks:
             for target_hook_name in event_hook.names:    
@@ -123,10 +132,35 @@ class TransitionAssembler:
                     self.logging.filesystem.sync['hedra.core'].info(
                         f'{self._graph_metadata_log_string} - Appendng Event - {event_hook.name}:{event_hook.hook_id} - to target Stage - {target_hook.stage}:{target_hook.stage_instance.stage_id} Event Hooks'
                     )
-                    
+
+
                     event = Event(target_hook, event_hook)
-                    target_hook.stage_instance.hooks[HookType.EVENT].append(event)
-                    registrar.all[event.name] = event
+                    event.target_key = event_hook.key
+
+                    target_hook_idx = -1
+
+                    try:
+                        target_hook_idx = target_hook.stage_instance.hooks[target_hook.hook_type].index(target_hook)
+
+                    except ValueError:
+                        pass
+
+                    if target_hook_idx >= 0 and isinstance(target_hook, Event):
+                        if event_hook.pre is True:
+                            target_hook.pre_sources[event_hook.name] = event_hook
+                            target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
+
+                        else:
+                            target_hook.post_sources[event_hook.name] = event_hook
+                            target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
+
+                        
+                        registrar.all[event.name] = target_hook
+
+                    elif target_hook_idx >= 0:
+                        target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = event
+
+                        registrar.all[event.name] = event
                
     
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Successfully generated - {stages_count} - stages')

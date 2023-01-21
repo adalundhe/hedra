@@ -1,10 +1,11 @@
 import functools
+from typing import Optional
 from .hook_type import HookType
 from hedra.core.graphs.hooks.registry.registrar import registrar
 
 
 @registrar(HookType.EVENT)
-def event(*names, pre: bool=False):
+def event(*names, pre: bool=False, key: Optional[str]=None):
 
     def wrapper(func):
 

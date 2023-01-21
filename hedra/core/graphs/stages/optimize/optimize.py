@@ -110,6 +110,9 @@ class Optimize(Stage):
                     'graph_id': self.graph_id,
                     'optimize_params': self.optimize_params,
                     'worker_idx': worker_idx,
+                    'source_stage_context': {
+                        context_key: context_value for context_key, context_value in self.context if context_key not in self.context.known_keys
+                    },
                     'source_stage_name': self.name,
                     'source_stage_id': self.stage_id,
                     'execute_stage_name': stage_name,
@@ -211,7 +214,6 @@ class Optimize(Stage):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Optimization complete for stages - {stage_names} - over - {self.optimization_execution_time} - seconds')
         await self.logger.spinner.set_default_message(f'Optimized - batch sizes for stages - {optimized_batch_sizes} - over {self.optimization_execution_time} seconds')
 
-        context_hooks: List[ContextHook] = self.hooks[HookType.CONTEXT]
         context_hooks: List[ContextHook] = self.hooks[HookType.CONTEXT]
         await asyncio.gather(*[
             asyncio.create_task(context_hook.call(self.context)) for context_hook in context_hooks

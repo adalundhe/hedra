@@ -148,8 +148,12 @@ class Analyze(Stage):
             for batch in stage_batches:
                 batch_configs.append({
                     'graph_name': self.graph_name,
+                    'graph_path': self.graph_path,
                     'graph_id': self.graph_id,
                     'source_stage_name': self.name,
+                    'source_stage_context': {
+                        context_key: context_value for context_key, context_value in self.context if context_key not in self.context.known_keys
+                    },
                     'source_stage_id': self.stage_id,
                     'analyze_stage_name': stage_name,
                     'analyze_stage_metric_hooks': list(metric_hook_names),

@@ -46,7 +46,7 @@ class HTTPClient(BaseClient[MercuryHTTPClient, HTTPAction, HTTPResult]):
         headers: Dict[str, str] = {}, 
         user: str = None,
         tags: List[Dict[str, str]] = [],
-        redirects: int = 10
+        redirects: int=3
     ):
 
         request = HTTPAction(
@@ -69,7 +69,7 @@ class HTTPClient(BaseClient[MercuryHTTPClient, HTTPAction, HTTPResult]):
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
         tags: List[Dict[str, str]] = [],
-        redirects: int = 10
+        redirects: int=3
     ):
 
         request = HTTPAction(
@@ -92,7 +92,7 @@ class HTTPClient(BaseClient[MercuryHTTPClient, HTTPAction, HTTPResult]):
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
         tags: List[Dict[str, str]] = [],
-        redirects: int = 10
+        redirects: int=3
     ):
 
         request = HTTPAction(
@@ -115,7 +115,7 @@ class HTTPClient(BaseClient[MercuryHTTPClient, HTTPAction, HTTPResult]):
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
         tags: List[Dict[str, str]] = [],
-        redirects: int = 10
+        redirects: int=3
     ):
 
         request = HTTPAction(
@@ -137,7 +137,7 @@ class HTTPClient(BaseClient[MercuryHTTPClient, HTTPAction, HTTPResult]):
         headers: Dict[str, str] = {}, 
         user: str = None,
         tags: List[Dict[str, str]] = [],
-        redirects: int = 10
+        redirects: int=3
     ):
         request = HTTPAction(
             self.next_name,

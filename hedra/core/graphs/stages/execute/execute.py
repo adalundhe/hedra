@@ -156,6 +156,9 @@ class Execute(Stage, Generic[Unpack[T]]):
                         'graph_path': self.graph_path,
                         'graph_id': self.graph_id,
                         'source_stage_name': self.name,
+                        'source_stage_context': {
+                            context_key: context_value for context_key, context_value in self.context if context_key not in self.context.known_keys
+                        },
                         'source_stage_id': self.stage_id,
                         'source_stage_plugins': source_stage_plugins,
                         'source_stage_config': self.client._config,

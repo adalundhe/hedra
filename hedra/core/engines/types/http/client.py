@@ -174,44 +174,48 @@ class MercuryHTTPClient:
                 response.response_code = await connection.reader.readline_fast()
                 headers = await connection.read_headers()
                 status = response.status
-
+            
                 if status >= 300 and status < 400:
-                    for _ in range(action.redirects):
+                    elapsed_time = 0
+                    redirect_time_start = time.time()
 
-                        redirect_url = headers.get(b'Location')
+                    for redirect_number in range(action.redirects):
 
-                        redirect_action = HTTPAction(
-                            action.name,
-                            redirect_url,
-                            method=action.method
-                        )
+                        if elapsed_time > self.timeouts.total_timeout:
+                            response.status = 408
+                            raise Exception('Request timed out while redirecting.')
+                        
+                        redirect_url = str(headers.get(b'location'))
+                        if redirect_url.startswith('http') is False:
+                            action.url.path = redirect_url
+                            action.encoded_headers = None
+                            action.setup()
 
-                        redirect_action.is_setup = True
+                        else:
+                            await action.url.replace(redirect_url)
+                            action.encoded_headers = None
+                            action.is_setup = False
+                            await self.prepare(action)
 
-                        self.prepare(redirect_action)
-
-                        redirect_action.encoded_headers = action.encoded_headers
-                        redirect_action.encoded_data = action.encoded_data
-
-                        await connection.make_connection(
-                            redirect_action.url.hostname,
-                            redirect_action.url.ip_addr,
-                            redirect_action.url.port,
-                            redirect_action.url.socket_config,
-                            timeout=self.timeouts.connect_timeout,
-                            ssl=redirect_action.ssl_context
-                        )
+                            await connection.make_connection(
+                                action.url.hostname,
+                                action.url.ip_addr,
+                                action.url.port,
+                                action.url.socket_config,
+                                timeout=self.timeouts.connect_timeout,
+                                ssl=action.ssl_context
+                            )
 
                         response.connect_end = time.monotonic()
-
-                        connection.write(redirect_action.encoded_headers)
+                            
+                        connection.write(action.encoded_headers)
                         
-                        if redirect_action.encoded_data:
-                            if redirect_action.is_stream:
-                                redirect_action.write_chunks(connection)
+                        if action.encoded_data:
+                            if action.is_stream:
+                                action.write_chunks(connection)
 
                             else:
-                                connection.write(redirect_action.encoded_data)
+                                connection.write(action.encoded_data)
 
                         response.write_end = time.monotonic()
 
@@ -222,6 +226,9 @@ class MercuryHTTPClient:
 
                         if status >= 200 and status < 300:
                             break
+
+                        action.redirects -= redirect_number
+                        elapsed_time = time.time() - redirect_time_start
 
                 content_length = headers.get(b'content-length')
                 transfer_encoding = headers.get(b'transfer-encoding')

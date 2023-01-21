@@ -1,6 +1,7 @@
 import json
-from typing import Dict
+from typing import Dict, Any
 from hedra.core.engines.types.http2 import HTTP2Result
+from hedra.core.graphs.stages.base.stage import Stage
 from .base_event import BaseEvent
 
 
@@ -22,8 +23,11 @@ class HTTP2Event(BaseEvent):
         'timings'
     )
 
-    def __init__(self, result: HTTP2Result) -> None:
-        super(HTTP2Event, self).__init__(result)
+    def __init__(self, stage: Any, result: HTTP2Result) -> None:
+        super(HTTP2Event, self).__init__(
+            stage,
+            result
+        )
 
         self.url = result.url
         self.ip_addr = result.ip_addr

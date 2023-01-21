@@ -42,6 +42,10 @@ class URL:
         self.protocol = protocol
         self.loop = None
 
+    async def replace(self, url: str):
+        self.full = url
+        self.params = urlparse(url)
+
     async def lookup(self):
 
         if self.loop is None:
@@ -136,14 +140,16 @@ class URL:
     @property
     def path(self):
         url_path = self.parsed.path
+        url_query = self.parsed.query
+        url_params = self.parsed.params
 
-        if len(url_path) == 0:
+        if url_path and len(url_path) == 0:
             url_path = "/"
 
-        if len(self.parsed.query) > 0:
+        if url_query and len(url_query) > 0:
             url_path += f'?{self.parsed.query}'
 
-        elif len(self.parsed.params) > 0:
+        elif url_params and len(url_params) > 0:
             url_path += self.parsed.params
 
         return url_path

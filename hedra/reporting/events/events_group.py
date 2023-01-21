@@ -3,7 +3,6 @@ import uuid
 import numpy
 from collections import defaultdict
 from typing import Any, Dict, Union
-from hedra.logging import HedraLogger
 from hedra.reporting.stats import (
     Median,
     Mean,
@@ -52,9 +51,12 @@ class EventsGroup:
         self._streaming_stdev = defaultdict(StandardDeviation)
         self._streaming_median = defaultdict(Median)
 
-    async def add(self, result: Any, stage_name: str):
+    async def add(self, stage: Any, result: Any, stage_name: str):
 
-        event: BaseEvent = results_types.get(result.type, TaskEvent)(result)
+        event: BaseEvent = results_types.get(result.type, TaskEvent)(
+            stage,
+            result
+        )
         event.stage = stage_name
 
         if self.source is None:

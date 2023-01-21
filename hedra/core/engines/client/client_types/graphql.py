@@ -47,7 +47,7 @@ class GraphQLClient(BaseClient[MercuryGraphQLClient, GraphQLAction, GraphQLResul
         headers: Dict[str, str] = {}, 
         user: str = None, 
         tags: List[Dict[str, str]] = [],
-        redirects: int = 10
+        redirects: int = 3
     ):
 
         request = GraphQLAction(

@@ -166,7 +166,7 @@ class Setup(Stage, Generic[Unpack[T]]):
         connection_validation_retries = self.core_config.get('connection_validation_retries', 3)
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting setup')
-
+        
         setup_hooks: List[SetupHook] = self.hooks[HookType.SETUP]
         setup_hook_names = ', '.join([hook.name for hook in setup_hooks])
         
@@ -425,3 +425,4 @@ class Setup(Stage, Generic[Unpack[T]]):
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing Setup hook - {setup_hook.name}')
 
             await setup_hook()
+            

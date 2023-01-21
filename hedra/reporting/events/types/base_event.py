@@ -1,5 +1,8 @@
 import traceback
+import asyncio
 import uuid
+import inspect
+from typing import Any, Coroutine
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.reporting.tags import Tag
@@ -22,7 +25,7 @@ class BaseEvent:
         'time'
     )
 
-    def __init__(self, result: BaseResult) -> None:
+    def __init__(self, stage: Any, result: BaseResult) -> None:
 
         self.event_id = str(uuid.uuid4())
         self.action_id = result.action_id
@@ -39,6 +42,22 @@ class BaseEvent:
 
         for check_hook_name in result.checks:
             check_hook = registrar.all.get(check_hook_name)
+
+            check_hook.call = check_hook.call.__get__(
+                stage, 
+                stage.__class__
+            )
+
+            setattr(
+                stage, 
+                check_hook.shortname, 
+                check_hook.call
+            )
+
+            if inspect.ismethod(check_hook.call) is False:
+                check_hook.call = check_hook.call.__get__(stage, stage.__class__)
+                setattr(stage, check_hook.shortname, check_hook.call)
+
             self.checks.append(check_hook.call)
 
         self.tags = [
@@ -51,15 +70,19 @@ class BaseEvent:
 
     async def check_result(self):
         if self.error is None:
-            for check in self.checks:
-                try:
-                    await check(self)
-                except AssertionError:              
-                    error_message = traceback.format_exc().split(
-                        '\n'
-                    )[-3].strip()
+            await asyncio.gather(*[
+                self._check_results(check) for check in self.checks
+            ])
 
-                    self.error = f'Check - {error_message} - for action - {self.name} - failed.'
+    async def _check_results(self, check: Coroutine):
+        try:
+            await check(self)
+        except AssertionError:              
+            error_message = traceback.format_exc().split(
+                '\n'
+            )[-3].strip()
+
+            self.error = f'Check - {error_message} - for action - {self.name} - failed.'
 
     @property
     def fields(self):

@@ -10,6 +10,8 @@ import signal
 from collections import defaultdict
 from typing import Any, Dict, List
 from hedra.core.engines.types.common.base_result import BaseResult
+from hedra.core.graphs.stages.base.import_tools import import_stages
+from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.logging import (
     HedraLogger,
@@ -20,6 +22,7 @@ from hedra.reporting.events import EventsGroup
 
 
 async def process_batch(
+        stage: Stage,
         stage_name: str, 
         custom_metric_hook_names: List[str],
         results_batch: List[BaseResult],
@@ -74,6 +77,7 @@ async def process_batch(
 
         await asyncio.gather(*[
             asyncio.create_task(events[stage_result.name].add(
+                    stage,
                     stage_result,
                     stage_name
                 )) for stage_result in results_batch
@@ -102,8 +106,10 @@ def process_results_batch(config: Dict[str, Any]):
     asyncio.set_event_loop(loop)
     
     graph_name = config.get('graph_name')
+    graph_path = config.get('graph_path')
     graph_id = config.get('graph_id')
     source_stage_name = config.get('source_stage_name')
+    source_stage_context = config.get('source_stage_context')
     source_stage_id = config.get('source_stage_id')
 
     thread_id = threading.current_thread().ident
@@ -114,6 +120,10 @@ def process_results_batch(config: Dict[str, Any]):
     stage_name = config.get('analyze_stage_name')
     custom_metric_hook_names = config.get('analyze_stage_metric_hooks', [])
     results_batch = config.get('analyze_stage_batched_results', [])
+
+    stages = import_stages(graph_path)
+    stage: Stage = stages.get(stage_name)()
+    stage.context.update(source_stage_context)
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -133,6 +143,7 @@ def process_results_batch(config: Dict[str, Any]):
     try:
         return loop.run_until_complete(
             process_batch(
+                stage,
                 stage_name,
                 custom_metric_hook_names,
                 results_batch,
