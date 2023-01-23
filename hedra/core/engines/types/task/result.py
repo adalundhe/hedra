@@ -26,7 +26,7 @@ class TaskResult(BaseResult):
             task.metadata.user,
             task.metadata.tags,
             RequestTypes.TASK,
-            task.hooks.checks,
+            [],
             error
         )
 

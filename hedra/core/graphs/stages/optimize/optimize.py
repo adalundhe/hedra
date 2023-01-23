@@ -115,12 +115,14 @@ class Optimize(Stage):
                     },
                     'source_stage_name': self.name,
                     'source_stage_id': self.stage_id,
+                    'source_stage_target_events': self.linked_events,
                     'execute_stage_name': stage_name,
                     'execute_stage_generation_count': assigned_workers_count,
                     'execute_stage_id': stage.execution_stage_id,
                     'execute_stage_config': stage_config,
                     'execute_stage_batch_size': batch_size,
                     'execute_stage_plugins': execute_stage_plugins,
+                    'execute_stage_linked_events': stage.linked_events,
                     'optimizer_iterations': self.optimize_iterations,
                     'optimizer_algorithm': self.algorithm,
                     'execute_stage_hooks': [
@@ -166,6 +168,7 @@ class Optimize(Stage):
         optimized_batch_size = sum(optimized_batch_sizes)
 
         stage_optimzations = {}
+        stage_context = defaultdict(list)
         for optimization_result in optimization_results:
             
             stage_name = optimization_result.get('stage')
@@ -180,6 +183,10 @@ class Optimize(Stage):
                 hook.session.sem = asyncio.Semaphore(optimized_config.batch_size)
                 hook.session.pool.connections = []
                 hook.session.pool.create_pool()
+            
+            pipeline_context = optimization_result.get('context', {})
+            for context_key, context_value in pipeline_context.items():
+                stage_context[context_key].append(context_value)
 
             stage_optimzations[stage_name] = optimized_batch_size
 
@@ -187,6 +194,8 @@ class Optimize(Stage):
 
             optimized_config.optimized = True
             stage.optimized = True
+
+        self.context[self.name] = stage_context
 
         for stage in stages.values():
             stage.workers = stage_workers_map.get(stage.name)

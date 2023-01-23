@@ -49,6 +49,7 @@ class Analyze(Stage):
         self.requires_shutdown = True
         self.allow_parallel = True
         self.analysis_execution_time = 0
+        self.stages = {}
 
     @Internal()
     async def run(self):
@@ -119,6 +120,7 @@ class Analyze(Stage):
 
         for stage_name, _, assigned_workers_count in batches:
             
+            stage = self.stages.get(stage_name)
             stage_batches = []
 
             stage_results = self.raw_results.get(stage_name)
@@ -157,6 +159,7 @@ class Analyze(Stage):
                     'source_stage_id': self.stage_id,
                     'analyze_stage_name': stage_name,
                     'analyze_stage_metric_hooks': list(metric_hook_names),
+                    'analyze_stage_linked_events': stage.linked_events,
                     'analyze_stage_batched_results': batch
                 })
 
@@ -189,13 +192,21 @@ class Analyze(Stage):
 
         await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Starting stage results aggregation for {stages_count} stages')
         
+        stage_contexts = defaultdict(list)
+
         for stage_name, stage_results in stage_batches:
+
+            for group in stage_results:
+                pipeline_context = group.get('context', {})
+                for context_key, context_value in pipeline_context.items():
+                    stage_contexts[context_key].append(context_value)
+    
         
             stage_total = 0
             stage_total_time = stage_total_times.get(stage_name)
 
             batch_results: List[Dict[str, Union[dict, EventsGroup]]] = [
-                dill.loads(group) for group in stage_results
+                dill.loads(group.get('events')) for group in stage_results
             ]
 
             events =  defaultdict(EventsGroup)
@@ -259,6 +270,8 @@ class Analyze(Stage):
                 },
                 'stage_total': stage_total
             })
+
+        self.context[self.name] = stage_contexts
 
         for result in processed_results:
             summaries['stages'].update(result.get('stage_metrics'))

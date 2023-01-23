@@ -6,6 +6,7 @@ import os
 from typing import List, Dict, Union, Any, Tuple, Coroutine
 from collections import defaultdict
 from hedra.core.graphs.events import Event
+from hedra.core.graphs.stages.base.import_tools import set_stage_hooks
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.error import Error
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -92,6 +93,14 @@ class TransitionAssembler:
                     hook._call = hook._call.__get__(stage, stage.__class__)
                     setattr(stage, hook_shortname, hook._call)
 
+
+            stage = set_stage_hooks(stage)
+
+            for hook_type in stage.hooks:
+                self.hooks_by_type[hook_type].update({
+                    hook.name: hook for hook in stage.hooks[hook_type]
+                })
+
             methods = inspect.getmembers(stage, predicate=inspect.ismethod) 
 
             for _, method in methods:
@@ -133,7 +142,6 @@ class TransitionAssembler:
                         f'{self._graph_metadata_log_string} - Appendng Event - {event_hook.name}:{event_hook.hook_id} - to target Stage - {target_hook.stage}:{target_hook.stage_instance.stage_id} Event Hooks'
                     )
 
-
                     event = Event(target_hook, event_hook)
                     event.target_key = event_hook.key
 
@@ -153,14 +161,16 @@ class TransitionAssembler:
                         else:
                             target_hook.post_sources[event_hook.name] = event_hook
                             target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
-
                         
                         registrar.all[event.name] = target_hook
 
                     elif target_hook_idx >= 0:
                         target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = event
-
                         registrar.all[event.name] = event
+                    
+                    target_hook.stage_instance.linked_events[(target_hook.stage, target_hook.hook_type, target_hook.name)].append(
+                        (event_hook.stage,  event_hook.hook_type, event_hook.name)
+                    )
                
     
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Successfully generated - {stages_count} - stages')

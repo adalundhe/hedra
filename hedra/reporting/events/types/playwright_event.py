@@ -1,6 +1,6 @@
-from typing import Any
+from typing import Any, Tuple, Dict
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.engines.types.playwright import PlaywrightResult
-from hedra.core.graphs.stages.base.stage import Stage
 from .base_event import BaseEvent
 
 
@@ -19,7 +19,11 @@ class PlaywrightEvent(BaseEvent):
         'timings'
     )
 
-    def __init__(self, stage: Any, result: PlaywrightResult) -> None:
+    def __init__(
+        self, 
+        stage: Any, 
+        result: PlaywrightResult
+    ) -> None:
         super(
             PlaywrightEvent,
             self

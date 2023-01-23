@@ -122,17 +122,17 @@ class MercuryPlaywrightClient:
                     await event.wait()
 
                 if command.hooks.before:
-                    command = await command.hooks.before(command, result)
+                    command = await command.hooks.before.call(command, result)
 
                 result = await context.execute(command)
 
                 if command.hooks.after:
-                    command = await command.hooks.after(command, result)
+                    command = await command.hooks.after.call(command, result)
 
                 if command.hooks.notify:
                     await asyncio.gather(*[
                         asyncio.create_task(
-                            channel(result, command.hooks.listeners)
+                            channel.call(result, command.hooks.listeners)
                         ) for channel in command.hooks.channels
                     ])
 

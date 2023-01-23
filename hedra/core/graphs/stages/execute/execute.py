@@ -13,6 +13,7 @@ from hedra.core.engines.types.registry import registered_engines
 from hedra.core.graphs.hooks.registry.registry_types import (
     ActionHook,
     EventHook, 
+    CheckHook,
     ContextHook,
     TaskHook
 )
@@ -124,11 +125,13 @@ class Execute(Stage, Generic[Unpack[T]]):
                     'stage': hook.stage,
                     'weight': hook.metadata.weight,
                     'order': hook.metadata.order,
+                    'checks': [check.__name__ for check in hook.checks],
                     **hook.action.to_serializable()
                 } for hook in action_hooks
             ]
 
             task_hooks: List[TaskHook] = self.hooks[HookType.TASK]
+
             hooks.extend([
                 {
                     'graph_name': self.graph_name,
@@ -142,6 +145,7 @@ class Execute(Stage, Generic[Unpack[T]]):
                     'stage': hook.stage,
                     'weight': hook.metadata.weight,
                     'order': hook.metadata.order,
+                    'checks': [check.__name__ for check in hook.checks],
                     **hook.action.to_serializable()
                 } for hook in task_hooks
             ])
@@ -156,6 +160,7 @@ class Execute(Stage, Generic[Unpack[T]]):
                         'graph_path': self.graph_path,
                         'graph_id': self.graph_id,
                         'source_stage_name': self.name,
+                        'source_stage_linked_events': self.linked_events,
                         'source_stage_context': {
                             context_key: context_value for context_key, context_value in self.context if context_key not in self.context.known_keys
                         },
@@ -175,9 +180,17 @@ class Execute(Stage, Generic[Unpack[T]]):
             
             results = []
             elapsed_times = []
+            stage_contexts = defaultdict(list)
+
             for result_set in results_sets:
                 results.extend(result_set.get('results'))
                 elapsed_times.append(result_set.get('total_elapsed'))
+
+                pipeline_context = result_set.get('context', {})
+                for context_key, context_value in pipeline_context.items():
+                    stage_contexts[context_key].append(context_value)
+
+            self.context[self.name] = stage_contexts
 
             total_results = len(results)
             total_elapsed = statistics.median(elapsed_times)
@@ -225,6 +238,13 @@ class Execute(Stage, Generic[Unpack[T]]):
             await self.logger.filesystem.aio['hedra.core'].info(
                 f'{self.metadata_string} - Execution complete - Time (including addtional setup) took: {round(elapsed, 2)} seconds'
             )  
+
+            stage_contexts = defaultdict(list)
+            pipeline_context = results.get('context', {})
+            for context_key, context_value in pipeline_context.items():
+                stage_contexts[context_key].append(context_value)
+            
+            self.context[self.name] = stage_contexts
 
             total_results = len(results)
             total_elapsed = persona.total_elapsed

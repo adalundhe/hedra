@@ -33,8 +33,8 @@ class TaskHook(Hook):
         self.checks = checks
         self.is_notifier = len(notify) > 0
         self.is_listener = len(listen) > 0
-        self.notifiers: List[str] = []
-        self.listeners: List[str] = []
+        self.notifiers: List[str] = notify
+        self.listeners: List[str] = listen
         self.metadata = HookMetadata(
             weight=weight,
             order=order,

@@ -369,7 +369,7 @@ class Setup(Stage, Generic[Unpack[T]]):
             if shortname in hook.names:
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Adding Hook - {hook.name}:{hook.hook_id} - of type - {hook.hook_type.name.capitalize()} - to Action - {shortname} - for Execute stage - {execute_stage.name}')
 
-                return hook.call
+                return hook
 
     @Internal()
     async def get_checks(self, execute_stage: Stage, shortname: str) -> List[Coroutine]:
@@ -380,7 +380,7 @@ class Setup(Stage, Generic[Unpack[T]]):
             if shortname in hook.names:
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Adding Check - {hook.name}:{hook.hook_id} - to Action or Task - {shortname} - for Execute stage - {execute_stage.name}')
                 
-                checks.append(hook.call)
+                checks.append(hook)
 
         return checks
 
@@ -400,7 +400,7 @@ class Setup(Stage, Generic[Unpack[T]]):
 
                 for channel_name in hook.listeners:
                     channel: ChannelHook = channels.get(channel_name)
-                    action.hooks.channels.append(channel.call)
+                    action.hooks.channels.append(channel)
                     channel.listeners.append(hook.name)
 
             if hook.is_notifier:
@@ -408,7 +408,7 @@ class Setup(Stage, Generic[Unpack[T]]):
 
                 for channel_name in hook.notifiers:
                     channel: ChannelHook = channels.get(channel_name)
-                    action.hooks.channels.append(channel.call)
+                    action.hooks.channels.append(channel)
                     channel.notifiers.append(hook.name)
 
         for channel in channels.values():

@@ -2,7 +2,8 @@ import traceback
 import asyncio
 import uuid
 import inspect
-from typing import Any, Coroutine
+from typing import Any, Coroutine, Tuple, Dict
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.reporting.tags import Tag
@@ -11,6 +12,7 @@ from hedra.reporting.tags import Tag
 class BaseEvent:
 
     __slots__ = (
+        'stage_name',
         'event_id',
         'action_id',
         'name',
@@ -25,7 +27,11 @@ class BaseEvent:
         'time'
     )
 
-    def __init__(self, stage: Any, result: BaseResult) -> None:
+    def __init__(
+        self, 
+        stage: Any, 
+        result: BaseResult
+    ) -> None:
 
         self.event_id = str(uuid.uuid4())
         self.action_id = result.action_id
@@ -37,28 +43,12 @@ class BaseEvent:
         self.type = result.type
         self.source = result.source
         self.checks = []
+        self.stage_name = stage.name
 
         self.time = self.timings.get('total', 0)
-
-        for check_hook_name in result.checks:
-            check_hook = registrar.all.get(check_hook_name)
-
-            check_hook.call = check_hook.call.__get__(
-                stage, 
-                stage.__class__
-            )
-
-            setattr(
-                stage, 
-                check_hook.shortname, 
-                check_hook.call
-            )
-
-            if inspect.ismethod(check_hook.call) is False:
-                check_hook.call = check_hook.call.__get__(stage, stage.__class__)
-                setattr(stage, check_hook.shortname, check_hook.call)
-
-            self.checks.append(check_hook.call)
+        self.checks = [
+            check for check in stage.hooks[HookType.CHECK] if check.name in result.checks
+        ]
 
         self.tags = [
             Tag(
@@ -76,7 +66,7 @@ class BaseEvent:
 
     async def _check_results(self, check: Coroutine):
         try:
-            await check(self)
+            await check.call(self)
         except AssertionError:              
             error_message = traceback.format_exc().split(
                 '\n'

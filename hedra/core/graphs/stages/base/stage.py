@@ -62,6 +62,7 @@ class Stage:
             self.timeout = None
 
         self.internal_hooks = ['run']
+        self.linked_events = defaultdict(list)
 
     @Internal()
     async def run(self):

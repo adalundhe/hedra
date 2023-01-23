@@ -1,7 +1,7 @@
 import json
-from typing import Any
+from typing import Any, Tuple, Dict
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.engines.types.udp import UDPResult
-from hedra.core.graphs.stages.base.stage import Any
 from .base_event import BaseEvent
 
 
@@ -22,7 +22,11 @@ class UDPEvent(BaseEvent):
         'timings'
     )
 
-    def __init__(self, stage: Any, result: UDPResult) -> None:
+    def __init__(
+        self, 
+        stage: Any, 
+        result: UDPResult
+    ) -> None:
         super(UDPEvent, self).__init__(
             stage,
             result

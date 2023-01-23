@@ -1,5 +1,6 @@
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Tuple, Dict
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.engines.types.http import HTTPResult
 from .base_event import BaseEvent
 
@@ -21,7 +22,11 @@ class HTTPEvent(BaseEvent):
         'timings'
     )
 
-    def __init__(self, stage: Any, result: HTTPResult) -> None:
+    def __init__(
+        self, 
+        stage: Any, 
+        result: HTTPResult
+    ) -> None:
         super(HTTPEvent, self).__init__(
             stage,
             result

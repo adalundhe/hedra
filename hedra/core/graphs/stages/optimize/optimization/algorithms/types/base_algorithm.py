@@ -22,6 +22,7 @@ class BaseAlgorithm:
         self.persona_total_time = self.stage_config.total_time
         self.batch = Batch(self.stage_config)
         self.current_params = {}
+        self.session = None
 
         self.batch_time = self.time_limit/self.max_iter
 

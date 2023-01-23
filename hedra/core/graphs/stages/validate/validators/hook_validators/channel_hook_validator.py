@@ -1,4 +1,5 @@
 from typing import List, Union
+from hedra.core.graphs.events.event import Event
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.registry.registry_types import (
     ActionHook,
@@ -23,14 +24,18 @@ class ChannelHookValidator(BaseHookVaidator):
 
         try:
 
+            call = hook._call
+            if isinstance(hook, Event):
+                call = hook.target._call
+
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
             assert hook.hook_type is HookType.CHANNEL, f"Hook type mismatch - hook {hook.name}:{hook.hook_id} is a {hook.hook_type.name} hook, but Hedra expected a {HookType.CHANNEL.name} hook."
             assert hook.shortname in hook.name, f"Shortname {hook.shortname} must be contained in full Hook name {hook.name}:{hook.hook_id} for @channel hook {hook.name}:{hook.hook_id}."
-            assert hook.call is not None, f"Method is not not found on stage or was not supplied to @channel hook - {hook.name}:{hook.hook_id}"
-            assert hook.call.__code__.co_argcount > 2, f"Missing required arguments 'result' or 'actions' for @channel hook {hook.name}:{hook.hook_id}"
-            assert hook.call.__code__.co_argcount < 4, f"Too many args. - @channel hook {hook.name}:{hook.hook_id} only requires 'result' and 'actions' as additional args."
-            assert 'self' in hook.call.__code__.co_varnames
+            assert call is not None, f"Method is not not found on stage or was not supplied to @channel hook - {hook.name}:{hook.hook_id}"
+            assert call.__code__.co_argcount > 2, f"Missing required arguments 'result' or 'actions' for @channel hook {hook.name}:{hook.hook_id}"
+            assert call.__code__.co_argcount < 4, f"Too many args. - @channel hook {hook.name}:{hook.hook_id} only requires 'result' and 'actions' as additional args."
+            assert 'self' in call.__code__.co_varnames
 
             stage_actions: List[Union[ActionHook, TaskHook]] = list(
                 filter(

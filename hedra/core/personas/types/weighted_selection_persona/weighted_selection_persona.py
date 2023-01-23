@@ -41,15 +41,11 @@ class WeightedSelectionPersona(DefaultPersona):
 
     def setup(self, hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]], metadata_string: str):
 
-        self.metadata_string = f'{metadata_string} Persona: {self.type.capitalize()}:{self.persona_id} - '
+        self._setup(hooks, metadata_string)
         
-        actions = hooks.get(HookType.ACTION)
-        actions.extend(
-            hooks.get(HookType.TASK)
-        )
-        self.actions_count = len(actions)
+        self.actions_count = len(self._hooks)
 
-        self.weights = [action.metadata.weight for action in actions]
+        self.weights = [action.metadata.weight for action in self._hooks]
         self.indexes = [idx for idx in range(self.actions_count)]
 
         self.sample = random.choices(
@@ -57,8 +53,6 @@ class WeightedSelectionPersona(DefaultPersona):
             weights=self.weights,
             k=self.batch.size
         )
-
-        self._hooks = actions
 
 
     async def generator(self, total_time):

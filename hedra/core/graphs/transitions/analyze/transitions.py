@@ -33,6 +33,7 @@ async def analyze_transition(current_stage: Stage, next_stage: Stage):
         ]
 
         results_to_calculate = {}
+        stages = {}
         for stage_name in raw_results.keys():
             stage = execute_stages.get(stage_name)
 
@@ -41,8 +42,10 @@ async def analyze_transition(current_stage: Stage, next_stage: Stage):
             if stage.state in valid_states and in_path:
                 stage.state = StageStates.ANALYZING
                 results_to_calculate[stage_name] = raw_results.get(stage_name)
+                stages[stage_name] = stage
         
         current_stage.raw_results = results_to_calculate
+        current_stage.stages = stages
 
         if current_stage.timeout:
             summary = await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)

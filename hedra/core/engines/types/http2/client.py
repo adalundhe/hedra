@@ -141,7 +141,7 @@ class MercuryHTTP2Client:
                     await event.wait()
 
                 if action.hooks.before:
-                    action = await action.hooks.before(action, response)
+                    action = await action.hooks.before.call(action, response)
                     action.setup()
 
                 response.start = time.monotonic()
@@ -174,13 +174,13 @@ class MercuryHTTP2Client:
                 response.complete = time.monotonic()
 
                 if action.hooks.after:
-                    action = await action.hooks.after(action, response)
+                    action = await action.hooks.after.call(action, response)
                     action.setup()
 
                 if action.hooks.notify:
                     await asyncio.gather(*[
                         asyncio.create_task(
-                            channel(response, action.hooks.listeners)
+                            channel.call(response, action.hooks.listeners)
                         ) for channel in action.hooks.channels
                     ])
 

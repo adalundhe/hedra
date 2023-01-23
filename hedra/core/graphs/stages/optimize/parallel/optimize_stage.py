@@ -2,23 +2,29 @@ import json
 import dill
 import threading
 import os
-import inspect
+import traceback
 import signal
 import os
-from collections import defaultdict
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Union, Tuple
 from hedra.core.engines.client.config import Config
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.stages.optimize.optimization import Optimizer
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.setup.setup import Setup
+from hedra.core.graphs.events.event import Event, EventHook
 from hedra.core.engines.types.registry import registered_engines
 from hedra.core.personas.persona_registry import registered_personas
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.graphs.stages.execute import Execute
-from hedra.core.graphs.stages.base.import_tools import import_stages, import_plugins
+from hedra.core.graphs.stages.base.import_tools import (
+    import_stages, 
+    import_plugins,
+    set_stage_hooks
+)
 from hedra.core.graphs.stages.optimize.optimization.algorithms import registered_algorithms
 from hedra.logging import (
     HedraLogger,
@@ -88,6 +94,7 @@ def optimize_stage(serialized_config: str):
         execute_stage_name: str = optimization_config.get('execute_stage_name')
         execute_stage_config: Config = optimization_config.get('execute_stage_config')
         execute_stage_plugins: Dict[PluginType, List[str]] = optimization_config.get('execute_stage_plugins')
+        execute_stage_linked_events: Dict[Tuple[HookType, str], List[Tuple[str, str]]] = optimization_config.get('execute_stage_linked_events')
         optimize_params: List[str] = optimization_config.get('optimize_params')
         optimize_iterations: int = optimization_config.get('optimizer_iterations')
         optimizer_algorithm: str = optimization_config.get('optimizer_algorithm')
@@ -100,23 +107,9 @@ def optimize_stage(serialized_config: str):
 
         execute_stage: Stage = discovered.get(execute_stage_name)()
         execute_stage.context.update(source_stage_context)
+        execute_stage = set_stage_hooks(execute_stage)
 
-        execute_stage_actions = defaultdict(list)
-        for hook_name in optimization_config.get('execute_stage_hooks'):
-            hook = registrar.all.get(hook_name)
-
-            hook._call = hook._call.__get__(execute_stage, execute_stage.__class__)
-            setattr(execute_stage, hook.shortname, hook._call)
-
-            if inspect.ismethod(hook.call) is False:
-                hook.call = hook.call.__get__(execute_stage, execute_stage.__class__)
-                setattr(execute_stage, hook.shortname, hook.call)
-
-            execute_stage_actions[hook.hook_type].append(hook)
-
-        execute_stage.hooks.update(execute_stage_actions)
         execute_stage_config.batch_size = batch_size
-
         plugins_by_type = import_plugins(graph_path)
 
         stage_persona_plugins: List[str] = execute_stage_plugins[PluginType.PERSONA]
@@ -148,6 +141,67 @@ def optimize_stage(serialized_config: str):
         stages = loop.run_until_complete(setup_stage.run())
         
         setup_execute_stage: Execute = stages.get(execute_stage_name)
+
+        setup_execute_stage_hooks = {}
+        for hook_type in setup_execute_stage.hooks:
+            setup_execute_stage_hooks.update({
+                hook.name: hook for hook in setup_execute_stage.hooks[hook_type]
+            })
+
+        loaded_stages: Dict[str, Stage] = {
+            setup_execute_stage.name: setup_execute_stage
+        }
+        pipeline_stages = {
+            setup_execute_stage.name: setup_execute_stage
+        }
+        
+        for event_target in execute_stage_linked_events:
+            target_hook_stage, target_hook_type, target_hook_name = event_target
+            for event_source in execute_stage_linked_events[event_target]:
+                event_source_stage, event_hook_type, event_hook_name = event_source
+                
+                if target_hook_stage == setup_execute_stage.name:
+
+                    source_stage: Stage = loaded_stages.get(event_source_stage)
+                    if source_stage is None:
+                        source_stage = discovered.get(event_source_stage)()
+                        source_stage = set_stage_hooks(source_stage)
+                        
+                        loaded_stages[source_stage.name] = source_stage
+
+                    pipeline_stages[source_stage.name] = source_stage
+
+                    event_hooks = [hook.name for hook in source_stage.hooks[HookType.EVENT]]
+                    event_hook_idx = event_hooks.index(event_hook_name)
+
+                    event_hook: EventHook = source_stage.hooks[HookType.EVENT][event_hook_idx]
+
+                    target_hook_names = [hook.name for hook in setup_execute_stage.hooks[target_hook_type]]
+                    target_hook_idx = target_hook_names.index(target_hook_name)
+
+                    target_hook: Hook = setup_execute_stage.hooks[target_hook_type][target_hook_idx]
+
+                    event = Event(target_hook, event_hook)
+                    event.target_key = event_hook.key
+
+                    if target_hook_idx >= 0 and isinstance(target_hook, Event):
+                        if event_hook.pre is True:
+                            target_hook.pre_sources[event_hook.name] = event_hook
+                            target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
+
+                        else:
+                            target_hook.post_sources[event_hook.name] = event_hook
+                            target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
+                        
+                        registrar.all[event.name] = target_hook
+
+                    elif target_hook_idx >= 0:
+                        target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = event
+                        registrar.all[event.name] = event
+                    
+                    target_hook.stage_instance.linked_events[(target_hook.stage, target_hook.hook_type, target_hook.name)].append(
+                        (event_hook.stage, event_hook.hook_type, event_hook.name)
+                    )
 
         logger.filesystem.sync['hedra.optimize'].info(f'{metadata_string} - Setting up Optimization')
 
@@ -196,10 +250,17 @@ def optimize_stage(serialized_config: str):
 
         logger.filesystem.sync['hedra.optimize'].info(f'{optimizer.metadata_string} - Optimization complete')
 
+        context = {}
+        for stage in pipeline_stages.values():
+            context.update({
+                context_key: context_value for context_key, context_value in stage.context.items() if context_key not in stage.context.known_keys
+            })
+
         return {
             'stage': execute_stage.name,
             'config': execute_stage_config,
-            'params': results
+            'params': results,
+            'context': context
         }
 
     except BrokenPipeError:

@@ -136,6 +136,10 @@ def run_graph(
     def handle_loop_stop(signame):
         try:
             loop.close()
+
+        except BrokenPipeError:
+            os._exit(1)
+
         except RuntimeError:
             logger.console.sync.critical('\n\nAborted.\n')
             os._exit(1)

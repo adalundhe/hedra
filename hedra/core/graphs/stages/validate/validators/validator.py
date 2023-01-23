@@ -48,7 +48,7 @@ class Validator:
             HookType.AFTER: AfterHookValidator(metadata_string),
             HookType.BEFORE: BeforeHookVaidator(metadata_string),
             HookType.CHANNEL: ChannelHookValidator(metadata_string),
-            HookType.CHANNEL: CheckHookValidator(metadata_string),
+            HookType.CHECK: CheckHookValidator(metadata_string),
             HookType.EVENT: EventHookVaidator(metadata_string),
             HookType.METRIC: MetricHookVaidator(metadata_string),
             HookType.RESTORE: RestoreHookValidator(metadata_string),

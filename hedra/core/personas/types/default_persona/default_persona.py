@@ -85,7 +85,7 @@ class DefaultPersona:
         self.workers = 1
 
         self.actions = []
-        self._hooks: List[Union[ActionHook, TaskHook]] = []
+        self._hooks: List[Union[ActionHook, TaskHook]] = {}
         self.batch = Batch(config)
         self.thread_pool = ThreadPoolExecutor(self.workers)
 
@@ -110,15 +110,69 @@ class DefaultPersona:
         self.optimized_params = None
 
     def setup(self, hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]], metadata_string: str):
-
-        self.metadata_string = f'{metadata_string} Persona: {self.type.capitalize()}:{self.persona_id} - '
-        
-        self._hooks = hooks.get(HookType.ACTION)
-        self._hooks.extend(
-            hooks.get(HookType.TASK, [])
-        )
+        self._setup(hooks, metadata_string)
         self.actions_count = len(self._hooks)
+
+    def _setup(self, hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]], metadata_string: str):
+        self.metadata_string = f'{metadata_string} Persona: {self.type.capitalize()}:{self.persona_id} - '
+
+        tasks = hooks.get(HookType.TASK, [])
+        for hook in tasks:
+            if hook.is_event:
+                hook.action.event = hook
         
+        persona_hooks = {
+            hook.name: hook for hook in hooks.get(HookType.ACTION)
+        }
+        persona_hooks.update({
+            hook.name: hook for hook in tasks
+        })
+
+        before_hooks= {
+            hook.name: hook for hook in hooks[HookType.BEFORE]
+        }
+
+        after_hooks = {
+            hook.name: hook for hook in hooks[HookType.AFTER]
+        }
+
+        channel_hooks = {
+            hook.name: hook for hook in hooks[HookType.CHANNEL]
+        }
+
+        for hook in persona_hooks.values():
+            before_hook = hook.action.hooks.before_hook_name
+            if before_hook:
+                hook.action.hooks.before = before_hooks.get(before_hook)
+
+            after_hook = hook.action.hooks.after_hook_name
+            if after_hook:
+                hook.action.hooks.after = after_hooks.get(after_hook)
+
+            
+        for channel_hook in channel_hooks.values():
+            for notifier_name in channel_hook.notifiers:
+                notifier_hook = persona_hooks[notifier_name]
+                notifier_hook.action.hooks.notify = True
+                notifier_hook.action.hooks.listeners.extend([
+                    persona_hooks.get(hook_name) for hook_name in channel_hook.listeners
+                ])
+
+                notifier_hook.listeners = notifier_hook.action.hooks.listeners
+
+                notifier_hook.action.hooks.channels.append(channel_hook)
+   
+                persona_hooks[notifier_name] = notifier_hook
+
+            for listener_name in channel_hook.listeners:
+                listener_hook = persona_hooks[listener_name]
+                listener_hook.action.hooks.listen = True
+
+                listener_hook.action.hooks.channels.append(channel_hook)
+                persona_hooks[listener_hook.name] = listener_hook
+
+        self._hooks = list(persona_hooks.values())
+                
             
     async def execute(self):
         hooks = self._hooks

@@ -7,10 +7,17 @@ import json
 import threading
 import os
 import signal
+import traceback
 from collections import defaultdict
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.events.event import Event, EventHook
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.engines.types.common.base_result import BaseResult
-from hedra.core.graphs.stages.base.import_tools import import_stages
+from hedra.core.graphs.stages.base.import_tools import (
+    import_stages,
+    set_stage_hooks
+)
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.logging import (
@@ -120,11 +127,74 @@ def process_results_batch(config: Dict[str, Any]):
     stage_name = config.get('analyze_stage_name')
     custom_metric_hook_names = config.get('analyze_stage_metric_hooks', [])
     results_batch = config.get('analyze_stage_batched_results', [])
+    analyze_stage_linked_events = config.get('analyze_stage_linked_events', defaultdict(list))
 
-    stages = import_stages(graph_path)
-    stage: Stage = stages.get(stage_name)()
-    stage.context.update(source_stage_context)
+    discovered = import_stages(graph_path)
+    stage: Stage = discovered.get(stage_name)()
+    setup_analyze_stage: Stage = set_stage_hooks(stage)
+    setup_analyze_stage.context.update(source_stage_context)
 
+    loaded_stages: Dict[str, Stage] = {
+        setup_analyze_stage.name: setup_analyze_stage
+    }
+    pipeline_stage = {
+        setup_analyze_stage.name: setup_analyze_stage
+    }
+
+    for event_target in analyze_stage_linked_events:
+        target_hook_stage, target_hook_type, target_hook_name = event_target
+        for event_source in analyze_stage_linked_events[event_target]:
+            event_source_stage, _, event_hook_name = event_source
+
+            if target_hook_stage == stage_name:
+
+                source_stage: Stage = loaded_stages.get(stage_name)
+                source_stage: Stage = loaded_stages.get(event_source_stage)
+
+                if source_stage is None:
+                    source_stage = discovered.get(event_source_stage)()
+                    source_stage = set_stage_hooks(source_stage)
+                    
+                    loaded_stages[source_stage.name] = source_stage
+
+
+                pipeline_stage[source_stage.name] = source_stage
+
+                event_hooks = [hook.name for hook in source_stage.hooks[HookType.EVENT]]
+                event_hook_idx = event_hooks.index(event_hook_name)
+
+                event_hook: EventHook = source_stage.hooks[HookType.EVENT][event_hook_idx]
+
+                target_hook_names = [hook.name for hook in setup_analyze_stage.hooks[target_hook_type]]
+                target_hook_idx = target_hook_names.index(target_hook_name)
+
+                target_hook: Hook = setup_analyze_stage.hooks[target_hook_type][target_hook_idx]
+                target_hook.stage = source_stage_name
+                target_hook.stage_instance = setup_analyze_stage
+                target_hook.stage_instance.hooks = setup_analyze_stage.hooks
+
+                event = Event(target_hook, event_hook)
+                event.target_key = event_hook.key
+
+                if target_hook_idx >= 0 and isinstance(target_hook, Event):
+                    if event_hook.pre is True:
+                        target_hook.pre_sources[event_hook.name] = event_hook
+                        target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
+
+                    else:
+                        target_hook.post_sources[event_hook.name] = event_hook
+                        target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
+                    
+                    registrar.all[event.name] = target_hook
+
+                elif target_hook_idx >= 0:
+                    target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = event
+                    registrar.all[event.name] = event
+                
+                target_hook.stage_instance.linked_events[(target_hook.stage, target_hook.hook_type, target_hook.name)].append(
+                    (event_hook.stage, event_hook.hook_type, event_hook.name)
+                )
+                
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
@@ -141,15 +211,26 @@ def process_results_batch(config: Dict[str, Any]):
         )
 
     try:
-        return loop.run_until_complete(
+        events = loop.run_until_complete(
             process_batch(
-                stage,
+                setup_analyze_stage,
                 stage_name,
                 custom_metric_hook_names,
                 results_batch,
                 meetadata_string
             )
         )
+
+        context = {}
+        for stage in pipeline_stage.values():
+            context.update({
+                context_key: context_value for context_key, context_value in stage.context.items() if context_key not in stage.context.known_keys
+            })
+
+        return {
+            'events': events,
+            'context': context
+        }
 
     except BrokenPipeError:
 

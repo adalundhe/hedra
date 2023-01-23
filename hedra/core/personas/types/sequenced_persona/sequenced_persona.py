@@ -17,12 +17,12 @@ class SequencedPersona(DefaultPersona):
 
     def setup(self, hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]], metadata_string: str):
 
-        self.metadata_string = f'{metadata_string} Persona: {self.type.capitalize()}:{self.persona_id} - '
         
-        sequence = sorted(
-            hooks.get(HookType.ACTION),
+        self._setup(hooks, metadata_string)
+        
+        sequence = sorted(self._hooks,
             key=lambda action: action.metadata.order
         )
 
-        self.actions_count = len(sequence)
         self._hooks = sequence
+        self.actions_count = len(sequence)

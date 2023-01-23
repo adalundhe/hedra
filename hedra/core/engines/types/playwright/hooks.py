@@ -32,14 +32,14 @@ class Hooks(Generic[A]):
         names = {}
 
         if self.before:
-            names['before'] = self.before.__qualname__
+            names['before'] = self.before.name
 
         if self.after:
-            names['after'] = self.after.__qualname__
+            names['after'] = self.after.name
 
         check_names = []
         for check in self.checks:
-            check_names.append(check.__qualname__)
+            check_names.append(check.name)
 
         names['checks'] = check_names
 

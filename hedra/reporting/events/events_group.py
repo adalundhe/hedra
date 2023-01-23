@@ -2,13 +2,14 @@ from __future__ import annotations
 import uuid
 import numpy
 from collections import defaultdict
-from typing import Any, Dict, Union
+from typing import Any, Dict, Union, Tuple
 from hedra.reporting.stats import (
     Median,
     Mean,
     Variance,
     StandardDeviation
 )
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from .results import results_types
 from .types.task_event import TaskEvent
 from .types.base_event import BaseEvent
@@ -51,7 +52,12 @@ class EventsGroup:
         self._streaming_stdev = defaultdict(StandardDeviation)
         self._streaming_median = defaultdict(Median)
 
-    async def add(self, stage: Any, result: Any, stage_name: str):
+    async def add(
+        self, 
+        stage: Any, 
+        result: Any, 
+        stage_name: str
+    ):
 
         event: BaseEvent = results_types.get(result.type, TaskEvent)(
             stage,
