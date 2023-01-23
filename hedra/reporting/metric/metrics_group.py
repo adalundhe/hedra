@@ -39,8 +39,9 @@ class MetricsGroup:
             field: value for field, value in data.items() if field not in self._additional_fields
         })
 
-    
-        for metric_name, metric_value in flattened_data.items():
+        metrics_data = dict(flattened_data.get(group_name, {}))
+
+        for metric_name, metric_value in metrics_data.items():
             self.data.append((
                 metric_name,
                 metric_value
@@ -58,7 +59,6 @@ class MetricsGroup:
             self.fields.append(quantile)
             self.values.append(quantile_value)
             
-
         self.unique = list(self.data)
         self.unique_fields = list(self.fields)
         self.unique_values = list(self.values)
@@ -99,6 +99,7 @@ class MetricsGroup:
         return {
             'name': self.name,
             'stage': self.stage,
+            'group': self.group_name,
             **record_data,
             **custom_field_data
         }

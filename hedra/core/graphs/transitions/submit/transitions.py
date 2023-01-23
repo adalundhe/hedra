@@ -21,7 +21,6 @@ async def submit_transition(current_stage: Stage, next_stage: Stage):
         await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
 
         current_stage.state = StageStates.SUBMITTING
-        
         current_stage.summaries = current_stage.context.summaries
 
         if current_stage.timeout:
@@ -29,6 +28,8 @@ async def submit_transition(current_stage: Stage, next_stage: Stage):
         
         else:
             await current_stage.run()
+
+        current_stage.context.summaries = {}
 
         current_stage.state = StageStates.SUBMITTED
         next_stage.state = StageStates.SUBMITTED
@@ -39,7 +40,7 @@ async def submit_transition(current_stage: Stage, next_stage: Stage):
     else:
         await logger.spinner.system.debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
         await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
-    
+
     next_stage.context = current_stage.context
 
 

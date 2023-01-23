@@ -145,7 +145,7 @@ class EventsGroup:
                 )
             }
             
-            self.groups[group_name]['quanties'] = quantiles
+            self.groups[group_name]['quantiles'] = quantiles
 
     def merge(self, group: EventsGroup):
         

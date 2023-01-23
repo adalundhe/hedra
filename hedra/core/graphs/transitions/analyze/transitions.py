@@ -22,8 +22,9 @@ async def analyze_transition(current_stage: Stage, next_stage: Stage):
         
         current_stage.state = StageStates.ANALYZING
 
-        raw_results = current_stage.context.results
+        raw_results = dict(current_stage.context.results)
         execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE)
+        submit_stages = current_stage.context.stages.get(StageTypes.SUBMIT)
         paths = current_stage.context.paths
 
         valid_states = [
@@ -38,22 +39,29 @@ async def analyze_transition(current_stage: Stage, next_stage: Stage):
             stage = execute_stages.get(stage_name)
 
             in_path = current_stage.name in paths.get(stage.name)
-
             if stage.state in valid_states and in_path:
                 stage.state = StageStates.ANALYZING
                 results_to_calculate[stage_name] = raw_results.get(stage_name)
                 stages[stage_name] = stage
         
-        current_stage.raw_results = results_to_calculate
-        current_stage.stages = stages
 
-        if current_stage.timeout:
-            summary = await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
+        if len(results_to_calculate) > 0:
 
-        else:
-            summary = await current_stage.run()
+            current_stage.raw_results = results_to_calculate
+            current_stage.stages = stages
 
-        current_stage.context.summaries.update(summary)
+            if current_stage.timeout:
+                summary = await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
+
+            else:
+                summary = await current_stage.run()
+
+            current_stage.context.summaries.update(summary)
+
+
+            for stage in submit_stages.values():
+                if stage.name in paths.get(current_stage.name):
+                    stage.context.summaries.update(summary)
 
         current_stage.state = StageStates.ANALYZED
 

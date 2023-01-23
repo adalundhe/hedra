@@ -65,6 +65,8 @@ class MetricsSet:
         self.fields.extend(record_fields)
         self.fields.extend(custom_fields)
 
+        self.fields = list(sorted(set(self.fields)))
+
         self.quantiles = list(self.groups.get(
             'total'
         ).quantiles.keys())

@@ -81,7 +81,7 @@ class Analyze(Stage):
             results_types[plugin_name] = plugin.event
 
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Generated custom Event - {plugin.event.type} - for Reporter plugin - {plugin_name}')
-        
+
         all_results = list(self.raw_results.items())
         summaries = {
             'session_total': 0,

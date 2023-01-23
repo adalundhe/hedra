@@ -70,7 +70,8 @@ class CSV:
             'group',
             'total',
             'succeeded',
-            'failed'
+            'failed',
+            'actions_per_second'
         ]
 
         base_filepath = Path(self.metrics_filepath).parent
@@ -160,8 +161,6 @@ class CSV:
                 with open(f'{base_filepath}/{custom_group_name}.csv', 'a') as custom_metrics_file:
 
                     headers = [
-                        'name',
-                        'stage',
                         'group',
                         *list(group.keys())
                     ]
