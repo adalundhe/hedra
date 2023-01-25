@@ -4,6 +4,7 @@ from .core.graphs.hooks import (
     before,
     channel,
     check,
+    condition,
     context,
     depends,
     event,
@@ -13,6 +14,7 @@ from .core.graphs.hooks import (
     save,
     task,
     teardown,
+    transform,
     validate
 )
 

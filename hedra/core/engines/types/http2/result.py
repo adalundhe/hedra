@@ -1,11 +1,17 @@
 import json
-from typing import Dict, Union
+from typing import Dict, Union, Any
 from gzip import decompress as gzip_decompress
 from zlib import decompress as zlib_decompress
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common.base_result import BaseResult
 from .events.deferred_headers_event import DeferredHeaders
 from .action import HTTP2Action
+
+
+class HeadersDict(dict):
+
+    def __setitem__(self, __key: Any, __value: Any) -> None:
+        return super().__setitem__(__key, __value)
 
 
 class HTTP2Result(BaseResult):
@@ -19,10 +25,10 @@ class HTTP2Result(BaseResult):
         'params',
         'query',
         'hostname',
-        'headers',
         'body',
         'response_code',
         'deferred_headers',
+        '_headers',
         '_compression',
         '_content_type',
         '_size',
@@ -53,7 +59,7 @@ class HTTP2Result(BaseResult):
         self.params = action.url.params
         self.query = action.url.query
         self.hostname = action.url.hostname
-        self.headers: Dict[bytes, bytes] = {}
+        self._headers: HeadersDict = HeadersDict()
         self.body = bytearray()
         
         self.response_code: str = None
@@ -64,6 +70,17 @@ class HTTP2Result(BaseResult):
         self._version = None
         self._reason = None
         self._status = None
+
+    @property
+    def headers(self) -> HeadersDict:
+        if self._headers is None or  len(self._headers) == 0:
+            self._headers = self._parse_headers()
+        
+        return self._headers
+
+    @headers.setter
+    def headers(self, value: Any):
+        self._headers = value
 
     @property
     def content_type(self):
@@ -150,7 +167,7 @@ class HTTP2Result(BaseResult):
     def data(self) -> Union[str, dict, None]:
 
         if len(self.headers) == 0 and self.deferred_headers:
-            self.headers = self._parse_headers()
+            self._headers = self._parse_headers()
 
         data = self.body
         try:

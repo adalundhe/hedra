@@ -3,12 +3,7 @@ import inspect
 from typing import Dict, List, Union
 from collections import defaultdict
 from hedra.core.graphs.hooks.registry.registrar import registrar
-from hedra.core.graphs.events import Event
-from hedra.core.graphs.hooks.registry.registry_types import (
-   ContextHook,
-   EventHook,
-   ValidateHook
-)
+from hedra.core.graphs.hooks.registry.registry_types import ValidateHook
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.hook_types.internal import Internal
@@ -51,24 +46,19 @@ class Validate(Stage):
         for hook_type in HookType:
             self.hooks[hook_type] = []
 
-        self.accepted_hook_types = [ HookType.VALIDATE, HookType.INTERNAL, HookType.EVENT, HookType.CONTEXT ]
+        self.accepted_hook_types = [ 
+            HookType.CONDITION,
+            HookType.CONTEXT,
+            HookType.EVENT, 
+            HookType.INTERNAL, 
+            HookType.TRANSFORM,
+            HookType.VALIDATE, 
+        ]
 
     @Internal()
     async def run(self):
-        events: List[Union[EventHook, Event]] = [event for event in self.hooks[HookType.EVENT] if hasattr(self, event.shortname)]
-        pre_events: List[EventHook] = [
-            event for event in events if isinstance(event, EventHook) and event.pre
-        ]
         
-        if len(pre_events) > 0:
-            pre_event_names = ", ".join([
-                event.shortname for event in pre_events
-            ])
-
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing PRE events - {pre_event_names}')
-            await asyncio.wait([
-                asyncio.create_task(event.call()) for event in pre_events
-            ], timeout=self.stage_timeout)
+        await self.run_pre_events()
 
         validator = Validator(self.stages, self.metadata_string)
         await validator.validate_stages()
@@ -78,24 +68,7 @@ class Validate(Stage):
 
         await validator.validate_hooks()
 
-        post_events: List[EventHook] = [
-            event for event in events if isinstance(event, EventHook) and event.pre is False
-        ]
-
-        if len(post_events) > 0:
-            post_event_names = ", ".join([
-                event.shortname for event in post_events
-            ])
-
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing POST events - {post_event_names}')
-            await asyncio.wait([
-                asyncio.create_task(event.call()) for event in post_events
-            ], timeout=self.stage_timeout)
-
-        context_hooks: List[ContextHook] = self.hooks[HookType.CONTEXT]
-        await asyncio.gather(*[
-            asyncio.create_task(context_hook.call(self.context)) for context_hook in context_hooks
-        ])
+        await self.run_post_events()
 
     async def collect_validate_hooks(self):       
         

@@ -3,6 +3,7 @@ from .after import after
 from .before import before
 from .channel import channel
 from .check import check
+from .condition import condition
 from .context import context
 from .depends import depends
 from .event import event
@@ -13,4 +14,5 @@ from .save import save
 from .setup import setup
 from .task import task
 from .teardown import teardown
+from .transform import transform
 from .validate import validate

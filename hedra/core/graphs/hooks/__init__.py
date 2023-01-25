@@ -4,6 +4,7 @@ from .hook_types import (
     before,
     channel,
     check,
+    condition,
     context,
     depends,
     event,
@@ -13,5 +14,6 @@ from .hook_types import (
     setup,
     task,
     teardown,
+    transform,
     validate
 )

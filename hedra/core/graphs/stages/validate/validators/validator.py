@@ -18,6 +18,7 @@ from .hook_validators import (
     BeforeHookVaidator,
     ChannelHookValidator,
     CheckHookValidator,
+    ConditionHookVaidator,
     EventHookVaidator,
     MetricHookVaidator,
     RestoreHookValidator,
@@ -25,6 +26,7 @@ from .hook_validators import (
     SetupHookVaidator,
     TaskHookValidator,
     TeardownHookValidator,
+    TransformHookVaidator,
     ValidateHookValidator
 )
 from .stage_validator import StageValidator
@@ -49,6 +51,7 @@ class Validator:
             HookType.BEFORE: BeforeHookVaidator(metadata_string),
             HookType.CHANNEL: ChannelHookValidator(metadata_string),
             HookType.CHECK: CheckHookValidator(metadata_string),
+            HookType.CONDITION: ConditionHookVaidator(metadata_string),
             HookType.EVENT: EventHookVaidator(metadata_string),
             HookType.METRIC: MetricHookVaidator(metadata_string),
             HookType.RESTORE: RestoreHookValidator(metadata_string),
@@ -56,6 +59,7 @@ class Validator:
             HookType.SETUP: SetupHookVaidator(metadata_string),
             HookType.TASK: TaskHookValidator(metadata_string),
             HookType.TEARDOWN: TeardownHookValidator(metadata_string),
+            HookType.TRANSFORM: TransformHookVaidator(metadata_string),
             HookType.VALIDATE: ValidateHookValidator(metadata_string)
         }
 

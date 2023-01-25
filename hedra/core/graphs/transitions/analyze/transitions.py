@@ -60,7 +60,7 @@ async def analyze_transition(current_stage: Stage, next_stage: Stage):
 
 
             for stage in submit_stages.values():
-                if stage.name in paths.get(current_stage.name):
+                if stage.name in paths.get(current_stage.name) and stage.state == StageStates.INITIALIZED:
                     stage.context.summaries.update(summary)
 
         current_stage.state = StageStates.ANALYZED

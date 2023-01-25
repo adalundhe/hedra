@@ -2,12 +2,9 @@ import asyncio
 import dill
 import time
 from collections import defaultdict
-from typing import Dict, List, Tuple, Union
-from hedra.core.graphs.events import Event
+from typing import Dict, List, Tuple
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.registry.registry_types import (
-    EventHook, 
-    ContextHook,
     ActionHook,
     TaskHook
 )
@@ -41,25 +38,16 @@ class Optimize(Stage):
         self.allow_parallel = True
 
         self.optimization_execution_time = 0
-        self.accepted_hook_types = [ HookType.EVENT, HookType.CONTEXT ]
+        self.accepted_hook_types = [ 
+            HookType.CONTEXT,
+            HookType.EVENT, 
+            HookType.TRANSFORM 
+        ]
 
     @Internal()
     async def run(self, stages: Dict[str, Execute]):
 
-        events: List[Union[EventHook, Event]] = [event for event in self.hooks[HookType.EVENT]]
-        pre_events: List[EventHook] = [
-            event for event in events if isinstance(event, EventHook) and event.pre
-            ]
-        
-        if len(pre_events) > 0:
-            pre_event_names = ", ".join([
-                event.shortname for event in pre_events
-            ])
-
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing PRE events - {pre_event_names}')
-            await asyncio.wait([
-                asyncio.create_task(event.call()) for event in pre_events
-            ], timeout=self.stage_timeout)
+        await self.run_pre_events()
 
         optimization_execution_time_start = time.monotonic()
 
@@ -206,27 +194,10 @@ class Optimize(Stage):
             f'{stage_name}: {optimized_batch_size}' for stage_name, optimized_batch_size in stage_optimzations.items()
         ])
 
-        post_events: List[EventHook] = [
-            event for event in events if isinstance(event, EventHook) and event.pre is False
-        ]
-
-        if len(post_events) > 0:
-            post_event_names = ", ".join([
-                event.shortname for event in post_events
-            ])
-
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing POST events - {post_event_names}')
-            await asyncio.wait([
-                asyncio.create_task(event.call()) for event in post_events
-            ], timeout=self.stage_timeout)
+        await self.run_post_events()
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Optimization complete for stages - {stage_names} - over - {self.optimization_execution_time} - seconds')
         await self.logger.spinner.set_default_message(f'Optimized - batch sizes for stages - {optimized_batch_sizes} - over {self.optimization_execution_time} seconds')
-
-        context_hooks: List[ContextHook] = self.hooks[HookType.CONTEXT]
-        await asyncio.gather(*[
-            asyncio.create_task(context_hook.call(self.context)) for context_hook in context_hooks
-        ])
         
         return [
             result.get('params') for result in optimization_results

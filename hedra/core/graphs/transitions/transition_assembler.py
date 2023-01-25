@@ -5,13 +5,14 @@ import threading
 import os
 from typing import List, Dict, Union, Any, Tuple, Coroutine
 from collections import defaultdict
-from hedra.core.graphs.events import Event
+from hedra.core.graphs.events import get_event
+from hedra.core.graphs.events.base_event import BaseEvent
 from hedra.core.graphs.stages.base.import_tools import set_stage_hooks
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.error import Error
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.hooks.registry.registrar import registrar
-from hedra.core.graphs.hooks.registry.registry_types import EventHook
+from hedra.core.graphs.hooks.registry.registry_types import EventHook, TransformHook
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, HookType
 from hedra.core.graphs.stages.base.parallel.batch_executor import BatchExecutor
 from hedra.core.graphs.transitions.exceptions.exceptions import IsolatedStageError
@@ -125,14 +126,26 @@ class TransitionAssembler:
 
 
             event_hooks = []
-            stage_event_hooks: List[EventHook] = stage.hooks[HookType.EVENT]
+            stage_event_hooks: List[Union[EventHook, TransformHook]] = stage.hooks[HookType.EVENT]
+            stage_event_hooks.extend(stage.hooks[HookType.TRANSFORM])
+            stage_event_hooks.extend(stage.hooks[HookType.CONDITION])
+
             for event_hook in stage_event_hooks:
-                if event_hook.names is None or len(event_hook.names)  == 0:
+                if event_hook.names is None or len(event_hook.names)  == 0 and event_hook not in event_hooks:
                     event_hooks.append(event_hook)
 
-            stage.hooks[HookType.EVENT] = event_hooks
+            stage.hooks[HookType.EVENT] = [event_hook for event_hook in event_hooks if event_hook.hook_type == HookType.EVENT]
+            stage.hooks[HookType.TRANSFORM] = [event_hook for event_hook in event_hooks if event_hook.hook_type == HookType.TRANSFORM]
+            
+        event_hooks: List[Union[EventHook, TransformHook]] = list(self.hooks_by_type.get(HookType.EVENT, {}).values())
+        event_hooks.extend(
+            list(self.hooks_by_type.get(HookType.TRANSFORM, {}).values())
+        )
 
-        event_hooks: List[EventHook] = list(self.hooks_by_type.get(HookType.EVENT, {}).values())
+        event_hooks.extend(
+            list(self.hooks_by_type.get(HookType.CONDITION, {}).values())
+        )
+        
         for event_hook in event_hooks:
             for target_hook_name in event_hook.names:    
                 target_hook = registrar.all.get(target_hook_name)
@@ -142,7 +155,7 @@ class TransitionAssembler:
                         f'{self._graph_metadata_log_string} - Appendng Event - {event_hook.name}:{event_hook.hook_id} - to target Stage - {target_hook.stage}:{target_hook.stage_instance.stage_id} Event Hooks'
                     )
 
-                    event = Event(target_hook, event_hook)
+                    event = get_event(target_hook, event_hook)
                     event.target_key = event_hook.key
 
                     target_hook_idx = -1
@@ -153,7 +166,7 @@ class TransitionAssembler:
                     except ValueError:
                         pass
 
-                    if target_hook_idx >= 0 and isinstance(target_hook, Event):
+                    if target_hook_idx >= 0 and isinstance(target_hook, BaseEvent):
                         if event_hook.pre is True:
                             target_hook.pre_sources[event_hook.name] = event_hook
                             target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
@@ -171,7 +184,6 @@ class TransitionAssembler:
                     target_hook.stage_instance.linked_events[(target_hook.stage, target_hook.hook_type, target_hook.name)].append(
                         (event_hook.stage,  event_hook.hook_type, event_hook.name)
                     )
-               
     
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Successfully generated - {stages_count} - stages')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Successfully generated - {stages_count} - stages')
@@ -349,6 +361,11 @@ class TransitionAssembler:
         for stage in self.generated_stages.values():
             for idle_stage in idle_stages:
                 stage.context = idle_stage.context
+
+                for hook_type in stage.hooks:
+                    for hook in stage.hooks[hook_type]:
+                        if hook.hook_type == HookType.TRANSFORM:
+                            hook.context = stage.context
 
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')

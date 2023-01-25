@@ -1,5 +1,5 @@
 from typing import List, Union
-from hedra.core.graphs.events.event import Event
+from hedra.core.graphs.events.base_event import BaseEvent
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.registry.registry_types import (
     ActionHook,
@@ -20,12 +20,12 @@ class ChannelHookValidator(BaseHookVaidator):
 
         self.action_and_task_hooks: List[Union[ActionHook, TaskHook]] = []
 
-    async def validate(self, hook: ChannelHook):
+    async def validate(self, hook: Union[ChannelHook, BaseEvent]):
 
         try:
 
             call = hook._call
-            if isinstance(hook, Event):
+            if isinstance(hook, BaseEvent):
                 call = hook.target._call
 
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')

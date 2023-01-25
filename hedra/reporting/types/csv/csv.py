@@ -37,7 +37,7 @@ class CSV:
     async def submit_events(self, events: List[BaseEvent]):
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Events to file - {self.events_filepath}')
-        with open(self.events_filepath, 'a') as events_file:
+        with open(self.events_filepath, 'w') as events_file:
 
             for event in events:
                 if self._events_csv_writer is None:
@@ -75,7 +75,7 @@ class CSV:
         ]
 
         base_filepath = Path(self.metrics_filepath).parent
-        with open(f'{base_filepath}/stage_metrics.csv', 'a') as shared_metrics_file:
+        with open(f'{base_filepath}/stage_metrics.csv', 'w') as shared_metrics_file:
 
             if self._stage_metrics_csv_writer is None:
                 self._stage_metrics_csv_writer = csv.DictWriter(shared_metrics_file, fieldnames=headers)
@@ -110,7 +110,7 @@ class CSV:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Metrics to file - {self.metrics_filepath}')
 
-        with open(self.metrics_filepath, 'a') as metrics_file:
+        with open(self.metrics_filepath, 'w') as metrics_file:
 
             for metrics_set in metrics:
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
@@ -158,7 +158,7 @@ class CSV:
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Group - {custom_group_name}')
 
                 base_filepath = Path(self.metrics_filepath).parent
-                with open(f'{base_filepath}/{custom_group_name}.csv', 'a') as custom_metrics_file:
+                with open(f'{base_filepath}/{custom_group_name}.csv', 'w') as custom_metrics_file:
 
                     headers = [
                         'group',
@@ -205,7 +205,7 @@ class CSV:
         ]
 
         base_filepath = Path(self.metrics_filepath).parent
-        with open (f'{base_filepath}/stage_errors.csv', 'a') as errors_file:
+        with open (f'{base_filepath}/stage_errors.csv', 'w') as errors_file:
             
             if self._errors_csv_writer is None:
 

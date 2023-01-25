@@ -11,7 +11,8 @@ import traceback
 from collections import defaultdict
 from typing import Any, Dict, List, Tuple
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
-from hedra.core.graphs.events.event import Event, EventHook
+from hedra.core.graphs.events import get_event
+from hedra.core.graphs.events.base_event import BaseEvent
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.core.graphs.stages.base.import_tools import (
@@ -144,7 +145,7 @@ def process_results_batch(config: Dict[str, Any]):
     for event_target in analyze_stage_linked_events:
         target_hook_stage, target_hook_type, target_hook_name = event_target
         for event_source in analyze_stage_linked_events[event_target]:
-            event_source_stage, _, event_hook_name = event_source
+            event_source_stage, event_source_type, event_hook_name = event_source
 
             if target_hook_stage == stage_name:
 
@@ -160,10 +161,15 @@ def process_results_batch(config: Dict[str, Any]):
 
                 pipeline_stage[source_stage.name] = source_stage
 
-                event_hooks = [hook.name for hook in source_stage.hooks[HookType.EVENT]]
-                event_hook_idx = event_hooks.index(event_hook_name)
+                source_events = [
+                    *source_stage.hooks[HookType.EVENT],
+                    *source_stage.hooks[HookType.TRANSFORM]
+                ]
 
-                event_hook: EventHook = source_stage.hooks[HookType.EVENT][event_hook_idx]
+                source_event_hook_names = [hook.name for hook in source_events]
+                source_hook_idx = source_event_hook_names.index(event_hook_name)
+
+                source_hook: Hook = source_events[source_hook_idx]
 
                 target_hook_names = [hook.name for hook in setup_analyze_stage.hooks[target_hook_type]]
                 target_hook_idx = target_hook_names.index(target_hook_name)
@@ -173,16 +179,15 @@ def process_results_batch(config: Dict[str, Any]):
                 target_hook.stage_instance = setup_analyze_stage
                 target_hook.stage_instance.hooks = setup_analyze_stage.hooks
 
-                event = Event(target_hook, event_hook)
-                event.target_key = event_hook.key
+                event = get_event(target_hook, source_hook)
 
-                if target_hook_idx >= 0 and isinstance(target_hook, Event):
-                    if event_hook.pre is True:
-                        target_hook.pre_sources[event_hook.name] = event_hook
+                if target_hook_idx >= 0 and isinstance(target_hook, BaseEvent):
+                    if source_hook.pre is True:
+                        target_hook.pre_sources[source_hook.name] = source_hook
                         target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
 
                     else:
-                        target_hook.post_sources[event_hook.name] = event_hook
+                        target_hook.post_sources[source_hook.name] = source_hook
                         target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
                     
                     registrar.all[event.name] = target_hook
@@ -192,7 +197,7 @@ def process_results_batch(config: Dict[str, Any]):
                     registrar.all[event.name] = event
                 
                 target_hook.stage_instance.linked_events[(target_hook.stage, target_hook.hook_type, target_hook.name)].append(
-                    (event_hook.stage, event_hook.hook_type, event_hook.name)
+                    (source_hook.stage, source_hook.hook_type, source_hook.name)
                 )
                 
     loop = asyncio.new_event_loop()

@@ -75,7 +75,7 @@ class MercuryTaskRunner:
                 
 
                 if task_event:
-                    await task_event.execute_pre()
+                    await task_event.execute_pre(task)
 
                 start = time.monotonic()
 

@@ -1,6 +1,7 @@
 import os
+from typing import Union
 from pathlib import Path
-from hedra.core.graphs.events.event import Event
+from hedra.core.graphs.events.base_event import BaseEvent
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.registry.registry_types import SaveHook
 from hedra.core.graphs.stages.validate.exceptions import HookValidationError
@@ -15,12 +16,12 @@ class SaveHookValidator(BaseHookVaidator):
             self
         ).__init__(metadata_string)
 
-    async def validate(self, hook: SaveHook):
+    async def validate(self, hook: Union[SaveHook, BaseEvent]):
 
         try:
 
             call = hook._call
-            if isinstance(hook, Event):
+            if isinstance(hook, BaseEvent):
                 call = hook.target._call
 
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validating {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')

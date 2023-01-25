@@ -1,76 +1,36 @@
-from typing import Any, Dict
+from typing import Any, Optional
 from hedra.core.graphs.hooks.registry.registry_types import EventHook
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from .event_types import EventTypes
+from .base_event import BaseEvent
 
 
-class Event:
+class Event(BaseEvent[EventHook]):
 
     def __init__(self, target: Hook, source: EventHook) -> None:
+        super(
+            Event,
+            self
+        ).__init__(
+            target,
+            source
+        )
 
-        target.is_event = True
+        self.event_type = EventTypes.EVENT
 
-        self.target = target
-        self.pre_sources: Dict[str, EventHook] = {}
-        self.post_sources: Dict[str, EventHook] = {}
-        self.target_name = None
-        self.target_shortname = None
-        self.target_key = None
-
-        if source.pre:
-            self.pre_sources[source.name] = source
-
-        else:
-            self.post_sources[source.name] = source
-
-        if target:
-            self.target_name = self.target.name
-            self.target_shortname = self.target.shortname
-
-        self.pre = source.pre
-        self.as_hook = False
-
-    def __getattribute__(self, name: str) -> Any:
-        
-        target = object.__getattribute__(self, 'target')
-
-        if target and hasattr(target, name) and name != 'call':
-            return getattr(target, name)
-        
-        return object.__getattribute__(self, name)
-
-    async def call(self, *args, **kwargs):
-
+    async def call(self, *args, **kwargs): 
         result = None
-
-        if self.target:
-            
-            result = await self.execute_pre()
-            result = await self.target.call(*args, **kwargs) 
-            result = await self.execute_post(result)
-
-        else:
-
-            for source in self.pre_sources.values():
-                result = await source.call()
-
-                if source.key:
-                    source.stage_instance.context[source.key] = result
-
-
-            for source in self.post_sources.values():
-                result = await source.call()
-
-                if source.key:
-                    source.stage_instance.context[source.key] = result
+        
+        result = await self.execute_pre(result)
+        result = await self.target.call(*args, **kwargs) 
+        result = await self.execute_post(result)
 
         return result
 
-    async def execute_pre(self):
-
-        result = None
+    async def execute_pre(self, result: Optional[Any]):
 
         for source in self.pre_sources.values():
-            result = await source.call()
+            result = await source.call(result)
 
             if source.key:
                 source.stage_instance.context[source.key] = result

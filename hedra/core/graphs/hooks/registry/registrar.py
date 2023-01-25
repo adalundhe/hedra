@@ -9,6 +9,7 @@ from hedra.core.graphs.hooks.validation_types.action import ActionValidator
 from hedra.core.graphs.hooks.validation_types.after import AfterValidator
 from hedra.core.graphs.hooks.validation_types.before import BeforeValidator
 from hedra.core.graphs.hooks.validation_types.check import CheckValidator
+from hedra.core.graphs.hooks.validation_types.condition import ConditionValidator
 from hedra.core.graphs.hooks.validation_types.context import ContextValidator
 from hedra.core.graphs.hooks.validation_types.event import EventValidator
 from hedra.core.graphs.hooks.validation_types.metric import MetricValidator
@@ -17,6 +18,7 @@ from hedra.core.graphs.hooks.validation_types.save import SaveValidator
 from hedra.core.graphs.hooks.validation_types.setup import SetupValidator
 from hedra.core.graphs.hooks.validation_types.task import TaskValidator
 from hedra.core.graphs.hooks.validation_types.teardown import TeardownValidator
+from hedra.core.graphs.hooks.validation_types.transform import TransformValidator
 from hedra.core.graphs.hooks.validation_types.validate import ValidateValidator
 from .registry_types import (
     ActionHook,
@@ -24,6 +26,7 @@ from .registry_types import (
     BeforeHook,
     ChannelHook,
     CheckHook,
+    ConditionHook,
     ContextHook,
     EventHook,
     MetricHook,
@@ -32,6 +35,7 @@ from .registry_types import (
     SetupHook,
     TaskHook,
     TeardownHook,
+    TransformHook,
     ValidateHook
 )
 
@@ -50,6 +54,7 @@ class Registrar:
             HookType.BEFORE: lambda *args, **kwargs:  BeforeHook(*args, **kwargs),
             HookType.CHANNEL: lambda *args, **kwargs:  ChannelHook(*args, **kwargs),
             HookType.CHECK: lambda *args, **kwargs:  CheckHook(*args, **kwargs),
+            HookType.CONDITION: lambda *args, **kwargs: ConditionHook(*args, **kwargs),
             HookType.CONTEXT: lambda *args, **kwargs:  ContextHook(*args, **kwargs),
             HookType.EVENT: lambda *args, **kwargs:  EventHook(*args, **kwargs),
             HookType.METRIC: lambda *args, **kwargs:  MetricHook(*args, **kwargs),
@@ -58,6 +63,7 @@ class Registrar:
             HookType.SETUP: lambda *args, **kwargs:  SetupHook(*args, **kwargs),
             HookType.TASK: lambda *args, **kwargs:  TaskHook(*args, **kwargs),
             HookType.TEARDOWN: lambda *args, **kwargs:  TeardownHook(*args, **kwargs),
+            HookType.TRANSFORM: lambda *args, **kwargs: TransformHook(*args, **kwargs),
             HookType.VALIDATE: lambda *args, **kwargs:  ValidateHook(*args, **kwargs)
         }
 
@@ -66,7 +72,8 @@ class Registrar:
             HookType.AFTER: lambda *args, **kwargs: AfterValidator(*args, **kwargs),
             HookType.BEFORE: lambda *args, **kwargs: BeforeValidator(*args, **kwargs),
             HookType.CHECK: lambda *args, **kwargs: CheckValidator(*args, **kwargs),
-            HookType.CONTEXT: ContextValidator,
+            HookType.CONDITION: lambda *args, **kwargs: ConditionValidator(*args, **kwargs),
+            HookType.CONTEXT: lambda *args, **kwargs: ContextValidator(*args, **kwargs),
             HookType.EVENT: lambda *args, **kwargs: EventValidator(*args, **kwargs),
             HookType.METRIC: lambda *args, **kwargs: MetricValidator(*args, **kwargs),
             HookType.RESTORE: lambda *args, **kwargs: RestoreValidator(*args, **kwargs),
@@ -74,6 +81,7 @@ class Registrar:
             HookType.SETUP: lambda *args, **kwargs: SetupValidator(*args, **kwargs),
             HookType.TASK: lambda *args, **kwargs: TaskValidator(*args, **kwargs),
             HookType.TEARDOWN: lambda *args, **kwargs: TeardownValidator(*args, **kwargs),
+            HookType.TRANSFORM: lambda *args, **kwargs: TransformValidator(*args, **kwargs),
             HookType.VALIDATE: lambda *args, **kwargs: ValidateValidator(*args, **kwargs),
         }
 

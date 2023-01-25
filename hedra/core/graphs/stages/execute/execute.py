@@ -1,20 +1,15 @@
 
 import dill
 import time
-import asyncio
 import statistics
 from collections import defaultdict
 from typing import Generic, List, Union
 from hedra.core.engines.client import Client
 from typing_extensions import TypeVarTuple, Unpack
-from hedra.core.graphs.events import Event
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.registry import registered_engines
 from hedra.core.graphs.hooks.registry.registry_types import (
     ActionHook,
-    EventHook, 
-    CheckHook,
-    ContextHook,
     TaskHook
 )
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
@@ -49,16 +44,18 @@ class Execute(Stage, Generic[Unpack[T]]):
         )
         
         self.accepted_hook_types = [ 
-            HookType.SETUP, 
-            HookType.BEFORE, 
             HookType.ACTION,
-            HookType.TASK,
             HookType.AFTER,
-            HookType.TEARDOWN,
-            HookType.CHECK,
+            HookType.BEFORE, 
             HookType.CHANNEL, 
+            HookType.CHECK,
+            HookType.CONDITION,
+            HookType.CONTEXT,
             HookType.EVENT,
-            HookType.CONTEXT
+            HookType.SETUP, 
+            HookType.TASK,
+            HookType.TEARDOWN,
+            HookType.TRANSFORM
         ]
 
         self.concurrent_pool_aware_stages = 0
@@ -71,20 +68,7 @@ class Execute(Stage, Generic[Unpack[T]]):
     @Internal()
     async def run(self):
 
-        events: List[Union[EventHook, Event]] = [event for event in self.hooks[HookType.EVENT]]
-        pre_events: List[EventHook] = [
-            event for event in events if isinstance(event, EventHook) and event.pre
-        ]
-        
-        if len(pre_events) > 0:
-            pre_event_names = ", ".join([
-                event.shortname for event in pre_events
-            ])
-
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing PRE events - {pre_event_names}')
-            await asyncio.wait([
-                asyncio.create_task(event.call()) for event in pre_events
-            ], timeout=self.stage_timeout)
+        await self.run_pre_events()
 
         config = self.client._config
         persona_type_name = config.persona_type.capitalize()
@@ -249,30 +233,11 @@ class Execute(Stage, Generic[Unpack[T]]):
             total_results = len(results)
             total_elapsed = persona.total_elapsed
 
-        post_events: List[EventHook] = [
-            event for event in events if isinstance(event, EventHook) and event.pre is False
-        ]
-
-        if len(post_events) > 0:
-            post_event_names = ", ".join([
-                event.shortname for event in post_events
-            ])
-
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing POST events - {post_event_names}')
-            await asyncio.wait([
-                asyncio.create_task(event.call()) for event in post_events
-            ], timeout=self.stage_timeout)
-
+        await self.run_post_events()
 
         await self.logger.filesystem.aio['hedra.core'].info( f'{self.metadata_string} - Completed - {total_results} actions at  {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
         await self.logger.spinner.set_default_message(f'Stage - {self.name} completed {total_results} actions at {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
 
-        context_hooks: List[ContextHook] = self.hooks[HookType.CONTEXT]
-        context_hooks: List[ContextHook] = self.hooks[HookType.CONTEXT]
-        await asyncio.gather(*[
-            asyncio.create_task(context_hook.call(self.context)) for context_hook in context_hooks
-        ])
-        
         return {
             'results': results,
             'total_results': total_results,

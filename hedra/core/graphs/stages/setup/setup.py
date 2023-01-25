@@ -3,7 +3,6 @@ import psutil
 import traceback
 from typing_extensions import TypeVarTuple, Unpack
 from typing import Dict, Generic, List, Any, Union, Coroutine
-from hedra.core.graphs.events import Event
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.hook_types.internal import Internal
@@ -17,8 +16,6 @@ from hedra.core.graphs.hooks.registry.registry_types import (
     BeforeHook,
     ChannelHook,
     CheckHook,
-    ContextHook,
-    EventHook,
     SetupHook,
     TaskHook
 )
@@ -106,7 +103,14 @@ class Setup(Stage, Generic[Unpack[T]]):
         super().__init__()
         self.generation_setup_candidates = 0
         self.stages: Dict[str, Stage] = {}
-        self.accepted_hook_types = [ HookType.SETUP, HookType.EVENT, HookType.CONTEXT ]
+        self.accepted_hook_types = [ 
+            HookType.CONDITION,
+            HookType.CONTEXT,
+            HookType.EVENT, 
+            HookType.SETUP,
+            HookType.TRANSFORM 
+        ]
+
         self.persona_types = PersonaTypesMap()
         self.config = Config(
             log_level=self.log_level,
@@ -147,20 +151,7 @@ class Setup(Stage, Generic[Unpack[T]]):
     @Internal()
     async def run(self):
 
-        events: List[Union[EventHook, Event]] = [event for event in self.hooks[HookType.EVENT]]
-        pre_events: List[EventHook] = [
-            event for event in events if isinstance(event, EventHook) and event.pre
-        ]
-        
-        if len(pre_events) > 0:
-            pre_event_names = ", ".join([
-                event.shortname for event in pre_events
-            ])
-
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing PRE events - {pre_event_names}')
-            await asyncio.wait([
-                asyncio.create_task(event.call()) for event in pre_events
-            ], timeout=self.stage_timeout)
+        await self.run_pre_events()
         
         bypass_connection_validation = self.core_config.get('bypass_connection_validation', False)
         connection_validation_retries = self.core_config.get('connection_validation_retries', 3)
@@ -336,29 +327,7 @@ class Setup(Stage, Generic[Unpack[T]]):
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Generated - {actions_generated_count} - Actions for Execute stage - {execute_stage_name}')
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Generated - {tasks_generated_count} - Tasks for Execute stage - {execute_stage_name}')
 
-        post_events: List[EventHook] = [
-            event for event in events if isinstance(event, EventHook) and event.pre is False
-        ]
-
-        if len(post_events) > 0:
-            post_event_names = ", ".join([
-                event.shortname for event in post_events
-            ])
-
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing POST events - {post_event_names}')
-            await asyncio.wait([
-                asyncio.create_task(event.call()) for event in post_events
-            ], timeout=self.stage_timeout)
-
-
-        await self.logger.spinner.set_default_message(f'Setup for - {execute_stage_names} - complete')
-        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed setup')
-
-        context_hooks: List[ContextHook] = self.hooks[HookType.CONTEXT]
-        context_hooks: List[ContextHook] = self.hooks[HookType.CONTEXT]
-        await asyncio.gather(*[
-            asyncio.create_task(context_hook.call(self.context)) for context_hook in context_hooks
-        ])
+        await self.run_post_events()
 
         return self.stages
 
