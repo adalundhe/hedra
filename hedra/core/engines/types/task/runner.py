@@ -75,7 +75,7 @@ class MercuryTaskRunner:
                 
 
                 if task_event:
-                    await task_event.execute_pre(task)
+                    task, result = await task_event.execute_pre(task, result)
 
                 start = time.monotonic()
 
@@ -92,7 +92,7 @@ class MercuryTaskRunner:
 
 
                 if task_event:
-                    task = await task_event.execute_post(task)
+                    task, result = await task_event.execute_post(task, result)
 
                 if task.hooks.notify:
                     await asyncio.gather(*[

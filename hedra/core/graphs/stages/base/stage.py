@@ -3,7 +3,7 @@ import threading
 import os
 import uuid
 import asyncio
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from typing import Any, Dict, List, Union
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
@@ -12,15 +12,16 @@ from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.engines.client.time_parser import TimeParser
+from hedra.core.graphs.events.base_event import BaseEvent
 from hedra.core.graphs.events import (
     Event, 
     TransformEvent, 
-    ConditionEvent
+    ConditionEvent,
+    ContextEvent
 )
 from hedra.core.graphs.hooks.registry.registry_types import (
     EventHook, 
     ContextHook,
-    MetricHook,
     TransformHook
 )
 from hedra.logging import HedraLogger
@@ -62,6 +63,7 @@ class Stage:
 
         self.core_config = {}
         self.context = SimpleContext()
+        self.call_graph = {}
 
         self.logger: HedraLogger = HedraLogger()
         self.logger.initialize()
@@ -98,49 +100,64 @@ class Stage:
 
     @Internal()
     async def run_pre_events(self):
-        events: List[StageHookEvents] = self.hooks[HookType.EVENT]
-        events.extend(self.hooks[HookType.TRANSFORM])
-        
-        pre_events: List[StageHooks] = [
-            event for event in events if isinstance(event, (EventHook, TransformHook, ConditionEvent)) and event.pre
+        events: List[StageHookEvents] = [
+            *self.hooks[HookType.EVENT],
+            *self.hooks[HookType.TRANSFORM],
+            *self.hooks[HookType.CONTEXT]
         ]
         
+        pre_events: List[StageHooks] = [
+            event for event in events if isinstance(
+                event, 
+                (
+                    ContextHook, 
+                    EventHook, 
+                    TransformHook,
+                    ContextEvent,
+                    ConditionEvent,
+                    TransformEvent
+                )
+            ) and event.pre
+        ]
+
         if len(pre_events) > 0:
             pre_event_names = ", ".join([
                 event.shortname for event in pre_events
             ])
 
+            for hook in pre_events:
+                if isinstance(hook, (BaseEvent, ContextHook)):
+                    hook.context = self.context
+
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing PRE events - {pre_event_names}')
-            event_results = await asyncio.wait_for(
+            await asyncio.wait_for(
                 asyncio.gather(*[
-                    asyncio.create_task(event.call(self.context[event.key])) for event in pre_events if event.hook_type == HookType.EVENT
+                    asyncio.create_task(event.call()) for event in pre_events
                 ]), 
                 timeout=self.stage_timeout
             )
-
-            for event, result in zip(pre_events, event_results):
-                if event.key:
-                    self.context[event.key] = result
-
-            transform_results = await asyncio.wait_for(
-                asyncio.gather(*[
-                    asyncio.create_task(event.call(self.context[event.load])) for event in pre_events if event.hook_type == HookType.TRANSFORM
-                ]), 
-                timeout=self.stage_timeout
-            )
-
-            for event, result in zip(pre_events, transform_results):
-                if event.store:
-                    self.context[event.store] = result
 
     @Internal()
     async def run_post_events(self):
 
-        events: List[StageHookEvents] = self.hooks[HookType.EVENT]
-        events.extend(self.hooks[HookType.TRANSFORM])
+        events: List[StageHookEvents] = [
+            *self.hooks[HookType.EVENT],
+            *self.hooks[HookType.TRANSFORM],
+            *self.hooks[HookType.CONTEXT]
+        ]
 
         post_events: List[StageHooks] = [
-            event for event in events if isinstance(event, (EventHook, TransformHook, ConditionEvent)) and event.pre is False
+            event for event in events if isinstance(
+                event, 
+                (
+                    ContextHook, 
+                    EventHook, 
+                    TransformHook,
+                    ContextEvent,
+                    ConditionEvent,
+                    TransformEvent
+                )
+            ) and event.pre is False and len(event.names) == 0
         ]
 
         if len(post_events) > 0:
@@ -148,32 +165,15 @@ class Stage:
                 event.shortname for event in post_events
             ])
 
+            for hook in post_events:
+                if isinstance(hook, (BaseEvent, ContextHook)):
+                    hook.context = self.context
+
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing POST events - {post_event_names}')
-            event_results = await asyncio.wait_for(
+            await asyncio.wait_for(
                 asyncio.gather(*[
-                    asyncio.create_task(event.call(self.context[event.key])) for event in post_events if event.hook_type == HookType.EVENT
+                    asyncio.create_task(event.call()) for event in post_events if event.hook_type
                 ]), 
                 timeout=self.stage_timeout
             )
-
-            for event, result in zip(post_events, event_results):
-                if event.key:
-                    self.context[event.key] = result
-
-            transform_results = await asyncio.wait_for(
-                asyncio.gather(*[
-                    asyncio.create_task(event.call(self.context[event.load])) for event in post_events if event.hook_type == HookType.TRANSFORM
-                ]), 
-                timeout=self.stage_timeout
-            )
-
-            for event, result in zip(post_events, transform_results):
-                if event.store:
-                    self.context[event.store] = result
-
-        context_hooks: List[ContextHook] = self.hooks[HookType.CONTEXT]
-        await asyncio.gather(*[
-            asyncio.create_task(context_hook.call(self.context)) for context_hook in context_hooks
-        ])
-
 

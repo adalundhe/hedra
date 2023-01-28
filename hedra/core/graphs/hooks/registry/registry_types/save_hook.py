@@ -34,12 +34,16 @@ class SaveHook(Hook):
         self.loop = None
 
     async def call(self, context: SimpleContext) -> None:
-        self.loop = asyncio.get_event_loop()
-        return await self.loop.run_in_executor(
-            self.executor,
-            self._run,
-            context
-        )
+
+        execute = await self._execute_call(context[self.context_key])
+
+        if execute:
+            self.loop = asyncio.get_event_loop()
+            return await self.loop.run_in_executor(
+                self.executor,
+                self._run,
+                context
+            )
 
     def _run(self, context: SimpleContext):
         import asyncio
@@ -51,7 +55,9 @@ class SaveHook(Hook):
 
         return loop.run_until_complete(self._write(context))
 
-    async def _write(self, context: SimpleContext) -> None:
+    async def _write(self, **kwargs) -> None:
+
+        context: SimpleContext = kwargs.get('context')
 
         save_file = await open(self.save_path, 'w')
         context_data = context.get(self.context_key)
@@ -71,6 +77,5 @@ class SaveHook(Hook):
         if context.get(self.context_key):
             context[self.context_key] = type(context[self.context_key])()
 
-
-        
+        return kwargs    
 

@@ -34,12 +34,16 @@ class RestoreHook(Hook):
         self.loop = None
 
     async def call(self, context: SimpleContext) -> None:
-        self.loop = asyncio.get_event_loop()
-        return await self.loop.run_in_executor(
-            self.executor,
-            self._run,
-            context
-        )
+
+        execute = await self._execute_call(context[self.context_key])
+
+        if execute:
+            self.loop = asyncio.get_event_loop()
+            return await self.loop.run_in_executor(
+                self.executor,
+                self._run,
+                context
+            )
 
     def _run(self, context: SimpleContext):
         import asyncio
@@ -51,8 +55,9 @@ class RestoreHook(Hook):
 
         return loop.run_until_complete(self._load(context))
 
-    async def _load(self, context: SimpleContext):
+    async def _load(self, **kwargs,):
 
+        context: SimpleContext = kwargs.get('context')
         restore_file = await open(self.restore_path, 'r')
         file_data = await restore_file.read()
         data = await self._call(
@@ -74,4 +79,13 @@ class RestoreHook(Hook):
 
         await restore_file.close()
 
-        return context
+        if isinstance(data, dict):
+            return {
+                **kwargs,
+                **data
+            }
+
+        return {
+            **kwargs,
+            self.context_key: data
+        }

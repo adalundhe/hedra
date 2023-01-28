@@ -19,5 +19,21 @@ class BeforeHook(Hook):
             hook_type=HookType.BEFORE
         )
 
-        self.call: Type[self._call] = self._call
         self.names = list(set(names))
+
+    async def  call(self, **kwargs):
+        result = await super().call(**kwargs)
+
+        if isinstance(result, dict):
+            return {
+                **kwargs,
+                **result
+            }
+
+        action, response = result 
+
+        return {
+            **kwargs,
+            'action': action,
+            'response': response
+        }

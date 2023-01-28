@@ -36,7 +36,7 @@ class Validate(Stage):
                 assert hook.hook_type == HookType.INTERNAL
 
                 internal_hook = getattr(self, hook.shortname)
-                assert inspect.getsource(internal_hook) == inspect.getsource(hook.call)
+                assert inspect.getsource(internal_hook) == inspect.getsource(hook._call)
 
             except AssertionError:
                 raise ReservedMethodError(self, reserved_hook_name)

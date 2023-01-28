@@ -180,22 +180,17 @@ def process_results_batch(config: Dict[str, Any]):
                 target_hook.stage_instance.hooks = setup_analyze_stage.hooks
 
                 event = get_event(target_hook, source_hook)
-
-                if target_hook_idx >= 0 and isinstance(target_hook, BaseEvent):
-                    if source_hook.pre is True:
-                        target_hook.pre_sources[source_hook.name] = source_hook
-                        target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
-
-                    else:
-                        target_hook.post_sources[source_hook.name] = source_hook
-                        target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
-                    
-                    registrar.all[event.name] = target_hook
-
-                elif target_hook_idx >= 0:
-                    target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = event
-                    registrar.all[event.name] = event
+                setup_analyze_stage.hooks[target_hook_type][target_hook_idx] = event
                 
+                if isinstance(target_hook, BaseEvent) and source_hook.pre is True:
+                    target_hook.pre_sources[source_hook.name] = event
+
+                elif isinstance(target_hook, BaseEvent):
+                    target_hook.post_sources[source_hook.name] = event
+            
+                registrar.all[event.name] = event
+                
+                target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = event
                 target_hook.stage_instance.linked_events[(target_hook.stage, target_hook.hook_type, target_hook.name)].append(
                     (source_hook.stage, source_hook.hook_type, source_hook.name)
                 )

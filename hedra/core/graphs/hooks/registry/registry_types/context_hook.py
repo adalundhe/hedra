@@ -1,5 +1,7 @@
-from typing import Any, Callable, Awaitable, Optional
+import inspect
+from typing import Any, Callable, Awaitable, Optional, Tuple
 from hedra.core.graphs.simple_context import SimpleContext
+from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from .hook import Hook
 
@@ -9,10 +11,13 @@ class ContextHook(Hook):
     def __init__(
         self, 
         name: str, 
-        shortname: str, 
+        shortname: str,
         call: Callable[..., Awaitable[Any]], 
-        store_key: str,
-        load_key: Optional[str]=None
+        *names:  Optional[Tuple[str, ...]],
+        store: Optional[str]=None,
+        load: Optional[str]=None,
+        pre: bool=False,
+        order: int=1
     ) -> None:
         super().__init__(
             name, 
@@ -21,17 +26,49 @@ class ContextHook(Hook):
             hook_type=HookType.CONTEXT
         )
         
-        self.store_key = store_key
-        self.load_key = load_key
+        self.names = list(set(names))
+        self.context: SimpleContext = None
+        self.store = store
+        self.load = load
+        self.pre = pre
+        self.order = order
 
-    async def call(self, context: SimpleContext) -> None:
+        self.args = inspect.signature(call)
+        self.params = self.args.parameters
 
-        if self.load_key:
-            context[self.store_key] = await self.call(
-                context[self.load_key]
-            )
+    async def call(self, **kwargs) -> None:
 
-        else:
-            context[self.store_key] = await self._call()
+        hook_args = {name: value for name, value in kwargs.items() if name in self.params}
 
-        return context
+        execute = await self._execute_call(**hook_args)
+        if execute:
+            context_value = self.context
+            hook_args = hook_args
+            if self.load:
+                hook_args[self.load] = self.context[self.load]
+                
+            if self.load == 'results':
+                results = []
+
+                for stage_results in context_value.values():
+                    results.extend(
+                        stage_results.results
+                    )
+
+                context_value = results
+            
+            result = await self._call(**{name: value for name, value in hook_args.items() if name in self.params})
+ 
+            if self.store:
+                self.context[self.store] = result
+
+            if isinstance(result, dict):
+                return {
+                    **kwargs,
+                    **result
+                }
+
+            return {
+                **kwargs,
+                'context': result
+            }

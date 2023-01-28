@@ -1,11 +1,18 @@
 import functools
-from .hook_type import HookType
+from typing import Tuple, Optional
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.graphs.hooks.registry.registrar import registrar
+from .hook_type import HookType
 
 
 @registrar(HookType.CONTEXT)
-def context(store_key: str, load_key: str=None):
+def context(
+    *names: Tuple[str], 
+    store: Optional[str]=None, 
+    load: Optional[str]=None, 
+    pre: bool=False,
+    order: int=1
+):
 
     def wrapper(func) -> Hook:
 

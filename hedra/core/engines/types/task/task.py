@@ -37,7 +37,6 @@ class Task(BaseAction):
         self.source = source
         self.execute = task_action
         self.hooks: Hooks[Task] = Hooks()
-        self.event = None
 
     def to_serializable(self):
 

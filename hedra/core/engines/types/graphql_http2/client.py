@@ -36,6 +36,8 @@ class MercuryGraphQLHTTP2Client(MercuryHTTP2Client):
         response.wait_start = time.monotonic()
         self.active += 1
 
+        action_event = action.event
+
         async with self.sem:
             pipe = self.pool.pipes.pop()
             connection = self.pool.connections.pop()
@@ -48,8 +50,8 @@ class MercuryGraphQLHTTP2Client(MercuryHTTP2Client):
                     await event.wait()
 
                 
-                if action.hooks.before:
-                    action = await action.hooks.before.call(action, response)
+                if action_event:
+                    action, response = await action_event.execute_pre(action, response)
                     action.setup()
 
                 response.start = time.monotonic()
@@ -81,8 +83,8 @@ class MercuryGraphQLHTTP2Client(MercuryHTTP2Client):
 
                 response.complete = time.monotonic()
 
-                if action.hooks.after:
-                    action = await action.hooks.after.call(action, response)
+                if action_event:
+                    action, response = await action_event.execute_post(action, response)
                     action.setup()
 
                 if action.hooks.notify:

@@ -30,7 +30,7 @@ class SetupHookVaidator(BaseHookVaidator):
             assert call.__code__.co_argcount > 0, f"Too few args. - @setup hook {hook.name}:{hook.hook_id} requires no additional args."
             assert call.__code__.co_argcount < 2, f"Too many args. - @setup hook {hook.name}:{hook.hook_id} requires no additional args"
 
-            assert 'self' in hook.call.__code__.co_varnames
+            assert 'self' in hook._call.__code__.co_varnames
 
             
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validated {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')

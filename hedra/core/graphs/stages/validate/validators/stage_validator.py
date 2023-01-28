@@ -44,7 +44,7 @@ class StageValidator:
                 assert hook.hook_type == HookType.INTERNAL
                 
                 internal_hook = getattr(self.stage, hook.shortname)
-                assert inspect.getsource(internal_hook) == inspect.getsource(hook.call)
+                assert inspect.getsource(internal_hook) == inspect.getsource(hook._call)
 
             except AssertionError:
                 raise ReservedMethodError(self.stage, reserved_hook_name)
@@ -72,7 +72,7 @@ class StageValidator:
                     assert isinstance(hook.hook_id, str), "Hook ID must be string."
                     assert isinstance(hook.shortname, str), f"Hook shortname for hook {hook.name}:{hook.hook_id} must be a valid string."
                     assert isinstance(hook._call, MethodType), f"Hook {hook.name}:{hook.hook_id} call is not a vaid method. All hooks must be a method."
-                    assert inspect.iscoroutinefunction(hook.call), f"Hook {hook.name}:{hook.hook_id} call is not a vaid coroutine. All hook methods must be a async."
+                    assert inspect.iscoroutinefunction(hook._call), f"Hook {hook.name}:{hook.hook_id} call is not a vaid coroutine. All hook methods must be a async."
                     assert hook.hook_type in self.stage.accepted_hook_types, f"Hook {hook.name}:{hook.hook_id} is not a valid hook type for stage {self.stage.name}. Valid hook types are {valid_hook_types_string}."
                 
                 except AssertionError as hook_validation_error:

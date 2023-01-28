@@ -19,5 +19,18 @@ class CheckHook(Hook):
             hook_type=HookType.CHECK
         )
 
-        self.call: Type[self._call] = self._call
         self.names = list(set(names))
+
+    async def call(self, **kwargs):
+        passed = await super().call(**kwargs)
+
+        if isinstance(passed, dict):
+            return {
+                **kwargs,
+                **passed
+            }
+
+        return {
+            **kwargs,
+            'valid': passed
+        }

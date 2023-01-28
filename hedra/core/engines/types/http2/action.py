@@ -25,7 +25,8 @@ class HTTP2Action(BaseAction):
         'is_stream',
         'ssl_context',
         'hpack_encoder',
-        '_remote_settings'
+        '_remote_settings',
+        'event'
     )
     
     def __init__(

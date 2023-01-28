@@ -2,6 +2,7 @@ from enum import Enum
 
 
 class EventTypes(Enum):
-    EVENT='EVENT'
     CONDITION='CONDITION'
+    CONTEXT='CONTEXT'
+    EVENT='EVENT'
     TRANSFORM='TRANSFORM'

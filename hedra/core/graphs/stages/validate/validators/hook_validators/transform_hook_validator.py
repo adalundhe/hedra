@@ -41,11 +41,5 @@ class TransformHookVaidator(BaseHookVaidator):
             
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validated {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
-            if hook.store:
-                assert hook.load is not None, f'Load key must be set for @transform Hook {hook.name}:{hook.hook_id} is store argument is provided'
-
-            if hook.load or hook.store:
-                assert hook.context is not None, f"Context must be set for @transform Hook {hook.name}:{hook.hook_id} if store or load argument is provided"
-
         except AssertionError as hook_validation_error:
                 raise HookValidationError(hook.stage_instance, str(hook_validation_error))

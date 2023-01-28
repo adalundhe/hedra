@@ -95,7 +95,6 @@ def set_events(event_hooks: List[EventHook], logging: HedraLogger, metadata_stri
                 )
 
                 event = Event(target_hook, event_hook)
-                event.target_key = event_hook.key
 
                 target_hook_idx = -1
 

@@ -25,11 +25,22 @@ class SetupHook(Hook):
         self.key = key
         self.metadata = HookMetadata(**metadata)
 
-    async def call(self, context: SimpleContext):
+    async def call(self, **kwargs):
+
+        context: SimpleContext = kwargs.get('context')
+
         results = await self._call()
 
         if self.key:
             context[self.key] = results
 
+        if isinstance(results, dict):
+            return {
+                **kwargs,
+                **results
+            }
 
-        return context
+        return {
+            **kwargs,
+            'context': results
+        }
