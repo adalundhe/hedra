@@ -107,17 +107,7 @@ class Stage:
         ]
         
         pre_events: List[StageHooks] = [
-            event for event in events if isinstance(
-                event, 
-                (
-                    ContextHook, 
-                    EventHook, 
-                    TransformHook,
-                    ContextEvent,
-                    ConditionEvent,
-                    TransformEvent
-                )
-            ) and event.pre
+            event for event in events
         ]
 
         if len(pre_events) > 0:
@@ -139,41 +129,39 @@ class Stage:
 
     @Internal()
     async def run_post_events(self):
+        pass
+        # events: List[StageHookEvents] = [
+        #     *self.hooks[HookType.EVENT],
+        #     *self.hooks[HookType.TRANSFORM],
+        #     *self.hooks[HookType.CONTEXT]
+        # ]
 
-        events: List[StageHookEvents] = [
-            *self.hooks[HookType.EVENT],
-            *self.hooks[HookType.TRANSFORM],
-            *self.hooks[HookType.CONTEXT]
-        ]
+        # post_events: List[StageHooks] = [
+        #     event for event in events if isinstance(
+        #         event, 
+        #         (
+        #             ContextHook, 
+        #             EventHook, 
+        #             TransformHook,
+        #             BaseEvent
+        #         )
+        #     ) and event.pre is False and len(event.names) == 0
+        # ]
 
-        post_events: List[StageHooks] = [
-            event for event in events if isinstance(
-                event, 
-                (
-                    ContextHook, 
-                    EventHook, 
-                    TransformHook,
-                    ContextEvent,
-                    ConditionEvent,
-                    TransformEvent
-                )
-            ) and event.pre is False and len(event.names) == 0
-        ]
+        # if len(post_events) > 0:
+        #     post_event_names = ", ".join([
+        #         event.shortname for event in post_events
+        #     ])
 
-        if len(post_events) > 0:
-            post_event_names = ", ".join([
-                event.shortname for event in post_events
-            ])
+        #     for hook in post_events:
+        #         if isinstance(hook, (BaseEvent, ContextHook)):
+        #             hook.context = self.context
 
-            for hook in post_events:
-                if isinstance(hook, (BaseEvent, ContextHook)):
-                    hook.context = self.context
-
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing POST events - {post_event_names}')
-            await asyncio.wait_for(
-                asyncio.gather(*[
-                    asyncio.create_task(event.call()) for event in post_events if event.hook_type
-                ]), 
-                timeout=self.stage_timeout
-            )
+        #     await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing POST events - {post_event_names}')
+        #     await asyncio.wait_for(
+        #         asyncio.gather(*[
+        #             asyncio.create_task(event.call()) for event in post_events if event.hook_type
+        #         ]), 
+        #         timeout=self.stage_timeout
+        #     )
 

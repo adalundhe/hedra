@@ -21,11 +21,8 @@ class BaseEvent(Generic[T]):
 
     __slots__ = (
         'target',
-        'pre_sources',
-        'post_sources',
         'event_type',
         'source',
-        'pre',
         'as_hook',
         'event_name',
         'event_order',
@@ -47,8 +44,6 @@ class BaseEvent(Generic[T]):
         if isinstance(target, BaseEvent):
             self.target_is_event = True
 
-        self.pre_sources: Dict[str, T] = {}
-        self.post_sources: Dict[str, T] = {}
         self.event_type = EventTypes.EVENT
         self.event_name = source.name
         self.event_order = source.order
@@ -59,13 +54,12 @@ class BaseEvent(Generic[T]):
             self.target_name = self.target.name
             self.target_shortname = self.target.shortname
 
-        self.pre = source.pre
         self.as_hook = False
         self.context: SimpleContext = None
         self.events: Dict[str, BaseEvent] = {}
         self.execution_path = []
-        self.previous_map = defaultdict(list)
-        self.next_map = defaultdict(list)
+        self.previous_map = []
+        self.next_map = []
         self.next_args: Dict[str, Dict[str,Any]] = defaultdict(dict)
 
     def __getattribute__(self, name: str) -> Any:
@@ -76,9 +70,6 @@ class BaseEvent(Generic[T]):
             'event_type',
             'target', 
             'source',
-            'pre_sources',
-            'post_sources',
-            'pre',
             'as_hook',
             'event_name',
             'event_order',
@@ -109,9 +100,6 @@ class BaseEvent(Generic[T]):
                 'event_type',
                 'target', 
                 'source',
-                'pre_sources',
-                'post_sources',
-                'pre',
                 'as_hook',
                 'event_name',
                 'event_order',
@@ -133,8 +121,6 @@ class BaseEvent(Generic[T]):
         return super().__setattr__(name, value)
 
     async def call(self, **kwargs): 
-
-        print(kwargs)
    
         if len(self.next_args[self.event_name]) == 0:
             self.next_args[self.event_name] = kwargs
@@ -144,10 +130,8 @@ class BaseEvent(Generic[T]):
 
         results = await self.source.call(**{name: value for name, value in self.next_args[self.event_name].items() if name in self.source.params})
 
-        print(self.event_name, results)
-
         next_events = [
-            self.events.get(event_name) for event_name in  self.next_map[self.event_name] if self.events.get(event_name) is not None
+            self.events.get(event_name) for event_name in  self.next_map if self.events.get(event_name) is not None
         ]
 
         for event in next_events:
@@ -170,18 +154,18 @@ class BaseEvent(Generic[T]):
 
 
     async def execute_pre(self, *hook_args: List[Any]):
-
-        for source in self.pre_sources.values():
+        results = None
+        for source_name in self.previous_map:
+            source: BaseEvent = self.events.get(source_name)
             source.context = self.context
-            hook_args = [
-                *hook_args,
-                await source.call(*hook_args)
-            ]
+            results = await source.call(*hook_args)
 
-        return hook_args
+        return results
 
     async def execute_post(self, results):
-        for source in self.post_sources.values():
+        results = None
+        for source_name in self.previous_map:
+            source: BaseEvent = self.events.get(source_name)
             source.context = self.context
             results = await source.call(results)
 
