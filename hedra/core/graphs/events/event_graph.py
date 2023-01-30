@@ -142,5 +142,5 @@ class EventGraph:
                 else:
                     event.stage_instance.hooks[event.hook_type].append(event)    
 
-        networkx.draw_networkx(self.hooks_graph, pos=networkx.spring_layout(self.hooks_graph), with_labels=True, arrows=True)
-        plt.show()
+        # networkx.draw_networkx(self.hooks_graph, pos=networkx.spring_layout(self.hooks_graph), with_labels=True, arrows=True)
+        # plt.show()
