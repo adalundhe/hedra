@@ -60,10 +60,11 @@ class RestoreHook(Hook):
         context: SimpleContext = kwargs.get('context')
         restore_file = await open(self.restore_path, 'r')
         file_data = await restore_file.read()
-        data = await self._call(
-            context[self.context_key],
-            file_data
-        )
+
+        kwargs[self.context_key] = context[self.context_key]
+        kwargs['file'] = file_data
+
+        data = await self._call(**{name: value for name, value in kwargs.items() if name in self.params})
 
         if self.context_key == 'results':
 

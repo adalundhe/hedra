@@ -47,8 +47,8 @@ async def analyze_transition(current_stage: Stage, next_stage: Stage):
 
         if len(results_to_calculate) > 0:
 
-            current_stage.raw_results = results_to_calculate
-            current_stage.stages = stages
+            current_stage.context['raw_results'] = results_to_calculate
+            current_stage.context['stages'] = stages
 
             if current_stage.timeout:
                 summary = await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
@@ -105,6 +105,7 @@ async def analyze_to_submit_transition(current_stage: Stage, next_stage: Stage):
         return StageTimeoutError(current_stage), StageTypes.ERROR
     
     except Exception as stage_runtime_error:
+        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_runtime_error)), StageTypes.ERROR
 
     current_stage = None

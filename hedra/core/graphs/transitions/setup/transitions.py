@@ -82,24 +82,25 @@ async def setup_transition(current_stage: Setup, next_stage: Stage):
                 execute_stage.state = StageStates.SETTING_UP
                 stages[execute_stage_name] = execute_stage
 
-    current_stage.stages = stages
+    current_stage.context.setup_stages = stages
 
     if current_stage.timeout:
 
-        setup_results = await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
+        await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
 
     else:
 
-        setup_results = await current_stage.run()
+        await current_stage.run()
 
     for execute_stage in stages.values():
         execute_stage.state = StageStates.SETUP
 
-    current_stage.context.stages[StageTypes.EXECUTE].update(setup_results)
+    current_stage.context.stages[StageTypes.EXECUTE].update(current_stage.stages)
 
     await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
     
+    current_stage.context.setup_stages = list(stages.keys())
     next_stage.context = current_stage.context
     current_stage = None
 
@@ -144,6 +145,7 @@ async def setup_to_execute_transition(current_stage: Stage, next_stage: Stage):
         return StageTimeoutError(current_stage), StageTypes.ERROR
     
     except Exception as stage_execution_error:
+        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     return None, StageTypes.EXECUTE

@@ -40,35 +40,39 @@ class ContextHook(Hook):
 
         hook_args = {name: value for name, value in kwargs.items() if name in self.params}
 
-        execute = await self._execute_call(**hook_args)
-        if execute:
-            context_value = self.context
-            hook_args = hook_args
-            if self.load:
-                hook_args[self.load] = self.context[self.load]
-                
-            if self.load == 'results':
-                results = []
+        hook_args = hook_args
+  
+        for param_name in self.params.keys():
 
-                for stage_results in context_value.values():
-                    results.extend(
-                        stage_results.results
-                    )
+            context_value = self.context[param_name]
 
-                context_value = results
-            
-            result = await self._call(**{name: value for name, value in hook_args.items() if name in self.params})
- 
-            if self.store:
-                self.context[self.store] = result
+            if param_name != 'self' and context_value is not None:
+                hook_args[param_name] = context_value
+        
+        if 'results' in list(self.params.keys()):
+            results = []
 
-            if isinstance(result, dict):
-                return {
-                    **kwargs,
-                    **result
-                }
+            for stage_results in context_value.values():
+                results.extend(
+                    stage_results.results
+                )
+
+            context_value['results'] = results
+        
+        context_result = await self._call(**{name: value for name, value in hook_args.items() if name in self.params})
+
+        if isinstance(context_result, dict):
+
+            for context_key, value in context_result.items():
+                self.context[context_key] = value
 
             return {
                 **kwargs,
-                'context': result
+                **context_result
             }
+
+        self.context[self.name] = context_result
+        return {
+            **kwargs,
+            self.name: context_result
+        }

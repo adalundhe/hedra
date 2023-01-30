@@ -1,7 +1,7 @@
 import uuid
 from typing import List
 from hedra.logging import HedraLogger
-from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.events.types.base_result import BaseEvent
 
 
 try:

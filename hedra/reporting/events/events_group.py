@@ -12,7 +12,7 @@ from hedra.reporting.stats import (
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from .results import results_types
 from .types.task_event import TaskEvent
-from .types.base_event import BaseEvent
+from .types.base_result import BaseEvent
 
 
 class EventsGroup:

@@ -57,8 +57,8 @@ class Validate(Stage):
 
     @Internal()
     async def run(self):
-        
-        await self.run_pre_events()
+        await self.setup_events()
+        await self.dispatcher.dispatch_events()
 
         validator = Validator(self.stages, self.metadata_string)
         await validator.validate_stages()

@@ -2,36 +2,23 @@ from __future__ import annotations
 import threading
 import os
 import uuid
-import asyncio
-from collections import defaultdict, OrderedDict
-from typing import Any, Dict, List, Union
-from hedra.core.graphs.simple_context import SimpleContext
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
-from hedra.core.graphs.hooks.hook_types.internal import Internal
-from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.stages.types.stage_states import StageStates
-from hedra.core.graphs.stages.types.stage_types import StageTypes
+from collections import defaultdict
+from typing import Any, Dict, List
 from hedra.core.engines.client.time_parser import TimeParser
 from hedra.core.graphs.events.base_event import BaseEvent
-from hedra.core.graphs.events import (
-    Event, 
-    TransformEvent, 
-    ConditionEvent,
-    ContextEvent
-)
-from hedra.core.graphs.hooks.registry.registry_types import (
-    EventHook, 
-    ContextHook,
-    TransformHook
-)
+from hedra.core.graphs.events.event_dispatch import EventDispatcher
+from hedra.core.graphs.hooks.hook_types.internal import Internal
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.stages.base.parallel.batch_executor import BatchExecutor
+from hedra.core.graphs.stages.types.stage_states import StageStates
+from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.core.graphs.simple_context import SimpleContext
+
 from hedra.logging import HedraLogger
 from hedra.plugins.types.common.plugin import Plugin
 from hedra.plugins.types.plugin_types import PluginType
-from hedra.core.graphs.stages.base.parallel.batch_executor import BatchExecutor
 
-
-StageHookEvents = Union[EventHook, Event, TransformHook, TransformEvent, ConditionEvent]
-StageHooks = Union[EventHook, TransformHook, ConditionEvent]
 
 
 class Stage:
@@ -55,7 +42,6 @@ class Stage:
         self.worker_id: int = 1
         self.generation_stage_names = []
         self.generation_id = 1
-        self._shutdown_task = None
         self.requires_shutdown = False
         self.allow_parallel = False
         self.executor: BatchExecutor = None
@@ -63,8 +49,6 @@ class Stage:
 
         self.core_config = {}
         self.context = SimpleContext()
-        self.call_graph = {}
-
         self.logger: HedraLogger = HedraLogger()
         self.logger.initialize()
 
@@ -80,6 +64,7 @@ class Stage:
             self.timeout = None
 
         self.internal_hooks = ['run']
+        self.dispatcher = EventDispatcher()
         self.linked_events = defaultdict(list)
 
     @Internal()
@@ -97,35 +82,24 @@ class Stage:
     @property
     def metadata_string(self):
         return f'Graph - {self.graph_name}:{self.graph_id} - thread:{self.thread_id} - process:{self.process_id} - Stage: {self.name}:{self.stage_id} - '
-
+    
     @Internal()
-    async def run_pre_events(self):
-        events: List[StageHookEvents] = [
+    async def setup_events(self):
+
+        events: List[BaseEvent] = [
             *self.hooks[HookType.EVENT],
             *self.hooks[HookType.TRANSFORM],
             *self.hooks[HookType.CONTEXT]
         ]
-        
-        pre_events: List[StageHooks] = [
-            event for event in events
-        ]
 
-        if len(pre_events) > 0:
-            pre_event_names = ", ".join([
-                event.shortname for event in pre_events
-            ])
+        pre_event_names = ", ".join([
+            event.shortname for event in events
+        ])
 
-            for hook in pre_events:
-                if isinstance(hook, (BaseEvent, ContextHook)):
-                    hook.context = self.context
+        for event in self.dispatcher:
+            event.context = self.context
 
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing PRE events - {pre_event_names}')
-            await asyncio.wait_for(
-                asyncio.gather(*[
-                    asyncio.create_task(event.call()) for event in pre_events
-                ]), 
-                timeout=self.stage_timeout
-            )
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing events - {pre_event_names}')
 
     @Internal()
     async def run_post_events(self):

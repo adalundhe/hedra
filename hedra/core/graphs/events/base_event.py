@@ -11,7 +11,7 @@ from hedra.core.graphs.hooks.registry.registry_types import (
 )
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from .event_types import EventTypes
+from .event_types import EventType
 
 
 T = TypeVar('T', EventHook, TransformHook, ContextHook, ConditionHook)
@@ -44,7 +44,7 @@ class BaseEvent(Generic[T]):
         if isinstance(target, BaseEvent):
             self.target_is_event = True
 
-        self.event_type = EventTypes.EVENT
+        self.event_type = EventType.EVENT
         self.event_name = source.name
         self.event_order = source.order
 
@@ -79,7 +79,7 @@ class BaseEvent(Generic[T]):
             'execution_path',
             'next_args',
             'previous_map',
-            'next_map'
+            'next_map',
         ]
       
         target = object.__getattribute__(self, 'target')
@@ -128,7 +128,7 @@ class BaseEvent(Generic[T]):
         if isinstance(self.source, (BaseEvent, ContextHook)):
             self.source.context = self.context
 
-        results = await self.source.call(**{name: value for name, value in self.next_args[self.event_name].items() if name in self.source.params})
+        results = await self.source.call(**self.next_args[self.event_name])
 
         next_events = [
             self.events.get(event_name) for event_name in  self.next_map if self.events.get(event_name) is not None

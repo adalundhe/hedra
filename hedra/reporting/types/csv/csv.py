@@ -6,7 +6,7 @@ from typing import List
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
-from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.events.types.base_result import BaseEvent
 from hedra.reporting.metric.metrics_set import MetricsSet
 from .csv_config import CSVConfig
 has_connector = True

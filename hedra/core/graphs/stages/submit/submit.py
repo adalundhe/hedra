@@ -37,7 +37,7 @@ class Submit(Stage, Generic[T]):
     @Internal()
     async def run(self):
 
-        await self.run_pre_events()
+        await self.setup_events()
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Initializing results submission')
 

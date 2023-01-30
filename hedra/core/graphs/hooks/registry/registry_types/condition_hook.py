@@ -28,7 +28,7 @@ class ConditionHook(Hook):
         self.events: Dict[str, Coroutine] = {}
 
     async def call(self, **kwargs):
-        execute = await super().call(**kwargs)
+        execute = await super().call(**{name: value for name, value in kwargs.items() if name in self.params})
 
         if isinstance(execute, dict):
             return {

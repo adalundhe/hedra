@@ -49,6 +49,6 @@ class Hook:
     async def _execute_call(self, **hook_args):
         execute = True
         for condition in self.conditions:
-            execute = await condition(**hook_args)
+            execute = await condition(**{name: value for name, value in hook_args.items() if name in self.params})
 
         return execute

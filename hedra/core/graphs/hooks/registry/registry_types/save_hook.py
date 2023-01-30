@@ -67,8 +67,10 @@ class SaveHook(Hook):
             for stage_name in context_data:
                 context_data[stage_name] = results_data[stage_name].to_serializable()
 
+        kwargs[self.context_key] = context_data
+
         await save_file.write(
-            await self._call(context_data)
+            await self._call(**{name: value for name, value in kwargs.items() if name in self.params})
         )
 
         await save_file.close()

@@ -22,7 +22,7 @@ class CheckHook(Hook):
         self.names = list(set(names))
 
     async def call(self, **kwargs):
-        passed = await super().call(**kwargs)
+        passed = await super().call(**{name: value for name, value in kwargs.items() if name in self.params})
 
         if isinstance(passed, dict):
             return {

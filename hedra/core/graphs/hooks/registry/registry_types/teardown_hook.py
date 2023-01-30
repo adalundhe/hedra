@@ -33,7 +33,7 @@ class TeardownHook(Hook):
     
         context: SimpleContext = kwargs.get('context')
 
-        results = await self._call()
+        results = await self._call(**{name: value for name, value in kwargs.items() if name in self.params})
 
         if self.key:
             context[self.key] = results

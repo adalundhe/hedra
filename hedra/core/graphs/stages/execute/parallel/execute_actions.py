@@ -4,36 +4,34 @@ import os
 import time
 import signal
 import dill
-from hedra.core.graphs.hooks.registry.registrar import registrar
+from collections import defaultdict
 from typing import Dict, Any, List, Union, Tuple
 from hedra.core.engines.client.config import Config
-from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
-from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.registry import RequestTypes
 from hedra.core.engines.types.registry import registered_engines
+from hedra.core.personas import get_persona
 from hedra.core.personas.persona_registry import registered_personas
-from hedra.core.graphs.events import get_event
-from hedra.core.graphs.events.base_event import BaseEvent
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
-from hedra.plugins.types.plugin_types import PluginType
-from hedra.plugins.types.engine.engine_plugin import EnginePlugin
-from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
-from hedra.core.graphs.stages.setup.setup import Setup
+from hedra.core.graphs.events.event_graph import EventGraph
+from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.base.import_tools import (
     import_stages, 
     import_plugins, 
     set_stage_hooks
 )
-from hedra.core.personas import get_persona
+from hedra.core.graphs.stages.setup.setup import Setup
 from hedra.logging import (
     HedraLogger,
     LoggerTypes,
     logging_manager
 )
 
-from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
+from hedra.plugins.types.plugin_types import PluginType
+from hedra.plugins.types.engine.engine_plugin import EnginePlugin
+from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
 
 
 async def start_execution(parallel_config: Dict[str, Any]):
@@ -77,7 +75,6 @@ async def start_execution(parallel_config: Dict[str, Any]):
     graph_id = parallel_config.get('graph_id')
     source_stage_name = parallel_config.get('source_stage_name')
     source_stage_context: Dict[str, Any] = parallel_config.get('source_stage_context')
-    source_stage_linked_events: Dict[Tuple[HookType, str], List[Tuple[str, str]]] = parallel_config.get('source_stage_linked_events')
     source_stage_plugins = parallel_config.get('source_stage_plugins')
     source_stage_config = parallel_config.get('source_stage_config')
     source_stage_id = parallel_config.get('source_stage_id')
@@ -94,9 +91,26 @@ async def start_execution(parallel_config: Dict[str, Any]):
 
     discovered: Dict[str, Stage] = import_stages(graph_path)
     plugins_by_type = import_plugins(graph_path)
-    execute_stage: Stage = discovered.get(source_stage_name)()
-    execute_stage: Stage = set_stage_hooks(execute_stage)
+    
+    initialized_stages = {}
+    hooks_by_type = defaultdict(dict)
+    hooks_by_name = {}
+    hooks_by_shortname = defaultdict(dict)
 
+    discovered['Setup'] = Setup
+
+    for stage in discovered.values():
+        initialized_stage =  set_stage_hooks(stage())
+        initialized_stages[initialized_stage.name] = initialized_stage
+
+        for hook_type in initialized_stage.hooks:
+
+            for hook in initialized_stage.hooks[hook_type]:
+                hooks_by_type[hook_type][hook.name] = hook
+                hooks_by_name[hook.name] = hook
+                hooks_by_shortname[hook_type][hook.shortname] = hook
+
+    execute_stage: Stage = initialized_stages.get(source_stage_name)
     execute_stage.context.update(source_stage_context)
 
     execution_hooks_count = len(execution_hooks)
@@ -133,13 +147,25 @@ async def start_execution(parallel_config: Dict[str, Any]):
         f'{metadata_string} - Executing {execution_hooks_count} actions with a batch size of {persona_config.batch_size} for {persona_config.total_time} seconds using Persona - {persona.type.capitalize()}'
     )
 
-    setup_stage = Setup()
+    events_graph = EventGraph(hooks_by_type)
+    events_graph.hooks_by_name = hooks_by_name
+    events_graph.hooks_by_shortname = hooks_by_shortname
+    events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
+
+    setup_stage: Setup = initialized_stages.get('Setup')
+
     setup_stage.plugins_by_type = plugins_by_type
     setup_stage.generation_setup_candidates = 1
-    setup_stage.stages[execute_stage.name] = execute_stage
+    setup_stage.context['setup_stages'] = {
+        execute_stage.name: execute_stage
+    }
+
     setup_stage.config = source_stage_config
 
-    stages: Dict[str, Stage] = await setup_stage.run()
+    await setup_stage.run()
+
+
+    stages: Dict[str, Stage] =  setup_stage.context['setup_stages']
     setup_execute_stage: Stage = stages.get(source_stage_name)
 
     actions = {
@@ -155,8 +181,8 @@ async def start_execution(parallel_config: Dict[str, Any]):
         *setup_execute_stage.hooks.get(HookType.TASK, [])
     ]
 
-
     for hook in actions_and_tasks:
+
         if hook.action.hooks.notify:
             for idx, listener_name in enumerate(hook.action.hooks.listeners):
                 hook.action.hooks.listeners[idx] = actions.get(listener_name)
@@ -183,73 +209,9 @@ async def start_execution(parallel_config: Dict[str, Any]):
                 options=persona_config.playwright_options
             ))
     
-    loaded_stages: Dict[str, Stage] = {
-        setup_execute_stage.name: setup_execute_stage
-    }
     pipeline_stages = {
         setup_execute_stage.name: setup_execute_stage
     }
-
-    for event_target in source_stage_linked_events:
-        target_hook_stage, target_hook_type, target_hook_name = event_target
-        for event_source in source_stage_linked_events[event_target]:
-            event_source_stage, _, event_hook_name = event_source
-            
-            if target_hook_stage == source_stage_name:
-
-                source_stage: Stage = loaded_stages.get(event_source_stage)
-
-                if source_stage is None:
-                    source_stage = discovered.get(event_source_stage)()
-                    source_stage = set_stage_hooks(source_stage)
-                    
-                    loaded_stages[source_stage.name] = source_stage
-
-
-                source_stage = set_stage_hooks(source_stage)
-
-                pipeline_stages[source_stage.name] = source_stage
-
-                source_events = [
-                    *source_stage.hooks[HookType.EVENT],
-                    *source_stage.hooks[HookType.TRANSFORM]
-                ]
-
-                source_event_hook_names = [hook.name for hook in source_events]
-                source_hook_idx = source_event_hook_names.index(event_hook_name)
-
-                source_hook: Hook = source_events[source_hook_idx]
-
-                target_hook_names = [hook.name for hook in setup_execute_stage.hooks[target_hook_type]]
-                target_hook_idx = target_hook_names.index(target_hook_name)
-
-                target_hook: Hook = setup_execute_stage.hooks[target_hook_type][target_hook_idx]
-                target_hook.stage = source_stage_name
-                target_hook.stage_instance = setup_execute_stage
-                target_hook.stage_instance.hooks = setup_execute_stage.hooks
-
-                event = get_event(target_hook, source_hook)
-
-                if target_hook_idx >= 0 and isinstance(target_hook, BaseEvent):
-                    if source_hook.pre is True:
-                        target_hook.pre_sources[source_hook.name] = source_hook
-                        target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
-
-                    else:
-                        target_hook.post_sources[source_hook.name] = source_hook
-                        target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
-                    
-                    registrar.all[event.name] = target_hook
-
-                elif target_hook_idx >= 0:
-                    target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = event
-                    registrar.all[event.name] = event
-                
-                target_hook.stage_instance.linked_events[(target_hook.stage, target_hook.hook_type, target_hook.name)].append(
-                    (source_hook.stage, source_hook.hook_type, source_hook.name)
-                )
-
-                setup_execute_stage.hooks[target_hook_type][target_hook_idx] = event
                 
     persona.setup(setup_execute_stage.hooks, metadata_string)
 

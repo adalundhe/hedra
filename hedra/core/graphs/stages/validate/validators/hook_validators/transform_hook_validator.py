@@ -31,9 +31,6 @@ class TransformHookVaidator(BaseHookVaidator):
             assert call is not None, f"Method is not not found on stage or was not supplied to @transform hook - {hook.name}:{hook.hook_id}"
             assert 'self' in call.__code__.co_varnames
 
-            assert call.__code__.co_argcount > 1, f"Missing required argument 'result' for @transform hook {hook.name}:{hook.hook_id}"
-            assert call.__code__.co_argcount < 3, f"Too many args. - @transform hook {hook.name}:{hook.hook_id} only requires 'result' as an additional arg."
-
             for name in hook.names:
                 hook_for_validation = self.hooks_by_name.get(name)
 

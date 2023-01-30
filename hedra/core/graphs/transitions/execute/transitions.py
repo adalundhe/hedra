@@ -30,16 +30,16 @@ async def execute_transition(current_stage: Stage, next_stage: Stage, logger: He
     current_stage.total_concurrent_execute_stages = len(total_concurrent_execute_stages)
     
     if current_stage.timeout:
-        execution_results: Dict[str, Union[List[BaseResult], int, float]] = await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
+        await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
 
     else:
-        execution_results: Dict[str, Union[List[BaseResult], int, float]] = await current_stage.run()
+        await current_stage.run()
 
-    current_stage.context.results.update({
+    current_stage.context['results'].update({
         current_stage.name: ResultsSet({
-            'results': execution_results.get('results'),
-            'total_results': execution_results.get('total_results'),
-            'total_elapsed': execution_results.get('total_elapsed')
+            'results': current_stage.context['stage_results'],
+            'total_results': current_stage.context['total_results'],
+            'total_elapsed': current_stage.context['total_elapsed']
         })
     })
 
@@ -220,6 +220,7 @@ async def execute_to_analyze_transition(current_stage: Stage, next_stage: Stage)
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
+        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     current_stage = None

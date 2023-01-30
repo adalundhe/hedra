@@ -42,58 +42,51 @@ class TransformHook(Hook):
                 batchable_args.extend([
                     {**kwargs, name: item} for item in arg
                 ])
-            
+
         if len(batchable_args) > 0:
-            execute = await self._execute_call(*batchable_args)
+ 
+            result = await asyncio.wait_for(
+                asyncio.gather(*[
+                    asyncio.create_task(         
+                        self._call(**{name: value for name, value in call_kwargs.items() if name in self.params})
+                    ) for call_kwargs in batchable_args if (
+                        await self._execute_call(**call_kwargs) is True
+                    )
+                ]),
+                timeout=self.timeout
+            )
 
-            if execute:
-                result = await asyncio.wait_for(
-                    asyncio.gather(*[
-                        asyncio.create_task(         
-                            self._call(**call_kwargs)
-                        ) for call_kwargs in batchable_args if (
-                            await self._execute_call(arg) is True
-                        )
-                    ]),
-                    timeout=self.timeout
-                )
+            aggregated_transformm = defaultdict(list)
 
-                aggregated_transformm = defaultdict(list)
+            for data_item in result:
+                if isinstance(data_item, dict):
+                    for name, value in data_item.items():
+                        if isinstance(value, (list, tuple)):
+                            aggregated_transformm[name].extend(value)
 
-                for data_item in result:
-                    if isinstance(data_item, dict):
-                        for name, value in data_item.items():
-                            if isinstance(value, (list, tuple)):
-                                aggregated_transformm[name].extend(value)
+                        else:
+                            aggregated_transformm[name].append(value)
 
-                            else:
-                                aggregated_transformm[name] = value
-
-                    else:
-                        aggregated_transformm['transformed'].append(data_item)
+                else:
+                    aggregated_transformm['transformed'].append(data_item)
 
 
-                return {
-                    **kwargs,
-                    **dict(aggregated_transformm)
-                }
-
-            return kwargs
+            return {
+                **kwargs,
+                **dict(aggregated_transformm)
+            }
 
         else:     
-            
-            execute = await self._execute_call(**kwargs)
-            if execute:
+    
+            result = await self._call(**{name: value for name, value in kwargs.items() if name in self.params})
 
-                result = await self._call(**kwargs)
-
-                if isinstance(result, dict):
-                    return {
-                        **kwargs,
-                        **result
-                    }
-
+            if isinstance(result, dict):
                 return {
                     **kwargs,
-                    'transformed': result
+                    **result
                 }
+
+            return {
+                **kwargs,
+                'transformed': result
+            }

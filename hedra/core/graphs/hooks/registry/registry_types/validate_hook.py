@@ -23,7 +23,7 @@ class ValidateHook(Hook):
 
 
     async def call(self, **kwargs):
-        result = await super().call(**kwargs)
+        result = await super().call(**{name: value for name, value in kwargs.items() if name in self.params})
 
         if isinstance(result, dict):
             return {

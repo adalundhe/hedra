@@ -111,7 +111,6 @@ class TransitionAssembler:
             for _, method in methods:
                 method_name = method.__qualname__
                 hook: Hook = registrar.all.get(method_name)
-                
                 if hook and hook not in stage.hooks[hook.hook_type]:
                     hook._call = hook._call.__get__(stage, stage.__class__)
                     setattr(stage, hook.shortname, hook._call)
@@ -138,7 +137,9 @@ class TransitionAssembler:
             stage.hooks[HookType.EVENT] = [event_hook for event_hook in stage_event_hooks if event_hook.hook_type == HookType.EVENT and len(event_hook.names) < 1]
             stage.hooks[HookType.TRANSFORM] = [event_hook for event_hook in stage_event_hooks if event_hook.hook_type == HookType.TRANSFORM and len(event_hook.names) < 1]
             stage.hooks[HookType.CONTEXT] = [event_hook for event_hook in stage_event_hooks if event_hook.hook_type == HookType.CONTEXT and len(event_hook.names) < 1]
-                
+            stage.hooks[HookType.CONDITION] = [event_hook for event_hook in stage_event_hooks if event_hook.hook_type == HookType.CONDITION and len(event_hook.names) < 1]
+        
+        
         events_graph = EventGraph(self.hooks_by_type)
         events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
 

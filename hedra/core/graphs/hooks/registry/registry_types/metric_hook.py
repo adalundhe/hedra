@@ -22,7 +22,7 @@ class MetricHook(Hook):
         self.group = group
 
     async def call(self, **kwargs):
-        metric = await super().call(**kwargs)
+        metric = await super().call(**{name: value for name, value in kwargs.items() if name in self.params})
 
         if isinstance(metric, dict):
             return {

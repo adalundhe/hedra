@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, List
 from numpy import float32, float64, int16, int32, int64
 from hedra.logging import HedraLogger
-from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.events.types.base_result import BaseEvent
 from hedra.reporting.metric import MetricsSet
 
 
