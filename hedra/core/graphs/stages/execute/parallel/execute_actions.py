@@ -164,7 +164,6 @@ async def start_execution(parallel_config: Dict[str, Any]):
 
     await setup_stage.run()
 
-
     stages: Dict[str, Stage] =  setup_stage.context['setup_stages']
     setup_execute_stage: Stage = stages.get(source_stage_name)
 
@@ -227,9 +226,11 @@ async def start_execution(parallel_config: Dict[str, Any]):
         result.checks = [check.name for check in result.checks]
 
     context = {}
+
     for stage in pipeline_stages.values():
+        serializable_context = stage.context.as_serializable()
         context.update({
-            context_key: context_value for context_key, context_value in stage.context.items() if context_key not in stage.context.known_keys
+            context_key: context_value for context_key, context_value in serializable_context
         })   
     
     return {

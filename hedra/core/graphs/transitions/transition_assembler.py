@@ -126,19 +126,6 @@ class TransitionAssembler:
                     stage.hooks[hook.hook_type].append(hook)
             
             self.instances_by_type[stage.stage_type].append(stage)
-
-            stage_event_hooks: List[Union[EventHook, TransformHook]] = [
-                *stage.hooks[HookType.EVENT],
-                *stage.hooks[HookType.TRANSFORM],
-                *stage.hooks[HookType.CONDITION],
-                *stage.hooks[HookType.CONTEXT]
-            ]
-
-            stage.hooks[HookType.EVENT] = [event_hook for event_hook in stage_event_hooks if event_hook.hook_type == HookType.EVENT and len(event_hook.names) < 1]
-            stage.hooks[HookType.TRANSFORM] = [event_hook for event_hook in stage_event_hooks if event_hook.hook_type == HookType.TRANSFORM and len(event_hook.names) < 1]
-            stage.hooks[HookType.CONTEXT] = [event_hook for event_hook in stage_event_hooks if event_hook.hook_type == HookType.CONTEXT and len(event_hook.names) < 1]
-            stage.hooks[HookType.CONDITION] = [event_hook for event_hook in stage_event_hooks if event_hook.hook_type == HookType.CONDITION and len(event_hook.names) < 1]
-        
         
         events_graph = EventGraph(self.hooks_by_type)
         events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
@@ -316,15 +303,6 @@ class TransitionAssembler:
                         stage_path_lengths[path_stage_name] = path_lengths_set
 
                     idle_stage.context.path_lengths[stage_name] = stage_path_lengths.get(stage_name)
-
-        for stage in self.generated_stages.values():
-            for idle_stage in idle_stages:
-                stage.context = idle_stage.context
-
-                for hook_type in stage.hooks:
-                    for hook in stage.hooks[hook_type]:
-                        if hook.hook_type == HookType.CONTEXT:
-                            hook.context = stage.context
 
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')

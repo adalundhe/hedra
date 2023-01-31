@@ -35,8 +35,8 @@ class RestoreHookValidator(BaseHookVaidator):
             if hook.restore_path:
                 hook_path_dir = str(Path(hook.restore_path).parent.resolve())
                 
-                assert call.__code__.co_argcount > 1, f"Missing required argument 'data' for @restore hook {hook.name}:{hook.hook_id}"
-                assert call.__code__.co_argcount < 3, f"Too many args. - @restore hook {hook.name}:{hook.hook_id} only requires 'data' as additional args."
+                assert call.__code__.co_argcount > 2, f"Missing required arguments 'context_key' and 'data' for @restore hook {hook.name}:{hook.hook_id}"
+                assert call.__code__.co_argcount < 4, f"Too many args. - @restore hook {hook.name}:{hook.hook_id} only requires 'context_key' and 'data' as additional args."
                 assert hook.context_key is not None, f"Missing required keyword arg. - @restore hook {hook.name}:{hook.hook_id} requires a valid string for 'key'"
                 assert hook.restore_path is not None, f"Missing required keyword arg. - @restore hook {hook.name}:{hook.hook_id} requires a valid string for 'checkpoint_filepath'"
                 assert isinstance(hook.restore_path, str), f"Invalid path type - @restore hook {hook.name}:{hook.hook_id} path must be a valid string."

@@ -119,7 +119,7 @@ class Optimizer:
 
     async def _optimize(self, xargs: List[Union[int, float]]):
 
-        if self._current_iter < self.algorithm.max_iter:
+        if self._current_iter < self.algorithm.max_iter and self.elapsed < self._optimization_time_limit:
 
             persona = get_persona(self.stage_config)
             persona.setup(self.stage_hooks, self.metadata_string)
@@ -150,7 +150,10 @@ class Optimizer:
 
             completed_count = 0
             try:
-                results = await persona.execute()
+                results = await asyncio.wait_for(
+                    persona.execute(),
+                    timeout=persona.total_time * 2
+                )
                 completed_count = len([result for result in results if result.error is None])
 
             except Exception:

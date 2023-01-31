@@ -10,9 +10,7 @@ from hedra.core.graphs.hooks.hook_types.context import context
 from hedra.core.graphs.hooks.hook_types.event import event  
 from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.graphs.hooks.hook_types.internal import Internal
-from hedra.core.graphs.hooks.registry.registry_types import MetricHook
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.reporting.events import results_types
 from hedra.reporting.events.types import (
@@ -73,7 +71,7 @@ class Analyze(Stage):
     @context()
     async def initialize_raw_results(
         self,
-        raw_results: RawResultsSet=[]
+        raw_results: RawResultsSet={}
     ):
         await self.logger.filesystem.aio.create_logfile('hedra.reporting.log')
         self.logger.filesystem.create_filelogger('hedra.reporting.log')
@@ -89,16 +87,22 @@ class Analyze(Stage):
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Generated custom Event - {plugin.event.type} - for Reporter plugin - {plugin_name}')
 
         all_results = list(raw_results.items())
-        
 
+        self.context.ignore_serialization_filters = [
+            'all_results',
+            'raw_results',
+            'target_stages'
+        ]
+        
         return {
+            'raw_results': raw_results,
             'all_results': all_results
         }
 
     @event('initialize_raw_results')
     async def partition_results_batches(
         self,
-        raw_results: RawResultsSet=[],
+        raw_results: RawResultsSet={},
         all_results: List[RawResultsPairs]=[]
     ):
         batches = self.executor.partion_stage_batches(all_results)
@@ -125,17 +129,12 @@ class Analyze(Stage):
 
         metric_hook_names: List[str] = [hook.name for hook in self.hooks[HookType.METRIC]]
         
-
-        custom_metric_hooks: List[MetricHook] = []
         for metric_hook_name in metric_hook_names:
-            custom_metric_hook = registrar.all.get(metric_hook_name)
-            custom_metric_hooks.append(custom_metric_hook)
-
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Loaded custom Metric hook - {metric_hook_name}')
 
         return {
             'metric_hook_names': metric_hook_names,
-            'custom_metric_hooks': custom_metric_hooks
+            'custom_metric_hooks':  self.hooks[HookType.METRIC]
         }
 
     @event('get_custom_metric_hooks')
@@ -178,48 +177,51 @@ class Analyze(Stage):
             stage_batch_sizes[stage_name] = stage_batches
 
         return {
+            'target_stages': {},
             'stage_total_times': stage_total_times,
             'stage_batch_sizes': stage_batch_sizes
         }
 
-    @event('create_stage_batches')
+    @context('create_stage_batches')
     async def assign_stage_batches(
         self,
         batches: List[Tuple[str, Any, int]]=[],
-        stages: Dict[str, Stage]=[],
+        target_stages: Dict[str, Stage]={},
         stage_batch_sizes: Dict[str, List[List[Any]]]=[],
         metric_hook_names: List[str]=[]
     ):
         
 
         stage_configs = []
+        serializable_context = self.context.as_serializable()
 
         for stage_name, _, assigned_workers_count in batches:
             
-            stage = stages.get(stage_name)
+            stage = target_stages.get(stage_name)
             batch_configs = []
 
             for batch in stage_batch_sizes[stage_name]:
-                batch_configs.append({
+                batch_configs.append(dill.dumps({
                     'graph_name': self.graph_name,
                     'graph_path': self.graph_path,
                     'graph_id': self.graph_id,
                     'source_stage_name': self.name,
                     'source_stage_context': {
-                        context_key: context_value for context_key, context_value in self.context if context_key not in self.context.known_keys
+                        context_key: context_value for context_key, context_value in serializable_context
                     },
                     'source_stage_id': self.stage_id,
                     'analyze_stage_name': stage_name,
                     'analyze_stage_metric_hooks': list(metric_hook_names),
                     'analyze_stage_linked_events': stage.linked_events,
                     'analyze_stage_batched_results': batch
-                })
+                }))
 
             stage_configs.append((
                 stage_name,
                 assigned_workers_count,
                 batch_configs
             ))
+            
 
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Assigned {assigned_workers_count} to process results from stage - {stage_name}')
 
@@ -439,8 +441,6 @@ class Analyze(Stage):
         self.analysis_execution_time = round(
             time.monotonic() - self.analysis_execution_time_start
         )
-
-        await self.run_post_events()    
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed results analysis for - {stages_count} - stages in - {self.analysis_execution_time} seconds')
         await self.logger.spinner.set_default_message(f'Completed results analysis for {total_group_results} actions and {stages_count} stages over {self.analysis_execution_time} seconds')

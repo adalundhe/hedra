@@ -1,5 +1,5 @@
 import asyncio
-import traceback
+from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -21,7 +21,6 @@ async def submit_transition(current_stage: Stage, next_stage: Stage):
         await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
 
         current_stage.state = StageStates.SUBMITTING
-        current_stage.summaries = current_stage.context.summaries
 
         if current_stage.timeout:
             await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
@@ -41,7 +40,10 @@ async def submit_transition(current_stage: Stage, next_stage: Stage):
         await logger.spinner.system.debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
         await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Skipping transition from {current_stage.name} to {next_stage.name}')
 
-    next_stage.context = current_stage.context
+    next_stage.context = SimpleContext()
+
+    for known_key in current_stage.context.known_keys:
+        next_stage.context[known_key] = current_stage.context[known_key]
 
 
 async def submit_to_setup_transition(current_stage: Stage, next_stage: Stage):

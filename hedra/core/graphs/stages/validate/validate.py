@@ -1,7 +1,8 @@
-import asyncio
 import inspect
-from typing import Dict, List, Union
+from typing import Dict, List
 from collections import defaultdict
+from hedra.core.graphs.hooks.hook_types.context import context
+from hedra.core.graphs.hooks.hook_types.event import event
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.hooks.registry.registry_types import ValidateHook
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
@@ -59,17 +60,31 @@ class Validate(Stage):
     async def run(self):
         await self.setup_events()
         await self.dispatcher.dispatch_events()
-
-        validator = Validator(self.stages, self.metadata_string)
+    
+    @context()
+    async def validate_stages(
+        self,
+        validation_stages: Dict[str, Stage]={}
+    ):
+        validator = Validator(validation_stages, self.metadata_string)
         await validator.validate_stages()
+
+        return {
+            'validator': validator
+        }
+
+    @event('validate_stages')
+    async def validate_hooks(
+        self,
+        validator: Validator=None
+    ):
 
         validator_hooks = await self.collect_validate_hooks()
         validator.add_hooks(HookType.VALIDATE, validator_hooks)
 
         await validator.validate_hooks()
 
-        await self.run_post_events()
-
+    @Internal()
     async def collect_validate_hooks(self):       
         
         validate_hooks: List[ValidateHook] = []

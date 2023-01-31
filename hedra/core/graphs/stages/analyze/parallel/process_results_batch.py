@@ -102,12 +102,14 @@ async def process_batch(
         return dill.dumps(events)
 
 
-def process_results_batch(config: Dict[str, Any]):
+def process_results_batch(config: str):
     import asyncio
     import uvloop
     uvloop.install()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+
+    config: Dict[str, Any] = dill.loads(config)
     
     graph_name = config.get('graph_name')
     graph_path = config.get('graph_path')
@@ -146,13 +148,11 @@ def process_results_batch(config: Dict[str, Any]):
     setup_analyze_stage: Stage = initialized_stages.get(stage_name)
     setup_analyze_stage.context.update(source_stage_context)
 
-
     events_graph = EventGraph(hooks_by_type)
     events_graph.hooks_by_name = hooks_by_name
     events_graph.hooks_by_shortname = hooks_by_shortname
     events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
     
-
     pipeline_stage = {
         setup_analyze_stage.name: setup_analyze_stage
     }
@@ -186,8 +186,9 @@ def process_results_batch(config: Dict[str, Any]):
 
         context = {}
         for stage in pipeline_stage.values():
+            serializable_context = stage.context.as_serializable()
             context.update({
-                context_key: context_value for context_key, context_value in stage.context.items() if context_key not in stage.context.known_keys
+                context_key: context_value for context_key, context_value in serializable_context
             })
 
         return {

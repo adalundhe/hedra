@@ -176,7 +176,9 @@ class Execute(Stage, Generic[Unpack[T]]):
     ):
 
         if stage_has_multiple_workers:
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting execution for - {self.workers} workers')             
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting execution for - {self.workers} workers')
+
+            serializable_context = self.context.as_serializable()             
 
             results_sets = await self.executor.execute_stage_batch(
                 execute_actions,
@@ -188,7 +190,7 @@ class Execute(Stage, Generic[Unpack[T]]):
                         'source_stage_name': self.name,
                         'source_stage_linked_events': self.linked_events,
                         'source_stage_context': {
-                            context_key: context_value for context_key, context_value in self.context if context_key not in self.context.known_keys
+                            context_key: context_value for context_key, context_value in serializable_context
                         },
                         'source_stage_id': self.stage_id,
                         'source_stage_plugins': stage_plugins,

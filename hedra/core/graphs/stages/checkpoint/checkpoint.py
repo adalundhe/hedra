@@ -1,5 +1,6 @@
 import asyncio
 from typing import List
+from hedra.core.graphs.hooks.hook_types.event import event
 from hedra.core.graphs.hooks.registry.registry_types import (
     SaveHook,
     RestoreHook
@@ -29,13 +30,28 @@ class Checkpoint(Stage):
 
     @Internal()
     async def run(self):
+        await self.setup_events()
+        await self.dispatcher.dispatch_events()
 
-        await self.run_pre_events()
+    @event()
+    async def setup_restore_config(self):
 
         restore_hooks: List[RestoreHook] = self.hooks[HookType.RESTORE]
         restore_paths: List[str] = [restore_hook.restore_path for restore_hook in restore_hooks]
         restore_hooks_count = len(restore_hooks)
 
+        return {
+            'restore_hooks': restore_hooks,
+            'restore_paths': restore_paths,
+            'restore_hooks_count': restore_hooks_count
+        }
+
+    @event('setup_restore_config')
+    async def restore_to_context(
+        self,
+        restore_hooks: List[RestoreHook]=[],
+        restore_hooks_count: int=0
+    ):
         if restore_hooks_count > 0:
             await self.logger.spinner.append_message(f'Executing Restore checkpoints for - {restore_hooks_count} - items')
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing Restore checkpoints for - {restore_hooks_count} - items')
@@ -48,10 +64,18 @@ class Checkpoint(Stage):
                 restore_hook.call(self.context)
             ) for restore_hook in restore_hooks
         ])
+        
+
+    @event('setup_restore_config')
+    async def save_from_context(
+        self,
+        restore_paths: List[str]=[]
+    ):
 
         save_hooks: List[SaveHook] = self.hooks[HookType.SAVE]
         allowed_save_hooks = [save_hook for save_hook in save_hooks if save_hook.save_path not in restore_paths]
         save_hooks_count = len(allowed_save_hooks)
+        
         if save_hooks_count:
             await self.logger.spinner.append_message(f'Executing Save checkpoints for - {save_hooks_count} - items')
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing Save checkpoints for - {len(save_hooks)} - items')
@@ -65,9 +89,19 @@ class Checkpoint(Stage):
                 save_hook.call(self.context)
             ) for save_hook in allowed_save_hooks
         ])
-        
-        await self.run_post_events()
+
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed checkpoints for - {len(save_hooks)} - items')
+
+        return {
+            'save_hooks_count': save_hooks_count
+        }
+    
+    @event('restore_to_context','save_from_context')
+    async def complete_checkpoint(
+        self,
+        restore_hooks_count: int=0,
+        save_hooks_count: int=0
+    ):
 
         await self.logger.spinner.set_default_message(f"Checkpoint complete - Restored {restore_hooks_count} items and saved {save_hooks_count} items")
-        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed checkpoints for - {len(save_hooks)} - items')
 

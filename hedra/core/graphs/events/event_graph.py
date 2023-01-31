@@ -131,16 +131,23 @@ class EventGraph:
                     event_name: self.events.get(event_name) for event_name in path_layer
                 })
 
-            if len(event.previous_map) < 1:
-                hook_names = [hook.name for hook in event.stage_instance.hooks[event.hook_type]]
+            hook_names = [hook.name for hook in event.stage_instance.hooks[event.hook_type]]
 
-                if event.event_name in hook_names:
-                    hook_idx = hook_names.index(event.event_name)
-                    event.stage_instance.dispatcher.add_event(event)
-                    event.stage_instance.hooks[event.hook_type][hook_idx] = event
+            if event.event_name in hook_names:
+                hook_idx = hook_names.index(event.event_name)
+                event.stage_instance.hooks[event.hook_type][hook_idx] = event
 
-                else:
-                    event.stage_instance.hooks[event.hook_type].append(event)    
+            else:
+                event.stage_instance.hooks[event.hook_type].append(event)  
+
+            
+            for layer in event.execution_path:
+                for event_name in layer:
+                    next_event = self.events.get(event_name)
+                    event.stage_instance.dispatcher.add_event(next_event)
+
+             
+            event.stage_instance.dispatcher.add_event(event)
 
         # networkx.draw_networkx(self.hooks_graph, pos=networkx.spring_layout(self.hooks_graph), with_labels=True, arrows=True)
         # plt.show()

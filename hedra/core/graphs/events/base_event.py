@@ -120,7 +120,7 @@ class BaseEvent(Generic[T]):
 
         return super().__setattr__(name, value)
 
-    async def call(self, **kwargs): 
+    async def call(self, **kwargs) -> Dict[str, Any]: 
    
         if len(self.next_args[self.event_name]) == 0:
             self.next_args[self.event_name] = kwargs
@@ -140,18 +140,9 @@ class BaseEvent(Generic[T]):
 
             self.next_args[event.event_name].update(results)
 
-        if self.source.hook_type == HookType.CONDITION and results is False:
-            return
-
-        else:
-            results = await asyncio.gather(*[
-                asyncio.create_task(
-                    event.call(**self.next_args[event.event_name])
-                ) for event in next_events
-            ])
-
-            return results
-
+        return {
+            self.event_name: results
+        }
 
     async def execute_pre(self, *hook_args: List[Any]):
         results = None

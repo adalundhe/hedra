@@ -318,7 +318,7 @@ class Setup(Stage, Generic[Unpack[T]]):
 
                 action, session = execute_stage.client.actions.get(
                     execute_stage.name,
-                    action.name
+                    hook.name
                 )
 
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved prepared Action and Session for action - {action.name}:{action.action_id} - Execute stage - {execute_stage_name}')

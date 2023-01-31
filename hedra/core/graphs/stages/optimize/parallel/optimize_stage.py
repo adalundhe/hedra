@@ -5,6 +5,7 @@ import os
 import traceback
 import signal
 import os
+from collections import defaultdict
 from typing import Any, Dict, List, Union, Tuple
 from hedra.core.engines.client.config import Config
 from hedra.core.graphs.hooks.registry.registrar import registrar
@@ -13,12 +14,16 @@ from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.setup.setup import Setup
 from hedra.core.graphs.events import get_event
 from hedra.core.graphs.events.base_event import BaseEvent
+from hedra.core.graphs.events.event_graph import EventGraph
+from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.registry import registered_engines
 from hedra.core.personas.persona_registry import registered_personas
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
+from hedra.core.engines.types.registry import RequestTypes
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.base.import_tools import (
@@ -35,6 +40,52 @@ from hedra.logging import (
 from hedra.core.personas import get_persona
 
 
+async def setup_action_channels_and_playwright(
+    setup_execute_stage: Execute,
+    logger: HedraLogger,
+    metadata_string: str,
+    persona_config: Config
+):
+    actions = {
+        hook.name: hook for hook in setup_execute_stage.hooks[HookType.ACTION]
+    }
+
+    actions.update({
+        hook.name: hook for hook in setup_execute_stage.hooks[HookType.TASK]
+    })
+
+    actions_and_tasks: List[Union[ActionHook, TaskHook]] = [
+        *setup_execute_stage.hooks.get(HookType.ACTION, []),
+        *setup_execute_stage.hooks.get(HookType.TASK, [])
+    ]
+
+    for hook in actions_and_tasks:
+
+        if hook.action.hooks.notify:
+            for idx, listener_name in enumerate(hook.action.hooks.listeners):
+                hook.action.hooks.listeners[idx] = actions.get(listener_name)
+
+
+        if hook.action.type == RequestTypes.PLAYWRIGHT and isinstance(hook.session, MercuryPlaywrightClient):
+
+            await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Setting up Playwright Session')
+
+            await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - Playwright Session - {hook.session.session_id} - Browser Type: {persona_config.browser_type}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - Playwright Session - {hook.session.session_id} - Device Type: {persona_config.device_type}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - Playwright Session - {hook.session.session_id} - Locale: {persona_config.locale}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - Playwright Session - {hook.session.session_id} - geolocation: {persona_config.geolocation}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - Playwright Session - {hook.session.session_id} - Permissions: {persona_config.permissions}')
+            await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - Playwright Session - {hook.session.session_id} - Color Scheme: {persona_config.color_scheme}')
+
+            await hook.session.setup(ContextConfig(
+                browser_type=persona_config.browser_type,
+                device_type=persona_config.device_type,
+                locale=persona_config.locale,
+                geolocation=persona_config.geolocation,
+                permissions=persona_config.permissions,
+                color_scheme=persona_config.color_scheme,
+                options=persona_config.playwright_options
+            ))
 
 
 def optimize_stage(serialized_config: str):
@@ -103,12 +154,33 @@ def optimize_stage(serialized_config: str):
         batch_size: int = optimization_config.get('execute_stage_batch_size')
 
         metadata_string = f'Graph - {graph_name}:{graph_id} - thread:{thread_id} - process:{process_id} - Stage: {source_stage_name}:{source_stage_id} - '
+        discovered: Dict[str, Stage] = import_stages(graph_path)
 
-        discovered = import_stages(graph_path)
+        discovered['Setup'] = Setup
+        
+        initialized_stages = {}
+        hooks_by_type = defaultdict(dict)
+        hooks_by_name = {}
+        hooks_by_shortname = defaultdict(dict)
 
-        execute_stage: Stage = discovered.get(execute_stage_name)()
+        for stage in discovered.values():
+            initialized_stage =  set_stage_hooks(stage())
+            initialized_stages[initialized_stage.name] = initialized_stage
+
+            for hook_type in initialized_stage.hooks:
+
+                for hook in initialized_stage.hooks[hook_type]:
+                    hooks_by_type[hook_type][hook.name] = hook
+                    hooks_by_name[hook.name] = hook
+                    hooks_by_shortname[hook_type][hook.shortname] = hook
+
+        execute_stage: Stage = initialized_stages.get(execute_stage_name)
         execute_stage.context.update(source_stage_context)
-        execute_stage = set_stage_hooks(execute_stage)
+
+        events_graph = EventGraph(hooks_by_type)
+        events_graph.hooks_by_name = hooks_by_name
+        events_graph.hooks_by_shortname = hooks_by_shortname
+        events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
 
         execute_stage_config.batch_size = batch_size
         plugins_by_type = import_plugins(graph_path)
@@ -132,16 +204,20 @@ def optimize_stage(serialized_config: str):
         for plugin_name, plugin in plugins_by_type[PluginType.OPTIMIZER].items():
             registered_algorithms[plugin_name] = plugin
 
-        setup_stage = Setup()
-        setup_stage.logger.spinner.logger.log_level = 'critical'
+        setup_stage: Setup = initialized_stages.get('Setup')
+
         setup_stage.plugins_by_type = plugins_by_type
         setup_stage.generation_setup_candidates = 1
-        setup_stage.stages[execute_stage.name] = execute_stage
+        setup_stage.context['setup_stages'] = {
+            execute_stage.name: execute_stage
+        }
+
         setup_stage.config = execute_stage_config
 
-        stages = loop.run_until_complete(setup_stage.run())
-        
-        setup_execute_stage: Execute = stages.get(execute_stage_name)
+        loop.run_until_complete(setup_stage.run())
+
+        stages: Dict[str, Stage] =  setup_stage.context['setup_stages']
+        setup_execute_stage: Stage = stages.get(execute_stage_name)
 
         setup_execute_stage_hooks = {}
         for hook_type in setup_execute_stage.hooks:
@@ -149,64 +225,16 @@ def optimize_stage(serialized_config: str):
                 hook.name: hook for hook in setup_execute_stage.hooks[hook_type]
             })
 
-        loaded_stages: Dict[str, Stage] = {
-            setup_execute_stage.name: setup_execute_stage
-        }
         pipeline_stages = {
             setup_execute_stage.name: setup_execute_stage
         }
-        
-        for event_target in execute_stage_linked_events:
-            target_hook_stage, target_hook_type, target_hook_name = event_target
-            for event_source in execute_stage_linked_events[event_target]:
-                event_source_stage, event_hook_type, event_hook_name = event_source
-                
-                if target_hook_stage == setup_execute_stage.name:
 
-                    source_stage: Stage = loaded_stages.get(event_source_stage)
-                    if source_stage is None:
-                        source_stage = discovered.get(event_source_stage)()
-                        source_stage = set_stage_hooks(source_stage)
-                        
-                        loaded_stages[source_stage.name] = source_stage
-
-                    pipeline_stages[source_stage.name] = source_stage
-
-                    source_events = [
-                        *source_stage.hooks[HookType.EVENT],
-                        *source_stage.hooks[HookType.TRANSFORM]
-                    ]
-
-                    source_event_hook_names = [hook.name for hook in source_events]
-                    source_hook_idx = source_event_hook_names.index(event_hook_name)
-
-                    source_hook: Hook = source_events[source_hook_idx]
-
-                    target_hook_names = [hook.name for hook in setup_execute_stage.hooks[target_hook_type]]
-                    target_hook_idx = target_hook_names.index(target_hook_name)
-
-                    target_hook: Hook = setup_execute_stage.hooks[target_hook_type][target_hook_idx]
-
-                    event = get_event(target_hook, source_hook)
-
-                    if target_hook_idx >= 0 and isinstance(target_hook, BaseEvent):
-                        if source_hook.pre is True:
-                            target_hook.pre_sources[source_hook.name] = source_hook
-                            target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
-
-                        else:
-                            target_hook.post_sources[source_hook.name] = source_hook
-                            target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
-                        
-                        registrar.all[event.name] = target_hook
-
-                    elif target_hook_idx >= 0:
-                        target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = event
-                        registrar.all[event.name] = event
-                    
-                    target_hook.stage_instance.linked_events[(target_hook.stage, target_hook.hook_type, target_hook.name)].append(
-                        (source_hook.stage, source_hook.hook_type, source_hook.name)
-                    )
+        loop.run_until_complete(setup_action_channels_and_playwright(
+            setup_execute_stage=setup_execute_stage,
+            logger=logger,
+            metadata_string=metadata_string,
+            persona_config=execute_stage_config
+        ))
 
         logger.filesystem.sync['hedra.optimize'].info(f'{metadata_string} - Setting up Optimization')
 
@@ -257,8 +285,9 @@ def optimize_stage(serialized_config: str):
 
         context = {}
         for stage in pipeline_stages.values():
+            serializable_context = stage.context.as_serializable()
             context.update({
-                context_key: context_value for context_key, context_value in stage.context.items() if context_key not in stage.context.known_keys
+                context_key: context_value for context_key, context_value in serializable_context
             })
 
         return {
