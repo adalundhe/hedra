@@ -35,3 +35,11 @@ class ValidateHook(Hook):
             **kwargs,
             'valid': result
         }
+
+    def copy(self):
+        return ValidateHook(
+            self.name,
+            self.shortname,
+            self._call,
+            *self.names
+        )

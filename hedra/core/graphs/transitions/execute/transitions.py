@@ -4,6 +4,8 @@ from typing import Dict
 from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.stages.base.stage import Stage
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.core.graphs.stages.execute.execute import Execute
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.transitions.exceptions import (
@@ -13,7 +15,7 @@ from hedra.core.graphs.transitions.exceptions import (
 from hedra.logging import HedraLogger
 
 
-async def execute_transition(current_stage: Stage, next_stage: Stage, logger: HedraLogger):
+async def execute_transition(current_stage: Execute, next_stage: Stage, logger: HedraLogger):
     
     current_stage.state = StageStates.EXECUTING
 
@@ -31,6 +33,11 @@ async def execute_transition(current_stage: Stage, next_stage: Stage, logger: He
         if stage is not None:
             total_concurrent_execute_stages.append(stage)
 
+
+    current_stage.context['execute_hooks'] = [
+        *current_stage.hooks[HookType.ACTION],
+        *current_stage.hooks[HookType.TASK]
+    ]
     current_stage.total_concurrent_execute_stages = len(total_concurrent_execute_stages)
     if current_stage.timeout:
         await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
@@ -259,6 +266,7 @@ async def execute_to_analyze_transition(current_stage: Stage, next_stage: Stage)
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
+        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     current_stage = None
@@ -296,6 +304,7 @@ async def execute_to_checkpoint_transition(current_stage: Stage, next_stage: Sta
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
+        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     current_stage = None

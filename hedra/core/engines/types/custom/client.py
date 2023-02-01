@@ -73,6 +73,14 @@ class MercuryCustomClient(Generic[A, R]):
 
         self.pool.create_pool()
 
+    async def set_pool(self, concurrency: int):
+        self.sem = asyncio.Semaphore(value=concurrency)
+        self.pool = CustomPool(
+            self.custom_connection,
+            concurrency, 
+            reset_connections=self.pool.reset_connections
+        )
+        self.pool.create_pool()
 
     def extend_pool(self, increased_capacity: int):
         self.pool.size += increased_capacity

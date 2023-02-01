@@ -163,8 +163,13 @@ def optimize_stage(serialized_config: str):
         hooks_by_name = {}
         hooks_by_shortname = defaultdict(dict)
 
+        generated_stages = {}
         for stage in discovered.values():
-            initialized_stage =  set_stage_hooks(stage())
+            initialized_stage =  set_stage_hooks(
+                stage(),
+                generated_stages
+            )
+
             initialized_stages[initialized_stage.name] = initialized_stage
 
             for hook_type in initialized_stage.hooks:

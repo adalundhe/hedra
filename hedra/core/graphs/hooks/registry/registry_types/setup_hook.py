@@ -44,3 +44,18 @@ class SetupHook(Hook):
             **kwargs,
             'context': results
         }
+
+    def copy(self):
+        return SetupHook(
+            self.name,
+            self.shortname,
+            self._call,
+            key=self.key,
+            metadata={
+                'weight': self.metadata.weight,
+                'order': self.metadata.order,
+                'env': self.metadata.env,
+                'user': self.metadata.user,
+                'tags': self.metadata.tags
+            }
+        )

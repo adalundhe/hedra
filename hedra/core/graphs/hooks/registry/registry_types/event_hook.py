@@ -41,3 +41,14 @@ class EventHook(Hook):
             **kwargs,
             'result': result
         }
+
+    def copy(self):
+        return EventHook(
+            self.name,
+            self.shortname,
+            self._call,
+            *self.names,
+            pre=self.pre,
+            key=self.key,
+            order=self.order
+        )

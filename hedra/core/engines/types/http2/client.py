@@ -50,7 +50,11 @@ class MercuryHTTP2Client:
         self.waiter = None
 
         self.ssl_context = get_http2_ssl_context()
-        
+    
+    async def set_pool(self, concurrency: int):
+        self.sem = asyncio.Semaphore(value=concurrency)
+        self.pool = HTTP2Pool(concurrency, reset_connections=self.pool.reset_connections)
+        self.pool.create_pool()
 
     async def wait_for_active_threshold(self):
         if self.waiter is None:

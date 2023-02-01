@@ -52,3 +52,12 @@ class Hook:
             execute = await condition(**{name: value for name, value in hook_args.items() if name in self.params})
 
         return execute
+
+    def copy(self):
+        return Hook(
+            self.name,
+            self.shortname,
+            self._call,
+            self.stage,
+            self.hook_type
+        )

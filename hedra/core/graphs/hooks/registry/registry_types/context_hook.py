@@ -76,3 +76,15 @@ class ContextHook(Hook):
             **kwargs,
             self.name: context_result
         }
+
+    def copy(self):
+        return ContextHook(
+            self.name,
+            self.shortname,
+            self._call,
+            *self.names,
+            store=self.store,
+            load=self.load,
+            pre=self.pre,
+            order=self.order
+        )

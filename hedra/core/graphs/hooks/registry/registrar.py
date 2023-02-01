@@ -87,8 +87,6 @@ class Registrar:
 
 
     def __call__(self, hook: FunctionType):
-
-  
         self.module_paths[hook.__name__] = hook.__module__
 
         @functools.wraps(hook)
@@ -98,7 +96,6 @@ class Registrar:
 
                 hook_name = func.__qualname__
                 hook_shortname = func.__name__
-
                 hook = self.hook_types[self.hook_type]
 
                 hook_args = args
@@ -116,14 +113,25 @@ class Registrar:
                     except TypeError as e:
                         raise e
                         
+                if hook_name not in self.all:
+                    self.all[hook_name] = [
+                        hook(
+                            hook_name,
+                            hook_shortname,
+                            func,
+                            *hook_args,
+                            **kwargs
+                        )
+                    ]
 
-                self.all[hook_name] = hook(
-                    hook_name,
-                    hook_shortname,
-                    func,
-                    *hook_args,
-                    **kwargs
-                )
+                else:
+                    self.all[hook_name].append(hook(
+                        hook_name,
+                        hook_shortname,
+                        func,
+                        *hook_args,
+                        **kwargs
+                    ))
 
                 return func
             

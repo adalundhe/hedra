@@ -4,15 +4,15 @@ import inspect
 import threading
 import networkx
 import os
+import copy
 from typing import List, Dict, Union, Any, Tuple, Coroutine
 from collections import defaultdict
 from hedra.core.graphs.events.event_graph import EventGraph
-from hedra.core.graphs.stages.base.import_tools import set_stage_hooks
+from hedra.core.graphs.stages.base.import_tools import set_stage_hooks, import_stages
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.error import Error
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.hooks.registry.registrar import registrar
-from hedra.core.graphs.hooks.registry.registry_types import EventHook, TransformHook
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, HookType
 from hedra.core.graphs.stages.base.parallel.batch_executor import BatchExecutor
 from hedra.core.graphs.transitions.exceptions.exceptions import IsolatedStageError
@@ -56,13 +56,14 @@ class TransitionAssembler:
         self.cpus = cpus
         self.worker_id = worker_id
         self.loop = asyncio.get_event_loop()
-        self.hooks_by_type: Dict[HookType, Dict[str, Hook]] = defaultdict(dict)
+        self.hooks_by_type: Dict[HookType, Dict[str,Hook]] = defaultdict(dict)
 
         self.logging = HedraLogger()
         self.logging.initialize()
 
         self._thread_id = threading.current_thread().ident
         self._process_id = os.getpid()
+        self.all_hooks = []
 
         self._graph_metadata_log_string = f'Graph - {self.graph_name}:{self.graph_id} - thread:{self._thread_id} - process:{self._process_id} - '
 
@@ -85,6 +86,7 @@ class TransitionAssembler:
             stage_name: stage() for stage_name, stage in stages.items()
         }
 
+        generated_hooks = {}
         for stage in self.generated_stages.values():
             stage.core_config = self.core_config
             stage.graph_name = self.graph_name
@@ -99,38 +101,17 @@ class TransitionAssembler:
                     setattr(stage, hook_shortname, hook._call)
 
 
-            stage = set_stage_hooks(stage)
+            stage = set_stage_hooks(stage, generated_hooks)
 
             for hook_type in stage.hooks:
-                self.hooks_by_type[hook_type].update({
-                    hook.name: hook for hook in stage.hooks[hook_type]
-                })
-
-            methods = inspect.getmembers(stage, predicate=inspect.ismethod) 
-
-            for _, method in methods:
-                method_name = method.__qualname__
-                hook: Hook = registrar.all.get(method_name)
-                if hook and hook not in stage.hooks[hook.hook_type]:
-                    hook._call = hook._call.__get__(stage, stage.__class__)
-                    setattr(stage, hook.shortname, hook._call)
-
-                    if inspect.ismethod(hook.call) is False:
-                        hook.call = hook.call.__get__(stage, stage.__class__)
-                        setattr(stage, hook.shortname, hook.call)
-
-                    hook.stage = stage.name
-                    hook.stage_instance: Stage = stage
-                    
+                for hook in stage.hooks[hook_type]: 
                     self.hooks_by_type[hook.hook_type][hook.name] = hook
-                    stage.hooks[hook.hook_type].append(hook)
-            
+                
             self.instances_by_type[stage.stage_type].append(stage)
-        
+    
         events_graph = EventGraph(self.hooks_by_type)
         events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
 
-        
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Successfully generated - {stages_count} - stages')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Successfully generated - {stages_count} - stages')
 

@@ -60,68 +60,42 @@ def import_plugins(path: str) -> Dict[PluginType, Dict[str, Plugin]]:
     return plugins_by_type
 
 
-def set_stage_hooks(stage: Stage) -> Stage:
+def set_stage_hooks(stage: Stage, generated_hooks: Dict[str, Hook]) -> Stage:
     methods = inspect.getmembers(stage, predicate=inspect.ismethod) 
 
     for _, method in methods:
         method_name = method.__qualname__
-        hook: Hook = registrar.all.get(method_name)
-        
-        if hook:
+        hook_set: List[Hook] = registrar.all.get(method_name, [])
+
+        for hook in hook_set:
             hook._call = hook._call.__get__(stage, stage.__class__)
             setattr(stage, hook.shortname, hook._call)
 
             if inspect.ismethod(hook.call) is False:
                 hook.call = hook.call.__get__(stage, stage.__class__)
                 setattr(stage, hook.shortname, hook.call)
+                
 
-            hook.stage = stage.name
-            hook.stage_instance: Stage = stage
+            if generated_hooks.get(hook) is None:
+
+                generated_hooks[hook] = 'created'
+                hook.stage = stage.name
+
+                hook.stage_instance: Stage = stage
+
+                hook.name = f'{hook.stage}.{hook.shortname}'
+                stage.hooks[hook.hook_type].append(hook)
             
-            stage.hooks[hook.hook_type].append(hook)
+
+            elif generated_hooks.get(hook) == 'created':
+
+                generated_hooks[hook] = 'copied'
+                copied_hook = hook.copy()
+
+                copied_hook.stage = stage.name
+                copied_hook.stage_instance: Stage = stage
+
+                copied_hook.name = f'{copied_hook.stage}.{copied_hook.shortname}'
+                stage.hooks[hook.hook_type].append(copied_hook)
 
     return stage
-
-
-def set_events(event_hooks: List[EventHook], logging: HedraLogger, metadata_string: str) -> List[EventHook]:
-
-    for event_hook in event_hooks:
-        for target_hook_name in event_hook.names:    
-            target_hook = registrar.all.get(target_hook_name)
-
-            if target_hook and target_hook.stage_instance:
-                logging.filesystem.sync['hedra.core'].info(
-                    f'{metadata_string} - Appendng Event - {event_hook.name}:{event_hook.hook_id} - to target Stage - {target_hook.stage}:{target_hook.stage_instance.stage_id} Event Hooks'
-                )
-
-                event = Event(target_hook, event_hook)
-
-                target_hook_idx = -1
-
-                try:
-                    target_hook_names = [hook.name for hook in target_hook.stage_instance.hooks[target_hook.hook_type]]
-                    target_hook_idx = target_hook_names.index(target_hook.name)
-
-                except ValueError:
-                    pass
-
-                if target_hook_idx >= 0 and isinstance(target_hook, Event):
-                    if event_hook.pre is True:
-                        target_hook.pre_sources[event_hook.name] = event_hook
-                        target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
-
-                    else:
-                        target_hook.post_sources[event_hook.name] = event_hook
-                        target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
-                    
-                    registrar.all[event.name] = target_hook
-
-                elif target_hook_idx >= 0:
-                    target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = event
-                    registrar.all[event.name] = event
-                
-                target_hook.stage_instance.linked_events[(target_hook.stage, target_hook.hook_type, target_hook.name)].append(
-                    (event_hook.stage, event_hook.hook_type, event_hook.name)
-                )
-
-    return event_hooks

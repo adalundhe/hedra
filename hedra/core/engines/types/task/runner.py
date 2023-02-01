@@ -42,6 +42,14 @@ class MercuryTaskRunner:
         self.sem = asyncio.Semaphore(value=concurrency)
         self.active = 0
         self.waiter = None
+    
+    async def set_pool(self, concurrency: int):
+        self.pool = SimpleContext()
+        self.pool.size = concurrency
+        self.pool.reset_connections = False
+        self.pool.create_pool = lambda: None
+
+        self.sem = asyncio.Semaphore(value=concurrency)
 
     async def wait_for_active_threshold(self):
         if self.waiter is None:

@@ -52,7 +52,6 @@ class Optimize(Stage):
 
     @Internal()
     async def run(self):
-
         await self.setup_events()
         await self.dispatcher.dispatch_events()
 

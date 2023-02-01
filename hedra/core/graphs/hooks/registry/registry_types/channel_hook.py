@@ -37,3 +37,10 @@ class ChannelHook(Hook):
             'notifier_action': notifier_action,
             'listener_actions': listener_actions
         }
+
+    def copy(self):
+        return ChannelHook(
+            self.name,
+            self.shortname,
+            self._call
+        )

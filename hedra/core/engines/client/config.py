@@ -44,3 +44,31 @@ class Config:
         self.color_scheme = kwargs.get('color_scheme')
         self.group_size = kwargs.get('group_size')
         self.playwright_options = kwargs.get('playwright_options', {})
+
+    def copy(self):
+        return Config(**{
+            'total_time': self.total_time_string,
+            'log_level': self.log_level,
+            'persona_type': self.persona_type,
+            'batch_size': self.batch_size,
+            'batch_interval': self.batch_interval,
+            'action_interval': self.action_interval,
+            'optimize_iterations': self.optimize_iterations,
+            'optimizer_type': self.optimizer_type,
+            'batch_gradient': self.batch_gradient,
+            'cpus': self.cpus,
+            'no_run_visuals': self.no_run_visuals,
+            'connect_timeout': self.connect_timeout,
+            'request_timeout': self.request_timeout,
+            'reset_connections': self.reset_connections,
+            'graceful_stop': self.graceful_stop,
+            'optimized': self.optimized,
+            'browser_type': self.browser_type,
+            'device_type': self.device_type,
+            'locale': self.locale,
+            'geolocation': self.geolocation,
+            'permissions': self.permissions,
+            'color_scheme': self.color_scheme,
+            'group_size': self.group_size,
+            'playwright_options': self.playwright_options
+        })

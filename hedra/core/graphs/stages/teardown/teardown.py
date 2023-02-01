@@ -38,9 +38,9 @@ class Teardown(Stage):
         for _, method in methods:
 
             method_name = method.__qualname__
-            hook: Hook = registrar.all.get(method_name)
+            hook_set: List[Hook] = registrar.all.get(method_name, [])
 
-            if hook:
+            for hook in hook_set:
                 self.hooks[hook.hook_type].append(hook)
 
         teardown_hooks: List[TeardownHook] = self.hooks[HookType.TEARDOWN]

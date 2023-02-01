@@ -37,3 +37,11 @@ class BeforeHook(Hook):
             'action': action,
             'response': response
         }
+
+    def copy(self):
+        return BeforeHook(
+            self.name,
+            self.shortname,
+            self._call,
+            *self.names
+        )

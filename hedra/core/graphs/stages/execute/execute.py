@@ -74,16 +74,26 @@ class Execute(Stage, Generic[Unpack[T]]):
         await self.setup_events()
         await self.dispatcher.dispatch_events()
 
-    @event()
-    async def get_stage_config(self):
-        config = self.client._config
-        persona_type_name = config.persona_type.capitalize()
+    @context()
+    async def get_stage_config(
+        self,
+        setup_config: Config=None,
+        setup_by: str=None,
+        execute_hooks: List[Union[ActionHook , TaskHook]] = []
+    ):
+        self.context.ignore_serialization_filters = [
+            'execute_hooks'
+        ]
 
-        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing - {config.batch_size} - VUs over {self.workers} threads for {config.total_time_string} using - {persona_type_name} - persona')
-        await self.logger.spinner.append_message(f'Stage {self.name} executing - {config.batch_size} - VUs over {self.workers} threads for {config.total_time_string} using - {persona_type_name} - persona')
+        persona_type_name = setup_config.persona_type.capitalize()
+
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing - {setup_config.batch_size} - VUs over {self.workers} threads for {setup_config.total_time_string} using - {persona_type_name} - persona')
+        await self.logger.spinner.append_message(f'Stage {self.name} executing - {setup_config.batch_size} - VUs over {self.workers} threads for {setup_config.total_time_string} using - {persona_type_name} - persona')
 
         return {
-            'execute_stage_config': config
+            'execute_hooks': execute_hooks,
+            'setup_by': setup_by,
+            'execute_stage_config': setup_config
         }
 
     @event('get_stage_config')
@@ -114,65 +124,12 @@ class Execute(Stage, Generic[Unpack[T]]):
         }
 
     @event('check_has_multiple_workers')
-    async def setup_multiple_workers_job(
-        self,
-        stage_has_multiple_workers: bool = False
-    ):
-        if stage_has_multiple_workers:
-
-            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Provisioning execution over - {self.workers} - workers')
-
-            action_hooks: List[ActionHook] = self.hooks[HookType.ACTION]
-            hooks = [
-                {
-                    'graph_name': self.graph_name,
-                    'graph_path': self.graph_path,
-                    'stage': hook.stage,
-                    'timeouts': hook.session.timeouts,
-                    'reset_connections': hook.session.pool.reset_connections,
-                    'hook_name': hook.name,
-                    'hook_shortname': hook.shortname,
-                    'hook_type': hook.hook_type,
-                    'stage': hook.stage,
-                    'weight': hook.metadata.weight,
-                    'order': hook.metadata.order,
-                    'checks': [check.__name__ for check in hook.checks],
-                    **hook.action.to_serializable()
-                } for hook in action_hooks
-            ]
-
-            task_hooks: List[TaskHook] = self.hooks[HookType.TASK]
-
-            hooks.extend([
-                {
-                    'graph_name': self.graph_name,
-                    'graph_path': self.graph_path,
-                    'stage': hook.stage,
-                    'timeouts': hook.session.timeouts,
-                    'reset_connections': False,
-                    'hook_name': hook.name,
-                    'hook_shortname': hook.shortname,
-                    'hook_type': hook.hook_type,
-                    'stage': hook.stage,
-                    'weight': hook.metadata.weight,
-                    'order': hook.metadata.order,
-                    'checks': [check.__name__ for check in hook.checks],
-                    **hook.action.to_serializable()
-                } for hook in task_hooks
-            ])
-
-            return {
-                'stage_hooks': hooks
-            }
-
-
-    @event('setup_multiple_workers_job')
     async def run_multiple_worker_jobs(
         self,
         stage_has_multiple_workers: bool = False,
         execute_stage_config: Config=None,
-        stage_hooks: List[Union[ActionHook, TaskHook]]=[],
-        stage_plugins: Dict[str, List[Any]]={}
+        stage_plugins: Dict[str, List[Any]]={},
+        setup_by: str=None
     ):
 
         if stage_has_multiple_workers:
@@ -192,14 +149,14 @@ class Execute(Stage, Generic[Unpack[T]]):
                         'source_stage_context': {
                             context_key: context_value for context_key, context_value in serializable_context
                         },
+                        'source_setup_stage_name': setup_by,
                         'source_stage_id': self.stage_id,
                         'source_stage_plugins': stage_plugins,
                         'source_stage_config': execute_stage_config,
                         'partition_method': PartitionMethod.BATCHES,
                         'workers': self.workers,
                         'worker_id': idx + 1,
-                        'config': execute_stage_config,
-                        'hooks': stage_hooks
+                        'config': execute_stage_config
                     }) for idx in range(self.executor.max_workers)
                 ]
             )

@@ -92,10 +92,11 @@ class Validate(Stage):
         methods = inspect.getmembers(self, predicate=inspect.ismethod)
         for _, method in methods:
             method_name = method.__qualname__
-            hook: Hook = registrar.all.get(method_name)
-                        
-            if hook and hook.hook_type is HookType.VALIDATE:
-                validate_hooks.append(hook)
-                await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Validation hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
+            hook_set: List[Hook] = registrar.all.get(method_name, [])
+            
+            for hook in hook_set:
+                if hook.hook_type is HookType.VALIDATE:
+                    validate_hooks.append(hook)
+                    await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Validation hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
         return validate_hooks

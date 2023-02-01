@@ -40,4 +40,12 @@ class ConditionHook(Hook):
             **kwargs,
             'execute': execute
         }
-        
+    
+    def copy(self):
+        return ConditionHook(
+            self.name,
+            self.shortname,
+            self._call,
+            *self.names,
+            order=self.order
+        )

@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from typing import Dict
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.stages.base.stage import Stage
@@ -19,7 +20,7 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
     await logger.spinner.system.debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
 
-    execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE).items()
+    execute_stages = current_stage.context['stages'].get(StageTypes.EXECUTE).items()
     optimize_stages = current_stage.context.stages.get(StageTypes.OPTIMIZE).items()
     paths = current_stage.context.paths.get(current_stage.name)
 
@@ -32,7 +33,7 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
     optimize_stages_in_path = {}
     for stage_name, stage in optimize_stages:
         if stage_name in paths and stage_name != current_stage.name and stage_name not in visited:
-            optimize_stages_in_path[stage_name] = stage.context.paths.get(stage_name)
+            optimize_stages_in_path[stage_name] = current_stage.context.paths.get(stage_name)
 
     optimization_candidates: Dict[str, Stage] = {}
 
@@ -55,14 +56,13 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
                 optimization_candidates[stage_name] = stage
 
     if len(optimization_candidates) > 0:
-   
+        current_stage.context['optimization_candidates'] = optimization_candidates
         current_stage.generation_optimization_candidates = len(optimization_candidates)
 
         if current_stage.timeout:
             await asyncio.wait_for(current_stage.run(optimization_candidates), timeout=current_stage.timeout)
 
         else:
-            current_stage.context['optimization_candidates'] = optimization_candidates
             await current_stage.run()
         
         next_stage.context = SimpleContext()
@@ -96,6 +96,7 @@ async def optimize_to_execute_transition(current_stage: Stage, next_stage: Stage
         return StageTimeoutError(current_stage), StageTypes.ERROR
     
     except Exception as stage_execution_error:
+        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     current_stage = None

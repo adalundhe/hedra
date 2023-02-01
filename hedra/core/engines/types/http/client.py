@@ -52,6 +52,11 @@ class MercuryHTTPClient:
 
         self.ssl_context = get_default_ssl_context()
 
+    async def set_pool(self, concurrency: int):
+        self.sem = asyncio.Semaphore(value=concurrency)
+        self.pool = Pool(concurrency, reset_connections=self.pool.reset_connections)
+        self.pool.create_pool()
+
     async def wait_for_active_threshold(self):
         if self.waiter is None:
             self.waiter = asyncio.get_event_loop().create_future()
@@ -139,7 +144,7 @@ class MercuryHTTPClient:
             connection = self.pool.connections.pop()
             
             try:
-
+                
                 if action.hooks.listen:
                     event = asyncio.Event()
                     action.hooks.channel_events.append(event)

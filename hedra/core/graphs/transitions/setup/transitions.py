@@ -85,6 +85,7 @@ async def setup_transition(current_stage: Setup, next_stage: Stage):
                 stages[execute_stage_name] = execute_stage
 
     current_stage.context['setup_stages'] = stages
+    current_stage.context['setup_config'] = current_stage.config
 
     if current_stage.timeout:
 
@@ -98,8 +99,10 @@ async def setup_transition(current_stage: Setup, next_stage: Stage):
     for known_key in current_stage.context.known_keys:
         next_stage.context[known_key] = current_stage.context[known_key]
 
-    next_stage.context['stages'][StageTypes.EXECUTE].update(current_stage.context['stages'])
+    next_stage.context['stages'][StageTypes.EXECUTE].update(current_stage.context['ready_stages'])
     next_stage.context['setup_stages'] = list(stages.keys())
+    next_stage.context['setup_by'] = current_stage.name
+    next_stage.context['setup_config'] = current_stage.context['setup_config']
 
     for execute_stage in stages.values():
         execute_stage.state = StageStates.SETUP
@@ -107,11 +110,20 @@ async def setup_transition(current_stage: Setup, next_stage: Stage):
         if execute_stage.context is None:
             execute_stage.context = SimpleContext()
 
+        for known_key in current_stage.context.known_keys:
+            execute_stage.context[known_key] = current_stage.context[known_key]
+
         if execute_stage.context['stages'] is None:
             execute_stage.context['stages'] = defaultdict(dict)
 
-        execute_stage.context['stages'][StageTypes.EXECUTE].update(current_stage.context['stages'])
+        setup_execute_stage: Execute = current_stage.context['ready_stages'].get(execute_stage.name)
+        if setup_execute_stage:
+            execute_stage.context['hooks'] = setup_execute_stage.hooks['hooks']
+
+        execute_stage.context['setup_config'] = current_stage.context['setup_config']
+        execute_stage.context['stages'][StageTypes.EXECUTE].update(current_stage.context['ready_stages'])
         execute_stage.context['setup_stages'] = list(stages.keys())
+        execute_stage.context['setup_by'] = current_stage.name
 
     await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
@@ -159,6 +171,7 @@ async def setup_to_execute_transition(current_stage: Stage, next_stage: Stage):
         return StageTimeoutError(current_stage), StageTypes.ERROR
     
     except Exception as stage_execution_error:
+        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     return None, StageTypes.EXECUTE

@@ -13,6 +13,9 @@ class TaskClient(BaseClient[MercuryTaskRunner, Task, TaskResult]):
     def __init__(self, config: Config) -> None:
         super().__init__()
 
+        if config is None:
+            config = Config()
+
         self.session = MercuryTaskRunner(
             concurrency=config.batch_size,
             timeouts=Timeouts(

@@ -38,5 +38,13 @@ class AfterHook(Hook):
             'response': response,
         }
 
+    def copy(self):
+        return AfterHook(
+            self.name,
+            self.shortname,
+            self._call,
+            *self.names
+        )
+
     
     

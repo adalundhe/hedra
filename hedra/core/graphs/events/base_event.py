@@ -64,7 +64,7 @@ class BaseEvent(Generic[T]):
 
     def __getattribute__(self, name: str) -> Any:
         
-        target = None
+        source = None
         event_attrs = [
             'call', 
             'event_type',
@@ -82,10 +82,10 @@ class BaseEvent(Generic[T]):
             'next_map',
         ]
       
-        target = object.__getattribute__(self, 'target')
+        source = object.__getattribute__(self, 'source')
         
-        if target and hasattr(target, name) and name not in event_attrs:
-            return getattr(target, name)
+        if source and hasattr(source, name) and name not in event_attrs:
+            return getattr(source, name)
         
         return object.__getattribute__(self, name)
 
@@ -93,7 +93,7 @@ class BaseEvent(Generic[T]):
 
         try:
 
-            target = object.__getattribute__(self, 'target')
+            source = object.__getattribute__(self, 'source')
 
             event_attrs = [
                 'call', 
@@ -112,8 +112,8 @@ class BaseEvent(Generic[T]):
                 'next_map'
             ]
 
-            if target and hasattr(target, name) and name not in event_attrs:
-                return setattr(target, name, value)
+            if source and hasattr(source, name) and name not in event_attrs:
+                return setattr(source, name, value)
 
         except AttributeError:
             pass

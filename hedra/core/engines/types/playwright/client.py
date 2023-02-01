@@ -50,7 +50,10 @@ class MercuryPlaywrightClient:
         self._discarded_contexts = []
         self._pending_context_groups: List[ContextGroup] = []
         self._playwright_setup = False
-        
+
+    async def set_pool(self, concurrency: int):
+        self.sem = asyncio.Semaphore(value=concurrency)
+        self.pool = ContextPool(concurrency, reset_connections=self.pool.reset_connections)
 
     async def setup(self, config: ContextConfig):
         if self._playwright_setup is False:

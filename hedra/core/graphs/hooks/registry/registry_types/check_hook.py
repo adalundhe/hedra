@@ -34,3 +34,11 @@ class CheckHook(Hook):
             **kwargs,
             'valid': passed
         }
+
+    def copy(self):
+        return CheckHook(
+            self.name,
+            self.shortname,
+            self._call,
+            *self.names
+        )

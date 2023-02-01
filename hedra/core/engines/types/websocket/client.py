@@ -47,8 +47,11 @@ class MercuryWebsocketClient:
         self.waiter = None
 
         self.ssl_context = get_default_ssl_context()
-        
-
+    
+    async def set_pool(self, concurrency: int):
+        self.sem = asyncio.Semaphore(value=concurrency)
+        self.pool = Pool(concurrency, reset_connections=self.pool.reset_connections)
+        self.pool.create_pool()
         
     async def prepare(self, action: WebsocketAction) -> Awaitable[Union[WebsocketAction, Exception]]:
         try:

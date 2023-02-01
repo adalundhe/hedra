@@ -59,9 +59,9 @@ class StageValidator:
         for _, method in methods:
 
             method_name = method.__qualname__
-            hook: Hook = registrar.all.get(method_name)
+            hook_set: List[Hook] = registrar.all.get(method_name, [])
             
-            if hook:
+            for hook in hook_set:
                 
                 base_stage_name = self.stage.__class__.__base__.__name__
                 valid_hook_types_string = ', '.join([hook_type.name for hook_type in self.stage.accepted_hook_types])

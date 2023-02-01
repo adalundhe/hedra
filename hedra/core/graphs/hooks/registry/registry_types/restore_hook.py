@@ -90,3 +90,12 @@ class RestoreHook(Hook):
             **kwargs,
             self.context_key: data
         }
+
+    def copy(self):
+        return RestoreHook(
+            self.name,
+            self.shortname,
+            self._call,
+            key=self.context_key,
+            restore_filepath=self.restore_path
+        )

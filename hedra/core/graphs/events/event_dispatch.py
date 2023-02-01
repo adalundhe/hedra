@@ -33,6 +33,8 @@ class EventDispatcher:
             
         self.events_by_name: Dict[str, BaseEvent] = {}
         self.timeout = timeout
+        self.initial_events: List[BaseEvent] = []
+        self.source_name = None
 
     def __iter__(self):
         for event_type in self.events:
@@ -52,14 +54,15 @@ class EventDispatcher:
         self.events[event.event_type].append(event)
 
     async def dispatch_events(self):
-        batch_events: List[BaseEvent] = []
+        await asyncio.gather(*[
+            asyncio.create_task(
+                self._execute_batch(initial_event)
+            ) for initial_event in self.initial_events
+        ])
+            
 
-        for event in self.events_by_name.values():
-            if len(event.previous_map) < 1:
-                batch_events.append(event)
- 
-        for initial_event in batch_events:
-            for layer in initial_event.execution_path:
+    async def _execute_batch(self, initial_event: BaseEvent):
+        for layer in initial_event.execution_path:
                 layer_events = [
                     self.events_by_name.get(event_name) for event_name in layer
                 ]

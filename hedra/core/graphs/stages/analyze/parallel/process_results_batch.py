@@ -76,8 +76,10 @@ async def process_batch(
 
         custom_metric_hooks = []
         for metric_hook_name in custom_metric_hook_names:
-            custom_metric_hook = registrar.all.get(metric_hook_name)
-            custom_metric_hooks.append(custom_metric_hook)
+            custom_metric_hook_set = registrar.all.get(metric_hook_name, [])
+            
+            for custom_metric_hook in custom_metric_hook_set:
+                custom_metric_hooks.append(custom_metric_hook)
 
         await asyncio.gather(*[
             asyncio.create_task(events[stage_result.name].add(
@@ -134,8 +136,13 @@ def process_results_batch(config: str):
     hooks_by_name = {}
     hooks_by_shortname = defaultdict(dict)
 
+    generated_hooks = {}
     for stage in discovered.values():
-        initialized_stage =  set_stage_hooks(stage())
+        initialized_stage =  set_stage_hooks(
+            stage(), 
+            generated_hooks
+        )
+
         initialized_stages[initialized_stage.name] = initialized_stage
 
         for hook_type in initialized_stage.hooks:

@@ -24,7 +24,6 @@ class ActionHook(Hook):
             hook_type=HookType.ACTION
         )
         
-        self.call: Type[self._call] = self._call
         self.session: Any = None
         self.action: Any = None
         self.checks = checks
@@ -37,3 +36,18 @@ class ActionHook(Hook):
             order=order,
             **metadata
         )
+
+    def copy(self):
+        return ActionHook(
+            self.name,
+            self.shortname,
+            self._call,
+            weight=self.metadata.weight,
+            order=self.metadata.order,
+            checks=self.checks,
+            notify=self.notifiers,
+            listen=self.listeners
+        )
+
+    async def call(self, *args, **kwargs):
+        return await self._call(*args, **kwargs)

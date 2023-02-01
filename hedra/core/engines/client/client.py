@@ -24,6 +24,8 @@ from .plugins_store import PluginsStore
 
 T = TypeVarTuple('T')
 
+config_registry = []
+
 
 class Client(Generic[Unpack[T]]):
 
@@ -145,6 +147,10 @@ class Client(Generic[Unpack[T]]):
 
     @property
     def graphqlh2(self):
+
+        if self._config is None:
+            self._config = config_registry.pop()
+
         if self._graphqlh2.initialized is False:
             self._graphqlh2 = self._graphqlh2(self._config)
             self._graphqlh2.metadata_string = self.metadata_string
@@ -193,6 +199,7 @@ class Client(Generic[Unpack[T]]):
     
     @property
     def task(self):
+            
         if self._task.initialized is False:
             self._task = self._task(self._config)
             self._task.metadata_string = self.metadata_string

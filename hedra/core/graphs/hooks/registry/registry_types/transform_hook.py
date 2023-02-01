@@ -26,7 +26,9 @@ class TransformHook(Hook):
             call, 
             hook_type=HookType.TRANSFORM
         )
+        
         parser = TimeParser(time_amount=timeout)
+        
         self.timeout = parser.time
         self.names = list(set(names))
         self.pre = pre
@@ -34,6 +36,7 @@ class TransformHook(Hook):
         self.order = order
         self.context: Optional[SimpleContext] = None
         self.conditions: Optional[List[Callable[..., bool]]] = []
+        self._timeout_as_string = timeout
         
     async def call(self, **kwargs):
         batchable_args: List[Dict[str, Any]] = []
@@ -90,3 +93,14 @@ class TransformHook(Hook):
                 **kwargs,
                 'transformed': result
             }
+
+    def copy(self):
+        return TransformHook(
+            self.name,
+            self.shortname,
+            self._call,
+            *self.names,
+            timeout=self._timeout_as_string,
+            pre=self.pre,
+            order=self.order
+        )

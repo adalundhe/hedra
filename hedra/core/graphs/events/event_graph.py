@@ -60,7 +60,6 @@ class EventGraph:
         self.base_stages = list(set([node.stage_instance.__class__.__base__.__name__ for node in nodes]))
         self.removal_targets = []
 
-
     def hooks_to_events(self) -> EventGraph:
         for event_hook in self.event_hooks:
             for idx, target_hook_name in enumerate(event_hook.names): 
@@ -101,8 +100,7 @@ class EventGraph:
 
         return self
 
-    def assemble_graph(self) -> EventGraph:
-        
+    def assemble_graph(self) -> EventGraph:      
         for event_hook in self.event_hooks:  
             for target_hook_name in event_hook.names: 
                 target: BaseEvent = self.events.get(target_hook_name)
@@ -122,6 +120,7 @@ class EventGraph:
     def apply_graph_to_events(self) -> None:
 
         for event in self.events.values():
+
             event.execution_path = [edge for edge in networkx.bfs_layers(self.hooks_graph, event.event_name)]
             event.previous_map = [node for node in self.hooks_graph.predecessors(event.event_name)]
             event.next_map = [node for node in self.hooks_graph.successors(event.event_name)]
@@ -131,23 +130,27 @@ class EventGraph:
                     event_name: self.events.get(event_name) for event_name in path_layer
                 })
 
-            hook_names = [hook.name for hook in event.stage_instance.hooks[event.hook_type]]
+            hook_names = [hook.name for hook in event.source.stage_instance.hooks[event.hook_type]]
 
             if event.event_name in hook_names:
                 hook_idx = hook_names.index(event.event_name)
-                event.stage_instance.hooks[event.hook_type][hook_idx] = event
+                event.source.stage_instance.hooks[event.hook_type][hook_idx] = event
 
             else:
-                event.stage_instance.hooks[event.hook_type].append(event)  
+                event.source.stage_instance.hooks[event.hook_type].append(event)  
+                
+            if len(event.previous_map) < 1 and event.event_name in hook_names:
 
+                event.source.stage_instance.dispatcher.source_name = event.stage
+                event.source.stage_instance.dispatcher.initial_events.append(event)
             
             for layer in event.execution_path:
                 for event_name in layer:
                     next_event = self.events.get(event_name)
-                    event.stage_instance.dispatcher.add_event(next_event)
+                    event.source.stage_instance.dispatcher.add_event(next_event)
 
-             
-            event.stage_instance.dispatcher.add_event(event)
-
+            
+            event.source.stage_instance.dispatcher.add_event(event)
+        
         # networkx.draw_networkx(self.hooks_graph, pos=networkx.spring_layout(self.hooks_graph), with_labels=True, arrows=True)
         # plt.show()

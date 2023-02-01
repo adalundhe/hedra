@@ -81,3 +81,11 @@ class SaveHook(Hook):
 
         return kwargs    
 
+    def copy(self):
+        return SaveHook(
+            self.name,
+            self.shortname,
+            self._call,
+            key=self.context_key,
+            checkpoint_filepath=self.save_path
+        )

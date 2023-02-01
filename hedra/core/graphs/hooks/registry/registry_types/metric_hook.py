@@ -34,3 +34,11 @@ class MetricHook(Hook):
             **kwargs,
             'metric': metric
         }
+
+    def copy(self):
+        return MetricHook(
+            self.name,
+            self.shortname,
+            self._call,
+            self.group
+        )

@@ -40,3 +40,15 @@ class TaskHook(Hook):
             order=order,
             **metadata
         )
+
+    def copy(self):
+        return TaskHook(
+            self.name,
+            self.shortname,
+            self._call,
+            weight=self.metadata.weight,
+            order=self.metadata.order,
+            checks=self.checks,
+            notify=self.notifiers,
+            listen=self.listeners
+        )
