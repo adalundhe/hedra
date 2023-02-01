@@ -27,7 +27,6 @@ class ContextHook(Hook):
         )
         
         self.names = list(set(names))
-        self.context: SimpleContext = None
         self.store = store
         self.load = load
         self.pre = pre

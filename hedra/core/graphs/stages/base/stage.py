@@ -86,7 +86,10 @@ class Stage:
     @Internal()
     async def setup_events(self):
 
-        for event in self.dispatcher:
-            event.context = self.context
+        for event in self.dispatcher.events_by_name.values():
+            event.context.update(self.context)
+            
+            if event.source.context:
+                event.source.context.update(self.context)
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing events')

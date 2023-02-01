@@ -99,6 +99,7 @@ class AsyncFilesystemLogger:
         else:
             self.update_files(filepath)
 
+
     def update_files(self, filepath: str):
         logger_name = Path(filepath).stem
 

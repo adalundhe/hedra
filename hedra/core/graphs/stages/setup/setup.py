@@ -441,11 +441,15 @@ class Setup(Stage, Generic[Unpack[T]]):
 
             tasks_generated_count = len(execute_stage.hooks[HookType.TASK])
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Generated - {tasks_generated_count} - Tasks for Execute stage - {execute_stage.name}')
-
+    
         return {
             'setup_config': setup_config,
             'ready_stages': setup_stages
         }
+
+    @event('apply_channels')
+    async def complete(self):
+        return {}
 
     @Internal()
     async def get_hook(self, execute_stage: Stage, shortname: str, hook_type: str) -> Coroutine:

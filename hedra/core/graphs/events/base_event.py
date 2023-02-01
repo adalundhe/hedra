@@ -55,7 +55,7 @@ class BaseEvent(Generic[T]):
             self.target_shortname = self.target.shortname
 
         self.as_hook = False
-        self.context: SimpleContext = None
+        self.context: SimpleContext = SimpleContext()
         self.events: Dict[str, BaseEvent] = {}
         self.execution_path = []
         self.previous_map = []
@@ -129,6 +129,13 @@ class BaseEvent(Generic[T]):
             self.source.context = self.context
 
         results = await self.source.call(**self.next_args[self.event_name])
+        
+
+        self.context.update(results)
+        self.source.stage_instance.context.update(results)
+
+        if self.source.context:
+            self.source.context.update(results)
 
         next_events = [
             self.events.get(event_name) for event_name in  self.next_map if self.events.get(event_name) is not None

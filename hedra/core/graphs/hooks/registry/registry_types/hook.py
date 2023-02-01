@@ -1,8 +1,8 @@
 import uuid
 import inspect
 from typing import List, Callable, Any
-from hedra.logging import HedraLogger
 from typing import Any, Callable, Awaitable
+from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 
 
@@ -27,6 +27,7 @@ class Hook:
         self.conditions: List[Callable[..., Any]] = []
         self.args = inspect.signature(call)
         self.params = self.args.parameters
+        self.context: SimpleContext = SimpleContext()
         
 
     async def call(self, **kwargs):

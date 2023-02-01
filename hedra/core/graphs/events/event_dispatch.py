@@ -62,6 +62,7 @@ class EventDispatcher:
             
 
     async def _execute_batch(self, initial_event: BaseEvent):
+
         for layer in initial_event.execution_path:
                 layer_events = [
                     self.events_by_name.get(event_name) for event_name in layer
@@ -79,6 +80,7 @@ class EventDispatcher:
                 result_events: List[Tuple[BaseEvent, Any]] = []
                 for result in results:
                     for event_name, result in result.items():
+
                         event = self.events_by_name.get(event_name)
                         result_events.append((event, result))
 
@@ -89,6 +91,10 @@ class EventDispatcher:
 
                     for next_event in next_events:
                         if isinstance(event, (BaseEvent, ConditionHook)):
-                            next_event.context = event.context
+
+                            next_event.context.update(event.context)
 
                         next_event.next_args[next_event.event_name].update(result)
+                        event.context.update(next_event.next_args[next_event.event_name])
+                        event.source.stage_instance.context.update(next_event.next_args[next_event.event_name])
+                
