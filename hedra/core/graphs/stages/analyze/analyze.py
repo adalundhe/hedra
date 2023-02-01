@@ -1,7 +1,10 @@
 import dill
 import time
 import statistics
+import psutil
+import asyncio
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from typing import Union, List, Dict, Union, Any, Tuple
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.events import EventsGroup
@@ -62,6 +65,7 @@ class Analyze(Stage):
         self.allow_parallel = True
         self.analysis_execution_time = 0
         self.analysis_execution_time_start = 0
+        self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count())
 
     @Internal()
     async def run(self):  
@@ -186,40 +190,41 @@ class Analyze(Stage):
     async def assign_stage_batches(
         self,
         batches: List[Tuple[str, Any, int]]=[],
-        target_stages: Dict[str, Stage]={},
         stage_batch_sizes: Dict[str, List[List[Any]]]=[],
         metric_hook_names: List[str]=[]
     ):
-        
+        loop = asyncio.get_event_loop()
 
         stage_configs = []
         serializable_context = self.context.as_serializable()
 
         for stage_name, _, assigned_workers_count in batches:
-            
-            stage = target_stages.get(stage_name)
-            batch_configs = []
 
-            for batch in stage_batch_sizes[stage_name]:
-                batch_configs.append(dill.dumps({
-                    'graph_name': self.graph_name,
-                    'graph_path': self.graph_path,
-                    'graph_id': self.graph_id,
-                    'source_stage_name': self.name,
-                    'source_stage_context': {
-                        context_key: context_value for context_key, context_value in serializable_context
-                    },
-                    'source_stage_id': self.stage_id,
-                    'analyze_stage_name': stage_name,
-                    'analyze_stage_metric_hooks': list(metric_hook_names),
-                    'analyze_stage_linked_events': stage.linked_events,
-                    'analyze_stage_batched_results': batch
-                }))
+            stage_config_batch = await asyncio.gather(*[
+                loop.run_in_executor(
+                    self._executor,
+                    dill.dumps,
+                    {
+                        'graph_name': self.graph_name,
+                        'graph_path': self.graph_path,
+                        'graph_id': self.graph_id,
+                        'source_stage_name': self.name,
+                        'source_stage_context': {
+                            context_key: context_value for context_key, context_value in serializable_context
+                        },
+                        'source_stage_id': self.stage_id,
+                        'analyze_stage_name': stage_name,
+                        'analyze_stage_metric_hooks': list(metric_hook_names),
+                        'analyze_stage_batched_results': batch
+                    }
+                ) for batch in stage_batch_sizes[stage_name]
+            ])
+            
 
             stage_configs.append((
                 stage_name,
                 assigned_workers_count,
-                batch_configs
+                stage_config_batch
             ))
             
 

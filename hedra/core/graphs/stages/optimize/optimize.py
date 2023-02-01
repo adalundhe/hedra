@@ -112,14 +112,11 @@ class Optimize(Stage):
         for stage_name, stage, assigned_workers_count in batched_stages:
 
             configs = []
-            stage_config = stage.client._config
+            stage_config = stage.context['setup_config'] 
 
             batch_size = int(stage_config.batch_size/assigned_workers_count)
 
             for worker_idx in range(assigned_workers_count):
-                
-                execute_stage_actions: List[ActionHook] = [hook.name for hook in stage.hooks[HookType.ACTION]]
-                execute_stage_tasks: List[TaskHook] = [hook.name for hook in stage.hooks[HookType.TASK]]
 
                 execute_stage_plugins = defaultdict(list)
 
@@ -141,15 +138,14 @@ class Optimize(Stage):
                     'execute_stage_name': stage_name,
                     'execute_stage_generation_count': assigned_workers_count,
                     'execute_stage_id': stage.execution_stage_id,
-                    'execute_stage_config': stage_config,
+                    'execute_stage_config': stage.context['setup_config'],
                     'execute_stage_batch_size': batch_size,
+                    'execute_setup_stage_name': stage.context['setup_by'],
                     'execute_stage_plugins': execute_stage_plugins,
-                    'execute_stage_linked_events': stage.linked_events,
                     'optimizer_iterations': self.optimize_iterations,
                     'optimizer_algorithm': self.algorithm,
                     'execute_stage_hooks': [
-                        *execute_stage_actions,
-                        *execute_stage_tasks
+                        hook.name for hook in stage.context['execute_hooks']
                     ],
                     'time_limit': self.time_limit
                 })

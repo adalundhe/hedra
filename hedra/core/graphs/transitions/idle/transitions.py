@@ -21,7 +21,9 @@ async def idle_to_validate_transition(current_stage: Stage, next_stage: Stage):
         await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - NoOp transition from {current_stage.name} to {next_stage.name}')
         await current_stage.run()
 
-        next_stage.context = SimpleContext()
+        if next_stage.context is None:
+            next_stage.context = SimpleContext()
+
         for known_key in current_stage.context.known_keys:
             next_stage.context[known_key] = current_stage.context[known_key]
 
@@ -42,7 +44,11 @@ async def idle_to_wait_transition(current_stage: Stage, next_stage: Stage):
         await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - NoOp transition from {current_stage.name} to {next_stage.name}')
         await current_stage.run()
 
-        next_stage.context = current_stage.context
+        if next_stage.context is None:
+            next_stage.context = SimpleContext()
+            
+        for known_key in current_stage.context.known_keys:
+            next_stage.context[known_key] = current_stage.context[known_key]
 
     except Exception as stage_execution_error:
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR

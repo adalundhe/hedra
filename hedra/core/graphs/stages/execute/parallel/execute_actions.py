@@ -202,13 +202,14 @@ def execute_actions(parallel_config: str):
 
     try:
         parallel_config: Dict[str, Any] = dill.loads(parallel_config)
-
+        
         graph_name = parallel_config.get('graph_name')
         graph_path: str= parallel_config.get('graph_path') 
         graph_id = parallel_config.get('graph_id')
         source_stage_name = parallel_config.get('source_stage_name')
         source_stage_context: Dict[str, Any] = parallel_config.get('source_stage_context')
         source_stage_plugins = parallel_config.get('source_stage_plugins')
+        source_stage_config: Config = parallel_config.get('source_stage_config')
         source_stage_id = parallel_config.get('source_stage_id')
         source_setup_stage_name = parallel_config.get('source_setup_stage_name')
         thread_id = threading.current_thread().ident
@@ -217,7 +218,6 @@ def execute_actions(parallel_config: str):
         metadata_string = f'Graph - {graph_name}:{graph_id} - thread:{thread_id} - process:{process_id} - Stage: {source_stage_name}:{source_stage_id} - '
 
         partition_method = parallel_config.get('partition_method')
-        persona_config: Config = parallel_config.get('config')
         workers = parallel_config.get('workers')
         worker_id = parallel_config.get('worker_id')
 
@@ -258,16 +258,16 @@ def execute_actions(parallel_config: str):
         execute_stage: Stage = initialized_stages.get(source_stage_name)
         execute_stage.context.update(source_stage_context)
 
-        setup_stage: Stage = initialized_stages.get(source_setup_stage_name)
+        setup_stage: Setup = initialized_stages.get(source_setup_stage_name)
         setup_stage.context.update(source_stage_context)
 
 
-        if partition_method == PartitionMethod.BATCHES and persona_config.optimized is False:
+        if partition_method == PartitionMethod.BATCHES and source_stage_config.optimized is False:
             if workers == worker_id:
-                persona_config.batch_size = int(persona_config.batch_size/workers) + (persona_config.batch_size%workers)
+                source_stage_config.batch_size = int(source_stage_config.batch_size/workers) + (source_stage_config.batch_size%workers)
             
             else:
-                persona_config.batch_size = int(persona_config.batch_size/workers)
+                source_stage_config.batch_size = int(source_stage_config.batch_size/workers)
 
 
         stage_persona_plugins: List[str] = source_stage_plugins[PluginType.PERSONA]
@@ -297,10 +297,9 @@ def execute_actions(parallel_config: str):
         events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
 
         setup_stage.context = SimpleContext()
-        persona_config = persona_config.copy()
-        setup_stage.config = persona_config
+        setup_stage.config = source_stage_config
         setup_stage.generation_setup_candidates = 1
-        setup_stage.context['setup_config'] = persona_config
+        setup_stage.context['setup_config'] = source_stage_config
         setup_stage.context['setup_stages'] = {
             execute_stage.name: execute_stage
         }
@@ -309,14 +308,12 @@ def execute_actions(parallel_config: str):
         result = loop.run_until_complete(
             start_execution(
                 metadata_string,
-                persona_config,
+                source_stage_config,
                 setup_stage,
                 workers,
                 source_stage_name
             )
         )
-
-        loop.stop()
 
         return result
 

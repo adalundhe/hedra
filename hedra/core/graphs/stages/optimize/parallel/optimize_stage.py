@@ -22,6 +22,7 @@ from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
 from hedra.core.engines.types.registry import RequestTypes
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
@@ -145,8 +146,8 @@ def optimize_stage(serialized_config: str):
         source_stage_context: Dict[str, Any] = optimization_config.get('source_stage_context')
         execute_stage_name: str = optimization_config.get('execute_stage_name')
         execute_stage_config: Config = optimization_config.get('execute_stage_config')
+        execute_setup_stage_name: Config = optimization_config.get('execute_setup_stage_name')
         execute_stage_plugins: Dict[PluginType, List[str]] = optimization_config.get('execute_stage_plugins')
-        execute_stage_linked_events: Dict[Tuple[HookType, str], List[Tuple[str, str]]] = optimization_config.get('execute_stage_linked_events')
         optimize_params: List[str] = optimization_config.get('optimize_params')
         optimize_iterations: int = optimization_config.get('optimizer_iterations')
         optimizer_algorithm: str = optimization_config.get('optimizer_algorithm')
@@ -155,8 +156,6 @@ def optimize_stage(serialized_config: str):
 
         metadata_string = f'Graph - {graph_name}:{graph_id} - thread:{thread_id} - process:{process_id} - Stage: {source_stage_name}:{source_stage_id} - '
         discovered: Dict[str, Stage] = import_stages(graph_path)
-
-        discovered['Setup'] = Setup
         
         initialized_stages = {}
         hooks_by_type = defaultdict(dict)
@@ -190,6 +189,8 @@ def optimize_stage(serialized_config: str):
         execute_stage_config.batch_size = batch_size
         plugins_by_type = import_plugins(graph_path)
 
+        print(execute_stage_plugins)
+
         stage_persona_plugins: List[str] = execute_stage_plugins[PluginType.PERSONA]
         persona_plugins: Dict[str, PersonaPlugin] = plugins_by_type[PluginType.PERSONA]
 
@@ -208,20 +209,19 @@ def optimize_stage(serialized_config: str):
 
         for plugin_name, plugin in plugins_by_type[PluginType.OPTIMIZER].items():
             registered_algorithms[plugin_name] = plugin
-
-        setup_stage: Setup = initialized_stages.get('Setup')
-
-        setup_stage.plugins_by_type = plugins_by_type
+        
+        setup_stage: Setup = initialized_stages.get(execute_setup_stage_name)
+        setup_stage.context = SimpleContext()
+        setup_stage.config = execute_stage_config
         setup_stage.generation_setup_candidates = 1
+        setup_stage.context['setup_config'] = execute_stage_config
         setup_stage.context['setup_stages'] = {
             execute_stage.name: execute_stage
         }
 
-        setup_stage.config = execute_stage_config
-
         loop.run_until_complete(setup_stage.run())
-
-        stages: Dict[str, Stage] =  setup_stage.context['setup_stages']
+        
+        stages: Dict[str, Stage] =  setup_stage.context['ready_stages']
         setup_execute_stage: Stage = stages.get(execute_stage_name)
 
         setup_execute_stage_hooks = {}

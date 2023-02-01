@@ -70,7 +70,6 @@ class Execute(Stage, Generic[Unpack[T]]):
 
     @Internal()
     async def run(self):
-
         await self.setup_events()
         await self.dispatcher.dispatch_events()
 
@@ -84,7 +83,6 @@ class Execute(Stage, Generic[Unpack[T]]):
         self.context.ignore_serialization_filters = [
             'execute_hooks'
         ]
-
         persona_type_name = setup_config.persona_type.capitalize()
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing - {setup_config.batch_size} - VUs over {self.workers} threads for {setup_config.total_time_string} using - {persona_type_name} - persona')
@@ -131,11 +129,10 @@ class Execute(Stage, Generic[Unpack[T]]):
         stage_plugins: Dict[str, List[Any]]={},
         setup_by: str=None
     ):
-
         if stage_has_multiple_workers:
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting execution for - {self.workers} workers')
 
-            serializable_context = self.context.as_serializable()             
+            serializable_context = self.context.as_serializable()       
 
             results_sets = await self.executor.execute_stage_batch(
                 execute_actions,
@@ -155,9 +152,8 @@ class Execute(Stage, Generic[Unpack[T]]):
                         'source_stage_config': execute_stage_config,
                         'partition_method': PartitionMethod.BATCHES,
                         'workers': self.workers,
-                        'worker_id': idx + 1,
-                        'config': execute_stage_config
-                    }) for idx in range(self.executor.max_workers)
+                        'worker_id': idx + 1
+                    }) for idx in range(self.workers)
                 ]
             )
 

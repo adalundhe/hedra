@@ -96,4 +96,39 @@ class SimpleContext:
                 ))
         
         return serialization_items
+
+    def create_or_update(
+        self,
+        context_key: str,
+        value: Any,
+        default: Any
+    ):
+
+        if hasattr(self, context_key):
+            if isinstance(value, dict):
+                exitsting_value: dict = self.__getitem__(context_key)
+                exitsting_value.update(value)
+
+                self.__setitem__(context_key, exitsting_value)
+
+            elif isinstance(value, list):
+                exitsting_value: list = self.__getitem__(context_key)
+                exitsting_value.extend(value)
+
+                self.__setitem__(context_key, exitsting_value)
+            
+            else:
+                self.__setitem__(context_key, value)
+
+        else:
+            self.__setitem__(context_key, default)
+
+    def create_if_not_exists(
+        self,
+        context_key: str,
+        value: Any
+    ):
+
+        if hasattr(self, context_key) is False:
+            self.__setitem__(context_key, value)
     

@@ -17,118 +17,88 @@ from hedra.logging import HedraLogger
 
 async def setup_transition(current_stage: Setup, next_stage: Stage):
 
-    logger = HedraLogger()
-    logger.initialize()
-
-    await logger.spinner.system.debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
-    await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
-
-    execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE).items()
-    paths = current_stage.context.paths.get(current_stage.name)
-    path_lengths: Dict[str, int] = current_stage.context.path_lengths.get(current_stage.name)
-    visited = current_stage.context.visited
-
-    execute_stages: Dict[str, Execute] = {
-        stage_name: stage for stage_name, stage in execute_stages if stage_name in paths and stage_name not in visited
-    }
-
-    setup_candidates = {}
-    
-    setup_stages: Dict[str, Setup] = current_stage.context.stages.get(StageTypes.SETUP)
-    execute_stages: Dict[str, Execute] = current_stage.context.stages.get(StageTypes.EXECUTE)
-    following_setup_stage_distances = [
-        path_length for stage_name, path_length in path_lengths.items() if stage_name in setup_stages
+    valid_states = [
+        StageStates.INITIALIZED,
+        StageStates.VALIDATED
     ]
 
-    for stage_name in path_lengths.keys():
-        stage_distance = path_lengths.get(stage_name)
+    if current_stage.state in valid_states:
 
-        if stage_name in execute_stages:
+        current_stage.state = StageStates.EXECUTING
+        logger = HedraLogger()
+        logger.initialize()
 
-            if len(following_setup_stage_distances) > 0 and stage_distance < min(following_setup_stage_distances):
-                setup_candidates[stage_name] = execute_stages.get(stage_name)
+        await logger.spinner.system.debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
+        await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
 
-            elif len(following_setup_stage_distances) == 0:
-                setup_candidates[stage_name] = execute_stages.get(stage_name)
+        execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE).items()
+        paths = current_stage.context.paths.get(current_stage.name)
+        path_lengths: Dict[str, int] = current_stage.context.path_lengths.get(current_stage.name)
+        visited = current_stage.context.visited
 
-    current_stage.generation_setup_candidates = len(setup_candidates)
-    stages = {}
-    next_stage_decendants = current_stage.context.paths.get(next_stage.name)
-    path_decendants = [
-        next_stage.name,
-        *next_stage_decendants
-    ]
+        execute_stages: Dict[str, Execute] = {
+            stage_name: stage for stage_name, stage in execute_stages if stage_name in paths and stage_name not in visited
+        }
 
-    if len(current_stage.apply_to_stages) > 0:
-        for stage_name in current_stage.apply_to_stages:
-            execute_stage: Execute = execute_stages.get(stage_name)
-            if execute_stage.state == StageStates.INITIALIZED and execute_stage.name in path_decendants:
-                execute_stage.state = StageStates.SETTING_UP
-                stages[stage_name] = execute_stage
-
-    else:
-
-        generation_setup_candidates = [
-            stage_name for stage_name in current_stage.generation_stage_names if stage_name in current_stage.context.stages.get(StageTypes.SETUP)
+        setup_candidates: Dict[str, Execute] = {}
+        
+        setup_stages: Dict[str, Setup] = current_stage.context.stages.get(StageTypes.SETUP)
+        execute_stages: Dict[str, Execute] = current_stage.context.stages.get(StageTypes.EXECUTE)
+        following_setup_stage_distances = [
+            path_length for stage_name, path_length in path_lengths.items() if stage_name in setup_stages
         ]
 
-        user_specified_setup_candidates = []
-        all_setup_stages: Dict[str, Setup] = current_stage.context.stages.get(StageTypes.SETUP)
-        for stage_name in generation_setup_candidates:
-            stage: Setup = all_setup_stages.get(stage_name)
+        for stage_name in path_lengths.keys():
+            stage_distance = path_lengths.get(stage_name)
 
-            user_specified_setup_candidates.extend(stage.apply_to_stages)
+            if stage_name in execute_stages:
 
-        for execute_stage_name, execute_stage in setup_candidates.items():
-            if execute_stage.state == StageStates.INITIALIZED and execute_stage.name in path_decendants and execute_stage.name not in user_specified_setup_candidates:
-                execute_stage.state = StageStates.SETTING_UP
-                stages[execute_stage_name] = execute_stage
+                if len(following_setup_stage_distances) > 0 and stage_distance < min(following_setup_stage_distances):
+                    setup_candidates[stage_name] = execute_stages.get(stage_name)
 
-    current_stage.context['setup_stages'] = stages
-    current_stage.context['setup_config'] = current_stage.config
+                elif len(following_setup_stage_distances) == 0:
+                    setup_candidates[stage_name] = execute_stages.get(stage_name)
 
-    if current_stage.timeout:
+        current_stage.generation_setup_candidates = len(setup_candidates)
 
-        await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
+        current_stage.context['setup_stages'] = setup_candidates
+        current_stage.context['setup_config'] = current_stage.config
 
-    else:
+        if current_stage.timeout:
 
-        await current_stage.run()
+            await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
 
-    next_stage.context = SimpleContext()
-    for known_key in current_stage.context.known_keys:
-        next_stage.context[known_key] = current_stage.context[known_key]
+        else:
 
-    next_stage.context['stages'][StageTypes.EXECUTE].update(current_stage.context['ready_stages'])
-    next_stage.context['setup_stages'] = list(stages.keys())
-    next_stage.context['setup_by'] = current_stage.name
-    next_stage.context['setup_config'] = current_stage.context['setup_config']
-
-    for execute_stage in stages.values():
-        execute_stage.state = StageStates.SETUP
-
-        if execute_stage.context is None:
-            execute_stage.context = SimpleContext()
+            await current_stage.run()
 
         for known_key in current_stage.context.known_keys:
-            execute_stage.context[known_key] = current_stage.context[known_key]
+            next_stage.context[known_key] = current_stage.context[known_key]
 
-        if execute_stage.context['stages'] is None:
-            execute_stage.context['stages'] = defaultdict(dict)
+        for execute_stage in setup_candidates.values():
+            execute_stage.state = StageStates.SETUP
 
-        setup_execute_stage: Execute = current_stage.context['ready_stages'].get(execute_stage.name)
-        if setup_execute_stage:
-            execute_stage.context['hooks'] = setup_execute_stage.hooks['hooks']
+            if execute_stage.context is None:
+                execute_stage.context = SimpleContext()
 
-        execute_stage.context['setup_config'] = current_stage.context['setup_config']
-        execute_stage.context['stages'][StageTypes.EXECUTE].update(current_stage.context['ready_stages'])
-        execute_stage.context['setup_stages'] = list(stages.keys())
-        execute_stage.context['setup_by'] = current_stage.name
+            for known_key in current_stage.context.known_keys:
+                execute_stage.context[known_key] = current_stage.context[known_key]
+            
+            execute_stage.context.create_if_not_exists('stages', defaultdict(dict))
+            execute_stage.context['stages'][StageTypes.EXECUTE].update(current_stage.context['ready_stages'])
 
-    await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
-    await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
-    
-    current_stage = None
+            setup_execute_stage: Execute = current_stage.context['ready_stages'].get(execute_stage.name)
+            if setup_execute_stage:
+                execute_stage.context['execute_hooks'] = setup_execute_stage.context['execute_hooks']
+            execute_stage.context.create_or_update('setup_stages', list(setup_candidates.keys()), [])
+
+            execute_stage.context['setup_config'] = current_stage.context['setup_config']
+            execute_stage.context['setup_by'] = current_stage.name
+
+        await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
+        await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
+        
+        current_stage.state = StageStates.COMPLETE
 
 
 async def setup_to_validate_transition(current_stage: Stage, next_stage: Stage):

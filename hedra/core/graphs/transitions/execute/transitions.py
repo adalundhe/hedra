@@ -33,11 +33,6 @@ async def execute_transition(current_stage: Execute, next_stage: Stage, logger: 
         if stage is not None:
             total_concurrent_execute_stages.append(stage)
 
-
-    current_stage.context['execute_hooks'] = [
-        *current_stage.hooks[HookType.ACTION],
-        *current_stage.hooks[HookType.TASK]
-    ]
     current_stage.total_concurrent_execute_stages = len(total_concurrent_execute_stages)
     if current_stage.timeout:
         await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)

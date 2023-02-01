@@ -202,6 +202,7 @@ class Setup(Stage, Generic[Unpack[T]]):
         setup_stages: Dict[str, Stage]={},
         setup_config: Config=None
     ):
+    
         execute_stage_names = ', '.join(list(setup_stages.keys()))
 
         await self.logger.spinner.append_message(f'Setting up - {execute_stage_names}')
@@ -263,90 +264,90 @@ class Setup(Stage, Generic[Unpack[T]]):
             'has_actions_for_setup': len(actions) > 0
         }
         
-    @event('check_actions_setup_needed')
+    @transform('check_actions_setup_needed')
     async def setup_action(
         self,
-        actions: List[ActionHook]=None,
+        actions: ActionHook=None,
         has_actions_for_setup: bool = False,
         bypass_connection_validation: bool=False,
         connection_validation_retries: int=3,
         setup_config: Config=None
     ):
             if has_actions_for_setup:
-                for hook in actions:
-                    hook.stage_instance.client.next_name = hook.name
-                    hook.stage_instance.client.intercept = True
-                    hook.stage_instance.client._config = setup_config
-    
-                    execute_stage_name = hook.stage_instance.name
+                hook = actions
+                hook.stage_instance.client.next_name = hook.name
+                hook.stage_instance.client.intercept = True
+                hook.stage_instance.client._config = setup_config
 
-                    await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Client intercept set to {hook.stage_instance.client.intercept} - Action calls for client id - {hook.stage_instance.client.client_id} - will be suspended on execution')
+                execute_stage_name = hook.stage_instance.name
 
-                    await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Setting up Action - {hook.name}:{hook.hook_id} - for Execute stage - {execute_stage_name}')
-                    await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Preparing Action hook - {hook.name}:{hook.hook_id} - for suspension - Execute stage - {execute_stage_name}')
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Client intercept set to {hook.stage_instance.client.intercept} - Action calls for client id - {hook.stage_instance.client.client_id} - will be suspended on execution')
 
-                    hook.stage_instance.client.actions.set_waiter(hook.stage_instance.name)
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Setting up Action - {hook.name}:{hook.hook_id} - for Execute stage - {execute_stage_name}')
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Preparing Action hook - {hook.name}:{hook.hook_id} - for suspension - Execute stage - {execute_stage_name}')
 
-                    setup_call = SetupCall(hook, setup_config, retries=connection_validation_retries)
+                hook.stage_instance.client.actions.set_waiter(hook.stage_instance.name)
 
-                    setup_call.metadata_string = self.metadata_string
-                    setup_call.action_store = hook.stage_instance.client.actions
+                setup_call = SetupCall(hook, setup_config, retries=connection_validation_retries)
 
-                    await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Executing Action hook call - {hook.name}:{hook.hook_id} - Execute stage - {execute_stage_name}')
+                setup_call.metadata_string = self.metadata_string
+                setup_call.action_store = hook.stage_instance.client.actions
 
-                    task = asyncio.create_task(setup_call.setup())
-                    await hook.stage_instance.client.actions.wait_for_ready(setup_call)   
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Executing Action hook call - {hook.name}:{hook.hook_id} - Execute stage - {execute_stage_name}')
 
-                    await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Exiting suspension for Action - {hook.name}:{hook.hook_id} - Execute stage - {execute_stage_name}')
+                task = asyncio.create_task(setup_call.setup())
+                await hook.stage_instance.client.actions.wait_for_ready(setup_call)   
 
-                    action = None
-                    session = None
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Exiting suspension for Action - {hook.name}:{hook.hook_id} - Execute stage - {execute_stage_name}')
 
-                    try:
-                        if setup_call.exception:
-                            raise HookSetupError(hook, HookType.ACTION, str(setup_call.exception))
+                action = None
+                session = None
 
-                        task.cancel()
-                        if task.cancelled() is False:
-                            await asyncio.wait_for(task, timeout=0.1)
+                try:
+                    if setup_call.exception:
+                        raise HookSetupError(hook, HookType.ACTION, str(setup_call.exception))
 
-                    except HookSetupError as hook_setup_exception:
+                    task.cancel()
+                    if task.cancelled() is False:
+                        await asyncio.wait_for(task, timeout=0.1)
 
-                        if bypass_connection_validation:
+                except HookSetupError as hook_setup_exception:
 
-                            action.hook_type = HookType.TASK
+                    if bypass_connection_validation:
 
-                            hook.stage_instance.hooks[HookType.TASK].append(hook)
-                            action_idx = hook.stage_instance.hooks[HookType.ACTION].index(hook)
-                            hook.stage_instance.hooks[HookType.ACTION].pop(action_idx)
+                        action.hook_type = HookType.TASK
 
-                        else:
-                            raise hook_setup_exception
+                        hook.stage_instance.hooks[HookType.TASK].append(hook)
+                        action_idx = hook.stage_instance.hooks[HookType.ACTION].index(hook)
+                        hook.stage_instance.hooks[HookType.ACTION].pop(action_idx)
 
-                    except asyncio.InvalidStateError:
-                        pass
+                    else:
+                        raise hook_setup_exception
 
-                    except asyncio.CancelledError:
-                        pass
+                except asyncio.InvalidStateError:
+                    pass
 
-                    except asyncio.TimeoutError:
-                        pass
-                    
-                    action, session = hook.stage_instance.client.actions.get(
-                        hook.stage_instance.name,
-                        hook.name
-                    )
+                except asyncio.CancelledError:
+                    pass
 
-                    await session.set_pool(setup_config.batch_size)
+                except asyncio.TimeoutError:
+                    pass
+                
+                action, session = hook.stage_instance.client.actions.get(
+                    hook.stage_instance.name,
+                    hook.name
+                )
 
-                    await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved prepared Action and Session for action - {hook.name}:{action.action_id} - Execute stage - {execute_stage_name}')
-                    
-                    action.hooks.before =  await self.get_hook(hook.stage_instance, hook.shortname, HookType.BEFORE)
-                    action.hooks.after = await self.get_hook(hook.stage_instance, hook.shortname, HookType.AFTER)
-                    action.hooks.checks = await self.get_checks(hook.stage_instance, hook.shortname)
-                    
-                    hook.session = session
-                    hook.action = action  
+                await session.set_pool(setup_config.batch_size)
+
+                await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved prepared Action and Session for action - {hook.name}:{action.action_id} - Execute stage - {execute_stage_name}')
+                
+                action.hooks.before =  await self.get_hook(hook.stage_instance, hook.shortname, HookType.BEFORE)
+                action.hooks.after = await self.get_hook(hook.stage_instance, hook.shortname, HookType.AFTER)
+                action.hooks.checks = await self.get_checks(hook.stage_instance, hook.shortname)
+                
+                hook.session = session
+                hook.action = action  
 
                 return {
                     'actions': actions
@@ -371,38 +372,38 @@ class Setup(Stage, Generic[Unpack[T]]):
             'has_tasks_for_setup': len(tasks) > 0
         }
 
-    @event('check_tasks_setup_needed')
+    @transform('check_tasks_setup_needed')
     async def setup_task(
         self,
-        tasks: List[TaskHook]=None,
+        tasks: TaskHook=None,
         has_tasks_for_setup: bool=False,
         setup_config: Config=None
     ):
         if has_tasks_for_setup:
-            for hook in tasks:
-                execute_stage: Stage = hook.stage_instance
-                execute_stage.client.next_name = hook.name
-                execute_stage.client.intercept = True
-                execute_stage_name = execute_stage.name
+            hook = tasks
+            execute_stage: Stage = hook.stage_instance
+            execute_stage.client.next_name = hook.name
+            execute_stage.client.intercept = True
+            execute_stage_name = execute_stage.name
 
-                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Loading Task hook - {hook.name}:{hook.hook_id} - to Execute stage - {execute_stage_name}')
+            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Loading Task hook - {hook.name}:{hook.hook_id} - to Execute stage - {execute_stage_name}')
 
-                execute_stage.client.next_name = hook.name
-                task, session = execute_stage.client.task.call(
-                    hook.call,
-                    env=hook.metadata.env,
-                    user=hook.metadata.user,
-                    tags=hook.metadata.tags
-                )
+            execute_stage.client.next_name = hook.name
+            task, session = execute_stage.client.task.call(
+                hook.call,
+                env=hook.metadata.env,
+                user=hook.metadata.user,
+                tags=hook.metadata.tags
+            )
+            
+            await session.set_pool(setup_config.batch_size)
 
-                await session.set_pool(setup_config.batch_size)
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved task and session for Task - {hook.name}:{task.action_id} - Execute stage - {execute_stage_name}')
 
-                await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved task and session for Task - {hook.name}:{task.action_id} - Execute stage - {execute_stage_name}')
+            task.hooks.checks = await self.get_checks(execute_stage, hook.shortname)
 
-                task.hooks.checks = await self.get_checks(execute_stage, hook.shortname)
-
-                hook.session = session
-                hook.action = task  
+            hook.session = session
+            hook.action = task  
 
             return {
                 'tasks': tasks
@@ -427,10 +428,14 @@ class Setup(Stage, Generic[Unpack[T]]):
 
         for execute_stage in setup_stages.values():
             await self.get_channels(execute_stage)
-            
+
             execute_stage.client.intercept = False
             execute_stage.hooks[HookType.ACTION] = actions_by_stage[execute_stage.name]
             execute_stage.hooks[HookType.TASK] = tasks_by_stage[execute_stage.name]
+            execute_stage.context['execute_hooks'] = [
+                *actions_by_stage[execute_stage.name],
+                *tasks_by_stage[execute_stage.name]
+            ]
 
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Client intercept set to {execute_stage.client.intercept} - Action calls for client id - {execute_stage.client.client_id} - will not be suspended on execution')
 

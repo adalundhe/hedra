@@ -3,6 +3,7 @@ import math
 import multiprocessing
 import psutil
 from types import FunctionType
+from concurrent.futures import ProcessPoolExecutor
 from multiprocessing.pool import Pool
 from typing import Any, Coroutine, Dict, List, Tuple, Union
 from hedra.core.engines.types.common.base_result import BaseResult
@@ -21,8 +22,9 @@ class BatchExecutor:
         self.loop = asyncio.get_event_loop()
         self.start_method = start_method
 
+        self.context = multiprocessing.get_context(start_method)
         self.sem = BatchedSemaphore(max_workers)
-        self.pool = multiprocessing.get_context(start_method).Pool(processes=max_workers)
+        self.pool = ProcessPoolExecutor(max_workers=psutil.cpu_count(logical=False), mp_context=self.context)
         self.shutdown_task = None
 
     async def execute_batches(self, batched_stages: List[Tuple[int, List[Any]]], execution_task: FunctionType) -> List[Tuple[str, Any]]:
@@ -46,6 +48,7 @@ class BatchExecutor:
         execution_task: FunctionType,
         configs: List[List[Any]]
     ) -> Tuple[str, Any]:
+
         await self.sem.acquire(assigned_workers_count)
         stage_results = await self.execute_stage_batch(
             execution_task,
@@ -62,13 +65,14 @@ class BatchExecutor:
         configs: List[Any]
     ):
 
-        results = await self.loop.run_in_executor(
-            None,
-            self.pool.map,
-            execution_task,
-            configs
-            
-        )
+        results = await asyncio.gather(*[
+            self.loop.run_in_executor(
+                self.pool,
+                execution_task,
+                config
+                
+            ) for config in configs
+        ])
         
         return results
 

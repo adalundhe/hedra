@@ -80,7 +80,7 @@ def set_stage_hooks(stage: Stage, generated_hooks: Dict[str, Hook]) -> Stage:
 
                 generated_hooks[hook] = 'created'
                 hook.stage = stage.name
-
+                
                 hook.stage_instance: Stage = stage
 
                 hook.name = f'{hook.stage}.{hook.shortname}'
@@ -91,9 +91,11 @@ def set_stage_hooks(stage: Stage, generated_hooks: Dict[str, Hook]) -> Stage:
 
                 generated_hooks[hook] = 'copied'
                 copied_hook = hook.copy()
-
+                
                 copied_hook.stage = stage.name
                 copied_hook.stage_instance: Stage = stage
+                copied_hook.name = f'{stage.name}.{hook.shortname}'
+                copied_hook._call = method
 
                 copied_hook.name = f'{copied_hook.stage}.{copied_hook.shortname}'
                 stage.hooks[hook.hook_type].append(copied_hook)
