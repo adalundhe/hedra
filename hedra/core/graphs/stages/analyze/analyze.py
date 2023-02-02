@@ -1,7 +1,6 @@
 import dill
 import time
 import statistics
-import psutil
 import asyncio
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -27,6 +26,8 @@ from hedra.reporting.events.types import (
 )
 from hedra.core.graphs.stages.base.stage import Stage
 from .parallel import process_results_batch
+
+dill.settings['byref'] = True
 
 
 Events = Union[HTTPEvent, HTTP2Event, GraphQLEvent, GRPCEvent, WebsocketEvent, PlaywrightEvent, UDPEvent]
@@ -65,7 +66,7 @@ class Analyze(Stage):
         self.allow_parallel = True
         self.analysis_execution_time = 0
         self.analysis_execution_time_start = 0
-        self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count())
+        self._executor = ThreadPoolExecutor(max_workers=1)
 
     @Internal()
     async def run(self):  
@@ -194,11 +195,11 @@ class Analyze(Stage):
         metric_hook_names: List[str]=[]
     ):
 
+        loop = asyncio.get_event_loop()
         stage_configs = []
         serializable_context = self.context.as_serializable()
 
         for stage_name, _, assigned_workers_count in batches:
-            
 
             stage_configs.append((
                 stage_name,

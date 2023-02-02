@@ -6,7 +6,7 @@ import dill
 import json
 import threading
 import os
-import signal
+import signal 
 from collections import defaultdict
 from typing import Any, Dict, List
 from hedra.core.engines.types.common.base_result import BaseResult
@@ -23,7 +23,7 @@ from hedra.logging import (
     logging_manager
 )
 from hedra.reporting.events.events_group import EventsGroup
-
+dill.settings['byref'] = True
 
 async def process_batch(
         stage: Stage=None,
