@@ -104,14 +104,12 @@ async def process_batch(
         return dill.dumps(events)
 
 
-def process_results_batch(config: str):
+def process_results_batch(config: Dict[str, Any]):
     import asyncio
     import uvloop
     uvloop.install()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-
-    config: Dict[str, Any] = dill.loads(config)
     
     graph_name = config.get('graph_name')
     graph_path = config.get('graph_path')

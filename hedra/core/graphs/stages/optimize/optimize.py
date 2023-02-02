@@ -182,10 +182,13 @@ class Optimize(Stage):
             optimize_stage
         )
 
+
         await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Completed optimizaiton for - {stages_count} - stages')
 
-        for _, result in results:
-            optimization_results.extend(result)
+        for _, result_batch in results:
+            optimization_results.extend([
+                dill.loads(results_set) for results_set in result_batch
+            ])
 
         return {
             'optimization_results': optimization_results
@@ -209,7 +212,7 @@ class Optimize(Stage):
             'optimized_batch_size': optimized_batch_size
         }
 
-    @event('collect_optimized_batch_sizes')
+    @context('collect_optimized_batch_sizes')
     async def set_optimized_batch_size(
         self,
         optimization_results: List[Any]=[],
@@ -219,20 +222,41 @@ class Optimize(Stage):
        
         stage_optimzations = {}
         stage_context = defaultdict(list)
+        optimized_stages = {}
+        optimzied_hooks = defaultdict(list)
+        optimized_configs: Dict[str, Any] = {}
+        stages_setup_by = {}
+
         for optimization_result in optimization_results:
             
             stage_name = optimization_result.get('stage')
             optimized_config = optimization_result.get('config')
 
             stage = optimization_candidates.get(stage_name)
-            stage.client._config = optimized_config
+            optimized_configs[stage.name] = optimized_config
+            stages_setup_by[stage.name] = stage.context['setup_by']
 
-            action_hooks: List[ActionHook] = stage.hooks[HookType.ACTION]
-            for hook in action_hooks:
+            for hook in stage.hooks[HookType.ACTION]:
                 hook.session.pool.size = optimized_batch_size
                 hook.session.sem = asyncio.Semaphore(optimized_batch_size)
                 hook.session.pool.connections = []
                 hook.session.pool.create_pool()
+
+                optimzied_hooks[stage.name].append(hook)
+
+            
+            for hook in stage.hooks[HookType.TASK]:
+                hook.session.pool.size = optimized_batch_size
+                hook.session.sem = asyncio.Semaphore(optimized_batch_size)
+                hook.session.pool.connections = []
+                hook.session.pool.create_pool()
+
+                optimzied_hooks[stage.name].append(hook)
+
+            stage.context['execute_hooks'] = [
+                *stage.hooks[HookType.ACTION],
+                *stage.hooks[HookType.TASK]
+            ]
             
             pipeline_context = optimization_result.get('context', {})
             for context_key, context_value in pipeline_context.items():
@@ -245,7 +269,12 @@ class Optimize(Stage):
             optimized_config.optimized = True
             stage.optimized = True
 
+            optimized_stages[stage.name] = stage
+
         return {
+            'optimzied_hooks': optimzied_hooks,
+            'optimized_configs': optimized_configs,
+            'stages_setup_by': stages_setup_by,
             'stage_optimzations': stage_optimzations,
             'stage_context': stage_context
         }
@@ -279,4 +308,8 @@ class Optimize(Stage):
                 result.get('params') for result in optimization_results
             ]
         }
+
+    @event('complete_optimization')
+    async def complete(self):
+        pass
 

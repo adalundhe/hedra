@@ -2,18 +2,14 @@ import json
 import dill
 import threading
 import os
-import traceback
 import signal
 import os
 from collections import defaultdict
 from typing import Any, Dict, List, Union, Tuple
 from hedra.core.engines.client.config import Config
-from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.stages.optimize.optimization import Optimizer
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.setup.setup import Setup
-from hedra.core.graphs.events import get_event
-from hedra.core.graphs.events.base_event import BaseEvent
 from hedra.core.graphs.events.event_graph import EventGraph
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.registry import registered_engines
@@ -25,7 +21,6 @@ from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
 from hedra.core.engines.types.registry import RequestTypes
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.base.import_tools import (
     import_stages, 
@@ -38,15 +33,38 @@ from hedra.logging import (
     LoggerTypes,
     logging_manager
 )
-from hedra.core.personas import get_persona
+
+
+HooksByType = Dict[HookType, Union[List[ActionHook], List[TaskHook]]]
 
 
 async def setup_action_channels_and_playwright(
-    setup_execute_stage: Execute,
+    setup_stage: Setup,
+    execute_stage: Execute,
     logger: HedraLogger,
     metadata_string: str,
     persona_config: Config
-):
+) -> Execute:
+
+    setup_stage.context = SimpleContext()
+    setup_stage.generation_setup_candidates = 1
+    setup_stage.context['setup_config'] = persona_config
+    setup_stage.context['setup_stages'] = {
+        execute_stage.name: execute_stage
+    }
+
+    await setup_stage.run_internal()
+    
+    stages: Dict[str, Stage] =  setup_stage.context['ready_stages']
+    setup_execute_stage: Stage = stages.get(execute_stage.name)
+
+    setup_execute_stage_hooks = {}
+    for hook_type in setup_execute_stage.hooks:
+        setup_execute_stage_hooks.update({
+            hook.name: hook for hook in setup_execute_stage.hooks[hook_type]
+        })
+
+
     actions = {
         hook.name: hook for hook in setup_execute_stage.hooks[HookType.ACTION]
     }
@@ -60,7 +78,10 @@ async def setup_action_channels_and_playwright(
         *setup_execute_stage.hooks.get(HookType.TASK, [])
     ]
 
+    hooks_by_type = defaultdict(list)
     for hook in actions_and_tasks:
+
+        hooks_by_type[hook.hook_type].append(hook)
 
         if hook.action.hooks.notify:
             for idx, listener_name in enumerate(hook.action.hooks.listeners):
@@ -87,6 +108,9 @@ async def setup_action_channels_and_playwright(
                 color_scheme=persona_config.color_scheme,
                 options=persona_config.playwright_options
             ))
+
+
+    return setup_execute_stage
 
 
 def optimize_stage(serialized_config: str):
@@ -189,8 +213,6 @@ def optimize_stage(serialized_config: str):
         execute_stage_config.batch_size = batch_size
         plugins_by_type = import_plugins(graph_path)
 
-        print(execute_stage_plugins)
-
         stage_persona_plugins: List[str] = execute_stage_plugins[PluginType.PERSONA]
         persona_plugins: Dict[str, PersonaPlugin] = plugins_by_type[PluginType.PERSONA]
 
@@ -210,36 +232,20 @@ def optimize_stage(serialized_config: str):
         for plugin_name, plugin in plugins_by_type[PluginType.OPTIMIZER].items():
             registered_algorithms[plugin_name] = plugin
         
-        setup_stage: Setup = initialized_stages.get(execute_setup_stage_name)
-        setup_stage.context = SimpleContext()
-        setup_stage.config = execute_stage_config
-        setup_stage.generation_setup_candidates = 1
-        setup_stage.context['setup_config'] = execute_stage_config
-        setup_stage.context['setup_stages'] = {
-            execute_stage.name: execute_stage
-        }
-
-        loop.run_until_complete(setup_stage.run())
         
-        stages: Dict[str, Stage] =  setup_stage.context['ready_stages']
-        setup_execute_stage: Stage = stages.get(execute_stage_name)
+        setup_stage: Setup = initialized_stages.get(execute_setup_stage_name)
 
-        setup_execute_stage_hooks = {}
-        for hook_type in setup_execute_stage.hooks:
-            setup_execute_stage_hooks.update({
-                hook.name: hook for hook in setup_execute_stage.hooks[hook_type]
-            })
+        setup_execute_stage: Execute = loop.run_until_complete(setup_action_channels_and_playwright(
+            setup_stage=setup_stage,
+            logger=logger,
+            metadata_string=metadata_string,
+            persona_config=execute_stage_config,
+            execute_stage=execute_stage
+        ))
 
         pipeline_stages = {
             setup_execute_stage.name: setup_execute_stage
         }
-
-        loop.run_until_complete(setup_action_channels_and_playwright(
-            setup_execute_stage=setup_execute_stage,
-            logger=logger,
-            metadata_string=metadata_string,
-            persona_config=execute_stage_config
-        ))
 
         logger.filesystem.sync['hedra.optimize'].info(f'{metadata_string} - Setting up Optimization')
 
@@ -288,19 +294,25 @@ def optimize_stage(serialized_config: str):
 
         logger.filesystem.sync['hedra.optimize'].info(f'{optimizer.metadata_string} - Optimization complete')
 
+
         context = {}
         for stage in pipeline_stages.values():
+            
+            stage.context.ignore_serialization_filters = [
+                'execute_hooks'
+            ]
+
             serializable_context = stage.context.as_serializable()
             context.update({
                 context_key: context_value for context_key, context_value in serializable_context
             })
-
-        return {
+        
+        return dill.dumps({
             'stage': execute_stage.name,
             'config': execute_stage_config,
             'params': results,
             'context': context
-        }
+        })
 
     except BrokenPipeError:
 

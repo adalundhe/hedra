@@ -77,6 +77,15 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
                 optimization_candidate.context = SimpleContext()
 
             optimization_candidate.context['optimized_params'] = current_stage.context['optimized_params']
+
+            optimized_config: Stage = current_stage.context['optimized_configs'].get(optimization_candidate.name)
+            optimzied_hooks: Stage = current_stage.context['optimzied_hooks'].get(optimization_candidate.name)
+            stage_setup_by: str = current_stage.context['stages_setup_by'].get(optimization_candidate.name)
+            if optimized_config and optimzied_hooks and stage_setup_by:
+                optimization_candidate.context['setup_config'] = optimized_config
+                optimization_candidate.context['execute_hooks'] = optimzied_hooks
+                optimization_candidate.context['setup_by'] = stage_setup_by
+
             optimization_candidate.state = StageStates.OPTIMIZED
 
 

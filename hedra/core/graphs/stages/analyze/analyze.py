@@ -193,17 +193,17 @@ class Analyze(Stage):
         stage_batch_sizes: Dict[str, List[List[Any]]]=[],
         metric_hook_names: List[str]=[]
     ):
-        loop = asyncio.get_event_loop()
 
         stage_configs = []
         serializable_context = self.context.as_serializable()
 
         for stage_name, _, assigned_workers_count in batches:
+            
 
-            stage_config_batch = await asyncio.gather(*[
-                loop.run_in_executor(
-                    self._executor,
-                    dill.dumps,
+            stage_configs.append((
+                stage_name,
+                assigned_workers_count,
+                [
                     {
                         'graph_name': self.graph_name,
                         'graph_path': self.graph_path,
@@ -216,15 +216,8 @@ class Analyze(Stage):
                         'analyze_stage_name': stage_name,
                         'analyze_stage_metric_hooks': list(metric_hook_names),
                         'analyze_stage_batched_results': batch
-                    }
-                ) for batch in stage_batch_sizes[stage_name]
-            ])
-            
-
-            stage_configs.append((
-                stage_name,
-                assigned_workers_count,
-                stage_config_batch
+                    } for batch in stage_batch_sizes[stage_name]
+                ]
             ))
             
 
