@@ -72,6 +72,9 @@ async def setup_transition(current_stage: Setup, next_stage: Stage):
 
             await current_stage.run()
 
+        if next_stage.context is None:
+            next_stage.context = SimpleContext()
+
         for known_key in current_stage.context.known_keys:
             next_stage.context[known_key] = current_stage.context[known_key]
 

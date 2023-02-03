@@ -32,7 +32,7 @@ dill.settings['byref'] = True
 
 Events = Union[HTTPEvent, HTTP2Event, GraphQLEvent, GRPCEvent, WebsocketEvent, PlaywrightEvent, UDPEvent]
 
-RawResultsSet = Dict[str,  List[Tuple[str, Any]]]
+RawResultsSet = Dict[str, ResultsSet]
 
 RawResultsPairs = List[Tuple[Dict[str,  List[Tuple[str, Any]]]]]
 
@@ -195,7 +195,6 @@ class Analyze(Stage):
         metric_hook_names: List[str]=[]
     ):
 
-        loop = asyncio.get_event_loop()
         stage_configs = []
         serializable_context = self.context.as_serializable()
 

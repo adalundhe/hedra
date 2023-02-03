@@ -5,19 +5,22 @@ from hedra.core.graphs.hooks.registry.registry_types import (
     ConditionHook,
     EventHook,
     TransformHook,
-    ContextHook
+    ContextHook,
+    SaveHook,
+    LoadHook
 )
 from .condition_event import ConditionEvent
 from .context_event import ContextEvent
 from .event import Event
+from .load_event import LoadEvent
+from .save_event import SaveEvent
 from .transform_event import TransformEvent
-from .event_dispatch import EventDispatcher
 
 
-T = TypeVar('T', EventHook, TransformHook, ConditionHook, ContextHook)
+T = TypeVar('T', EventHook, TransformHook, ConditionHook, ContextHook, SaveHook, LoadHook)
 
 
-HedraEvent = Union[Event, TransformEvent, ConditionEvent, ContextEvent]
+HedraEvent = Union[Event, TransformEvent, ConditionEvent, ContextEvent, SaveEvent, LoadEvent]
 
 
 def get_event(target: Hook, source: T) -> HedraEvent:
@@ -25,6 +28,8 @@ def get_event(target: Hook, source: T) -> HedraEvent:
         HookType.CONDITION: ConditionEvent,
         HookType.CONTEXT: ContextEvent,
         HookType.EVENT: Event,
+        HookType.LOAD: LoadEvent,
+        HookType.SAVE: SaveEvent,
         HookType.TRANSFORM: TransformEvent
     }
 

@@ -12,7 +12,7 @@ class HookType(Enum):
     EVENT='EVENT'
     INTERNAL='INTERNAL'
     METRIC='METRIC'
-    RESTORE='RESTORE'
+    LOAD='LOAD'
     SAVE='SAVE'
     SETUP='SETUP'
     TASK='TASK'

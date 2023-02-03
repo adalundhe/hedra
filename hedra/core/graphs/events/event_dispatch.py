@@ -18,9 +18,11 @@ class EventDispatcher:
         self.events: OrderedDict[EventType, List[BaseEvent]]= OrderedDict()
         self.priority_map = {
             EventType.CONTEXT: 0,
-            EventType.EVENT: 1,
+            EventType.LOAD: 1,
+            EventType.EVENT: 2,
             EventType.TRANSFORM: 2,
-            EventType.CONDITION: 3
+            EventType.CONDITION: 2,
+            EventType.SAVE: 3,
         }
 
         event_orderings = list(sorted(
@@ -88,6 +90,10 @@ class EventDispatcher:
                     next_events = [
                         event.events.get(event_name) for event_name in  event.next_map if event.events.get(event_name) is not None
                     ]
+
+                    event.context.update(event.next_args[event.event_name])
+                    event.source.stage_instance.context.update(event.next_args[event.event_name])
+                
 
                     for next_event in next_events:
                         if isinstance(event, (BaseEvent, ConditionHook)):

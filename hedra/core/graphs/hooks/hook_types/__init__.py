@@ -9,7 +9,7 @@ from .depends import depends
 from .event import event
 from .internal import Internal  
 from .metric import metric
-from .restore import restore
+from .load import load
 from .save import save
 from .setup import setup
 from .task import task

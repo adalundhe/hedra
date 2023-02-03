@@ -12,15 +12,27 @@ from hedra.core.engines.types.udp import UDPResult
 from hedra.core.engines.types.websocket import WebsocketResult
 
 
+ResultsBatch = Dict[str, Union[List[BaseResult], float]]
+
+
 class ResultsSet:
 
     def __init__(
         self,
-        execution_results: Dict[str, Union[int, float, List[BaseResult]]]
+        execution_results: Dict[str, Union[int, float, List[ResultsBatch]]]
     ) -> None:
+
         self.total_elapsed: float = execution_results.get('total_elapsed', 0)
         self.total_results: int = execution_results.get('total_results', 0)
-        self.results: List[BaseResult] = execution_results.get('results', [])
+
+        self.results: List[BaseResult] = []
+        batched_results: List[ResultsBatch] = execution_results.get('results', [])
+
+        for batch in batched_results:
+            self.results.extend(
+                batch.get('results')
+            )
+
         self.serialized_results: List[Dict[str, Any]] = execution_results.get('serialized_results', [])
 
         self.types = {
@@ -44,7 +56,7 @@ class ResultsSet:
         return {
             'total_elapsed': self.total_elapsed,
             'total_results': self.total_results,
-            'serialized_results': [result.to_dict() for result in self.results]
+            'results': [result.to_dict() for result in self.results]
         }
     
     def load_results(self):

@@ -43,7 +43,8 @@ async def execute_transition(current_stage: Execute, next_stage: Stage, logger: 
     await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
     
-    next_stage.context = SimpleContext()
+    if next_stage.context is None:
+        next_stage.context = SimpleContext()
 
     for known_key in current_stage.context.known_keys:
         next_stage.context[known_key] = current_stage.context[known_key]

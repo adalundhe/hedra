@@ -9,7 +9,7 @@ from .hook_types import (
     depends,
     event,
     metric,
-    restore,
+    load,
     save,
     setup,
     task,

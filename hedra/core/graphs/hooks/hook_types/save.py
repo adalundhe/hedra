@@ -1,10 +1,15 @@
 import functools
+from typing import Tuple
 from .hook_type import HookType
 from hedra.core.graphs.hooks.registry.registrar import registrar
 
 
 @registrar(HookType.SAVE)
-def save(key: str, checkpoint_filepath: str):
+def save(
+    *names: Tuple[str, ...], 
+    save_path: str=None,
+    order: int = 1
+):
     
     def wrapper(func):
 

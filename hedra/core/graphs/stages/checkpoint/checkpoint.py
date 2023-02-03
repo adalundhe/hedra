@@ -3,7 +3,7 @@ from typing import List
 from hedra.core.graphs.hooks.hook_types.event import event
 from hedra.core.graphs.hooks.registry.registry_types import (
     SaveHook,
-    RestoreHook
+    LoadHook
 )
 from hedra.core.graphs.hooks.hook_types.internal import Internal
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
@@ -21,7 +21,7 @@ class Checkpoint(Stage):
             HookType.CONDITION,
             HookType.CONTEXT,
             HookType.EVENT, 
-            HookType.RESTORE,
+            HookType.LOAD,
             HookType.SAVE, 
             HookType.TRANSFORM
         ]
@@ -36,7 +36,7 @@ class Checkpoint(Stage):
     @event()
     async def setup_restore_config(self):
 
-        restore_hooks: List[RestoreHook] = self.hooks[HookType.RESTORE]
+        restore_hooks: List[LoadHook] = self.hooks[HookType.LOAD]
         restore_paths: List[str] = [restore_hook.restore_path for restore_hook in restore_hooks]
         restore_hooks_count = len(restore_hooks)
 
@@ -49,7 +49,7 @@ class Checkpoint(Stage):
     @event('setup_restore_config')
     async def restore_to_context(
         self,
-        restore_hooks: List[RestoreHook]=[],
+        restore_hooks: List[LoadHook]=[],
         restore_hooks_count: int=0
     ):
         if restore_hooks_count > 0:
@@ -57,11 +57,11 @@ class Checkpoint(Stage):
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing Restore checkpoints for - {restore_hooks_count} - items')
 
         for restore_hook in restore_hooks:
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Restore Hook {restore_hook.name}:{restore_hook.hook_id} - Restoring data from checkpoint file - {restore_hook.restore_path}')
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Restore Hook {restore_hook.name}:{restore_hook.hook_id} - Restoring data from checkpoint file - {restore_hook.load_path}')
 
         await asyncio.gather(*[
             asyncio.create_task(
-                restore_hook.call(self.context)
+                restore_hook.call()
             ) for restore_hook in restore_hooks
         ])
         
@@ -80,13 +80,12 @@ class Checkpoint(Stage):
             await self.logger.spinner.append_message(f'Executing Save checkpoints for - {save_hooks_count} - items')
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing Save checkpoints for - {len(save_hooks)} - items')
 
-        
         for save_hook in allowed_save_hooks:
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Save Hook {save_hook.name}:{save_hook.hook_id} - Saving data to checkpoint file - {save_hook.save_path}')
         
         await asyncio.gather(*[
             asyncio.create_task(
-                save_hook.call(self.context)
+                save_hook.call()
             ) for save_hook in allowed_save_hooks
         ])
 

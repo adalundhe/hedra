@@ -8,9 +8,6 @@ from .hook_type import HookType
 @registrar(HookType.CONTEXT)
 def context(
     *names: Tuple[str], 
-    store: Optional[str]=None, 
-    load: Optional[str]=None, 
-    pre: bool=False,
     order: int=1
 ):
 

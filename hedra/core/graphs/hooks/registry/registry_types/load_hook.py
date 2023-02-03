@@ -1,7 +1,9 @@
 import psutil
 import asyncio
+import re
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, Awaitable, Any
+from typing import Callable, Awaitable, Any, Dict, Union, List, Tuple
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.engines.types.common.results_set import ResultsSet
@@ -9,43 +11,49 @@ from hedra.tools.filesystem import open
 from .hook import Hook
 
 
-class RestoreHook(Hook):
+RawResultsSet = Dict[str, Dict[str, Union[int, float, List[Any]]]]
+
+
+class LoadHook(Hook):
 
     def __init__(
         self, 
         name: str, 
         shortname: str, 
         call: Callable[..., Awaitable[Any]], 
-        key: str=None,
-        restore_filepath: str=None
+        *names: Tuple[str, ...],
+        load_path: str=None,
+        order: int=1
     ) -> None:
         super().__init__(
             name, 
             shortname, 
             call, 
-            hook_type=HookType.RESTORE
+            hook_type=HookType.LOAD
         )
 
-        self.context_key = key
-        self.restore_path = restore_filepath
+        self.names = list(set(names))
+        self.load_path = load_path
         self.executor = ThreadPoolExecutor(
             max_workers=psutil.cpu_count(logical=False)
         )
         self.loop = None
+        self.order = order
+        self._strip_pattern = re.compile('[^a-z]+'); 
 
-    async def call(self, context: SimpleContext) -> None:
+    async def call(self, **kwargs) -> None:
 
-        execute = await self._execute_call(context[self.context_key])
+        execute = await self._execute_call(**kwargs)
 
         if execute:
             self.loop = asyncio.get_event_loop()
             return await self.loop.run_in_executor(
                 self.executor,
                 self._run,
-                context
+                **kwargs
             )
 
-    def _run(self, context: SimpleContext):
+    def _run(self, **kwargs):
         import asyncio
         import uvloop
         uvloop.install()
@@ -53,49 +61,51 @@ class RestoreHook(Hook):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        return loop.run_until_complete(self._load(context))
+        return loop.run_until_complete(self._load(**kwargs))
 
-    async def _load(self, **kwargs,):
+    async def _load(self, **kwargs):
 
         context: SimpleContext = kwargs.get('context')
-        restore_file = await open(self.restore_path, 'r')
+        restore_file = await open(self.load_path, 'r')
+        
+        file_stem = Path(self.load_path).stem
+        restore_slug = self._strip_pattern.sub('',file_stem.lower().replace())
         file_data = await restore_file.read()
 
-        kwargs[self.context_key] = context[self.context_key]
-        kwargs['file'] = file_data
+        hook_args = {name: value for name, value in kwargs.items() if name in self.params}
+        hook_args[restore_slug] = file_data
 
-        data = await self._call(**{name: value for name, value in kwargs.items() if name in self.params})
+        load_result: Union[Any, dict] = await self._call(**{name: value for name, value in hook_args.items() if name in self.params})
 
-        if self.context_key == 'results':
+        if restore_slug == 'results':
 
-            for stage_name, stage_data in data.items():
+            for stage_name, stage_data in load_result.items():
 
                 if isinstance(stage_data, ResultsSet) is False:
                     results_set = ResultsSet(stage_data)
                     results_set.load_results()
 
-                    data[stage_name] = results_set
+                    load_result[stage_name] = results_set
 
-        context[self.context_key] = data
+        context[file_data] = load_result
 
         await restore_file.close()
 
-        if isinstance(data, dict):
+        if isinstance(load_result, dict):
             return {
                 **kwargs,
-                **data
+                **load_result
             }
 
         return {
             **kwargs,
-            self.context_key: data
+            file_data: load_result
         }
 
     def copy(self):
-        return RestoreHook(
+        return LoadHook(
             self.name,
             self.shortname,
             self._call,
-            key=self.context_key,
-            restore_filepath=self.restore_path
+            self.load_path
         )

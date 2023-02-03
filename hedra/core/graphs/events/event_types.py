@@ -6,3 +6,5 @@ class EventType(Enum):
     CONTEXT='CONTEXT'
     EVENT='EVENT'
     TRANSFORM='TRANSFORM'
+    SAVE='SAVE'
+    LOAD='LOAD'

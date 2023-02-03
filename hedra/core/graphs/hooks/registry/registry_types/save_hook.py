@@ -1,12 +1,15 @@
 import psutil
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import Type, Callable, Awaitable, Any, Dict
+from typing import Type, Callable, Awaitable, Any, Tuple, Dict
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.tools.filesystem import open
 from .hook import Hook
+
+
+RawResultsSet = Dict[str, ResultsSet]
 
 
 class SaveHook(Hook):
@@ -16,8 +19,9 @@ class SaveHook(Hook):
         name: str, 
         shortname: str, 
         call: Callable[..., Awaitable[Any]], 
-        key: str=None,
-        checkpoint_filepath: str=None
+        *names: Tuple[str, ...],
+        save_path: str=None,
+        order: int=1
     ) -> None:
         super().__init__(
             name, 
@@ -26,26 +30,24 @@ class SaveHook(Hook):
             hook_type=HookType.SAVE
         )
 
-        self.context_key = key
-        self.save_path = checkpoint_filepath
+        self.names = list(set(names))
+        self.save_path = save_path
         self.executor = ThreadPoolExecutor(
             max_workers=psutil.cpu_count(logical=False)
         )
+        self.order: int = order
         self.loop = None
 
-    async def call(self, context: SimpleContext) -> None:
+    async def call(self, **kwargs) -> None:
+        self.loop = asyncio.get_event_loop()
 
-        execute = await self._execute_call(context[self.context_key])
+        return await self.loop.run_in_executor(
+            self.executor,
+            self._run,
+            **kwargs
+        )
 
-        if execute:
-            self.loop = asyncio.get_event_loop()
-            return await self.loop.run_in_executor(
-                self.executor,
-                self._run,
-                context
-            )
-
-    def _run(self, context: SimpleContext):
+    def _run(self, **kwargs):
         import asyncio
         import uvloop
         uvloop.install()
@@ -53,21 +55,41 @@ class SaveHook(Hook):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        return loop.run_until_complete(self._write(context))
+        return loop.run_until_complete(self._write(**kwargs))
 
     async def _write(self, **kwargs) -> None:
 
-        context: SimpleContext = kwargs.get('context')
-
         save_file = await open(self.save_path, 'w')
-        context_data = context.get(self.context_key)
 
-        if context_data and self.context_key == 'results':
-            results_data: Dict[str, ResultsSet] = context_data
-            for stage_name in context_data:
-                context_data[stage_name] = results_data[stage_name].to_serializable()
+        hook_args = {name: value for name, value in kwargs.items() if name in self.params}
 
-        kwargs[self.context_key] = context_data
+        for param_name in self.params.keys():
+
+            if param_name == 'results':
+                
+                results: RawResultsSet = self.context[param_name]
+                
+                for stage_name, result, in results.items():
+                    results[stage_name] = result.to_serializable()
+
+                context_value = results
+
+            else:
+
+                context_value = self.context[param_name]
+
+            if param_name != 'self' and context_value is not None:
+                hook_args[param_name] = context_value
+        
+        if 'results' in list(self.params.keys()):
+            results = []
+
+            for stage_results in context_value.values():
+                results.extend(
+                    stage_results.results
+                )
+
+            context_value['results'] = results
 
         await save_file.write(
             await self._call(**{name: value for name, value in kwargs.items() if name in self.params})
@@ -75,9 +97,10 @@ class SaveHook(Hook):
 
         await save_file.close()
 
-
-        if context.get(self.context_key):
-            context[self.context_key] = type(context[self.context_key])()
+        for context_key in hook_args:
+            if self.context.get(context_key):
+                self.context[context_key] = type(self.context[context_key])()
+                kwargs[context_key] = type(self.context[context_key])()
 
         return kwargs    
 
@@ -86,6 +109,5 @@ class SaveHook(Hook):
             self.name,
             self.shortname,
             self._call,
-            key=self.context_key,
-            checkpoint_filepath=self.save_path
+            self.save_path
         )

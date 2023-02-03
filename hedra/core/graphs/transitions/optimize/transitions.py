@@ -65,7 +65,9 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
         else:
             await current_stage.run()
         
-        next_stage.context = SimpleContext()
+        if next_stage.context is None:
+            next_stage.context = SimpleContext()
+            
         for known_key in current_stage.context.known_keys:
             next_stage.context[known_key] = current_stage.context[known_key]
 

@@ -9,9 +9,13 @@ from hedra.core.graphs.hooks.registry.registry_types import (
     EventHook, 
     TransformHook,
     ContextHook,
-    ConditionHook
+    ConditionHook,
+    SaveHook
 )
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, HookType
+
+
+EventTypeHook = Union[EventHook, TransformHook, ContextHook, ConditionHook, SaveHook]
 
 
 class EventGraph:
@@ -36,7 +40,7 @@ class EventGraph:
         ])
         
 
-        self.event_hooks: List[Union[EventHook, TransformHook, ContextHook, ConditionHook]] = [
+        self.event_hooks: List[EventTypeHook] = [
             *list(self.hooks_by_type.get(
                 HookType.EVENT, 
                 {}
@@ -51,6 +55,14 @@ class EventGraph:
             ).values()),
             *list(self.hooks_by_type.get(
                 HookType.CONTEXT, 
+                {}
+            ).values()),
+            *list(self.hooks_by_type.get(
+                HookType.SAVE,
+                {}
+            ).values()),
+            *list(self.hooks_by_type.get(
+                HookType.LOAD,
                 {}
             ).values())
         ]
