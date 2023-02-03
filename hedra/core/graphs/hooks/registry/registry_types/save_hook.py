@@ -1,5 +1,6 @@
 import psutil
 import asyncio
+import functools
 from concurrent.futures import ThreadPoolExecutor
 from typing import Type, Callable, Awaitable, Any, Tuple, Dict
 from hedra.core.graphs.simple_context import SimpleContext
@@ -43,8 +44,10 @@ class SaveHook(Hook):
 
         return await self.loop.run_in_executor(
             self.executor,
-            self._run,
-            **kwargs
+            functools.partial(
+                self._run,
+                **kwargs
+            )
         )
 
     def _run(self, **kwargs):

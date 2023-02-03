@@ -1,6 +1,7 @@
 import psutil
 import asyncio
 import re
+import functools
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Awaitable, Any, Dict, Union, List, Tuple
@@ -49,8 +50,10 @@ class LoadHook(Hook):
             self.loop = asyncio.get_event_loop()
             return await self.loop.run_in_executor(
                 self.executor,
-                self._run,
-                **kwargs
+                functools.partial(
+                    self._run,
+                    **kwargs
+                )
             )
 
     def _run(self, **kwargs):
@@ -65,11 +68,10 @@ class LoadHook(Hook):
 
     async def _load(self, **kwargs):
 
-        context: SimpleContext = kwargs.get('context')
         restore_file = await open(self.load_path, 'r')
         
         file_stem = Path(self.load_path).stem
-        restore_slug = self._strip_pattern.sub('',file_stem.lower().replace())
+        restore_slug = self._strip_pattern.sub('',file_stem.lower())
         file_data = await restore_file.read()
 
         hook_args = {name: value for name, value in kwargs.items() if name in self.params}
@@ -87,7 +89,7 @@ class LoadHook(Hook):
 
                     load_result[stage_name] = results_set
 
-        context[file_data] = load_result
+        self.context[file_data] = load_result
 
         await restore_file.close()
 

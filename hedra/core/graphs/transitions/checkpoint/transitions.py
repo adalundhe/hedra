@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_states import StageStates
@@ -134,6 +135,7 @@ async def checkpoint_to_analyze_transition(current_stage: Stage, next_stage: Sta
         return StageTimeoutError(current_stage), StageTypes.ERROR
 
     except Exception as stage_execution_error:
+        print(traceback.format_exc())
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
     else:
