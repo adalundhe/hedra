@@ -1,8 +1,9 @@
-from typing import List, Optional, Dict, Union
+from typing import List, Optional, Dict, Union, Tuple
 from pydantic import BaseModel, StrictStr, StrictInt, StrictFloat, validator
 
 
 class ActionHookValidator(BaseModel):
+    names: Tuple[StrictStr, ...]
     weight: StrictInt
     order: StrictInt
     metadata: Optional[Dict[str, Union[StrictStr, StrictInt, StrictFloat]]]
@@ -21,7 +22,8 @@ class ActionHookValidator(BaseModel):
 class ActionValidator:
 
     def __init__(
-        __pydantic_self__, 
+        self,
+        *names: Tuple[str, ...], 
         weight: Optional[int]=1, 
         order: Optional[int]=1, 
         metadata: Optional[Dict[str, Union[str, int, float]]]={}, 
@@ -30,6 +32,7 @@ class ActionValidator:
         listen: Optional[List[str]]=[]
     ) -> None:
         ActionHookValidator(
+            names=names,
             weight=weight,
             order=order,
             metadata=metadata,

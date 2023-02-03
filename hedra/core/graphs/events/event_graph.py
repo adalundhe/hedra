@@ -10,7 +10,9 @@ from hedra.core.graphs.hooks.registry.registry_types import (
     TransformHook,
     ContextHook,
     ConditionHook,
-    SaveHook
+    SaveHook,
+    ActionHook,
+    TaskHook
 )
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, HookType
 
@@ -42,11 +44,7 @@ class EventGraph:
 
         self.event_hooks: List[EventTypeHook] = [
             *list(self.hooks_by_type.get(
-                HookType.EVENT, 
-                {}
-            ).values()),
-            *list(self.hooks_by_type.get(
-                HookType.TRANSFORM, 
+                HookType.ACTION, 
                 {}
             ).values()),
             *list(self.hooks_by_type.get(
@@ -58,19 +56,32 @@ class EventGraph:
                 {}
             ).values()),
             *list(self.hooks_by_type.get(
-                HookType.SAVE,
+                HookType.EVENT, 
                 {}
             ).values()),
             *list(self.hooks_by_type.get(
                 HookType.LOAD,
                 {}
-            ).values())
+            ).values()),
+            *list(self.hooks_by_type.get(
+                HookType.SAVE,
+                {}
+            ).values()),
+            *list(self.hooks_by_type.get(
+                HookType.TASK, 
+                {}
+            ).values()),
+            *list(self.hooks_by_type.get(
+                HookType.TRANSFORM, 
+                {}
+            ).values()),
         ]
         
         nodes = [self.hooks_by_name.get(node) for node in self.hooks_graph.nodes()]
         self.events: Dict[str, BaseEvent] = {}
         self.base_stages = list(set([node.stage_instance.__class__.__base__.__name__ for node in nodes]))
         self.removal_targets = []
+        self.action_and_task_events = {}
 
     def hooks_to_events(self) -> EventGraph:
         for event_hook in self.event_hooks:
@@ -84,6 +95,7 @@ class EventGraph:
                 event = get_event(target, event_hook)
                 
                 if isinstance(target, Hook):
+
                     target: BaseEvent = get_event(target, target)
                     self.events[target.event_name] = target
 

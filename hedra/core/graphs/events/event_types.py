@@ -8,3 +8,5 @@ class EventType(Enum):
     TRANSFORM='TRANSFORM'
     SAVE='SAVE'
     LOAD='LOAD'
+    ACTION='ACTION'
+    TASK='TASK'

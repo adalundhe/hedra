@@ -71,6 +71,7 @@ class MercuryTaskRunner:
         self.active += 1
 
         task_event = task.event
+        start = 0
  
         async with self.sem:
             
