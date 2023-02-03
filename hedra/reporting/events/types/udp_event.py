@@ -2,7 +2,7 @@ import json
 from typing import Any, Tuple, Dict
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.engines.types.udp import UDPResult
-from .base_event import BaseEvent
+from .base_result import BaseEvent
 
 
 class UDPEvent(BaseEvent):

@@ -3,8 +3,6 @@ from collections import defaultdict
 from typing import Dict, List
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.registry.registry_types import (
-    ActionHook,
-    TaskHook,
     ValidateHook
 )
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
@@ -19,9 +17,10 @@ from .hook_validators import (
     ChannelHookValidator,
     CheckHookValidator,
     ConditionHookVaidator,
+    ContextHookVaidator,
     EventHookVaidator,
     MetricHookVaidator,
-    RestoreHookValidator,
+    LoadHookValidator,
     SaveHookValidator,
     SetupHookVaidator,
     TaskHookValidator,
@@ -29,6 +28,8 @@ from .hook_validators import (
     TransformHookVaidator,
     ValidateHookValidator
 )
+
+
 from .stage_validator import StageValidator
 
 
@@ -52,9 +53,10 @@ class Validator:
             HookType.CHANNEL: ChannelHookValidator(metadata_string),
             HookType.CHECK: CheckHookValidator(metadata_string),
             HookType.CONDITION: ConditionHookVaidator(metadata_string),
+            HookType.CONTEXT: ContextHookVaidator(metadata_string),
             HookType.EVENT: EventHookVaidator(metadata_string),
             HookType.METRIC: MetricHookVaidator(metadata_string),
-            HookType.RESTORE: RestoreHookValidator(metadata_string),
+            HookType.LOAD: LoadHookValidator(metadata_string),
             HookType.SAVE: SaveHookValidator(metadata_string),
             HookType.SETUP: SetupHookVaidator(metadata_string),
             HookType.TASK: TaskHookValidator(metadata_string),
@@ -91,7 +93,7 @@ class Validator:
         self.hooks[hook_type].extend(hooks)
 
     async def validate_stages(self):
-
+        
         validation_stage_names = ', '.join(self.stage_names)
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Validating stages - {validation_stage_names}')

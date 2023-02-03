@@ -20,5 +20,3 @@ class InternallHook(Hook):
             stage, 
             hook_type
         )
-
-        self.call: Type[self._call] = self._call

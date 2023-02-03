@@ -18,6 +18,29 @@ class ChannelHook(Hook):
             hook_type=HookType.CHANNEL
         )
 
-        self.call: Type[self._call] = self._call
         self.notifiers: List[str] = []
         self.listeners: List[str] = []
+
+    async def call(self, **kwargs):
+        result = await super().call(**{name: value for name, value in kwargs.items() if name in self.params})
+
+        if isinstance(result, dict):
+            return {
+                **kwargs,
+                **result
+            }
+
+        notifier_action, listener_actions = result
+
+        return {
+            **kwargs,
+            'notifier_action': notifier_action,
+            'listener_actions': listener_actions
+        }
+
+    def copy(self):
+        return ChannelHook(
+            self.name,
+            self.shortname,
+            self._call
+        )

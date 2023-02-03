@@ -10,7 +10,7 @@ from .core.graphs.hooks import (
     event,
     setup,
     metric,
-    restore,
+    load,
     save,
     task,
     teardown,

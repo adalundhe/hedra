@@ -50,7 +50,11 @@ class MercuryHTTP2Client:
         self.waiter = None
 
         self.ssl_context = get_http2_ssl_context()
-        
+    
+    async def set_pool(self, concurrency: int):
+        self.sem = asyncio.Semaphore(value=concurrency)
+        self.pool = HTTP2Pool(concurrency, reset_connections=self.pool.reset_connections)
+        self.pool.create_pool()
 
     async def wait_for_active_threshold(self):
         if self.waiter is None:
@@ -127,6 +131,8 @@ class MercuryHTTP2Client:
         response = HTTP2Result(action)
         response.wait_start = time.monotonic()
         self.active += 1
+
+        action_event = action.event
         
         async with self.sem:
 
@@ -140,8 +146,8 @@ class MercuryHTTP2Client:
                     action.hooks.channel_events.append(event)
                     await event.wait()
 
-                if action.hooks.before:
-                    action = await action.hooks.before.call(action, response)
+                if action_event:
+                    action, response = await action_event.execute_pre(action, response)
                     action.setup()
 
                 response.start = time.monotonic()
@@ -173,8 +179,8 @@ class MercuryHTTP2Client:
 
                 response.complete = time.monotonic()
 
-                if action.hooks.after:
-                    action = await action.hooks.after.call(action, response)
+                if action_event:
+                    action, response = await action_event.execute_post(action, response)
                     action.setup()
 
                 if action.hooks.notify:

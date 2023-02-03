@@ -42,6 +42,14 @@ class MercuryTaskRunner:
         self.sem = asyncio.Semaphore(value=concurrency)
         self.active = 0
         self.waiter = None
+    
+    async def set_pool(self, concurrency: int):
+        self.pool = SimpleContext()
+        self.pool.size = concurrency
+        self.pool.reset_connections = False
+        self.pool.create_pool = lambda: None
+
+        self.sem = asyncio.Semaphore(value=concurrency)
 
     async def wait_for_active_threshold(self):
         if self.waiter is None:
@@ -75,7 +83,7 @@ class MercuryTaskRunner:
                 
 
                 if task_event:
-                    await task_event.execute_pre(task)
+                    task, result = await task_event.execute_pre(task, result)
 
                 start = time.monotonic()
 
@@ -92,7 +100,7 @@ class MercuryTaskRunner:
 
 
                 if task_event:
-                    task = await task_event.execute_post(task)
+                    task, result = await task_event.execute_post(task, result)
 
                 if task.hooks.notify:
                     await asyncio.gather(*[

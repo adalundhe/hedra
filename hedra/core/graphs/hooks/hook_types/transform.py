@@ -7,8 +7,6 @@ from hedra.core.graphs.hooks.registry.registrar import registrar
 @registrar(HookType.TRANSFORM)
 def transform(
     *names, 
-    load: Optional[str]=None, 
-    store: Optional[str]=None, 
     pre: bool=False,
     order: int=1
 ):

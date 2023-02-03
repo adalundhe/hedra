@@ -1,6 +1,6 @@
 import json
 from typing import Generic, TypeVar
-from hedra.reporting.events.types.base_event import BaseEvent
+from hedra.reporting.events.types.base_result import BaseEvent
 
 
 T = TypeVar('T')

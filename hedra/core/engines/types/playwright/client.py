@@ -50,7 +50,10 @@ class MercuryPlaywrightClient:
         self._discarded_contexts = []
         self._pending_context_groups: List[ContextGroup] = []
         self._playwright_setup = False
-        
+
+    async def set_pool(self, concurrency: int):
+        self.sem = asyncio.Semaphore(value=concurrency)
+        self.pool = ContextPool(concurrency, reset_connections=self.pool.reset_connections)
 
     async def setup(self, config: ContextConfig):
         if self._playwright_setup is False:
@@ -111,6 +114,8 @@ class MercuryPlaywrightClient:
 
         result = PlaywrightResult(command, type=RequestTypes.PLAYWRIGHT)
         self.active += 1
+
+        command_event = command.event
         
         async with self.sem:
             context = self.pool.contexts.pop()
@@ -121,13 +126,13 @@ class MercuryPlaywrightClient:
                     command.hooks.channel_events.append(event)
                     await event.wait()
 
-                if command.hooks.before:
-                    command = await command.hooks.before.call(command, result)
-
+                if command_event:
+                    command, result = await command_event.execute_pre(command, result)
+            
                 result = await context.execute(command)
 
-                if command.hooks.after:
-                    command = await command.hooks.after.call(command, result)
+                if command_event:
+                    command, result = await command_event.execute_post(command, result)
 
                 if command.hooks.notify:
                     await asyncio.gather(*[

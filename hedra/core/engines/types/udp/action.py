@@ -19,7 +19,8 @@ class UDPAction(BaseAction):
         '_data',
         'encoded_data',
         'is_stream',
-        'ssl_context'
+        'ssl_context',
+        'event'
     )
     
     def __init__(

@@ -19,7 +19,32 @@ class AfterHook(Hook):
             hook_type=HookType.AFTER
         )
 
-        self.call: Type[self._call] = self._call
         self.names = list(set(names))
 
+    async def call(self, **kwargs):
+        result = await super().call(**{name: value for name, value in kwargs.items() if name in self.params})
 
+        if isinstance(result, dict):
+            return {
+                **kwargs,
+                **result
+            }
+
+        action, response = result 
+
+        return {
+            **kwargs,
+            'action': action,
+            'response': response,
+        }
+
+    def copy(self):
+        return AfterHook(
+            self.name,
+            self.shortname,
+            self._call,
+            *self.names
+        )
+
+    
+    

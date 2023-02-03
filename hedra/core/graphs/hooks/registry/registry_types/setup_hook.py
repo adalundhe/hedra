@@ -25,11 +25,37 @@ class SetupHook(Hook):
         self.key = key
         self.metadata = HookMetadata(**metadata)
 
-    async def call(self, context: SimpleContext):
-        results = await self._call()
+    async def call(self, **kwargs):
+
+        context: SimpleContext = kwargs.get('context')
+
+        results = await self._call(**{name: value for name, value in kwargs.items() if name in self.params})
 
         if self.key:
             context[self.key] = results
 
+        if isinstance(results, dict):
+            return {
+                **kwargs,
+                **results
+            }
 
-        return context
+        return {
+            **kwargs,
+            'context': results
+        }
+
+    def copy(self):
+        return SetupHook(
+            self.name,
+            self.shortname,
+            self._call,
+            key=self.key,
+            metadata={
+                'weight': self.metadata.weight,
+                'order': self.metadata.order,
+                'env': self.metadata.env,
+                'user': self.metadata.user,
+                'tags': self.metadata.tags
+            }
+        )

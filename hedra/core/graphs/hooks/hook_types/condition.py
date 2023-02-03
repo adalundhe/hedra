@@ -6,7 +6,8 @@ from hedra.core.graphs.hooks.registry.registrar import registrar
 
 @registrar(HookType.CONDITION)
 def condition(
-    *names
+    *names,
+    order: int=1
 ):
 
     def wrapper(func):

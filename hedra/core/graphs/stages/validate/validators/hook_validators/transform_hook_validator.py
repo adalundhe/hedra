@@ -31,21 +31,12 @@ class TransformHookVaidator(BaseHookVaidator):
             assert call is not None, f"Method is not not found on stage or was not supplied to @transform hook - {hook.name}:{hook.hook_id}"
             assert 'self' in call.__code__.co_varnames
 
-            assert call.__code__.co_argcount > 1, f"Missing required argument 'result' for @transform hook {hook.name}:{hook.hook_id}"
-            assert call.__code__.co_argcount < 3, f"Too many args. - @transform hook {hook.name}:{hook.hook_id} only requires 'result' as an additional arg."
-
             for name in hook.names:
                 hook_for_validation = self.hooks_by_name.get(name)
 
                 assert hook_for_validation is not None, f"Specified hook {name} for stage {hook.stage} not found for @transform hook {hook.name}:{hook.hook_id}"
             
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Validated {hook.hook_type.name.capitalize()} Hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
-
-            if hook.store:
-                assert hook.load is not None, f'Load key must be set for @transform Hook {hook.name}:{hook.hook_id} is store argument is provided'
-
-            if hook.load or hook.store:
-                assert hook.context is not None, f"Context must be set for @transform Hook {hook.name}:{hook.hook_id} if store or load argument is provided"
 
         except AssertionError as hook_validation_error:
                 raise HookValidationError(hook.stage_instance, str(hook_validation_error))

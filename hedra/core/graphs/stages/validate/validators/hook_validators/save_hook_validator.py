@@ -35,9 +35,6 @@ class SaveHookValidator(BaseHookVaidator):
             if hook.save_path:
                 hook_path_dir = str(Path(hook.save_path).parent.resolve())
                 
-                assert call.__code__.co_argcount > 1, f"Missing required argument 'data' for @save hook {hook.name}:{hook.hook_id}"
-                assert call.__code__.co_argcount < 3, f"Too many args. - @save hook {hook.name}:{hook.hook_id} only requires 'data' as additional args."
-                assert hook.context_key is not None, f"Missing required keyword arg. - @save hook {hook.name}:{hook.hook_id} requires a valid string for 'key'"
                 assert hook.save_path is not None, f"Missing required keyword arg. - @save hook {hook.name}:{hook.hook_id} requires a valid string for 'checkpoint_filepath'"
                 assert isinstance(hook.save_path, str), f"Invalid path type - @save hook {hook.name}:{hook.hook_id} path must be a valid string."
                 assert os.path.exists(hook_path_dir), f"Invalid path - @save hook {hook.name}:{hook.hook_id} path {hook_path_dir} must exist."

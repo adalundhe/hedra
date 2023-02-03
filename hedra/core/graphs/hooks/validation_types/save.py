@@ -1,15 +1,28 @@
-from pydantic import BaseModel, Field, StrictStr
+from typing import Tuple, Optional
+from pydantic import (
+    BaseModel, 
+    Field, 
+    StrictStr, 
+    StrictInt
+)
 
 
 class SaveHookValidator(BaseModel):
-    key: StrictStr=Field(..., min_length=1)
-    checkpoint_filepath: StrictStr=Field(..., min_length=1)
+    names: Optional[Tuple[StrictStr, ...]]
+    save_path: StrictStr=Field(..., min_length=1)
+    order: StrictInt
 
 
 class SaveValidator:
 
-    def __init__(__pydantic_self__, key: str, checkpoint_filepath: str) -> None:
+    def __init__(
+        self, 
+        *names: Tuple[str, ...], 
+        save_path: str=None,
+        order: int = 1
+    ) -> None:
         SaveHookValidator(
-            key=key,
-            checkpoint_filepath=checkpoint_filepath
+            names=names,
+            save_path=save_path,
+            order=order
         )

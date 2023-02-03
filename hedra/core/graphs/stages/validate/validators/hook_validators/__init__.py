@@ -5,9 +5,10 @@ from .before_hook_validator import BeforeHookVaidator
 from .channel_hook_validator import ChannelHookValidator
 from .check_hook_validator import CheckHookValidator
 from .condition_hook_validator import ConditionHookVaidator
+from .context_hook_validator import ContextHookVaidator
 from .event_hook_validator import EventHookVaidator
 from .metric_hook_validator import MetricHookVaidator
-from .restore_hook_validator import RestoreHookValidator
+from .load_hook_validator import LoadHookValidator
 from .save_hook_validator import SaveHookValidator
 from .setup_hook_validator import SetupHookVaidator
 from .task_hook_validator import TaskHookValidator

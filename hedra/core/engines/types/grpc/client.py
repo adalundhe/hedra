@@ -32,6 +32,8 @@ class MercuryGRPCClient(MercuryHTTP2Client):
         response.wait_start = time.monotonic()
         self.active += 1
 
+        action_event = action.event
+
         async with self.sem:
             pipe = self.pool.pipes.pop()
             connection = self.pool.connections.pop()
@@ -43,8 +45,9 @@ class MercuryGRPCClient(MercuryHTTP2Client):
                     action.hooks.channel_events.append(event)
                     await event.wait()
                 
-                if action.hooks.before:
-                    action = await action.hooks.before.call(action, response)
+                if action_event:
+                    event_results = await action_event.execute_pre(action, response)
+                    action, response = event_results[-1]
                     action.setup()
 
                 response.start = time.monotonic()
@@ -76,8 +79,9 @@ class MercuryGRPCClient(MercuryHTTP2Client):
 
                 response.complete = time.monotonic()
 
-                if action.hooks.after:
-                    action = await action.hooks.after.call(action, response)
+                if action_event:
+                    event_results = await action_event.execute_post(action, response)
+                    action, response = event_results[-1]
                     action.setup()
 
                 if action.hooks.notify:

@@ -12,7 +12,8 @@ class BaseAction:
         'name', 
         'is_setup', 
         'metadata', 
-        'hooks'
+        'hooks',
+        'event'
     )
 
     def __init__(
@@ -27,3 +28,4 @@ class BaseAction:
         self.is_setup = False
         self.metadata = Metadata(user, tags)
         self.hooks: Hooks[BaseAction] = Hooks()
+        self.event = None

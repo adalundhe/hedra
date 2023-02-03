@@ -19,5 +19,26 @@ class MetricHook(Hook):
             hook_type=HookType.METRIC
         )
 
-        self.call: Type[self._call] = self._call
         self.group = group
+
+    async def call(self, **kwargs):
+        metric = await super().call(**{name: value for name, value in kwargs.items() if name in self.params})
+
+        if isinstance(metric, dict):
+            return {
+                **kwargs,
+                **metric
+            }
+
+        return {
+            **kwargs,
+            'metric': metric
+        }
+
+    def copy(self):
+        return MetricHook(
+            self.name,
+            self.shortname,
+            self._call,
+            self.group
+        )

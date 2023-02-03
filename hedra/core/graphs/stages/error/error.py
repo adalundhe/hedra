@@ -28,13 +28,13 @@ class Error(Stage):
                 assert hook.hook_type == HookType.INTERNAL
 
                 internal_hook = getattr(self, hook.shortname)
-                assert inspect.getsource(internal_hook) == inspect.getsource(hook.call)
+                assert inspect.getsource(internal_hook) == inspect.getsource(hook._call)
 
             except AssertionError:
                 raise ReservedMethodError(self, reserved_hook_name)
 
-            hook.call = hook.call.__get__(self, self.__class__)
-            setattr(self, reserved_hook_name, hook.call)
+            hook._call = hook._call.__get__(self, self.__class__)
+            setattr(self, reserved_hook_name, hook._call)
             
             self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Loading internal Hook - {hook.name} - for stage - {base_stage_name}')
 

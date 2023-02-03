@@ -6,35 +6,31 @@ import dill
 import json
 import threading
 import os
-import signal
-import traceback
+import signal 
 from collections import defaultdict
-from typing import Any, Dict, List, Tuple
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
-from hedra.core.graphs.events import get_event
-from hedra.core.graphs.events.base_event import BaseEvent
-from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from typing import Any, Dict, List
 from hedra.core.engines.types.common.base_result import BaseResult
+from hedra.core.graphs.events.event_graph import EventGraph
+from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.stages.base.import_tools import (
     import_stages,
     set_stage_hooks
 )
 from hedra.core.graphs.stages.base.stage import Stage
-from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.logging import (
     HedraLogger,
     LoggerTypes,
     logging_manager
 )
-from hedra.reporting.events import EventsGroup
-
+from hedra.reporting.events.events_group import EventsGroup
+dill.settings['byref'] = True
 
 async def process_batch(
-        stage: Stage,
-        stage_name: str, 
-        custom_metric_hook_names: List[str],
-        results_batch: List[BaseResult],
-        metadata_string: str
+        stage: Stage=None,
+        stage_name: str=None, 
+        custom_metric_hook_names: List[str]=[],
+        results_batch: List[BaseResult]=[],
+        metadata_string: str=None
     ):
 
         hedra_config_filepath = os.path.join(
@@ -80,8 +76,10 @@ async def process_batch(
 
         custom_metric_hooks = []
         for metric_hook_name in custom_metric_hook_names:
-            custom_metric_hook = registrar.all.get(metric_hook_name)
-            custom_metric_hooks.append(custom_metric_hook)
+            custom_metric_hook_set = registrar.all.get(metric_hook_name, [])
+            
+            for custom_metric_hook in custom_metric_hook_set:
+                custom_metric_hooks.append(custom_metric_hook)
 
         await asyncio.gather(*[
             asyncio.create_task(events[stage_result.name].add(
@@ -128,77 +126,41 @@ def process_results_batch(config: Dict[str, Any]):
     stage_name = config.get('analyze_stage_name')
     custom_metric_hook_names = config.get('analyze_stage_metric_hooks', [])
     results_batch = config.get('analyze_stage_batched_results', [])
-    analyze_stage_linked_events = config.get('analyze_stage_linked_events', defaultdict(list))
 
-    discovered = import_stages(graph_path)
-    stage: Stage = discovered.get(stage_name)()
-    setup_analyze_stage: Stage = set_stage_hooks(stage)
+    discovered: Dict[str, Stage] = import_stages(graph_path)
+    
+    initialized_stages = {}
+    hooks_by_type = defaultdict(dict)
+    hooks_by_name = {}
+    hooks_by_shortname = defaultdict(dict)
+
+    generated_hooks = {}
+    for stage in discovered.values():
+        initialized_stage =  set_stage_hooks(
+            stage(), 
+            generated_hooks
+        )
+
+        initialized_stages[initialized_stage.name] = initialized_stage
+
+        for hook_type in initialized_stage.hooks:
+
+            for hook in initialized_stage.hooks[hook_type]:
+                hooks_by_type[hook_type][hook.name] = hook
+                hooks_by_name[hook.name] = hook
+                hooks_by_shortname[hook_type][hook.shortname] = hook
+
+    setup_analyze_stage: Stage = initialized_stages.get(stage_name)
     setup_analyze_stage.context.update(source_stage_context)
 
-    loaded_stages: Dict[str, Stage] = {
-        setup_analyze_stage.name: setup_analyze_stage
-    }
+    events_graph = EventGraph(hooks_by_type)
+    events_graph.hooks_by_name = hooks_by_name
+    events_graph.hooks_by_shortname = hooks_by_shortname
+    events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
+    
     pipeline_stage = {
         setup_analyze_stage.name: setup_analyze_stage
     }
-
-    for event_target in analyze_stage_linked_events:
-        target_hook_stage, target_hook_type, target_hook_name = event_target
-        for event_source in analyze_stage_linked_events[event_target]:
-            event_source_stage, event_source_type, event_hook_name = event_source
-
-            if target_hook_stage == stage_name:
-
-                source_stage: Stage = loaded_stages.get(stage_name)
-                source_stage: Stage = loaded_stages.get(event_source_stage)
-
-                if source_stage is None:
-                    source_stage = discovered.get(event_source_stage)()
-                    source_stage = set_stage_hooks(source_stage)
-                    
-                    loaded_stages[source_stage.name] = source_stage
-
-
-                pipeline_stage[source_stage.name] = source_stage
-
-                source_events = [
-                    *source_stage.hooks[HookType.EVENT],
-                    *source_stage.hooks[HookType.TRANSFORM]
-                ]
-
-                source_event_hook_names = [hook.name for hook in source_events]
-                source_hook_idx = source_event_hook_names.index(event_hook_name)
-
-                source_hook: Hook = source_events[source_hook_idx]
-
-                target_hook_names = [hook.name for hook in setup_analyze_stage.hooks[target_hook_type]]
-                target_hook_idx = target_hook_names.index(target_hook_name)
-
-                target_hook: Hook = setup_analyze_stage.hooks[target_hook_type][target_hook_idx]
-                target_hook.stage = source_stage_name
-                target_hook.stage_instance = setup_analyze_stage
-                target_hook.stage_instance.hooks = setup_analyze_stage.hooks
-
-                event = get_event(target_hook, source_hook)
-
-                if target_hook_idx >= 0 and isinstance(target_hook, BaseEvent):
-                    if source_hook.pre is True:
-                        target_hook.pre_sources[source_hook.name] = source_hook
-                        target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
-
-                    else:
-                        target_hook.post_sources[source_hook.name] = source_hook
-                        target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
-                    
-                    registrar.all[event.name] = target_hook
-
-                elif target_hook_idx >= 0:
-                    target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = event
-                    registrar.all[event.name] = event
-                
-                target_hook.stage_instance.linked_events[(target_hook.stage, target_hook.hook_type, target_hook.name)].append(
-                    (source_hook.stage, source_hook.hook_type, source_hook.name)
-                )
                 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -216,20 +178,22 @@ def process_results_batch(config: Dict[str, Any]):
         )
 
     try:
+
         events = loop.run_until_complete(
             process_batch(
-                setup_analyze_stage,
-                stage_name,
-                custom_metric_hook_names,
-                results_batch,
-                meetadata_string
+                stage=setup_analyze_stage,
+                stage_name=stage_name,
+                custom_metric_hook_names=custom_metric_hook_names,
+                results_batch=results_batch,
+                metadata_string=meetadata_string
             )
         )
 
         context = {}
         for stage in pipeline_stage.values():
+            serializable_context = stage.context.as_serializable()
             context.update({
-                context_key: context_value for context_key, context_value in stage.context.items() if context_key not in stage.context.known_keys
+                context_key: context_value for context_key, context_value in serializable_context
             })
 
         return {

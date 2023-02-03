@@ -1,5 +1,5 @@
 import asyncio
-import traceback
+from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -28,7 +28,7 @@ async def validate_to_setup_transition(current_stage: Stage, next_stage: Stage):
             await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
 
             current_stage.state = StageStates.VALIDATING
-            current_stage.stages = current_stage.context.stages
+            current_stage.context['validation_stages'] = current_stage.context.stages
             
             if current_stage.timeout:
                 await asyncio.wait_for(current_stage.run(), timeout=current_stage.timeout)
@@ -47,7 +47,11 @@ async def validate_to_setup_transition(current_stage: Stage, next_stage: Stage):
 
         next_stage.state = StageStates.VALIDATED
 
-        next_stage.context = current_stage.context
+        if next_stage.context is None:
+            next_stage.context = SimpleContext()
+
+        for known_key in current_stage.context.known_keys:
+            next_stage.context[known_key] = current_stage.context[known_key]
 
     except MissingReservedMethodError as missing_reserved_method_error:
         return missing_reserved_method_error, StageTypes.ERROR
@@ -85,8 +89,6 @@ async def validate_to_wait_transition(current_stage: Stage, next_stage: Stage):
             current_stage.state = StageStates.VALIDATED
 
         next_stage.state = StageStates.VALIDATED
-
-        next_stage.context = current_stage.context
 
     except MissingReservedMethodError as missing_reserved_method_error:
         return missing_reserved_method_error, StageTypes.ERROR

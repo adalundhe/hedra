@@ -1,4 +1,6 @@
 from __future__ import annotations
+import dill
+import asyncio
 from typing import Any, Optional, List, Union, Dict
 
 
@@ -17,6 +19,8 @@ class SimpleContext:
             'known_keys'
         ]
 
+        self.ignore_serialization_filters = []
+
         for kwarg_name, kwarg in kwargs.items():
             object.__setattr__(self, kwarg_name, kwarg)
 
@@ -26,8 +30,14 @@ class SimpleContext:
         })
 
     def __iter__(self):
+
+        ignore_items = [
+            *self.known_keys,
+            *self.ignore_serialization_filters
+        ]
+
         for key, value in self.__dict__.items():
-            if key.startswith('__') is False:
+            if key.startswith('__') is False and key not in ignore_items:
                 yield key, value
 
     def __getattribute__(self, __name: str) -> Any:
@@ -69,5 +79,56 @@ class SimpleContext:
     def update(self, update_context: Union[SimpleContext, Dict[str, Any]]):
         for context_key, context_value in update_context.items():
             object.__setattr__(self, context_key, context_value)
+
+    def as_serializable(self):
+
+        ignore_items = [
+            *self.known_keys,
+            *self.ignore_serialization_filters
+        ]
+
+        serialization_items = []
+        for key, value in self.__dict__.items():
+            if key.startswith('__') is False and key not in  ignore_items:
+                serialization_items.append((
+                    key,
+                    value
+                ))
+        
+        return serialization_items
+
+    def create_or_update(
+        self,
+        context_key: str,
+        value: Any,
+        default: Any
+    ):
+
+        if hasattr(self, context_key):
+            if isinstance(value, dict):
+                exitsting_value: dict = self.__getitem__(context_key)
+                exitsting_value.update(value)
+
+                self.__setitem__(context_key, exitsting_value)
+
+            elif isinstance(value, list):
+                exitsting_value: list = self.__getitem__(context_key)
+                exitsting_value.extend(value)
+
+                self.__setitem__(context_key, exitsting_value)
             
+            else:
+                self.__setitem__(context_key, value)
+
+        else:
+            self.__setitem__(context_key, default)
+
+    def create_if_not_exists(
+        self,
+        context_key: str,
+        value: Any
+    ):
+
+        if hasattr(self, context_key) is False:
+            self.__setitem__(context_key, value)
     

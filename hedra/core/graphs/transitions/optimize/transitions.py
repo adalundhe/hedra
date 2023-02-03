@@ -1,7 +1,7 @@
 import asyncio
-from sys import path
 import traceback
-import uuid
+from typing import Dict
+from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -20,7 +20,7 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
     await logger.spinner.system.debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Executing transition from {current_stage.name} to {next_stage.name}')
 
-    execute_stages = current_stage.context.stages.get(StageTypes.EXECUTE).items()
+    execute_stages = current_stage.context['stages'].get(StageTypes.EXECUTE).items()
     optimize_stages = current_stage.context.stages.get(StageTypes.OPTIMIZE).items()
     paths = current_stage.context.paths.get(current_stage.name)
 
@@ -33,9 +33,9 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
     optimize_stages_in_path = {}
     for stage_name, stage in optimize_stages:
         if stage_name in paths and stage_name != current_stage.name and stage_name not in visited:
-            optimize_stages_in_path[stage_name] = stage.context.paths.get(stage_name)
+            optimize_stages_in_path[stage_name] = current_stage.context.paths.get(stage_name)
 
-    optimization_candidates = {}
+    optimization_candidates: Dict[str, Stage] = {}
 
     valid_states = [
         StageStates.INITIALIZED,
@@ -55,28 +55,46 @@ async def optimize_transition(current_stage: Stage, next_stage: Stage):
                 stage.state = StageStates.OPTIMIZING
                 optimization_candidates[stage_name] = stage
 
-    next_stage.context = current_stage.context
-
     if len(optimization_candidates) > 0:
-   
+        current_stage.context['optimization_candidates'] = optimization_candidates
         current_stage.generation_optimization_candidates = len(optimization_candidates)
 
         if current_stage.timeout:
-            optimization_results = await asyncio.wait_for(current_stage.run(optimization_candidates), timeout=current_stage.timeout)
+            await asyncio.wait_for(current_stage.run(optimization_candidates), timeout=current_stage.timeout)
 
         else:
-            optimization_results = await current_stage.run(optimization_candidates)
+            await current_stage.run()
+        
+        if next_stage.context is None:
+            next_stage.context = SimpleContext()
+            
+        for known_key in current_stage.context.known_keys:
+            next_stage.context[known_key] = current_stage.context[known_key]
 
-        next_stage.context.optimized_params = optimization_results
+        next_stage.context['optimized_params'] = current_stage.context['optimized_params']
 
         for optimization_candidate in optimization_candidates.values():
+
+            if optimization_candidate.context is None:
+                optimization_candidate.context = SimpleContext()
+
+            optimization_candidate.context['optimized_params'] = current_stage.context['optimized_params']
+
+            optimized_config: Stage = current_stage.context['optimized_configs'].get(optimization_candidate.name)
+            optimzied_hooks: Stage = current_stage.context['optimzied_hooks'].get(optimization_candidate.name)
+            stage_setup_by: str = current_stage.context['stages_setup_by'].get(optimization_candidate.name)
+            if optimized_config and optimzied_hooks and stage_setup_by:
+                optimization_candidate.context['setup_config'] = optimized_config
+                optimization_candidate.context['execute_hooks'] = optimzied_hooks
+                optimization_candidate.context['setup_by'] = stage_setup_by
+
             optimization_candidate.state = StageStates.OPTIMIZED
+
 
     next_stage.state = StageStates.OPTIMIZED
 
     await logger.spinner.system.debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
     await logger.filesystem.aio['hedra.core'].debug(f'{current_stage.metadata_string} - Completed transition from {current_stage.name} to {next_stage.name}')
-
 
 
 async def optimize_to_execute_transition(current_stage: Stage, next_stage: Stage):
@@ -91,7 +109,6 @@ async def optimize_to_execute_transition(current_stage: Stage, next_stage: Stage
     except Exception as stage_execution_error:
         return StageExecutionError(current_stage, next_stage, str(stage_execution_error)), StageTypes.ERROR
 
-    
     current_stage = None
 
     return None, StageTypes.EXECUTE

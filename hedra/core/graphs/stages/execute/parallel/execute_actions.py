@@ -4,39 +4,46 @@ import os
 import time
 import signal
 import dill
-from hedra.core.graphs.hooks.registry.registrar import registrar
+import asyncio
+from collections import defaultdict
 from typing import Dict, Any, List, Union, Tuple
 from hedra.core.engines.client.config import Config
-from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
-from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.registry import RequestTypes
 from hedra.core.engines.types.registry import registered_engines
+from hedra.core.graphs.hooks.registry.registrar import registrar
+from hedra.core.personas import get_persona
 from hedra.core.personas.persona_registry import registered_personas
-from hedra.core.graphs.events import get_event
-from hedra.core.graphs.events.base_event import BaseEvent
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
-from hedra.plugins.types.plugin_types import PluginType
-from hedra.plugins.types.engine.engine_plugin import EnginePlugin
-from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
-from hedra.core.graphs.stages.setup.setup import Setup
+from hedra.core.graphs.events.event_graph import EventGraph
+from hedra.core.graphs.simple_context import SimpleContext
+from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.base.import_tools import (
     import_stages, 
     import_plugins, 
     set_stage_hooks
 )
-from hedra.core.personas import get_persona
+from hedra.core.graphs.stages.setup.setup import Setup
 from hedra.logging import (
     HedraLogger,
     LoggerTypes,
     logging_manager
 )
 
-from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
+from hedra.plugins.types.plugin_types import PluginType
+from hedra.plugins.types.engine.engine_plugin import EnginePlugin
+from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
 
 
-async def start_execution(parallel_config: Dict[str, Any]):
+async def start_execution(
+    metadata_string: str,
+    persona_config: Config,
+    setup_stage: Setup,
+    workers: int,
+    source_stage_name: str
+):
 
     hedra_config_filepath = os.path.join(
         os.getcwd(),
@@ -58,7 +65,8 @@ async def start_execution(parallel_config: Dict[str, Any]):
 
     logging_manager.disable(
         LoggerTypes.DISTRIBUTED,
-        LoggerTypes.DISTRIBUTED_FILESYSTEM
+        LoggerTypes.DISTRIBUTED_FILESYSTEM,
+        LoggerTypes.SPINNER
     )
 
     logging_manager.update_log_level(log_level)
@@ -72,75 +80,16 @@ async def start_execution(parallel_config: Dict[str, Any]):
 
     start = time.monotonic()
 
-    graph_name = parallel_config.get('graph_name')
-    graph_path: str= parallel_config.get('graph_path') 
-    graph_id = parallel_config.get('graph_id')
-    source_stage_name = parallel_config.get('source_stage_name')
-    source_stage_context: Dict[str, Any] = parallel_config.get('source_stage_context')
-    source_stage_linked_events: Dict[Tuple[HookType, str], List[Tuple[str, str]]] = parallel_config.get('source_stage_linked_events')
-    source_stage_plugins = parallel_config.get('source_stage_plugins')
-    source_stage_config = parallel_config.get('source_stage_config')
-    source_stage_id = parallel_config.get('source_stage_id')
-    thread_id = threading.current_thread().ident
-    process_id = os.getpid()
-
-    metadata_string = f'Graph - {graph_name}:{graph_id} - thread:{thread_id} - process:{process_id} - Stage: {source_stage_name}:{source_stage_id} - '
-
-    execution_hooks = parallel_config.get('hooks')
-    partition_method = parallel_config.get('partition_method')
-    persona_config: Config = parallel_config.get('config')
-    workers = parallel_config.get('workers')
-    worker_id = parallel_config.get('worker_id')
-
-    discovered: Dict[str, Stage] = import_stages(graph_path)
-    plugins_by_type = import_plugins(graph_path)
-    execute_stage: Stage = discovered.get(source_stage_name)()
-    execute_stage: Stage = set_stage_hooks(execute_stage)
-
-    execute_stage.context.update(source_stage_context)
-
-    execution_hooks_count = len(execution_hooks)
-
-    if partition_method == PartitionMethod.BATCHES and persona_config.optimized is False:
-        if workers == worker_id:
-            persona_config.batch_size = int(persona_config.batch_size/workers) + (persona_config.batch_size%workers)
-        
-        else:
-            persona_config.batch_size = int(persona_config.batch_size/workers)
-
-
-    stage_persona_plugins: List[str] = source_stage_plugins[PluginType.PERSONA]
-    persona_plugins: Dict[str, PersonaPlugin] = plugins_by_type[PluginType.PERSONA]
-
-    stage_engine_plugins: List[str] = source_stage_plugins[PluginType.ENGINE]
-    engine_plugins: Dict[str, EnginePlugin] = plugins_by_type[PluginType.ENGINE]
     
-    for plugin_name in stage_persona_plugins:
-        plugin = persona_plugins.get(plugin_name)
-        plugin.name = plugin_name
-        registered_personas[plugin_name] = lambda config: plugin(config)
-    
-    for plugin_name in stage_engine_plugins:
-        plugin = engine_plugins.get(plugin_name)
-        plugin.name = plugin_name
-        registered_engines[plugin_name] = lambda config: plugin(config)
-
     persona = get_persona(persona_config)
     persona.workers = workers
 
+    await setup_stage.run_internal()
 
-    await logger.filesystem.aio['hedra.core'].info(
-        f'{metadata_string} - Executing {execution_hooks_count} actions with a batch size of {persona_config.batch_size} for {persona_config.total_time} seconds using Persona - {persona.type.capitalize()}'
-    )
+    stages: Dict[str, Stage] =  setup_stage.context['ready_stages']
 
-    setup_stage = Setup()
-    setup_stage.plugins_by_type = plugins_by_type
-    setup_stage.generation_setup_candidates = 1
-    setup_stage.stages[execute_stage.name] = execute_stage
-    setup_stage.config = source_stage_config
-
-    stages: Dict[str, Stage] = await setup_stage.run()
     setup_execute_stage: Stage = stages.get(source_stage_name)
+    setup_execute_stage.logger = logger
 
     actions = {
         hook.name: hook for hook in setup_execute_stage.hooks[HookType.ACTION]
@@ -156,7 +105,14 @@ async def start_execution(parallel_config: Dict[str, Any]):
     ]
 
 
+    execution_hooks_count = len(actions_and_tasks)
+    await logger.filesystem.aio['hedra.core'].info(
+        f'{metadata_string} - Executing {execution_hooks_count} actions with a batch size of {persona_config.batch_size} for {persona_config.total_time} seconds using Persona - {persona.type.capitalize()}'
+    )
+
+
     for hook in actions_and_tasks:
+
         if hook.action.hooks.notify:
             for idx, listener_name in enumerate(hook.action.hooks.listeners):
                 hook.action.hooks.listeners[idx] = actions.get(listener_name)
@@ -183,73 +139,9 @@ async def start_execution(parallel_config: Dict[str, Any]):
                 options=persona_config.playwright_options
             ))
     
-    loaded_stages: Dict[str, Stage] = {
-        setup_execute_stage.name: setup_execute_stage
-    }
     pipeline_stages = {
         setup_execute_stage.name: setup_execute_stage
     }
-
-    for event_target in source_stage_linked_events:
-        target_hook_stage, target_hook_type, target_hook_name = event_target
-        for event_source in source_stage_linked_events[event_target]:
-            event_source_stage, _, event_hook_name = event_source
-            
-            if target_hook_stage == source_stage_name:
-
-                source_stage: Stage = loaded_stages.get(event_source_stage)
-
-                if source_stage is None:
-                    source_stage = discovered.get(event_source_stage)()
-                    source_stage = set_stage_hooks(source_stage)
-                    
-                    loaded_stages[source_stage.name] = source_stage
-
-
-                source_stage = set_stage_hooks(source_stage)
-
-                pipeline_stages[source_stage.name] = source_stage
-
-                source_events = [
-                    *source_stage.hooks[HookType.EVENT],
-                    *source_stage.hooks[HookType.TRANSFORM]
-                ]
-
-                source_event_hook_names = [hook.name for hook in source_events]
-                source_hook_idx = source_event_hook_names.index(event_hook_name)
-
-                source_hook: Hook = source_events[source_hook_idx]
-
-                target_hook_names = [hook.name for hook in setup_execute_stage.hooks[target_hook_type]]
-                target_hook_idx = target_hook_names.index(target_hook_name)
-
-                target_hook: Hook = setup_execute_stage.hooks[target_hook_type][target_hook_idx]
-                target_hook.stage = source_stage_name
-                target_hook.stage_instance = setup_execute_stage
-                target_hook.stage_instance.hooks = setup_execute_stage.hooks
-
-                event = get_event(target_hook, source_hook)
-
-                if target_hook_idx >= 0 and isinstance(target_hook, BaseEvent):
-                    if source_hook.pre is True:
-                        target_hook.pre_sources[source_hook.name] = source_hook
-                        target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
-
-                    else:
-                        target_hook.post_sources[source_hook.name] = source_hook
-                        target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = target_hook
-                    
-                    registrar.all[event.name] = target_hook
-
-                elif target_hook_idx >= 0:
-                    target_hook.stage_instance.hooks[target_hook.hook_type][target_hook_idx] = event
-                    registrar.all[event.name] = event
-                
-                target_hook.stage_instance.linked_events[(target_hook.stage, target_hook.hook_type, target_hook.name)].append(
-                    (source_hook.stage, source_hook.hook_type, source_hook.name)
-                )
-
-                setup_execute_stage.hooks[target_hook_type][target_hook_idx] = event
                 
     persona.setup(setup_execute_stage.hooks, metadata_string)
 
@@ -265,11 +157,13 @@ async def start_execution(parallel_config: Dict[str, Any]):
         result.checks = [check.name for check in result.checks]
 
     context = {}
+
     for stage in pipeline_stages.values():
+        serializable_context = stage.context.as_serializable()
         context.update({
-            context_key: context_value for context_key, context_value in stage.context.items() if context_key not in stage.context.known_keys
+            context_key: context_value for context_key, context_value in serializable_context
         })   
-    
+
     return {
         'results': results,
         'total_results': len(results),
@@ -282,8 +176,13 @@ def execute_actions(parallel_config: str):
     import asyncio
     import uvloop
     uvloop.install()
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+
+    try:
+        loop = asyncio.get_event_loop()
+    except Exception:
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
 
     def handle_loop_stop(signame):
         try:
@@ -302,11 +201,118 @@ def execute_actions(parallel_config: str):
         )
 
     try:
-        
         parallel_config: Dict[str, Any] = dill.loads(parallel_config)
+        
+        graph_name = parallel_config.get('graph_name')
+        graph_path: str= parallel_config.get('graph_path') 
+        graph_id = parallel_config.get('graph_id')
+        source_stage_name = parallel_config.get('source_stage_name')
+        source_stage_context: Dict[str, Any] = parallel_config.get('source_stage_context')
+        source_stage_plugins = parallel_config.get('source_stage_plugins')
+        source_stage_config: Config = parallel_config.get('source_stage_config')
+        source_stage_id = parallel_config.get('source_stage_id')
+        source_setup_stage_name = parallel_config.get('source_setup_stage_name')
+        thread_id = threading.current_thread().ident
+        process_id = os.getpid()
+
+        metadata_string = f'Graph - {graph_name}:{graph_id} - thread:{thread_id} - process:{process_id} - Stage: {source_stage_name}:{source_stage_id} - '
+
+        partition_method = parallel_config.get('partition_method')
+        workers = parallel_config.get('workers')
+        worker_id = parallel_config.get('worker_id')
+
+        discovered: Dict[str, Stage] = import_stages(graph_path)
+        plugins_by_type = import_plugins(graph_path)
+
+        
+        initialized_stages = {}
+        hooks_by_type = defaultdict(dict)
+        hooks_by_name = {}
+        hooks_by_shortname = defaultdict(dict)
+
+        generated_hooks = {}
+        for stage in discovered.values():
+            stage: Stage = stage()
+            stage.graph_name = graph_name
+            stage.graph_path = graph_path
+            stage.graph_id = graph_id
+
+            for hook_shortname, hook in registrar.reserved[stage.name].items():
+                hook._call = hook._call.__get__(stage, stage.__class__)
+                setattr(stage, hook_shortname, hook._call)
+
+            initialized_stage = set_stage_hooks(
+                stage, 
+                generated_hooks
+            )
+
+            for hook_type in initialized_stage.hooks:
+
+                for hook in initialized_stage.hooks[hook_type]:
+                    hooks_by_type[hook_type][hook.name] = hook
+                    hooks_by_name[hook.name] = hook
+                    hooks_by_shortname[hook_type][hook.shortname] = hook
+
+            initialized_stages[initialized_stage.name] = initialized_stage
+
+        execute_stage: Stage = initialized_stages.get(source_stage_name)
+        execute_stage.context.update(source_stage_context)
+
+        setup_stage: Setup = initialized_stages.get(source_setup_stage_name)
+        setup_stage.context.update(source_stage_context)
+
+
+        if partition_method == PartitionMethod.BATCHES and source_stage_config.optimized is False:
+            if workers == worker_id:
+                source_stage_config.batch_size = int(source_stage_config.batch_size/workers) + (source_stage_config.batch_size%workers)
+            
+            else:
+                source_stage_config.batch_size = int(source_stage_config.batch_size/workers)
+
+
+        stage_persona_plugins: List[str] = source_stage_plugins[PluginType.PERSONA]
+        persona_plugins: Dict[str, PersonaPlugin] = plugins_by_type[PluginType.PERSONA]
+
+        stage_engine_plugins: List[str] = source_stage_plugins[PluginType.ENGINE]
+        engine_plugins: Dict[str, EnginePlugin] = plugins_by_type[PluginType.ENGINE]
+        
+        for plugin_name in stage_persona_plugins:
+            plugin = persona_plugins.get(plugin_name)
+            plugin.name = plugin_name
+            registered_personas[plugin_name] = lambda config: plugin(config)
+        
+        for plugin_name in stage_engine_plugins:
+            plugin = engine_plugins.get(plugin_name)
+            plugin.name = plugin_name
+            registered_engines[plugin_name] = lambda config: plugin(config)
+
+
+        for hook_type in setup_stage.hooks:
+            for hook in setup_stage.hooks[hook_type]:
+                hooks_by_type[hook_type][hook.name] = hook
+
+        events_graph = EventGraph(hooks_by_type)
+        events_graph.hooks_by_name = hooks_by_name
+        events_graph.hooks_by_shortname = hooks_by_shortname
+        events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
+
+        setup_stage.context = SimpleContext()
+        setup_stage.config = source_stage_config
+        setup_stage.generation_setup_candidates = 1
+        setup_stage.context['setup_config'] = source_stage_config
+        setup_stage.context['setup_stages'] = {
+            execute_stage.name: execute_stage
+        }
+  
 
         result = loop.run_until_complete(
-            start_execution(parallel_config)
+            start_execution(
+                metadata_string,
+                source_stage_config,
+                setup_stage,
+                workers,
+                source_stage_name
+            )
         )
 
         return result

@@ -73,6 +73,14 @@ class MercuryCustomClient(Generic[A, R]):
 
         self.pool.create_pool()
 
+    async def set_pool(self, concurrency: int):
+        self.sem = asyncio.Semaphore(value=concurrency)
+        self.pool = CustomPool(
+            self.custom_connection,
+            concurrency, 
+            reset_connections=self.pool.reset_connections
+        )
+        self.pool.create_pool()
 
     def extend_pool(self, increased_capacity: int):
         self.pool.size += increased_capacity
@@ -119,6 +127,8 @@ class MercuryCustomClient(Generic[A, R]):
         
         result.times['wait_start'] = time.monotonic()
         self.active += 1
+
+        action_event = action.event
  
         async with self.sem:
             connection = self.pool.connections.pop()
@@ -130,8 +140,8 @@ class MercuryCustomClient(Generic[A, R]):
                     action.hooks.channel_events.append(event)
                     await event.wait()
 
-                if action.hooks.before:
-                    action = await action.hooks.before(action, result)
+                if action_event:
+                    action, result = await action_event.execute_pre(action, result)
                     action.setup()
 
                 result.times['start'] = time.monotonic()
@@ -145,8 +155,8 @@ class MercuryCustomClient(Generic[A, R]):
        
                 self.pool.connections.append(connection)
 
-                if action.hooks.after:
-                    action = await action.hooks.after(action, result)
+                if action_event:
+                    action, result = await action_event.execute_post(action, result)
                     action.setup()
 
                 if action.hooks.notify:

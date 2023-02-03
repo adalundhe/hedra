@@ -1,7 +1,8 @@
-import asyncio
 import inspect
-from typing import Dict, List, Union
+from typing import Dict, List
 from collections import defaultdict
+from hedra.core.graphs.hooks.hook_types.context import context
+from hedra.core.graphs.hooks.hook_types.event import event
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.hooks.registry.registry_types import ValidateHook
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
@@ -36,7 +37,7 @@ class Validate(Stage):
                 assert hook.hook_type == HookType.INTERNAL
 
                 internal_hook = getattr(self, hook.shortname)
-                assert inspect.getsource(internal_hook) == inspect.getsource(hook.call)
+                assert inspect.getsource(internal_hook) == inspect.getsource(hook._call)
 
             except AssertionError:
                 raise ReservedMethodError(self, reserved_hook_name)
@@ -57,19 +58,33 @@ class Validate(Stage):
 
     @Internal()
     async def run(self):
-        
-        await self.run_pre_events()
-
-        validator = Validator(self.stages, self.metadata_string)
+        await self.setup_events()
+        await self.dispatcher.dispatch_events()
+    
+    @context()
+    async def validate_stages(
+        self,
+        validation_stages: Dict[str, Stage]={}
+    ):
+        validator = Validator(validation_stages, self.metadata_string)
         await validator.validate_stages()
+
+        return {
+            'validator': validator
+        }
+
+    @event('validate_stages')
+    async def validate_hooks(
+        self,
+        validator: Validator=None
+    ):
 
         validator_hooks = await self.collect_validate_hooks()
         validator.add_hooks(HookType.VALIDATE, validator_hooks)
 
         await validator.validate_hooks()
 
-        await self.run_post_events()
-
+    @Internal()
     async def collect_validate_hooks(self):       
         
         validate_hooks: List[ValidateHook] = []
@@ -77,10 +92,11 @@ class Validate(Stage):
         methods = inspect.getmembers(self, predicate=inspect.ismethod)
         for _, method in methods:
             method_name = method.__qualname__
-            hook: Hook = registrar.all.get(method_name)
-                        
-            if hook and hook.hook_type is HookType.VALIDATE:
-                validate_hooks.append(hook)
-                await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Validation hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
+            hook_set: List[Hook] = registrar.all.get(method_name, [])
+            
+            for hook in hook_set:
+                if hook.hook_type is HookType.VALIDATE:
+                    validate_hooks.append(hook)
+                    await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Validation hook - {hook.name}:{hook.hook_id}:{hook.hook_id}')
 
         return validate_hooks

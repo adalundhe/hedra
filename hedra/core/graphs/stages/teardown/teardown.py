@@ -2,6 +2,7 @@ import asyncio
 import inspect
 from typing import List
 from hedra.core.graphs.hooks.registry.registrar import registrar
+from hedra.core.graphs.hooks.hook_types.event import event  
 from hedra.core.graphs.hooks.hook_types.internal import Internal
 from hedra.core.graphs.hooks.registry.registry_types import TeardownHook
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
@@ -20,26 +21,39 @@ class Teardown(Stage):
             HookType.CONDITION,
             HookType.CONTEXT,
             HookType.EVENT, 
-            HookType.TRANSFORM
+            HookType.TRANSFORM,
+            HookType.TEARDOWN
         ]
 
     @Internal()
     async def run(self):
+        await self.setup_events()
+        await self.dispatcher.dispatch_events()
 
-        await self.run_pre_events()
-
+    @event()
+    async def collect_teardown_hooks(self):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting Teardown stage.')
 
         methods = inspect.getmembers(self, predicate=inspect.ismethod) 
         for _, method in methods:
 
             method_name = method.__qualname__
-            hook: Hook = registrar.all.get(method_name)
+            hook_set: List[Hook] = registrar.all.get(method_name, [])
 
-            if hook:
+            for hook in hook_set:
                 self.hooks[hook.hook_type].append(hook)
 
         teardown_hooks: List[TeardownHook] = self.hooks[HookType.TEARDOWN]
+
+        return {
+            'teardown_hooks': teardown_hooks
+        }
+
+    @event('collect_teardown_hooks')
+    async def run_teardown_hooks(
+        self,
+        teardown_hooks: List[TeardownHook]=[]
+    ):
 
         if teardown_hooks:
 
@@ -49,7 +63,5 @@ class Teardown(Stage):
             results = await asyncio.gather(*[teardown_hook.call(self.context) for teardown_hook in teardown_hooks])
             for result in results:
                 self.context = result
-
-        await self.run_post_events()
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Teardown complete.')

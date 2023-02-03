@@ -19,5 +19,27 @@ class ValidateHook(Hook):
             hook_type=HookType.VALIDATE
         )
         
-        self.call: Type[self._call] = self._call
         self.names = list(set(names))
+
+
+    async def call(self, **kwargs):
+        result = await super().call(**{name: value for name, value in kwargs.items() if name in self.params})
+
+        if isinstance(result, dict):
+            return {
+                **kwargs,
+                **result
+            }
+
+        return {
+            **kwargs,
+            'valid': result
+        }
+
+    def copy(self):
+        return ValidateHook(
+            self.name,
+            self.shortname,
+            self._call,
+            *self.names
+        )
