@@ -286,7 +286,6 @@ def execute_actions(parallel_config: str):
             plugin.name = plugin_name
             registered_engines[plugin_name] = lambda config: plugin(config)
 
-
         for hook_type in setup_stage.hooks:
             for hook in setup_stage.hooks[hook_type]:
                 hooks_by_type[hook_type][hook.name] = hook
@@ -295,6 +294,9 @@ def execute_actions(parallel_config: str):
         events_graph.hooks_by_name = hooks_by_name
         events_graph.hooks_by_shortname = hooks_by_shortname
         events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
+
+        for stage in initialized_stages.values():
+            stage.dispatcher.assemble_action_and_task_subgraphs()
 
         setup_stage.context = SimpleContext()
         setup_stage.config = source_stage_config

@@ -90,6 +90,19 @@ class EventDispatcher:
                     self.skip_list.append(event_name)
                     action_or_task_event.after.extend(event.execution_path)
 
+
+        for event in self.actions_and_tasks.values():
+            for idx, layer in enumerate(event.before):
+                event.before[idx] = [
+                    self.events_by_name.get(event_name) for event_name in layer
+                ]
+
+        for event in self.actions_and_tasks.values():
+            for idx, layer in enumerate(event.after):
+                event.after[idx] = [
+                    self.events_by_name.get(event_name) for event_name in layer
+                ]
+
     def _prepend_action_or_task_event(self, dependency_event: BaseEvent, action_or_task: BaseEvent):
         execution_path = list(dependency_event.execution_path)
 
@@ -105,7 +118,6 @@ class EventDispatcher:
 
                 if len(layer) < 1:
                     dependency_event.execution_path.remove(layer)
-
 
         return dependency_event.execution_path
 

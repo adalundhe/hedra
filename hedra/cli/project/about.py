@@ -34,7 +34,7 @@ def about_project(
 
     else:
         logger.console.sync.error(f'No project found at path - {path}\n')
-        exit(0)
+        os._exit(0)
 
     project_name = hedra_config.get('name')
     logger.console.sync.info(f'Project - {project_name}')

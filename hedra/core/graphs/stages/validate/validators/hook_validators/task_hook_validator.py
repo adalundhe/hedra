@@ -27,7 +27,6 @@ class TaskHookValidator(BaseHookVaidator):
             assert hook.hook_type is HookType.TASK, f"Hook type mismatch - hook {hook.name}:{hook.hook_id} is a {hook.hook_type.name} hook, but Hedra expected a {HookType.TASK.name} hook."
             assert hook.shortname in hook.name, f"Shortname {hook.shortname} must be contained in full Hook name {hook.name}:{hook.hook_id} for @task hook {hook.name}:{hook.hook_id}."
             assert call is not None, f"Method is not not found on stage or was not supplied to @task hook - {hook.name}:{hook.hook_id}"
-            assert call.__code__.co_argcount == 1, f"Too many args. - @task hook {hook.name}:{hook.hook_id} requires no additional args."
             assert 'self' in call.__code__.co_varnames
 
             for notify_action in hook.notifiers:

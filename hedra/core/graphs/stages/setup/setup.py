@@ -152,7 +152,6 @@ class Setup(Stage, Generic[Unpack[T]]):
         self.client._config = self.config
 
         self.internal_hooks.extend([
-            'get_hook',
             'get_checks',
             'setup'
         ])
@@ -341,9 +340,13 @@ class Setup(Stage, Generic[Unpack[T]]):
                 await session.set_pool(setup_config.batch_size)
 
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved prepared Action and Session for action - {hook.name}:{action.action_id} - Execute stage - {execute_stage_name}')
-                
-                action.hooks.before =  await self.get_hook(hook.stage_instance, hook.shortname, HookType.BEFORE)
-                action.hooks.after = await self.get_hook(hook.stage_instance, hook.shortname, HookType.AFTER)
+                    
+                if len(hook.before) > 0:
+                    action.hooks.before = hook.before
+
+                if len(hook.after) > 0:
+                    action.hooks.after = hook.after
+
                 action.hooks.checks = await self.get_checks(hook.stage_instance, hook.shortname)
                 
                 hook.session = session
@@ -400,6 +403,12 @@ class Setup(Stage, Generic[Unpack[T]]):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved task and session for Task - {hook.name}:{task.action_id} - Execute stage - {execute_stage_name}')
 
+            if len(hook.before) > 0:
+                task.hooks.before = hook.before
+
+            if len(hook.after) > 0:
+                task.hooks.after = hook.after
+
             task.hooks.checks = await self.get_checks(execute_stage, hook.shortname)
 
             hook.session = session
@@ -455,15 +464,6 @@ class Setup(Stage, Generic[Unpack[T]]):
     @event('apply_channels')
     async def complete(self):
         return {}
-
-    @Internal()
-    async def get_hook(self, execute_stage: Stage, shortname: str, hook_type: str) -> Coroutine:
-        hooks: List[Union[AfterHook, BeforeHook]] = execute_stage.hooks[hook_type]
-        for hook in hooks:
-            if shortname in hook.names:
-                await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Adding Hook - {hook.name}:{hook.hook_id} - of type - {hook.hook_type.name.capitalize()} - to Action - {shortname} - for Execute stage - {execute_stage.name}')
-
-                return hook
 
     @Internal()
     async def get_checks(self, execute_stage: Stage, shortname: str) -> List[Coroutine]:

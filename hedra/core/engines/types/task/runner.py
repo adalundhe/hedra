@@ -1,8 +1,9 @@
 import asyncio
 import time
 import uuid
+import asyncio
 import traceback
-from typing import Awaitable, Dict
+from typing import Awaitable, Dict, List, Any, Union
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.concurrency import Semaphore
 from hedra.core.engines.types.common.base_result import BaseResult
@@ -42,6 +43,54 @@ class MercuryTaskRunner:
         self.sem = asyncio.Semaphore(value=concurrency)
         self.active = 0
         self.waiter = None
+
+    
+    async def execute_before(self, task: Task):
+        task.task_args = {
+            'task': task
+        }
+        for before_batch in task.hooks.before:
+            results: List[Dict[str, Any]] = await asyncio.gather(*[
+                before.call(**{
+                    name: value for name, value in task.task_args.items() if name in before.params
+                }) for before in before_batch
+            ])
+
+            for before_event, result in zip(before_batch, results):
+                for data in result.values():
+                    if isinstance(result, dict):
+                        task.task_args.update(data)
+
+                    else:
+                        task.task_args.update({
+                            before_event.shortname: data
+                        })
+
+        return task
+
+    
+    async def execute_after(self, task: Task, result: Union[BaseResult, TaskResult]):
+        
+        task.task_args['result'] = result
+
+        for after_batch in task.hooks.after:
+            results = await asyncio.gather(*[
+                after.call(**{
+                    name: value for name, value in task.task_args.items() if name in after.params
+                }) for after in after_batch
+            ])
+
+            for after_event, result in zip(after_batch, results):
+                for data in result.values():
+                    if isinstance(result, dict):
+                        task.task_args.update(data)
+
+                    else:
+                        task.task_args.update({
+                            after_event.shortname: data
+                        })
+ 
+        return result
     
     async def set_pool(self, concurrency: int):
         self.pool = SimpleContext()
@@ -70,7 +119,6 @@ class MercuryTaskRunner:
         wait_start = time.monotonic()
         self.active += 1
 
-        task_event = task.event
         start = 0
  
         async with self.sem:
@@ -82,13 +130,14 @@ class MercuryTaskRunner:
                     task.hooks.channel_events.append(event)
                     await event.wait()
                 
-
-                if task_event:
-                    task, result = await task_event.execute_pre(task, result)
+                if task.hooks.before:
+                    task: Task = await self.execute_before(task)
 
                 start = time.monotonic()
 
-                result: BaseResult = await task.execute()
+                result: BaseResult = await task.execute(**{
+                    name: value for name, value in task.task_args.items() if name in task.params
+                })
                 
                 result.name = task.name
                 result.source = task.source
@@ -99,9 +148,8 @@ class MercuryTaskRunner:
                 result.start = start
                 result.complete = time.monotonic()
 
-
-                if task_event:
-                    task, result = await task_event.execute_post(task, result)
+                if task.hooks.after:
+                    result: Union[BaseResult, TaskResult] = await self.execute_after(task, result)
 
                 if task.hooks.notify:
                     await asyncio.gather(*[

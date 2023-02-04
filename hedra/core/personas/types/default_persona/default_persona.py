@@ -128,28 +128,10 @@ class DefaultPersona:
             hook.name: hook for hook in tasks
         })
 
-        before_hooks= {
-            hook.name: hook for hook in hooks[HookType.BEFORE]
-        }
-
-        after_hooks = {
-            hook.name: hook for hook in hooks[HookType.AFTER]
-        }
-
         channel_hooks = {
             hook.name: hook for hook in hooks[HookType.CHANNEL]
         }
-
-        for hook in persona_hooks.values():
-            before_hook = hook.action.hooks.before_hook_name
-            if before_hook:
-                hook.action.hooks.before = before_hooks.get(before_hook)
-
-            after_hook = hook.action.hooks.after_hook_name
-            if after_hook:
-                hook.action.hooks.after = after_hooks.get(after_hook)
-
-            
+        
         for channel_hook in channel_hooks.values():
             for notifier_name in channel_hook.notifiers:
                 notifier_hook = persona_hooks[notifier_name]

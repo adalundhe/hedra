@@ -35,16 +35,6 @@ class Hooks(Generic[A]):
         self.channels: List[Coroutine] = []
 
     @property
-    def before_hook_name(self):
-        if self.before:
-            return self.before.name
-
-    @property
-    def after_hook_name(self):
-        if self.after:
-            return self.after.name
-
-    @property
     def channel_hook_names(self):
         if self.channels:
             return [
