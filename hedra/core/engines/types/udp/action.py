@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Iterator, Union, List
+from typing import Dict, Iterator, Union, List, Any
 from urllib.parse import urlencode
 from hedra.core.engines.types.common.base_action import BaseAction
 from hedra.core.engines.types.common.hooks import Hooks
@@ -20,7 +20,8 @@ class UDPAction(BaseAction):
         'encoded_data',
         'is_stream',
         'ssl_context',
-        'event'
+        'event',
+        'action_args'
     )
     
     def __init__(
@@ -50,6 +51,7 @@ class UDPAction(BaseAction):
         self.is_stream = False
         self.ssl_context = None
         self.hooks: Hooks[UDPAction] = Hooks()
+        self.action_args: Dict[str, Any] = {}
 
     @property
     def size(self):

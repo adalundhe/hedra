@@ -1,4 +1,4 @@
-from typing import Dict, Iterator, Union, List
+from typing import Dict, Iterator, Union, List, Any
 from hedra.core.engines.types.common.hooks import Hooks
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.http.action import HTTPAction
@@ -35,6 +35,7 @@ class WebsocketAction(HTTPAction):
             tags
         )
 
+        self.action_args: Dict[str, Any] = {}
         self.type = RequestTypes.WEBSOCKET
         self.hooks: Hooks[WebsocketAction] = Hooks()
 

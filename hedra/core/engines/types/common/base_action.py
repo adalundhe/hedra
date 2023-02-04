@@ -1,10 +1,14 @@
 import uuid
-from typing import Any, Coroutine, Dict, Iterator, Union, List
+from typing import Any, Dict, List, Any, TypeVar, Generic
 from .metadata import Metadata
 from .hooks import Hooks
 from .types import ProtocolMap
 
-class BaseAction:
+
+A = TypeVar('A')
+
+
+class BaseAction(Generic[A]):
 
     __slots__ = ( 
         'action_id'
@@ -13,7 +17,8 @@ class BaseAction:
         'is_setup', 
         'metadata', 
         'hooks',
-        'event'
+        'event',
+        'action_args'
     )
 
     def __init__(
@@ -29,3 +34,4 @@ class BaseAction:
         self.metadata = Metadata(user, tags)
         self.hooks: Hooks[BaseAction] = Hooks()
         self.event = None
+        self.action_args: Dict[str, Any] = {}

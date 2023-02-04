@@ -1,8 +1,8 @@
 import asyncio
 import time
 import uuid
-import traceback
-from typing import Awaitable, Dict, Set, Tuple, Union
+from typing import Dict, Any, Union, Coroutine, TypeVar
+from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.concurrency import Semaphore
@@ -13,11 +13,11 @@ from .result import HTTPResult
 from .pool import Pool
 
 
-HTTPResponseFuture = Awaitable[Union[HTTPResult, Exception]]
-HTTPBatchResponseFuture = Awaitable[Tuple[Set[HTTPResponseFuture], Set[HTTPResponseFuture]]]
+A = TypeVar('A')
+R = TypeVar('R')
 
 
-class MercuryHTTPClient:
+class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
 
     __slots__ = (
         'session_id',
@@ -34,6 +34,10 @@ class MercuryHTTPClient:
     )
 
     def __init__(self, concurrency: int=10**3, timeouts: Timeouts = Timeouts(), reset_connections: bool=False) -> None:
+        super(
+            MercuryHTTPClient,
+            self
+        ).__init__()
 
         self.session_id = str(uuid.uuid4())
         self.timeouts = timeouts
@@ -57,13 +61,21 @@ class MercuryHTTPClient:
         self.pool = Pool(concurrency, reset_connections=self.pool.reset_connections)
         self.pool.create_pool()
 
-    async def wait_for_active_threshold(self):
-        if self.waiter is None:
-            self.waiter = asyncio.get_event_loop().create_future()
-            await self.waiter
+    def extend_pool(self, increased_capacity: int):
+        self.pool.size += increased_capacity
+        for _ in range(increased_capacity):
+            self.pool.connections.append(
+                HTTPConnection(self.pool.reset_connections)
+            )
+        
+        self.sem = Semaphore(self.pool.size)
 
+    def shrink_pool(self, decrease_capacity: int):
+        self.pool.size -= decrease_capacity
+        self.pool.connections = self.pool.connections[:self.pool.size]
+        self.sem = Semaphore(self.pool.size)
 
-    async def prepare(self, action: HTTPAction) -> Awaitable[Union[HTTPAction, Exception]]:
+    async def prepare(self, action: HTTPAction) -> Coroutine[Any, Any, None]:
         try:
             if action.url.is_ssl:
                 action.ssl_context = self.ssl_context
@@ -118,27 +130,11 @@ class MercuryHTTPClient:
         except Exception as e:       
             raise e
 
-    def extend_pool(self, increased_capacity: int):
-        self.pool.size += increased_capacity
-        for _ in range(increased_capacity):
-            self.pool.connections.append(
-                HTTPConnection(self.pool.reset_connections)
-            )
-        
-        self.sem = Semaphore(self.pool.size)
-
-    def shrink_pool(self, decrease_capacity: int):
-        self.pool.size -= decrease_capacity
-        self.pool.connections = self.pool.connections[:self.pool.size]
-        self.sem = Semaphore(self.pool.size)
-
-    async def execute_prepared_request(self, action: HTTPAction) -> HTTPResponseFuture:
+    async def execute_prepared_request(self, action: HTTPAction) -> Coroutine[Any, Any, HTTPResult]:
   
         response = HTTPResult(action)
         response.wait_start = time.monotonic()
         self.active += 1
-
-        action_event = action.event
  
         async with self.sem:
             connection = self.pool.connections.pop()
@@ -150,8 +146,8 @@ class MercuryHTTPClient:
                     action.hooks.channel_events.append(event)
                     await event.wait()
 
-                if action_event:
-                    action, response = await action_event.execute_pre(action, response)
+                if action.hooks.before:
+                    action = await self.execute_before(action)
                     action.setup()
 
                 response.start = time.monotonic()
@@ -275,8 +271,8 @@ class MercuryHTTPClient:
                 
                 self.pool.connections.append(connection)
 
-                if action_event:
-                    action, response = await action_event.execute_post(action, response)
+                if action.hooks.after:
+                    response = await self.execute_after(action, response)
                     action.setup()
 
                 if action.hooks.notify:

@@ -225,7 +225,7 @@ class Graph:
                 await status_spinner.ok('✔')
             
         if self.status == GraphStatus.RUNNING:
-            await status_spinner.system.debug(f'{self.metadata_string} - Changed status to - {GraphStatus.COMPLETE.name} - from - {GraphStatus.RUNNING.name}')
+            await self.logger.spinner.system.debug(f'{self.metadata_string} - Changed status to - {GraphStatus.COMPLETE.name} - from - {GraphStatus.RUNNING.name}')
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Changed status to - {GraphStatus.COMPLETE.name} - from - {GraphStatus.RUNNING.name}')
 
             self.status = GraphStatus.COMPLETE

@@ -54,6 +54,9 @@ class ActionsStore:
         except asyncio.exceptions.CancelledError:
             pass
 
+        except asyncio.exceptions.InvalidStateError:
+            pass
+
     def get(self, stage: str, action_name: str) -> Tuple[BaseAction, Union[MercuryGraphQLClient, MercuryGraphQLHTTP2Client, MercuryGRPCClient, MercuryHTTP2Client, MercuryHTTPClient, MercuryPlaywrightClient, MercuryWebsocketClient, MercuryUDPClient]]:
         action = self.actions.get(
             stage

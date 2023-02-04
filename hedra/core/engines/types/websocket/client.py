@@ -1,8 +1,9 @@
 import time
 import asyncio
 import uuid
-from typing import Awaitable, Dict, Union, Tuple, Set
+from typing import Dict, Coroutine, Any
 from hedra.core.engines.types.common.timeouts import Timeouts
+from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
 from .connection import WebsocketConnection
 from .pool import Pool
@@ -11,11 +12,7 @@ from .result import WebsocketResult
 from .utils import get_header_bits, get_message_buffer_size
 
 
-WebsocketResponseFuture = Awaitable[Union[WebsocketAction, Exception]]
-WebsocketBatchResponseFuture = Awaitable[Tuple[Set[WebsocketResponseFuture], Set[WebsocketResponseFuture]]]
-
-
-class MercuryWebsocketClient:
+class MercuryWebsocketClient(BaseEngine[WebsocketAction, WebsocketResult]):
 
     __slots__ = (
         'session_id',
@@ -52,8 +49,23 @@ class MercuryWebsocketClient:
         self.sem = asyncio.Semaphore(value=concurrency)
         self.pool = Pool(concurrency, reset_connections=self.pool.reset_connections)
         self.pool.create_pool()
+
+    
+    def extend_pool(self, increased_capacity: int):
+        self.pool.size += increased_capacity
+        for _ in range(increased_capacity):
+            self.pool.connections.append(
+                WebsocketConnection(self.pool.reset_connections)
+            )
         
-    async def prepare(self, action: WebsocketAction) -> Awaitable[Union[WebsocketAction, Exception]]:
+        self.sem = asyncio.Semaphore(self.pool.size)
+
+    def shrink_pool(self, decrease_capacity: int):
+        self.pool.size -= decrease_capacity
+        self.pool.connections = self.pool.connections[:self.pool.size]
+        self.sem = asyncio.Semaphore(self.pool.size)
+        
+    async def prepare(self, action: WebsocketAction) -> Coroutine[Any, Any, None]:
         try:
             if action.url.is_ssl:
                 action.ssl_context = self.ssl_context
@@ -107,28 +119,11 @@ class MercuryWebsocketClient:
         except Exception as e:
             raise e
 
-    def extend_pool(self, increased_capacity: int):
-        self.pool.size += increased_capacity
-        for _ in range(increased_capacity):
-            self.pool.connections.append(
-                WebsocketConnection(self.pool.reset_connections)
-            )
-        
-        self.sem = asyncio.Semaphore(self.pool.size)
-
-    def shrink_pool(self, decrease_capacity: int):
-        self.pool.size -= decrease_capacity
-        self.pool.connections = self.pool.connections[:self.pool.size]
-        self.sem = asyncio.Semaphore(self.pool.size)
-
-
-    async def execute_prepared_request(self, action: WebsocketAction) -> WebsocketResponseFuture:
+    async def execute_prepared_request(self, action: WebsocketAction) -> Coroutine[Any, Any, WebsocketResult]:
 
         response = WebsocketResult(action)
         response.wait_start = time.monotonic()
         self.active += 1
-
-        action_event = action.event
 
         async with self.sem:
 
@@ -141,8 +136,8 @@ class MercuryWebsocketClient:
                     action.hooks.channel_events.append(event)
                     await event.wait()
 
-                if action_event:
-                    action, response = await action_event.execute_pre(action, response)
+                if action.hooks.before:
+                    action = await self.execute_before(action)
                     action.setup()
 
                 response.start = time.monotonic()
@@ -185,8 +180,8 @@ class MercuryWebsocketClient:
                 
                 response.complete = time.monotonic()
 
-                if action_event:
-                    action, response = await action_event.execute_post(action, response)
+                if action.hooks.after:
+                    response = await self.execute_after(action, response)
                     action.setup()
 
                 if action.hooks.notify:

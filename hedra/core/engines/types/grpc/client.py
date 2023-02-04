@@ -1,18 +1,14 @@
 import time 
 import uuid
 import asyncio
-from typing import Awaitable, Set, Tuple
+from typing import Any, Coroutine
 from hedra.core.engines.types.http2 import MercuryHTTP2Client
 from hedra.core.engines.types.common import Timeouts
 from .action import GRPCAction
 from .result import GRPCResult
 
 
-GRPCResponseFuture = Awaitable[GRPCAction]
-GRPCBatchResponseFuture = Awaitable[Tuple[Set[GRPCResponseFuture], Set[GRPCResponseFuture]]]
-
-
-class MercuryGRPCClient(MercuryHTTP2Client):
+class MercuryGRPCClient(MercuryHTTP2Client[GRPCAction, GRPCResult]):
 
     def __init__(self, concurrency: int = 10 ** 3, timeouts: Timeouts = None, reset_connections: bool=False) -> None:
         super(
@@ -26,13 +22,11 @@ class MercuryGRPCClient(MercuryHTTP2Client):
 
         self.session_id = str(uuid.uuid4())
 
-    async def execute_prepared_request(self, action: GRPCAction) -> GRPCResponseFuture:
+    async def execute_prepared_request(self, action: GRPCAction) -> Coroutine[Any, Any, GRPCResult]:
         
         response = GRPCResult(action)
         response.wait_start = time.monotonic()
         self.active += 1
-
-        action_event = action.event
 
         async with self.sem:
             pipe = self.pool.pipes.pop()
@@ -45,9 +39,8 @@ class MercuryGRPCClient(MercuryHTTP2Client):
                     action.hooks.channel_events.append(event)
                     await event.wait()
                 
-                if action_event:
-                    event_results = await action_event.execute_pre(action, response)
-                    action, response = event_results[-1]
+                if action.hooks.before:
+                    action = await self.execute_before(action)
                     action.setup()
 
                 response.start = time.monotonic()
@@ -79,10 +72,10 @@ class MercuryGRPCClient(MercuryHTTP2Client):
 
                 response.complete = time.monotonic()
 
-                if action_event:
-                    event_results = await action_event.execute_post(action, response)
-                    action, response = event_results[-1]
+                if action.hooks.after:
+                    response: GRPCResult = await self.execute_after(action, response)
                     action.setup()
+
 
                 if action.hooks.notify:
                     await asyncio.gather(*[

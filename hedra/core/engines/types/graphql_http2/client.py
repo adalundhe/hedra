@@ -1,16 +1,14 @@
 import asyncio
 import time
 import uuid
+from typing import Coroutine, Any
 from hedra.core.engines.types.http2.client import MercuryHTTP2Client
 from hedra.core.engines.types.common.timeouts import Timeouts
-from typing import Awaitable, Union
 from .action import GraphQLHTTP2Action
 from .result import GraphQLHTTP2Result
 
-GraphQLHTTP2ResponseFuture = Awaitable[Union[GraphQLHTTP2Action, Exception]]
 
-
-class MercuryGraphQLHTTP2Client(MercuryHTTP2Client):
+class MercuryGraphQLHTTP2Client(MercuryHTTP2Client[GraphQLHTTP2Action, GraphQLHTTP2Result]):
 
     def __init__(
         self, 
@@ -30,13 +28,11 @@ class MercuryGraphQLHTTP2Client(MercuryHTTP2Client):
 
         self.session_id = str(uuid.uuid4())
 
-    async def execute_prepared_request(self, action: GraphQLHTTP2Action) -> GraphQLHTTP2Action:
+    async def execute_prepared_request(self, action: GraphQLHTTP2Action) -> Coroutine[Any, Any, GraphQLHTTP2Result]:
         
         response = GraphQLHTTP2Result(action)
         response.wait_start = time.monotonic()
         self.active += 1
-
-        action_event = action.event
 
         async with self.sem:
             pipe = self.pool.pipes.pop()
@@ -48,10 +44,9 @@ class MercuryGraphQLHTTP2Client(MercuryHTTP2Client):
                     event = asyncio.Event()
                     action.hooks.channel_events.append(event)
                     await event.wait()
-
                 
-                if action_event:
-                    action, response = await action_event.execute_pre(action, response)
+                if action.hooks.before:
+                    action = await self.execute_before(action)
                     action.setup()
 
                 response.start = time.monotonic()
@@ -83,8 +78,8 @@ class MercuryGraphQLHTTP2Client(MercuryHTTP2Client):
 
                 response.complete = time.monotonic()
 
-                if action_event:
-                    action, response = await action_event.execute_post(action, response)
+                if action.hooks.after:
+                    response = await self.execute_after(action, response)
                     action.setup()
 
                 if action.hooks.notify:

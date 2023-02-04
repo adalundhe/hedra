@@ -7,7 +7,7 @@ from hedra.core.engines.types.common.types import RequestTypes
 
 A = TypeVar('A')
 
-class Action(BaseAction, Generic[A]):
+class Action(BaseAction[A], Generic[A]):
 
     __slots__ = (
         "source",

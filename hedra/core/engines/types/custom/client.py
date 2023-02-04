@@ -1,7 +1,8 @@
 import asyncio
 import time
 import uuid
-from typing import Any, Awaitable, Dict, Generic, TypeVar, Union
+from typing import Any, Coroutine, Dict, TypeVar, Union
+from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.concurrency import Semaphore
 from hedra.plugins.types.engine.action import Action
@@ -13,7 +14,7 @@ from .pool import CustomPool
 A = TypeVar('A')
 R = TypeVar('R')
 
-class MercuryCustomClient(Generic[A, R]):
+class MercuryCustomClient(BaseEngine[A, R]):
 
     __slots__ = (
         'session_id',
@@ -96,12 +97,7 @@ class MercuryCustomClient(Generic[A, R]):
         self.pool.connections = self.pool.connections[:self.pool.size]
         self.sem = Semaphore(self.pool.size)
 
-    async def wait_for_active_threshold(self):
-        if self.waiter is None:
-            self.waiter = asyncio.get_event_loop().create_future()
-            await self.waiter
-
-    async def prepare(self, action: Action) -> Awaitable[Union[CustomConnection, Exception]]:
+    async def prepare(self, action: Action[A]) -> Coroutine[Any, Any, None]:
         try:
             connection: CustomConnection = self.custom_connection(self.pool.reset_connections)
 
@@ -121,14 +117,12 @@ class MercuryCustomClient(Generic[A, R]):
         except Exception as e:       
             raise e
 
-    async def execute_prepared_request(self, action: Action) -> Awaitable[Result[R]]:
+    async def execute_prepared_request(self, action: Action[A]) -> Coroutine[Any, Any, Result[R]]:
  
-        result: Result = self.plugin.result(action)
+        result: Result[R] = self.plugin.result(action)
         
         result.times['wait_start'] = time.monotonic()
         self.active += 1
-
-        action_event = action.event
  
         async with self.sem:
             connection = self.pool.connections.pop()
@@ -140,8 +134,8 @@ class MercuryCustomClient(Generic[A, R]):
                     action.hooks.channel_events.append(event)
                     await event.wait()
 
-                if action_event:
-                    action, result = await action_event.execute_pre(action, result)
+                if action.hooks.before:
+                    action: Action[A] = await self.execute_before(action)
                     action.setup()
 
                 result.times['start'] = time.monotonic()
@@ -155,8 +149,8 @@ class MercuryCustomClient(Generic[A, R]):
        
                 self.pool.connections.append(connection)
 
-                if action_event:
-                    action, result = await action_event.execute_post(action, result)
+                if action.hooks.after:
+                    response: Result[R] = await self.execute_after(action, response)
                     action.setup()
 
                 if action.hooks.notify:

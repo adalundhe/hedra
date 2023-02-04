@@ -2,8 +2,8 @@ import asyncio
 import time
 import uuid
 import asyncio
-import traceback
-from typing import Awaitable, Dict, List, Any, Union
+from typing import Dict, Union, Coroutine, Any
+from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.concurrency import Semaphore
 from hedra.core.engines.types.common.base_result import BaseResult
@@ -12,7 +12,7 @@ from .task import Task
 from .result import TaskResult
 
 
-class MercuryTaskRunner:
+class MercuryTaskRunner(BaseEngine[Task, Union[BaseResult, TaskResult]]):
 
     __slots__ = (
         'pool',
@@ -27,6 +27,10 @@ class MercuryTaskRunner:
     )
 
     def __init__(self, concurrency: int=10**3, timeouts: Timeouts = Timeouts()) -> None:
+        super(
+            MercuryTaskRunner,
+            self
+        ).__init__()
         
         self.session_id = str(uuid.uuid4())
 
@@ -44,54 +48,6 @@ class MercuryTaskRunner:
         self.active = 0
         self.waiter = None
 
-    
-    async def execute_before(self, task: Task):
-        task.task_args = {
-            'task': task
-        }
-        for before_batch in task.hooks.before:
-            results: List[Dict[str, Any]] = await asyncio.gather(*[
-                before.call(**{
-                    name: value for name, value in task.task_args.items() if name in before.params
-                }) for before in before_batch
-            ])
-
-            for before_event, result in zip(before_batch, results):
-                for data in result.values():
-                    if isinstance(result, dict):
-                        task.task_args.update(data)
-
-                    else:
-                        task.task_args.update({
-                            before_event.shortname: data
-                        })
-
-        return task
-
-    
-    async def execute_after(self, task: Task, result: Union[BaseResult, TaskResult]):
-        
-        task.task_args['result'] = result
-
-        for after_batch in task.hooks.after:
-            results = await asyncio.gather(*[
-                after.call(**{
-                    name: value for name, value in task.task_args.items() if name in after.params
-                }) for after in after_batch
-            ])
-
-            for after_event, result in zip(after_batch, results):
-                for data in result.values():
-                    if isinstance(result, dict):
-                        task.task_args.update(data)
-
-                    else:
-                        task.task_args.update({
-                            after_event.shortname: data
-                        })
- 
-        return result
-    
     async def set_pool(self, concurrency: int):
         self.pool = SimpleContext()
         self.pool.size = concurrency
@@ -99,11 +55,6 @@ class MercuryTaskRunner:
         self.pool.create_pool = lambda: None
 
         self.sem = asyncio.Semaphore(value=concurrency)
-
-    async def wait_for_active_threshold(self):
-        if self.waiter is None:
-            self.waiter = asyncio.get_event_loop().create_future()
-            await self.waiter
 
     def extend_pool(self, increased_capacity: int):
         self.concurrency += increased_capacity
@@ -113,7 +64,7 @@ class MercuryTaskRunner:
         self.concurrency -= decrease_capacity
         self.sem = Semaphore(self.concurrency)
 
-    async def execute_prepared_request(self, task: Task) -> Awaitable[TaskResult]:
+    async def execute_prepared_request(self, task: Task) -> Coroutine[Any, Any, Union[BaseResult, TaskResult]]:
 
         result = None
         wait_start = time.monotonic()
@@ -131,7 +82,7 @@ class MercuryTaskRunner:
                     await event.wait()
                 
                 if task.hooks.before:
-                    task: Task = await self.execute_before(task)
+                    task = await self.execute_before(task)
 
                 start = time.monotonic()
 
@@ -149,7 +100,7 @@ class MercuryTaskRunner:
                 result.complete = time.monotonic()
 
                 if task.hooks.after:
-                    result: Union[BaseResult, TaskResult] = await self.execute_after(task, result)
+                    result = await self.execute_after(task, result)
 
                 if task.hooks.notify:
                     await asyncio.gather(*[
