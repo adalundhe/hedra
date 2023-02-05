@@ -91,7 +91,7 @@ class TransformHook(Hook):
 
             return {
                 **kwargs,
-                'transformed': result
+                self.shortname: result
             }
 
     def copy(self):

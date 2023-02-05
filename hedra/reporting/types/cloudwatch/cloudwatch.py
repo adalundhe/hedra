@@ -7,7 +7,7 @@ from typing import List
 
 import psutil
 from hedra.logging import HedraLogger
-from hedra.reporting.events.types.base_result import BaseEvent
+from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
 from concurrent.futures import ThreadPoolExecutor
 
@@ -66,7 +66,7 @@ class Cloudwatch:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created AWS Cloudwatch client for region - {self.region_name}')
 
-    async def submit_events(self, events: List[BaseEvent]):
+    async def submit_events(self, events: List[BaseProcessedResult]):
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to Cloudwatch rule - {self.events_rule_name}')
 

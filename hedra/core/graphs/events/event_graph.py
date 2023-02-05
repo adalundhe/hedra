@@ -40,11 +40,14 @@ class EventGraph:
                 {'hook': hook}
             ) for hook_name, hook in self.hooks_by_name.items()
         ])
-        
 
         self.event_hooks: List[EventTypeHook] = [
             *list(self.hooks_by_type.get(
                 HookType.ACTION, 
+                {}
+            ).values()),
+            *list(self.hooks_by_type.get(
+                HookType.CHECK,
                 {}
             ).values()),
             *list(self.hooks_by_type.get(

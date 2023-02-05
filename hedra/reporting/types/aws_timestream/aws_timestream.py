@@ -5,7 +5,7 @@ import psutil
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
-from hedra.reporting.events.types.base_result import BaseEvent
+from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
 from .aws_timestream_config import AWSTimestreamConfig
 from .aws_timestream_record import AWSTimestreamRecord
@@ -78,7 +78,7 @@ class AWSTimestream:
         
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Successfully opened connection to AWS - Region: {self.region_name}')
 
-    async def submit_events(self, events: List[BaseEvent]):
+    async def submit_events(self, events: List[BaseProcessedResult]):
 
         try:
             

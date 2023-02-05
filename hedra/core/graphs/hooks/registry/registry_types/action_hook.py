@@ -28,7 +28,7 @@ class ActionHook(Hook):
         self.names = list(set(names))
         self.session: Any = None
         self.action: Any = None
-        self.checks = checks
+        self.checks = []
         self.before: List[str] = []
         self.after: List[str] = []
         self.is_notifier = len(notify) > 0

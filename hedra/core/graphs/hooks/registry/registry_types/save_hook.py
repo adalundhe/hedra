@@ -112,5 +112,6 @@ class SaveHook(Hook):
             self.name,
             self.shortname,
             self._call,
-            self.save_path
+            self.save_path,
+            order=self.order
         )

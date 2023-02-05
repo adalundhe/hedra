@@ -14,6 +14,7 @@ from hedra.core.engines.types.registry import registered_engines
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.personas import get_persona
 from hedra.core.personas.persona_registry import registered_personas
+from hedra.core.graphs.events.base_event import BaseEvent
 from hedra.core.graphs.events.event_graph import EventGraph
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
@@ -153,8 +154,13 @@ async def start_execution(
 
     await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Execution complete - Time (including addtional setup) took: {round(elapsed, 2)} seconds')
 
+    
     for result in results:
-        result.checks = [check.name for check in result.checks]
+        result.checks = [
+            [
+                event.event_name for event in layer
+            ] for layer in list(result.checks)
+        ]
 
     context = {}
 

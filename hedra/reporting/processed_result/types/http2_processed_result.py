@@ -1,12 +1,11 @@
 import json
-from typing import Dict, Any, Tuple, Dict
+from typing import Dict, Any, Dict
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.engines.types.http2 import HTTP2Result
-from hedra.core.graphs.stages.base.stage import Stage
-from .base_result import BaseEvent
+from .base_processed_result import BaseProcessedResult
 
 
-class HTTP2Event(BaseEvent):
+class HTTP2ProcessedResult(BaseProcessedResult):
 
     __slots__ = (
         'event_id',
@@ -29,7 +28,7 @@ class HTTP2Event(BaseEvent):
         stage: Any, 
         result: HTTP2Result
     ) -> None:
-        super(HTTP2Event, self).__init__(
+        super(HTTP2ProcessedResult, self).__init__(
             stage,
             result
         )

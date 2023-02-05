@@ -38,7 +38,7 @@ class ConditionHook(Hook):
 
         return {
             **kwargs,
-            'execute': execute
+            self.shortname: execute
         }
     
     def copy(self):

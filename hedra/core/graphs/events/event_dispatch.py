@@ -1,4 +1,5 @@
 import asyncio
+from itertools import chain
 from collections import OrderedDict, defaultdict
 from typing import List, Union, Dict, Any, Tuple
 from hedra.core.graphs.hooks.registry.registry_types import (
@@ -26,7 +27,8 @@ class EventDispatcher:
             EventType.CONDITION: 2,
             EventType.SAVE: 3,
             EventType.ACTION: 4,
-            EventType.TASK: 4
+            EventType.TASK: 4,
+            EventType.CHECK: 5,
         }
 
         event_orderings = list(sorted(
@@ -82,26 +84,33 @@ class EventDispatcher:
                 )
 
         for event_name, event in self.events_by_name.items():
-
             for dependency_name in event.names:
-                action_or_task_event = self.actions_and_tasks.get(dependency_name)
-
+                action_or_task_event: BaseEvent = self.actions_and_tasks.get(dependency_name)
                 if action_or_task_event:
                     self.skip_list.append(event_name)
-                    action_or_task_event.after.extend(event.execution_path)
-
-
+                    action_or_task_event.after.extend(
+                        self._append_action_or_task_event(
+                            event,
+                            action_or_task_event
+                        )
+                    )
+                    
         for event in self.actions_and_tasks.values():
             for idx, layer in enumerate(event.before):
                 event.before[idx] = [
                     self.events_by_name.get(event_name) for event_name in layer
                 ]
 
-        for event in self.actions_and_tasks.values():
             for idx, layer in enumerate(event.after):
                 event.after[idx] = [
                     self.events_by_name.get(event_name) for event_name in layer
                 ]
+
+            for idx, layer in enumerate(event.checks):
+                event.checks[idx] = [
+                    self.events_by_name.get(event_name) for event_name in layer
+                ]
+
 
     def _prepend_action_or_task_event(self, dependency_event: BaseEvent, action_or_task: BaseEvent):
         execution_path = list(dependency_event.execution_path)
@@ -120,6 +129,31 @@ class EventDispatcher:
                     dependency_event.execution_path.remove(layer)
 
         return dependency_event.execution_path
+
+    def _append_action_or_task_event(self, dependant_event: BaseEvent, action_or_task: BaseEvent):
+        execution_path = []
+
+        if dependant_event.event_type == EventType.CHECK:
+            for idx, layer in enumerate(dependant_event.execution_path):
+                if idx >= len(action_or_task.checks):
+                    action_or_task.checks.append(layer)
+
+                else:
+                    action_or_task.checks[idx].extend([
+                        node for node in layer if node not in action_or_task.checks[idx]
+                    ])
+
+        else:
+            for idx, layer in enumerate(dependant_event.execution_path):
+                if idx >= len(action_or_task.after):
+                    action_or_task.after.append(layer)
+
+                else:
+                    action_or_task.after[idx].extend([
+                        node for node in layer if node not in action_or_task.after[idx]
+                    ])
+
+        return execution_path
 
     async def dispatch_events(self):
         await asyncio.gather(*[

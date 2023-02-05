@@ -1,9 +1,9 @@
 from typing import Any
 from hedra.core.engines.types.playwright import PlaywrightResult
-from .base_result import BaseEvent
+from .base_processed_result import BaseProcessedResult
 
 
-class PlaywrightEvent(BaseEvent):
+class PlaywrightProcessedResult(BaseProcessedResult):
 
     __slots__ = (
         'event_id',
@@ -24,7 +24,7 @@ class PlaywrightEvent(BaseEvent):
         result: PlaywrightResult
     ) -> None:
         super(
-            PlaywrightEvent,
+            PlaywrightProcessedResult,
             self
         ).__init__(
             stage,

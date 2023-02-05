@@ -73,7 +73,7 @@ class ContextHook(Hook):
         self.context[self.name] = context_result
         return {
             **kwargs,
-            self.name: context_result
+            self.shortname: context_result
         }
 
     def copy(self):

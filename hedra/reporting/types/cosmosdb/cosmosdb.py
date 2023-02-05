@@ -1,7 +1,7 @@
 import uuid
 from typing import List
 from hedra.logging import HedraLogger
-from hedra.reporting.events.types.base_result import BaseEvent
+from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
 
 
@@ -63,7 +63,7 @@ class CosmosDB:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created or set Database - {self.database_name}')
 
-    async def submit_events(self, events: List[BaseEvent]):
+    async def submit_events(self, events: List[BaseProcessedResult]):
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Events container - {self.events_container_name} with Partition Key /{self.events_container_name} if not exists')
         self.events_container = await self.database.create_container_if_not_exists(

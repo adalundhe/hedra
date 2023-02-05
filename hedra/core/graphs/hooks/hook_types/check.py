@@ -5,7 +5,7 @@ from hedra.core.graphs.hooks.registry.registrar import registrar
 
 
 @registrar(HookType.CHECK)
-def check(*names):
+def check(*names, order: int=1):
     
     def wrapper(func) -> Hook:
 
