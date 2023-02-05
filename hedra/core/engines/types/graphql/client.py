@@ -1,18 +1,15 @@
 import time
 import uuid
 import asyncio
+from typing import Coroutine, Any
 from hedra.core.engines.types.http import MercuryHTTPClient
 from hedra.core.engines.types.http.connection import HTTPConnection
 from hedra.core.engines.types.common import Timeouts
-from typing import Awaitable, Union
 from .action import GraphQLAction
 from .result import GraphQLResult
 
 
-GraphQLResponseFuture = Awaitable[Union[GraphQLAction, Exception]]
-
-
-class MercuryGraphQLClient(MercuryHTTPClient):
+class MercuryGraphQLClient(MercuryHTTPClient[GraphQLAction, GraphQLResult]):
 
     def __init__(
         self, 
@@ -32,13 +29,11 @@ class MercuryGraphQLClient(MercuryHTTPClient):
 
         self.session_id = str(uuid.uuid4())
 
-    async def execute_prepared_request(self, action: GraphQLAction) -> GraphQLResponseFuture:
+    async def execute_prepared_request(self, action: GraphQLAction) -> Coroutine[Any, Any, GraphQLResult]:
    
         response = GraphQLResult(action)
         response.wait_start = time.monotonic()
         self.active += 1
-
-        action_event = action.event
 
         async with self.sem:
             connection = self.pool.connections.pop()
@@ -50,8 +45,8 @@ class MercuryGraphQLClient(MercuryHTTPClient):
                     action.hooks.channel_events.append(event)
                     await event.wait()
 
-                if action_event:
-                    action, response = await action_event.execute_pre(action, response)
+                if action.hooks.before:
+                    action = await self.execute_before(action)
                     action.setup()
 
                 response.start = time.monotonic()
@@ -167,8 +162,8 @@ class MercuryGraphQLClient(MercuryHTTPClient):
                 
                 self.pool.connections.append(connection)
 
-                if action_event:
-                    action, response = await action_event.execute_post(action, response)
+                if action.hooks.after:
+                    response = await self.execute_after(action, response)
                     action.setup()
 
                 if action.hooks.notify:

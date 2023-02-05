@@ -9,13 +9,12 @@ from hedra.reporting.stats import (
     Variance,
     StandardDeviation
 )
-from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from .results import results_types
-from .types.task_event import TaskEvent
-from .types.base_result import BaseEvent
+from .types.task_processed_result import TaskProcessedResult
+from .types.base_processed_result import BaseProcessedResult
 
 
-class EventsGroup:
+class ProcessedResultsGroup:
 
     __slots__ = (
         'events_group_id',
@@ -59,27 +58,27 @@ class EventsGroup:
         stage_name: str
     ):
 
-        event: BaseEvent = results_types.get(result.type, TaskEvent)(
+        processed_result: BaseProcessedResult = results_types.get(result.type, TaskProcessedResult)(
             stage,
             result
         )
-        event.stage = stage_name
+        processed_result.stage = stage_name
 
         if self.source is None:
-            self.source = event.source
+            self.source = processed_result.source
 
-        self.tags.update(event.tags_to_dict())
+        self.tags.update(processed_result.tags_to_dict())
     
-        await event.check_result()
+        await processed_result.check_result(result)
 
-        if event.error is None:
+        if processed_result.error is None:
             self.succeeded += 1
         
         else:
-            self.errors[event.error] += 1
+            self.errors[processed_result.error] += 1
             self.failed += 1
 
-        for timing_group, timing in event.timings.items():
+        for timing_group, timing in processed_result.timings.items():
             if timing > 0:
                 self.timings[timing_group].append(timing)
 

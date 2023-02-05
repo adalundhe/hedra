@@ -1,23 +1,23 @@
 import json
-from typing import Any, Tuple, Dict
+from typing import Dict, Any, Tuple, Dict
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.engines.types.udp import UDPResult
-from .base_result import BaseEvent
+from hedra.core.engines.types.http import HTTPResult
+from .base_processed_result import BaseProcessedResult
 
 
-class UDPEvent(BaseEvent):
+class HTTPProcessedResult(BaseProcessedResult):
 
     __slots__ = (
         'event_id',
         'action_id',
         'url',
         'ip_addr',
-        'path',
         'method',
-        'headers',
+        'path',
         'params',
         'hostname',
         'status',
+        'headers',
         'data',
         'timings'
     )
@@ -25,26 +25,26 @@ class UDPEvent(BaseEvent):
     def __init__(
         self, 
         stage: Any, 
-        result: UDPResult
+        result: HTTPResult
     ) -> None:
-        super(UDPEvent, self).__init__(
+        super(HTTPProcessedResult, self).__init__(
             stage,
             result
         )
 
         self.url = result.url
         self.ip_addr = result.ip_addr
+        self.method = result.method
         self.path = result.path
-        self.method = 'n/a'
-        self.headers = {}
         self.params = result.params
         self.hostname = result.hostname
         self.status = result.status
+        self.headers: Dict[bytes, bytes] = result.headers
         self.data = result.data
-        self.name = self.shortname
+        self.name = f'{self.method}_{self.shortname}'
 
         self.time = result.complete - result.start
-        
+
         self.timings = {
             'total': self.time,
             'waiting': result.start - result.wait_start,
@@ -53,12 +53,15 @@ class UDPEvent(BaseEvent):
             'reading': result.complete - result.write_end
         }
 
-
     def serialize(self):
 
         data = self.data
         if isinstance(data, (bytes, bytearray)):
             data = data.decode()
+
+        serializable_headers = {}
+        for key, value in self.headers.items():
+            serializable_headers[key.decode()] = value.decode()
 
         return json.dumps({
             'name': self.name,
@@ -76,6 +79,6 @@ class UDPEvent(BaseEvent):
             'params': self.params,
             'hostname': self.hostname,
             'status': self.status,
-            'headers': self.headers,
+            'headers': serializable_headers,
             'data': data
         })

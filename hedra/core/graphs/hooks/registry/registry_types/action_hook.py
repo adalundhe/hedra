@@ -1,4 +1,4 @@
-from typing import Coroutine, List, Union, Dict, Any, Type, Callable, Awaitable
+from typing import Coroutine, List, Union, Dict, Any, Type, Callable, Awaitable, Tuple
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from .hook import Hook
 from .hook_metadata import HookMetadata
@@ -10,6 +10,7 @@ class ActionHook(Hook):
         name: str, 
         shortname: str, 
         call: Callable[..., Awaitable[Any]], 
+        *names: Tuple[str, ...],
         weight: int=1, 
         order: int=1, 
         metadata: Dict[str, Union[str, int]]={}, 
@@ -24,13 +25,17 @@ class ActionHook(Hook):
             hook_type=HookType.ACTION
         )
         
+        self.names = list(set(names))
         self.session: Any = None
         self.action: Any = None
-        self.checks = checks
+        self.checks = []
+        self.before: List[str] = []
+        self.after: List[str] = []
         self.is_notifier = len(notify) > 0
         self.is_listener = len(listen) > 0
         self.notifiers: List[str] = notify
         self.listeners: List[str] = listen
+        self.order = order
         self.metadata = HookMetadata(
             weight=weight,
             order=order,

@@ -8,7 +8,7 @@ from typing import List
 
 import psutil
 from hedra.logging import HedraLogger
-from hedra.reporting.events.types.base_result import BaseEvent
+from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
 
 try:
@@ -81,7 +81,7 @@ class BigTable:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opened connection to Google Cloud - Created Client Instance - ID:{self.instance_id}')
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opened connection to Google Cloud - Loaded account config from - {self.service_account_json_path}')
 
-    async def submit_events(self, events: List[BaseEvent]):
+    async def submit_events(self, events: List[BaseProcessedResult]):
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to Table {self.events_table_id}')
         self._events_table = self.instance.table(self.events_table_id)

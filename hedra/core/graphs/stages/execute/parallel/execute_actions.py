@@ -14,6 +14,7 @@ from hedra.core.engines.types.registry import registered_engines
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.personas import get_persona
 from hedra.core.personas.persona_registry import registered_personas
+from hedra.core.graphs.events.base_event import BaseEvent
 from hedra.core.graphs.events.event_graph import EventGraph
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
@@ -153,8 +154,13 @@ async def start_execution(
 
     await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Execution complete - Time (including addtional setup) took: {round(elapsed, 2)} seconds')
 
+    
     for result in results:
-        result.checks = [check.name for check in result.checks]
+        result.checks = [
+            [
+                event.event_name for event in layer
+            ] for layer in list(result.checks)
+        ]
 
     context = {}
 
@@ -286,7 +292,6 @@ def execute_actions(parallel_config: str):
             plugin.name = plugin_name
             registered_engines[plugin_name] = lambda config: plugin(config)
 
-
         for hook_type in setup_stage.hooks:
             for hook in setup_stage.hooks[hook_type]:
                 hooks_by_type[hook_type][hook.name] = hook
@@ -295,6 +300,9 @@ def execute_actions(parallel_config: str):
         events_graph.hooks_by_name = hooks_by_name
         events_graph.hooks_by_shortname = hooks_by_shortname
         events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
+
+        for stage in initialized_stages.values():
+            stage.dispatcher.assemble_action_and_task_subgraphs()
 
         setup_stage.context = SimpleContext()
         setup_stage.config = source_stage_config

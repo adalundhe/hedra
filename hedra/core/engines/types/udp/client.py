@@ -1,7 +1,8 @@
 import asyncio
 import time
 import uuid
-from typing import Awaitable, Dict, Set, Tuple, Union
+from typing import Dict, Coroutine, Any
+from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
 from hedra.core.engines.types.common.timeouts import Timeouts
 from .connection import UDPConnection
@@ -10,11 +11,7 @@ from .result import UDPResult
 from .pool import Pool
 
 
-UDPResponseFuture = Awaitable[Union[UDPResult, Exception]]
-UDPBatchResponseFuture = Awaitable[Tuple[Set[UDPResponseFuture], Set[UDPResponseFuture]]]
-
-
-class MercuryUDPClient:
+class MercuryUDPClient(BaseEngine[UDPAction, UDPResult]):
 
     __slots__ = (
         'session_id',
@@ -29,6 +26,10 @@ class MercuryUDPClient:
     )
 
     def __init__(self, concurrency: int=10**3, timeouts: Timeouts = Timeouts(), reset_connections: bool=False) -> None:
+        super(
+            MercuryUDPClient,
+            self
+        ).__init__()
 
         self.session_id = str(uuid.uuid4())
         self.timeouts = timeouts
@@ -50,13 +51,7 @@ class MercuryUDPClient:
         self.pool = Pool(concurrency, reset_connections=self.pool.reset_connections)
         self.pool.create_pool()
 
-    async def wait_for_active_threshold(self):
-        if self.waiter is None:
-            self.waiter = asyncio.get_event_loop().create_future()
-            await self.waiter
-
-
-    async def prepare(self, action: UDPAction) -> Awaitable[Union[UDPAction, Exception]]:
+    async def prepare(self, action: UDPAction) -> Coroutine[Any, Any, None]:
         try:
             if action.url.is_ssl:
                 action.ssl_context = self.ssl_context
@@ -124,13 +119,11 @@ class MercuryUDPClient:
         self.pool.connections = self.pool.connections[:self.pool.size]
         self.sem = asyncio.Semaphore(self.pool.size)
 
-    async def execute_prepared_request(self, action: UDPAction) -> UDPResponseFuture:
+    async def execute_prepared_request(self, action: UDPAction) -> Coroutine[Any, Any, UDPResult]:
  
         response = UDPResult(action)
         response.wait_start = time.monotonic()
         self.active += 1
-
-        action_event = action.event
  
         async with self.sem:
             connection = self.pool.connections.pop()
@@ -142,8 +135,8 @@ class MercuryUDPClient:
                     action.hooks.channel_events.append(event)
                     await event.wait()
 
-                if action_event:
-                    action, response = await action_event.execute_pre(action, response)
+                if action.hooks.before:
+                    action = await self.execute_before(action)
                     action.setup()
 
                 response.start = time.monotonic()
@@ -173,8 +166,8 @@ class MercuryUDPClient:
 
                 self.pool.connections.append(connection)
 
-                if action_event:
-                    action, response = await action_event.execute_post(action, response)
+                if action.hooks.after:
+                    response = await self.execute_after(action, response)
                     action.setup()
 
                 if action.hooks.notify:

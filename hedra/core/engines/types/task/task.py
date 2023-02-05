@@ -1,4 +1,5 @@
-from typing import Coroutine, Dict, List
+import inspect
+from typing import Coroutine, Dict, List, Any
 from hedra.core.engines.types.common.base_action import BaseAction
 from hedra.core.engines.types.common.hooks import Hooks
 from hedra.core.engines.types.common.types import RequestTypes
@@ -16,7 +17,10 @@ class Task(BaseAction):
         'type',
         'source',
         'execute',
-        'event'
+        'event',
+        'args',
+        'params',
+        'task_args'
     )
 
     def __init__(
@@ -37,6 +41,11 @@ class Task(BaseAction):
         self.source = source
         self.execute = task_action
         self.hooks: Hooks[Task] = Hooks()
+
+
+        self.args = inspect.signature(task_action)
+        self.params = self.args.parameters
+        self.task_args: Dict[str, Any] = {}
 
     def to_serializable(self):
 

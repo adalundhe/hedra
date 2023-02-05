@@ -1,8 +1,9 @@
 import asyncio
 import time
 import uuid
-import traceback
-from typing import Awaitable, Dict
+import asyncio
+from typing import Dict, Union, Coroutine, Any
+from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.concurrency import Semaphore
 from hedra.core.engines.types.common.base_result import BaseResult
@@ -11,7 +12,7 @@ from .task import Task
 from .result import TaskResult
 
 
-class MercuryTaskRunner:
+class MercuryTaskRunner(BaseEngine[Task, Union[BaseResult, TaskResult]]):
 
     __slots__ = (
         'pool',
@@ -26,6 +27,10 @@ class MercuryTaskRunner:
     )
 
     def __init__(self, concurrency: int=10**3, timeouts: Timeouts = Timeouts()) -> None:
+        super(
+            MercuryTaskRunner,
+            self
+        ).__init__()
         
         self.session_id = str(uuid.uuid4())
 
@@ -42,7 +47,7 @@ class MercuryTaskRunner:
         self.sem = asyncio.Semaphore(value=concurrency)
         self.active = 0
         self.waiter = None
-    
+
     async def set_pool(self, concurrency: int):
         self.pool = SimpleContext()
         self.pool.size = concurrency
@@ -50,11 +55,6 @@ class MercuryTaskRunner:
         self.pool.create_pool = lambda: None
 
         self.sem = asyncio.Semaphore(value=concurrency)
-
-    async def wait_for_active_threshold(self):
-        if self.waiter is None:
-            self.waiter = asyncio.get_event_loop().create_future()
-            await self.waiter
 
     def extend_pool(self, increased_capacity: int):
         self.concurrency += increased_capacity
@@ -64,13 +64,13 @@ class MercuryTaskRunner:
         self.concurrency -= decrease_capacity
         self.sem = Semaphore(self.concurrency)
 
-    async def execute_prepared_request(self, task: Task) -> Awaitable[TaskResult]:
+    async def execute_prepared_request(self, task: Task) -> Coroutine[Any, Any, Union[BaseResult, TaskResult]]:
 
         result = None
         wait_start = time.monotonic()
         self.active += 1
 
-        task_event = task.event
+        start = 0
  
         async with self.sem:
             
@@ -81,13 +81,14 @@ class MercuryTaskRunner:
                     task.hooks.channel_events.append(event)
                     await event.wait()
                 
-
-                if task_event:
-                    task, result = await task_event.execute_pre(task, result)
+                if task.hooks.before:
+                    task = await self.execute_before(task)
 
                 start = time.monotonic()
 
-                result: BaseResult = await task.execute()
+                result: BaseResult = await task.execute(**{
+                    name: value for name, value in task.task_args.items() if name in task.params
+                })
                 
                 result.name = task.name
                 result.source = task.source
@@ -98,9 +99,8 @@ class MercuryTaskRunner:
                 result.start = start
                 result.complete = time.monotonic()
 
-
-                if task_event:
-                    task, result = await task_event.execute_post(task, result)
+                if task.hooks.after:
+                    result = await self.execute_after(task, result)
 
                 if task.hooks.notify:
                     await asyncio.gather(*[

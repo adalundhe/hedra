@@ -179,11 +179,9 @@ class Execute(Stage, Generic[Unpack[T]]):
                 aggregate_results.extend(result_set.get('results'))
                 elapsed_times.append(result_set.get('total_elapsed'))
 
-                pipeline_context = result_set.get('context', {})
+                pipeline_context: Dict[str, Any] = result_set.get('context', {})
                 for context_key, context_value in pipeline_context.items():
                     stage_contexts[context_key].append(context_value)
-
-            self.context[self.name] = stage_contexts
 
             total_results = len(aggregate_results)
             total_elapsed = statistics.median(elapsed_times)
@@ -191,7 +189,10 @@ class Execute(Stage, Generic[Unpack[T]]):
             await self.logger.filesystem.aio['hedra.core'].info( f'{self.metadata_string} - Completed - {total_results} actions at  {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
             await self.logger.spinner.set_default_message(f'Stage - {self.name} completed {total_results} actions at {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
 
+            stage_name = self.name.lower()
+            
             return {
+                stage_name: stage_contexts,
                 'stage_results': aggregate_results,
                 'total_results': total_results,
                 'total_elapsed': total_elapsed

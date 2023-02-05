@@ -1,6 +1,6 @@
 import json
 import h2.settings
-from typing import Dict, Iterator, Union, List
+from typing import Dict, Iterator, Union, List, Any
 from urllib.parse import urlencode
 from hedra.core.engines.types.common.base_action import BaseAction
 from hedra.core.engines.types.common.constants import NEW_LINE
@@ -26,7 +26,8 @@ class HTTP2Action(BaseAction):
         'ssl_context',
         'hpack_encoder',
         '_remote_settings',
-        'event'
+        'event',
+        'action_args'
     )
     
     def __init__(
@@ -64,6 +65,7 @@ class HTTP2Action(BaseAction):
         )
         
         self.hooks: Hooks[HTTP2Action] = Hooks()
+        self.action_args: Dict[str, Any] = {}
 
     @property
     def size(self):

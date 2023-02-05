@@ -1,7 +1,7 @@
 import uuid
 from typing import List
 from hedra.logging import HedraLogger
-from hedra.reporting.events.types.base_result import BaseEvent
+from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 
 
 try:
@@ -56,7 +56,7 @@ class TelegrafStatsD(StatsD):
 
         self.statsd_type = 'TelegrafStatsD'
 
-    async def submit_events(self, events: List[BaseEvent]):
+    async def submit_events(self, events: List[BaseProcessedResult]):
         
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to {self.statsd_type}')
 

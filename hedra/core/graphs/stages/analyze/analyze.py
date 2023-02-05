@@ -6,7 +6,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from typing import Union, List, Dict, Union, Any, Tuple
 from hedra.plugins.types.plugin_types import PluginType
-from hedra.reporting.events import EventsGroup
+from hedra.reporting.processed_result import ProcessedResultsGroup
 from hedra.reporting.metric import MetricsSet
 from hedra.core.graphs.hooks.hook_types.context import context
 from hedra.core.graphs.hooks.hook_types.event import event  
@@ -14,23 +14,36 @@ from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.graphs.hooks.hook_types.internal import Internal
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.reporting.events import results_types
-from hedra.reporting.events.types import (
-    HTTPEvent, 
-    HTTP2Event, 
-    GraphQLEvent, 
-    GRPCEvent, 
-    WebsocketEvent, 
-    PlaywrightEvent,
-    UDPEvent
+from hedra.reporting.processed_result import results_types
+from hedra.reporting.processed_result.types import (
+    GraphQLProcessedResult,
+    GraphQLHTTP2ProcessedResult,
+    GRPCProcessedResult,
+    HTTPProcessedResult,
+    HTTP2ProcessedResult,
+    PlaywrightProcessedResult,
+    TaskProcessedResult,
+    UDPProcessedResult,
+    WebsocketProcessedResult,
 )
+
 from hedra.core.graphs.stages.base.stage import Stage
 from .parallel import process_results_batch
 
 dill.settings['byref'] = True
 
 
-Events = Union[HTTPEvent, HTTP2Event, GraphQLEvent, GRPCEvent, WebsocketEvent, PlaywrightEvent, UDPEvent]
+Events = Union[
+    GraphQLProcessedResult, 
+    GraphQLHTTP2ProcessedResult, 
+    GRPCProcessedResult, 
+    HTTPProcessedResult, 
+    HTTP2ProcessedResult, 
+    PlaywrightProcessedResult, 
+    TaskProcessedResult,
+    UDPProcessedResult,
+    WebsocketProcessedResult
+]
 
 RawResultsSet = Dict[str, ResultsSet]
 
@@ -42,7 +55,7 @@ ProcessedResultsSet = List[Dict[str, Union[Dict[str, Union[int, float, int]], in
 
 CustoMetricsSet = Dict[str, Dict[str, Dict[str, Union[int, float, Any]]]]
 
-EventsSet = Dict[str, Dict[str, EventsGroup]]
+EventsSet = Dict[str, Dict[str, ProcessedResultsGroup]]
 
 
 class Analyze(Stage):
@@ -296,11 +309,11 @@ class Analyze(Stage):
         for stage_name, stage_results in stage_batches:
 
 
-            batch_results: List[Dict[str, Union[dict, EventsGroup]]] = [
+            batch_results: List[Dict[str, Union[dict, ProcessedResultsGroup]]] = [
                 dill.loads(group.get('events')) for group in stage_results
             ]
 
-            stage_events =  defaultdict(EventsGroup)
+            stage_events =  defaultdict(ProcessedResultsGroup)
 
             for events_groups in batch_results:
                 for event_group_name, events_group in events_groups.items():

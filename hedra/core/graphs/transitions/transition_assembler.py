@@ -191,6 +191,7 @@ class TransitionAssembler:
             for stage in stages.values():
 
                 stage.plugins_by_type = plugins
+                stage.dispatcher.assemble_action_and_task_subgraphs()
 
                 neighbors = list(graph.neighbors(stage.name))
 

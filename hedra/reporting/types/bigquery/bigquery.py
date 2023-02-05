@@ -7,7 +7,7 @@ from numpy import float32, float64, int16, int32, int64
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
-from hedra.reporting.events.types.base_result import BaseEvent
+from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
 
 try:
@@ -60,7 +60,7 @@ class BigQuery:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opened connection to Google Cloud - Loaded account config from - {self.service_account_json_path}')
 
-    async def submit_events(self, events: List[BaseEvent]):
+    async def submit_events(self, events: List[BaseProcessedResult]):
         
         if self._events_table is None:
 

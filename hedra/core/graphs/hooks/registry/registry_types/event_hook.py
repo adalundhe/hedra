@@ -39,7 +39,7 @@ class EventHook(Hook):
 
         return {
             **kwargs,
-            'result': result
+            self.shortname: result
         }
 
     def copy(self):

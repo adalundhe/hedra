@@ -1,7 +1,8 @@
 import asyncio
 import uuid
-from typing import Awaitable, Dict, List, Set, Tuple, Union
+from typing import Dict, List, Coroutine, Any
 from hedra.core.engines.types.common import Timeouts
+from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.types import RequestTypes
 from .context_config import ContextConfig
 from .context_group import ContextGroup
@@ -10,11 +11,7 @@ from .command import PlaywrightCommand
 from .result import PlaywrightResult
 
 
-PlaywrightResponseFuture = Awaitable[Union[PlaywrightResult, Exception]]
-PlaywrightBatchResponseFuture = Awaitable[Tuple[Set[PlaywrightResponseFuture], Set[PlaywrightResponseFuture]]]
-
-
-class MercuryPlaywrightClient:
+class MercuryPlaywrightClient(BaseEngine[PlaywrightCommand, PlaywrightResult]):
 
     __slots__ = (
         'session_id',
@@ -33,6 +30,10 @@ class MercuryPlaywrightClient:
     )
 
     def __init__(self,  concurrency: int = 500, group_size: int=50, timeouts: Timeouts = Timeouts()) -> None:
+        super(
+            MercuryPlaywrightClient,
+            self
+        ).__init__()
         
         self.session_id = str(uuid.uuid4())
 
@@ -64,7 +65,7 @@ class MercuryPlaywrightClient:
 
             self._playwright_setup = True
 
-    async def prepare(self, command: PlaywrightCommand) -> Awaitable[None]:
+    async def prepare(self, command: PlaywrightCommand) -> Coroutine[Any, Any, None]:
 
         command.options.extra = {
             **command.options.extra,
@@ -107,15 +108,13 @@ class MercuryPlaywrightClient:
         self.sem = asyncio.Semaphore(self.pool.size)
 
 
-    async def execute_prepared_command(self, command: PlaywrightCommand) -> PlaywrightResponseFuture:
+    async def execute_prepared_command(self, command: PlaywrightCommand) -> Coroutine[Any, Any, PlaywrightResult]:
 
         for pending_context in self._pending_context_groups:
             await pending_context.create()
 
         result = PlaywrightResult(command, type=RequestTypes.PLAYWRIGHT)
         self.active += 1
-
-        command_event = command.event
         
         async with self.sem:
             context = self.pool.contexts.pop()
@@ -126,13 +125,13 @@ class MercuryPlaywrightClient:
                     command.hooks.channel_events.append(event)
                     await event.wait()
 
-                if command_event:
-                    command, result = await command_event.execute_pre(command, result)
+                if command.hooks.before:
+                    command = await self.execute_before(command)
             
                 result = await context.execute(command)
 
-                if command_event:
-                    command, result = await command_event.execute_post(command, result)
+                if command.hooks.after:
+                    result = await self.execute_after(command, result)
 
                 if command.hooks.notify:
                     await asyncio.gather(*[

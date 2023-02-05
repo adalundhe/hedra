@@ -1,10 +1,10 @@
 from typing import Any, Tuple, Dict
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.engines.types.websocket import WebsocketResult
-from .http_event import HTTPEvent
+from .http_processed_result import HTTPProcessedResult
 
 
-class WebsocketEvent(HTTPEvent):
+class WebsocketProcessedResult(HTTPProcessedResult):
 
     def __init__(
         self, 
@@ -12,7 +12,7 @@ class WebsocketEvent(HTTPEvent):
         result: WebsocketResult
     ) -> None:
         super(
-            WebsocketEvent,
+            WebsocketProcessedResult,
             self
         ).__init__(
             stage,

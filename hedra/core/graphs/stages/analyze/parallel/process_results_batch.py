@@ -22,7 +22,7 @@ from hedra.logging import (
     LoggerTypes,
     logging_manager
 )
-from hedra.reporting.events.events_group import EventsGroup
+from hedra.reporting.processed_result.processed_results_group import ProcessedResultsGroup
 dill.settings['byref'] = True
 
 async def process_batch(
@@ -72,7 +72,7 @@ async def process_batch(
 
         start = time.monotonic()
 
-        events =  defaultdict(EventsGroup)
+        events =  defaultdict(ProcessedResultsGroup)
 
         custom_metric_hooks = []
         for metric_hook_name in custom_metric_hook_names:

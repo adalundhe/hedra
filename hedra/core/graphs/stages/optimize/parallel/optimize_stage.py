@@ -181,7 +181,7 @@ def optimize_stage(serialized_config: str):
         metadata_string = f'Graph - {graph_name}:{graph_id} - thread:{thread_id} - process:{process_id} - Stage: {source_stage_name}:{source_stage_id} - '
         discovered: Dict[str, Stage] = import_stages(graph_path)
         
-        initialized_stages = {}
+        initialized_stages: Dict[str, Stage] = {}
         hooks_by_type = defaultdict(dict)
         hooks_by_name = {}
         hooks_by_shortname = defaultdict(dict)
@@ -209,6 +209,9 @@ def optimize_stage(serialized_config: str):
         events_graph.hooks_by_name = hooks_by_name
         events_graph.hooks_by_shortname = hooks_by_shortname
         events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
+
+        for stage in initialized_stages.values():
+            stage.dispatcher.assemble_action_and_task_subgraphs()
 
         execute_stage_config.batch_size = batch_size
         plugins_by_type = import_plugins(graph_path)

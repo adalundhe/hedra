@@ -151,12 +151,7 @@ class Setup(Stage, Generic[Unpack[T]]):
         )
         self.client._config = self.config
 
-        self.internal_hooks.extend([
-            'get_hook',
-            'get_checks',
-            'setup'
-        ])
-        
+
         self.internal_events = [
             'collect_target_stages'
         ]
@@ -341,11 +336,16 @@ class Setup(Stage, Generic[Unpack[T]]):
                 await session.set_pool(setup_config.batch_size)
 
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved prepared Action and Session for action - {hook.name}:{action.action_id} - Execute stage - {execute_stage_name}')
-                
-                action.hooks.before =  await self.get_hook(hook.stage_instance, hook.shortname, HookType.BEFORE)
-                action.hooks.after = await self.get_hook(hook.stage_instance, hook.shortname, HookType.AFTER)
-                action.hooks.checks = await self.get_checks(hook.stage_instance, hook.shortname)
-                
+                    
+                if len(hook.before) > 0:
+                    action.hooks.before = hook.before
+
+                if len(hook.after) > 0:
+                    action.hooks.after = hook.after
+
+                if len(hook.checks) > 0:
+                    action.hooks.checks = hook.checks
+                    
                 hook.session = session
                 hook.action = action  
 
@@ -399,6 +399,15 @@ class Setup(Stage, Generic[Unpack[T]]):
             await session.set_pool(setup_config.batch_size)
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved task and session for Task - {hook.name}:{task.action_id} - Execute stage - {execute_stage_name}')
+
+            if len(hook.before) > 0:
+                task.hooks.before = hook.before
+
+            if len(hook.after) > 0:
+                task.hooks.after = hook.after
+
+            if len(hook.checks) > 0:
+                task.hooks.checks = hook.checks
 
             task.hooks.checks = await self.get_checks(execute_stage, hook.shortname)
 
@@ -457,15 +466,6 @@ class Setup(Stage, Generic[Unpack[T]]):
         return {}
 
     @Internal()
-    async def get_hook(self, execute_stage: Stage, shortname: str, hook_type: str) -> Coroutine:
-        hooks: List[Union[AfterHook, BeforeHook]] = execute_stage.hooks[hook_type]
-        for hook in hooks:
-            if shortname in hook.names:
-                await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Adding Hook - {hook.name}:{hook.hook_id} - of type - {hook.hook_type.name.capitalize()} - to Action - {shortname} - for Execute stage - {execute_stage.name}')
-
-                return hook
-
-    @Internal()
     async def get_checks(self, execute_stage: Stage, shortname: str) -> List[Coroutine]:
 
         checks = []
@@ -511,12 +511,3 @@ class Setup(Stage, Generic[Unpack[T]]):
                 action: Union[BaseAction, Task] = notifier.action
                 
                 action.hooks.listeners: List[Hook] = [listeners.get(listener_name) for listener_name in channel.listeners]
-
-    @Internal()
-    async def setup(self) -> None:
-        setup_hooks: List[SetupHook] = self.hooks[HookType.SETUP]
-        for setup_hook in setup_hooks:
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing Setup hook - {setup_hook.name}')
-
-            await setup_hook()
-            

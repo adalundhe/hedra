@@ -101,7 +101,7 @@ class LoadHook(Hook):
 
         return {
             **kwargs,
-            file_data: load_result
+            self.shortname: load_result
         }
 
     def copy(self):
@@ -109,5 +109,6 @@ class LoadHook(Hook):
             self.name,
             self.shortname,
             self._call,
-            self.load_path
+            self.load_path,
+            order=self.order
         )

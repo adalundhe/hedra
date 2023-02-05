@@ -6,7 +6,7 @@ import psutil
 from datetime import datetime
 from typing import List
 from hedra.logging import HedraLogger
-from hedra.reporting.events.types.base_result import BaseEvent
+from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
 from concurrent.futures import ThreadPoolExecutor
 
@@ -57,7 +57,7 @@ class S3:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to AWS S3 - Region: {self.region_name}')
 
-    async def submit_events(self, events: List[BaseEvent]):
+    async def submit_events(self, events: List[BaseProcessedResult]):
         
         events_bucket_name = f'{self.buckets_namespace}-{self.events_bucket_name}'
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to Bucket - {events_bucket_name}')

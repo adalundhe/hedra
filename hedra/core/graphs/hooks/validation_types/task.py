@@ -1,8 +1,9 @@
-from typing import List, Optional, Dict, Union, Coroutine
+from typing import List, Optional, Dict, Union, Tuple
 from pydantic import BaseModel, StrictStr, StrictInt, StrictFloat, validator
 
 
 class TaskHookValidator(BaseModel):
+    names: Tuple[StrictStr, ...]
     weight: StrictInt
     order: StrictInt
     metadata: Optional[Dict[str, Union[StrictStr, StrictInt, StrictFloat]]]
@@ -20,7 +21,8 @@ class TaskHookValidator(BaseModel):
 class TaskValidator(BaseModel):
 
     def __init__(
-        __pydantic_self__, 
+        self,
+        *names: Tuple[str, ...], 
         weight: Optional[int]=1, 
         order: Optional[int]=1, 
         metadata: Optional[Dict[str, Union[str, int, float]]]={}, 
@@ -29,6 +31,7 @@ class TaskValidator(BaseModel):
         listen: Optional[List[str]]=[]
     ) -> None:
         TaskHookValidator(
+            names=names,
             weight=weight,
             order=order,
             metadata=metadata,

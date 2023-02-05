@@ -10,7 +10,8 @@ class CheckHook(Hook):
         name: str, 
         shortname: str, 
         call: Callable[..., Awaitable[Any]], 
-        *names: List[str]
+        *names: List[str],
+        order: int=1
     ) -> None:
         super().__init__(
             name, 
@@ -20,6 +21,7 @@ class CheckHook(Hook):
         )
 
         self.names = list(set(names))
+        self.order = order
 
     async def call(self, **kwargs):
         passed = await super().call(**{name: value for name, value in kwargs.items() if name in self.params})
@@ -32,7 +34,7 @@ class CheckHook(Hook):
 
         return {
             **kwargs,
-            'valid': passed
+            self.shortname: passed
         }
 
     def copy(self):
@@ -40,5 +42,6 @@ class CheckHook(Hook):
             self.name,
             self.shortname,
             self._call,
-            *self.names
+            *self.names,
+            oreder=self.order
         )

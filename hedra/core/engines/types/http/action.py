@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Iterator, Union, List
+from typing import Dict, Iterator, Union, List, Any
 from urllib.parse import urlencode
 from hedra.core.engines.types.common.hooks import Hooks
 from hedra.core.engines.types.common.base_action import BaseAction
@@ -24,7 +24,8 @@ class HTTPAction(BaseAction):
         'encoded_headers',
         'is_stream',
         'ssl_context',
-        'redirects'
+        'redirects',
+        'action_args'
     )
     
     def __init__(
@@ -59,6 +60,7 @@ class HTTPAction(BaseAction):
         self.ssl_context = None
         self.redirects = redirects
         self.hooks: Hooks[HTTPAction] = Hooks()
+        self.action_args: Dict[str, Any] = {}
 
     @property
     def size(self):

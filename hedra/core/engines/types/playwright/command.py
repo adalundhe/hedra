@@ -144,7 +144,8 @@ class PlaywrightCommand:
         'options',
         'metadata',
         'hooks',
-        'event'
+        'event',
+        'command_args'
     )
     
     def __init__(self, 
@@ -167,6 +168,7 @@ class PlaywrightCommand:
         self.metadata = Metadata(user, tags)
         self.hooks: Hooks[PlaywrightCommand] = Hooks()
         self.event = None
+        self.command_args: Dict[str, Any] = {}
 
     def to_serializable(self):
 

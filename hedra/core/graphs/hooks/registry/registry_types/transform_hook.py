@@ -71,7 +71,7 @@ class TransformHook(Hook):
                             aggregated_transformm[name].append(value)
 
                 else:
-                    aggregated_transformm['transformed'].append(data_item)
+                    aggregated_transformm[self.shortname].append(data_item)
 
 
             return {
@@ -91,7 +91,7 @@ class TransformHook(Hook):
 
             return {
                 **kwargs,
-                'transformed': result
+                self.shortname: result
             }
 
     def copy(self):
