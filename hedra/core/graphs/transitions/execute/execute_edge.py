@@ -21,19 +21,19 @@ class ExecuteEdge(BaseEdge[Execute]):
         )
 
         self.history = {
-            'execute_hooks': {},
-            'stages': defaultdict(dict),
-            'setup_stages': [],
-            'setup_config': None,
+            'execute_stage_setup_hooks': {},
+            'execute_stage_setup_by': [],
+            'execute_stage_setup_config': None,
+            'setup_stage_ready_stages': defaultdict(dict),
             'setup_by': None,
-            'results': {}
+            'execute_stage_results': {}
         }
 
         self.requires = [
-            'setup_stages',
-            'setup_config',
-            'setup_by',
-            'execute_hooks'
+            'setup_stage_candidates',
+            'execute_stage_setup_config',
+            'execute_stage_setup_by',
+            'execute_stage_setup_hooks'
         ]
 
         self.provides = [

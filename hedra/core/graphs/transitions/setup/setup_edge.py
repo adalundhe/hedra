@@ -35,11 +35,11 @@ class SetupEdge(BaseEdge[Setup]):
         )
 
         self.history = {
-            'setup_stages': [],
-            'setup_config': None,
-            'ready_stages': {},
-            'setup_by': None,
-            'execute_hooks': {}
+            'setup_stage_target_stages': [],
+            'setup_stage_target_config': None,
+            'setup_stage_ready_stages': {},
+            'execute_stage_setup_by': None,
+            'execute_stage_setup_hooks': {}
         }
 
         self.valid_states = [
@@ -49,10 +49,11 @@ class SetupEdge(BaseEdge[Setup]):
 
         self.requires = []
         self.provides = [
-            'execute_hooks',
-            'ready_stages',
-            'setup_candidates',
-            'setup_config'
+            'execute_stage_setup_hooks',
+            'execute_stage_setup_config',
+            'execute_stage_setup_by',
+            'setup_stage_ready_stages',
+            'setup_stage_candidates',
         ]
 
     async def transition(self):
@@ -87,8 +88,8 @@ class SetupEdge(BaseEdge[Setup]):
 
         self.source.generation_setup_candidates = len(setup_candidates)
 
-        self.history['setup_stages'] = setup_candidates
-        self.history['setup_config'] = self.source.config
+        self.history['setup_stage_target_stages'] = setup_candidates
+        self.history['setup_stage_target_config'] = self.source.config
 
         for event in self.source.dispatcher.events_by_name.values():
             if event.source.shortname in self.source.internal_events:
@@ -106,7 +107,7 @@ class SetupEdge(BaseEdge[Setup]):
         for provided in self.provides:
             self.history[provided] = self.source.context[provided]
 
-        self.history['setup_candidates'] = setup_candidates
+        self.history['setup_stage_candidates'] = setup_candidates
 
         if self.destination.context is None:
             self.destination.context = SimpleContext()
@@ -125,9 +126,9 @@ class SetupEdge(BaseEdge[Setup]):
 
     def _update(self, destination: Stage):
 
-        ready_stages = self.history.get('ready_stages', {})
-        setup_candidates = self.history.get('setup_candidates', {})
-        setup_config = self.history.get('setup_config')
+        ready_stages = self.history.get('setup_stage_ready_stages', {})
+        setup_candidates = self.history.get('setup_stage_candidates', {})
+        setup_config = self.history.get('execute_stage_setup_config')
         
 
         self.stages_by_type[StageTypes.EXECUTE].update(ready_stages)
@@ -135,14 +136,14 @@ class SetupEdge(BaseEdge[Setup]):
         setup_execute_stage: Execute = ready_stages.get(self.source.name)
 
         self.next_history[destination.name] = {
-            'setup_stages': [],
+            'setup_stage_candidates': [],
             'setup_config': None,
-            'setup_by': None   
+            'execute_stage_setup_by': None   
         }
 
         if setup_execute_stage:
-            self.next_history[destination.name]['execute_hooks'] = setup_execute_stage.context['execute_hooks']
+            self.next_history[destination.name]['execute_stage_setup_hooks'] = setup_execute_stage.context['execute_stage_setup_hooks']
         
-        self.next_history[destination.name]['setup_stages'].extend(list(setup_candidates.keys()))
-        self.next_history[destination.name]['setup_config'] = setup_config
-        self.next_history[destination.name]['setup_by'] = self.source.name
+        self.next_history[destination.name]['setup_stage_candidates'].extend(list(setup_candidates.keys()))
+        self.next_history[destination.name]['execute_stage_setup_config'] = setup_config
+        self.next_history[destination.name]['execute_stage_setup_by'] = self.source.name

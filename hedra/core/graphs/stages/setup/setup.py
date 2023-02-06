@@ -189,8 +189,8 @@ class Setup(Stage, Generic[Unpack[T]]):
     @context()
     async def collect_target_stages(
         self,
-        setup_stages: Dict[str, Stage]={},
-        setup_config: Config=None
+        setup_stage_target_stages: Dict[str, Stage]={},
+        setup_stage_target_config: Config=None
     ):
         bypass_connection_validation = self.core_config.get('bypass_connection_validation', False)
         connection_validation_retries = self.core_config.get('connection_validation_retries', 3)
@@ -198,8 +198,8 @@ class Setup(Stage, Generic[Unpack[T]]):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting setup')
         
         return {
-            'setup_config': setup_config,
-            'setup_stages': setup_stages,
+            'setup_stage_target_config': setup_stage_target_config,
+            'setup_stage_target_stages': setup_stage_target_stages,
             'bypass_connection_validation': bypass_connection_validation,
             'connection_validation_retries': connection_validation_retries
         }
@@ -207,17 +207,17 @@ class Setup(Stage, Generic[Unpack[T]]):
     @event('collect_target_stages')
     async def configure_target_stages(
         self, 
-        setup_stages: Dict[str, Stage]={},
-        setup_config: Config=None
+        setup_stage_target_stages: Dict[str, Stage]={},
+        setup_stage_target_config: Config=None
     ):
     
-        execute_stage_names = ', '.join(list(setup_stages.keys()))
+        execute_stage_names = ', '.join(list(setup_stage_target_stages.keys()))
 
         await self.logger.spinner.append_message(f'Setting up - {execute_stage_names}')
 
         execute_stage_id = 1
         
-        for execute_stage_name, execute_stage in setup_stages.items():
+        for execute_stage_name, execute_stage in setup_stage_target_stages.items():
 
             execute_stage.execution_stage_id = execute_stage_id
             execute_stage.execute_setup_stage = self.name
@@ -237,55 +237,58 @@ class Setup(Stage, Generic[Unpack[T]]):
             engine_plugins: Dict[str, EnginePlugin] = self.plugins_by_type[PluginType.ENGINE]
 
             for plugin_name, plugin in engine_plugins.items():
-                execute_stage.client.plugin[plugin_name] = plugin(setup_config)
+                execute_stage.client.plugin[plugin_name] = plugin(setup_stage_target_config)
                 plugin.name = plugin_name
                 execute_stage.plugins[plugin_name] = plugin
                 self.plugins_by_type[plugin_name] = plugin
 
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Engine plugin - {plugin.name} - for Execute stage - {execute_stage_name}')
 
-            execute_stage.client._config = setup_config
-            setup_stages[execute_stage_name] = execute_stage
+            execute_stage.client._config = setup_stage_target_config
+            setup_stage_target_stages[execute_stage_name] = execute_stage
 
         return  {
-            'prepared_stages': setup_stages
+            'setup_stage_target_stages': setup_stage_target_stages
         }
 
     @event('configure_target_stages')
     async def collect_action_hooks(
         self,
-        prepared_stages: Dict[str, Stage]={}
+        setup_stage_target_stages: Dict[str, Stage]={}
     ):
     
         actions: List[ActionHook] = []
-        for execute_stage in prepared_stages.values():
+        for execute_stage in setup_stage_target_stages.values():
             actions.extend(execute_stage.hooks[HookType.ACTION])
 
         return {
-            'actions': actions
+            'setup_stage_actions': actions
         }
 
     
     @condition('collect_action_hooks')
-    async def check_actions_setup_needed(self, actions: List[ActionHook]=[]):
+    async def check_actions_setup_needed(
+        self, 
+        setup_stage_actions: List[ActionHook]=[]
+    ):
         return {
-            'has_actions_for_setup': len(actions) > 0
+            'setup_stage_has_actions': len(setup_stage_actions) > 0
         }
         
     @transform('check_actions_setup_needed')
     async def setup_action(
         self,
-        actions: ActionHook=None,
-        has_actions_for_setup: bool = False,
+        setup_stage_actions: ActionHook=None,
+        setup_stage_has_actions: bool = False,
         bypass_connection_validation: bool=False,
         connection_validation_retries: int=3,
-        setup_config: Config=None
+        setup_stage_target_config: Config=None
     ):
-            if has_actions_for_setup:
-                hook = actions
+            if setup_stage_has_actions:
+                hook = setup_stage_actions
                 hook.stage_instance.client.next_name = hook.name
                 hook.stage_instance.client.intercept = True
-                hook.stage_instance.client._config = setup_config
+                hook.stage_instance.client._config = setup_stage_target_config
 
                 execute_stage_name = hook.stage_instance.name
 
@@ -296,7 +299,7 @@ class Setup(Stage, Generic[Unpack[T]]):
 
                 hook.stage_instance.client.actions.set_waiter(hook.stage_instance.name)
 
-                setup_call = SetupCall(hook, setup_config, retries=connection_validation_retries)
+                setup_call = SetupCall(hook, setup_stage_target_config, retries=connection_validation_retries)
 
                 setup_call.metadata_string = self.metadata_string
                 setup_call.action_store = hook.stage_instance.client.actions
@@ -346,7 +349,7 @@ class Setup(Stage, Generic[Unpack[T]]):
                     hook.name
                 )
 
-                await session.set_pool(setup_config.batch_size)
+                await session.set_pool(setup_stage_target_config.batch_size)
 
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved prepared Action and Session for action - {hook.name}:{action.action_id} - Execute stage - {execute_stage_name}')
                     
@@ -363,37 +366,37 @@ class Setup(Stage, Generic[Unpack[T]]):
                 hook.action = action  
 
                 return {
-                    'actions': actions
+                    'setup_stage_actions': setup_stage_actions
                 }
 
     @event('setup_action')
     async def collect_task_hooks(
         self,
-        setup_stages: Dict[str, Stage]={}
+        setup_stage_target_stages: Dict[str, Stage]={}
     ):
         tasks: List[TaskHook] = []
-        for execute_stage in setup_stages.values():
+        for execute_stage in setup_stage_target_stages.values():
             tasks.extend(execute_stage.hooks[HookType.TASK])
 
         return {
-            'tasks': tasks
+            'setup_stage_tasks': tasks
         }
     
     @condition('collect_task_hooks')
     async def check_tasks_setup_needed(self, tasks: List[ActionHook]=[]):
         return {
-            'has_tasks_for_setup': len(tasks) > 0
+            'setup_stage_has_tasks': len(tasks) > 0
         }
 
     @transform('check_tasks_setup_needed')
     async def setup_task(
         self,
-        tasks: TaskHook=None,
-        has_tasks_for_setup: bool=False,
-        setup_config: Config=None
+        setup_stage_tasks: TaskHook=None,
+        setup_stage_has_tasks: bool=False,
+        setup_stage_target_config: Config=None
     ):
-        if has_tasks_for_setup:
-            hook = tasks
+        if setup_stage_has_tasks:
+            hook = setup_stage_tasks
             execute_stage: Stage = hook.stage_instance
             execute_stage.client.next_name = hook.name
             execute_stage.client.intercept = True
@@ -409,7 +412,7 @@ class Setup(Stage, Generic[Unpack[T]]):
                 tags=hook.metadata.tags
             )
             
-            await session.set_pool(setup_config.batch_size)
+            await session.set_pool(setup_stage_target_config.batch_size)
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved task and session for Task - {hook.name}:{task.action_id} - Execute stage - {execute_stage_name}')
 
@@ -437,27 +440,27 @@ class Setup(Stage, Generic[Unpack[T]]):
             hook.action = task  
 
             return {
-                'tasks': tasks
+                'setup_stage_tasks': setup_stage_tasks
             }
 
     @context('setup_task')
     async def apply_channels(
         self,
-        setup_stages: Dict[str, Stage]=[],
-        actions: List[ActionHook]=[],
-        tasks: List[TaskHook]=[],
-        setup_config: Config=None
+        setup_stage_target_stages: Dict[str, Stage]=[],
+        setup_stage_actions: List[ActionHook]=[],
+        setup_stage_tasks: List[TaskHook]=[],
+        setup_stage_target_config: Config=None
     ):
         actions_by_stage = defaultdict(list)
         tasks_by_stage = defaultdict(list)
 
-        for action in actions:
+        for action in setup_stage_actions:
             actions_by_stage[action.stage].append(action)
 
-        for task in tasks:
+        for task in setup_stage_tasks:
             tasks_by_stage[task.stage].append(task)
 
-        for execute_stage in setup_stages.values():
+        for execute_stage in setup_stage_target_stages.values():
 
             execute_stage.client.intercept = False
             execute_stage.hooks[HookType.ACTION] = actions_by_stage[execute_stage.name]
@@ -478,8 +481,8 @@ class Setup(Stage, Generic[Unpack[T]]):
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Generated - {tasks_generated_count} - Tasks for Execute stage - {execute_stage.name}')
     
         return {
-            'setup_config': setup_config,
-            'ready_stages': setup_stages
+            'setup_stage_target_config': setup_stage_target_config,
+            'setup_stage_ready_stages': setup_stage_target_stages
         }
 
     @event('apply_channels')

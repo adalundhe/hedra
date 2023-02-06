@@ -92,22 +92,22 @@ class Execute(Stage, Generic[Unpack[T]]):
     @context()
     async def get_stage_config(
         self,
-        setup_config: Config=None,
-        setup_by: str=None,
-        execute_hooks: List[Union[ActionHook , TaskHook]] = []
+        execute_stage_setup_config: Config=None,
+        execute_stage_setup_by: str=None,
+        execute_stage_setup_hooks: List[Union[ActionHook , TaskHook]] = []
     ):
         self.context.ignore_serialization_filters = [
-            'execute_hooks'
+            'execute_stage_setup_hooks'
         ]
-        persona_type_name = setup_config.persona_type.capitalize()
+        persona_type_name = execute_stage_setup_config.persona_type.capitalize()
 
-        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing - {setup_config.batch_size} - VUs over {self.workers} threads for {setup_config.total_time_string} using - {persona_type_name} - persona')
-        await self.logger.spinner.append_message(f'Stage {self.name} executing - {setup_config.batch_size} - VUs over {self.workers} threads for {setup_config.total_time_string} using - {persona_type_name} - persona')
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing - {execute_stage_setup_config.batch_size} - VUs over {self.workers} threads for {execute_stage_setup_config.total_time_string} using - {persona_type_name} - persona')
+        await self.logger.spinner.append_message(f'Stage {self.name} executing - {execute_stage_setup_config.batch_size} - VUs over {self.workers} threads for {execute_stage_setup_config.total_time_string} using - {persona_type_name} - persona')
 
         return {
-            'execute_hooks': execute_hooks,
-            'setup_by': setup_by,
-            'execute_stage_config': setup_config
+            'execute_stage_setup_hooks': execute_stage_setup_hooks,
+            'execute_stage_setup_by': execute_stage_setup_by,
+            'execute_stage_config': execute_stage_setup_config
         }
 
     @event('get_stage_config')
@@ -128,24 +128,24 @@ class Execute(Stage, Generic[Unpack[T]]):
             source_stage_plugins[plugin.type].append(plugin.name)
 
         return {
-            'stage_plugins': source_stage_plugins
+            'execute_stage_plugins': source_stage_plugins
         }
 
     @condition('get_stage_plugins')
     async def check_has_multiple_workers(self):
         return {
-            'stage_has_multiple_workers': self.workers > 1
+            'execute_stage_has_multiple_workers': self.workers > 1
         }
 
     @event('check_has_multiple_workers')
     async def run_multiple_worker_jobs(
         self,
-        stage_has_multiple_workers: bool = False,
+        execute_stage_has_multiple_workers: bool = False,
         execute_stage_config: Config=None,
-        stage_plugins: Dict[str, List[Any]]={},
-        setup_by: str=None
+        execute_stage_plugins: Dict[str, List[Any]]={},
+        execute_stage_setup_by: str=None
     ):
-        if stage_has_multiple_workers:
+        if execute_stage_has_multiple_workers:
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting execution for - {self.workers} workers')
 
             serializable_context = self.context.as_serializable()       
@@ -161,9 +161,9 @@ class Execute(Stage, Generic[Unpack[T]]):
                         'source_stage_context': {
                             context_key: context_value for context_key, context_value in serializable_context
                         },
-                        'source_setup_stage_name': setup_by,
+                        'source_setup_stage_name': execute_stage_setup_by,
                         'source_stage_id': self.stage_id,
-                        'source_stage_plugins': stage_plugins,
+                        'source_stage_plugins': execute_stage_plugins,
                         'source_stage_config': execute_stage_config,
                         'partition_method': PartitionMethod.BATCHES,
                         'workers': self.workers,
@@ -176,21 +176,21 @@ class Execute(Stage, Generic[Unpack[T]]):
 
 
             return {
-                'stage_results': results_sets
+                'execute_stage_results': results_sets
             }
 
     @context('run_multiple_worker_jobs')
     async def aggregate_multiple_worker_results(
         self,
-        stage_has_multiple_workers: bool = False,
-        stage_results: List[List[Any]]=[]
+        execute_stage_has_multiple_workers: bool = False,
+        execute_stage_results: List[List[Any]]=[]
     ):
-        if stage_has_multiple_workers:
+        if execute_stage_has_multiple_workers:
             aggregate_results = []
             elapsed_times = []
             stage_contexts = defaultdict(list)
 
-            for result_set in stage_results:
+            for result_set in execute_stage_results:
                 aggregate_results.extend(result_set.get('results'))
                 elapsed_times.append(result_set.get('total_elapsed'))
 
@@ -218,11 +218,11 @@ class Execute(Stage, Generic[Unpack[T]]):
     @event('check_has_multiple_workers')
     async def setup_single_worker_job(
         self,
-        stage_has_multiple_workers: bool = False,
+        execute_stage_has_multiple_workers: bool = False,
         execute_stage_config: Config=None,
     ):
 
-        if stage_has_multiple_workers is False:
+        if execute_stage_has_multiple_workers is False:
 
             persona_config = execute_stage_config
             persona = get_persona(persona_config)
@@ -256,21 +256,21 @@ class Execute(Stage, Generic[Unpack[T]]):
                         options=persona_config.playwright_options
                     ))
             return {
-                'stage_persona': persona
+                'execute_stage_persona': persona
             }
 
 
     @context('setup_single_worker_job')
     async def run_single_worker_job(
         self,
-        stage_has_multiple_workers: bool = False,
-        stage_persona: DefaultPersona=None
+        execute_stage_has_multiple_workers: bool = False,
+        execute_stage_persona: DefaultPersona=None
     ):
-        if stage_has_multiple_workers is False:
+        if execute_stage_has_multiple_workers is False:
 
             start = time.monotonic()
 
-            results = await stage_persona.execute()
+            results = await execute_stage_persona.execute()
 
             elapsed = time.monotonic() - start
 
@@ -286,7 +286,7 @@ class Execute(Stage, Generic[Unpack[T]]):
             self.context[self.name] = stage_contexts
 
             total_results = len(results)
-            total_elapsed = stage_persona.total_elapsed
+            total_elapsed = execute_stage_persona.total_elapsed
 
             await self.logger.filesystem.aio['hedra.core'].info( f'{self.metadata_string} - Completed - {total_results} actions at  {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
             await self.logger.spinner.set_default_message(f'Stage - {self.name} completed {total_results} actions at {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')

@@ -19,10 +19,12 @@ class SubmitEdge(BaseEdge[Submit]):
         )
 
         self.history = {
+            'analyze_stage_events': [],
             'analyze_stage_summaries': {}
         }
 
         self.requires = [
+            'analyze_stage_events',
             'analyze_stage_summaries'
         ]
         self.provides = [
