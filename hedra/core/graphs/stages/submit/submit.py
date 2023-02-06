@@ -31,6 +31,23 @@ class Submit(Stage, Generic[T]):
             HookType.TRANSFORM
         ]
 
+        self.source_internal_events = [
+            'collect_process_results_and_metrics'
+        ]
+
+        self.internal_events = [
+            'collect_process_results_and_metrics',
+            'collect_reporter_plugins',
+            'initialize_reporter',
+            'check_for_events',
+            'submit_processed_results',
+            'submit_stage_metrics',
+            'submit_main_metrics',
+            'submit_error_metrics',
+            'submit_custom_metrics',
+            'complete_submit_session'
+        ]
+
     @Internal()
     async def run(self):
 

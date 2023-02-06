@@ -47,6 +47,10 @@ class EventGraph:
                 {}
             ).values()),
             *list(self.hooks_by_type.get(
+                HookType.CHANNEL,
+                {}
+            ).values()),
+            *list(self.hooks_by_type.get(
                 HookType.CHECK,
                 {}
             ).values()),

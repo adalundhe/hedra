@@ -191,6 +191,12 @@ def process_results_batch(config: Dict[str, Any]):
 
         context = {}
         for stage in pipeline_stage.values():
+            for key, value in stage.context:
+                try:
+                    dill.dumps(value)
+                except ValueError:
+                    stage.context.ignore_serialization_filters.append(key)
+                    
             serializable_context = stage.context.as_serializable()
             context.update({
                 context_key: context_value for context_key, context_value in serializable_context

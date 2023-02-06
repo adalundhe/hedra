@@ -7,9 +7,6 @@ class TaskHookValidator(BaseModel):
     weight: StrictInt
     order: StrictInt
     metadata: Optional[Dict[str, Union[StrictStr, StrictInt, StrictFloat]]]
-    checks: Optional[List[StrictStr]]
-    notify: Optional[List[StrictStr]]
-    listen: Optional[List[StrictStr]]
 
     class Config:
         arbitrary_types_allowed = True
@@ -25,17 +22,11 @@ class TaskValidator(BaseModel):
         *names: Tuple[str, ...], 
         weight: Optional[int]=1, 
         order: Optional[int]=1, 
-        metadata: Optional[Dict[str, Union[str, int, float]]]={}, 
-        checks: Optional[List[str]]=[],
-        notify: Optional[List[str]]=[],
-        listen: Optional[List[str]]=[]
+        metadata: Optional[Dict[str, Union[str, int, float]]]={}
     ) -> None:
         TaskHookValidator(
             names=names,
             weight=weight,
             order=order,
-            metadata=metadata,
-            checks=checks,
-            notify=notify,
-            listen=listen
+            metadata=metadata
         )

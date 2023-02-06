@@ -12,6 +12,7 @@ from hedra.core.engines.types.playwright import (
     MercuryPlaywrightClient,
     ContextConfig
 )
+from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.engines.types.registry import registered_engines
 from hedra.core.graphs.hooks.hook_types.condition import condition
 from hedra.core.graphs.hooks.hook_types.context import context
@@ -67,6 +68,21 @@ class Execute(Stage, Generic[Unpack[T]]):
         self.execute_setup_stage = None
         self.requires_shutdown = True
         self.allow_parallel = True
+
+        self.source_internal_events = [
+            'get_stage_config'
+        ]
+
+        self.internal_events = [
+            'get_stage_config',
+            'get_stage_plugins',
+            'check_has_multiple_workers',
+            'run_multiple_worker_jobs',
+            'aggregate_multiple_worker_results',
+            'setup_single_worker_job',
+            'run_single_worker_job',
+            'complete'
+        ]
 
     @Internal()
     async def run(self):
@@ -142,7 +158,6 @@ class Execute(Stage, Generic[Unpack[T]]):
                         'graph_path': self.graph_path,
                         'graph_id': self.graph_id,
                         'source_stage_name': self.name,
-                        'source_stage_linked_events': self.linked_events,
                         'source_stage_context': {
                             context_key: context_value for context_key, context_value in serializable_context
                         },
@@ -190,12 +205,14 @@ class Execute(Stage, Generic[Unpack[T]]):
             await self.logger.spinner.set_default_message(f'Stage - {self.name} completed {total_results} actions at {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
 
             stage_name = self.name.lower()
-            
+
             return {
                 stage_name: stage_contexts,
-                'stage_results': aggregate_results,
-                'total_results': total_results,
-                'total_elapsed': total_elapsed
+                'results':  ResultsSet({
+                    'stage_results': aggregate_results,
+                    'total_results': total_results,
+                    'total_elapsed': total_elapsed
+                })
             }
 
     @event('check_has_multiple_workers')
@@ -275,7 +292,13 @@ class Execute(Stage, Generic[Unpack[T]]):
             await self.logger.spinner.set_default_message(f'Stage - {self.name} completed {total_results} actions at {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
 
             return {
-                'stage_results': results,
-                'total_results': total_results,
-                'total_elapsed': total_elapsed
+                'results': ResultsSet({
+                    'stage_results': results,
+                    'total_results': total_results,
+                    'total_elapsed': total_elapsed
+                })
             }
+
+    @event('aggregate_multiple_worker_results', 'setup_single_worker_job')
+    async def complete(self):
+        return {}

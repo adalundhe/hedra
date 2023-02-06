@@ -116,44 +116,10 @@ class DefaultPersona:
     def _setup(self, hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]], metadata_string: str):
         self.metadata_string = f'{metadata_string} Persona: {self.type.capitalize()}:{self.persona_id} - '
 
-        tasks = hooks.get(HookType.TASK, [])
-        for hook in tasks:
-            if hook.is_event:
-                hook.action.event = hook
-        
-        persona_hooks = {
-            hook.name: hook for hook in hooks.get(HookType.ACTION)
-        }
-        persona_hooks.update({
-            hook.name: hook for hook in tasks
-        })
-
-        channel_hooks = {
-            hook.name: hook for hook in hooks[HookType.CHANNEL]
-        }
-        
-        for channel_hook in channel_hooks.values():
-            for notifier_name in channel_hook.notifiers:
-                notifier_hook = persona_hooks[notifier_name]
-                notifier_hook.action.hooks.notify = True
-                notifier_hook.action.hooks.listeners.extend([
-                    persona_hooks.get(hook_name) for hook_name in channel_hook.listeners
-                ])
-
-                notifier_hook.listeners = notifier_hook.action.hooks.listeners
-
-                notifier_hook.action.hooks.channels.append(channel_hook)
-   
-                persona_hooks[notifier_name] = notifier_hook
-
-            for listener_name in channel_hook.listeners:
-                listener_hook = persona_hooks[listener_name]
-                listener_hook.action.hooks.listen = True
-
-                listener_hook.action.hooks.channels.append(channel_hook)
-                persona_hooks[listener_hook.name] = listener_hook
-
-        self._hooks = list(persona_hooks.values())
+        self._hooks = list([
+            *hooks.get(HookType.ACTION),
+            *hooks.get(HookType.TASK, [])
+        ])
                 
             
     async def execute(self):

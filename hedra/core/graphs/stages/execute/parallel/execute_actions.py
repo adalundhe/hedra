@@ -114,11 +114,6 @@ async def start_execution(
 
     for hook in actions_and_tasks:
 
-        if hook.action.hooks.notify:
-            for idx, listener_name in enumerate(hook.action.hooks.listeners):
-                hook.action.hooks.listeners[idx] = actions.get(listener_name)
-
-
         if hook.action.type == RequestTypes.PLAYWRIGHT and isinstance(hook.session, MercuryPlaywrightClient):
 
             await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Setting up Playwright Session')
@@ -154,7 +149,6 @@ async def start_execution(
 
     await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Execution complete - Time (including addtional setup) took: {round(elapsed, 2)} seconds')
 
-    
     for result in results:
         result.checks = [
             [
@@ -165,7 +159,14 @@ async def start_execution(
     context = {}
 
     for stage in pipeline_stages.values():
+        for key, value in stage.context:
+            try:
+                dill.dumps(value)
+            except ValueError:
+                stage.context.ignore_serialization_filters.append(key)
+
         serializable_context = stage.context.as_serializable()
+
         context.update({
             context_key: context_value for context_key, context_value in serializable_context
         })   

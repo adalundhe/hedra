@@ -8,12 +8,13 @@ import copy
 from typing import List, Dict, Union, Any, Tuple, Coroutine
 from collections import defaultdict
 from hedra.core.graphs.events.event_graph import EventGraph
-from hedra.core.graphs.stages.base.import_tools import set_stage_hooks, import_stages
+from hedra.core.graphs.stages.base.import_tools import set_stage_hooks
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.error import Error
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, HookType
+from hedra.core.graphs.stages.complete.complete import Complete
 from hedra.core.graphs.stages.base.parallel.batch_executor import BatchExecutor
 from hedra.core.graphs.transitions.exceptions.exceptions import IsolatedStageError
 from hedra.logging import HedraLogger
@@ -21,6 +22,7 @@ from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.reporter.reporter_plugin import ReporterPlugin
 from hedra.plugins.types.plugin_types import PluginType
 from .transition import Transition
+from .common.base_edge import BaseEdge
 from .common import (
     invalid_transition
 )
@@ -64,6 +66,7 @@ class TransitionAssembler:
         self._thread_id = threading.current_thread().ident
         self._process_id = os.getpid()
         self.all_hooks = []
+        self.edges_by_name: Dict[str, BaseEdge] = {}
 
         self._graph_metadata_log_string = f'Graph - {self.graph_name}:{self.graph_id} - thread:{self._thread_id} - process:{self._process_id} - '
 
@@ -223,6 +226,8 @@ class TransitionAssembler:
                         neighbor_stage
                     )
 
+                    self.edges_by_name[transition.from_stage.name] = transition.edge
+
                     generation_transitions.append(transition)
 
             if len(generation_transitions) > 0:
@@ -267,15 +272,16 @@ class TransitionAssembler:
                 )
 
                 if has_path:
-                    idle_stage.context.stages[stage_type][stage_name] = stage
+                    self.edges_by_name[idle_stage.name].stages_by_type[stage_type][stage_name] = stage
                     paths = networkx.all_shortest_paths(graph, stage_name, complete_stage.name)
                 
                     stage_paths = []
                     for path in paths:
                         stage_paths.extend(path)
                     
-                    idle_stage.context.paths[stage_name] = stage_paths
-
+                    # idle_stage.context.paths[stage_name] = stage_paths
+                    self.edges_by_name[idle_stage.name].all_paths[stage_name] = stage_paths
+                    
                     path_lengths = networkx.all_pairs_shortest_path_length(graph)
 
                     stage_path_lengths = {}
@@ -284,7 +290,7 @@ class TransitionAssembler:
                         del path_lengths_set[path_stage_name]
                         stage_path_lengths[path_stage_name] = path_lengths_set
 
-                    idle_stage.context.path_lengths[stage_name] = stage_path_lengths.get(stage_name)
+                    self.edges_by_name[idle_stage.name].path_lengths[stage_name] = stage_path_lengths.get(stage_name)
 
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')

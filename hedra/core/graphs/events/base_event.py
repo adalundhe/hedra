@@ -48,7 +48,7 @@ class BaseEvent(Generic[T]):
         self.event_name = source.name
         self.event_order = source.order
 
-        self.source = source
+        self.source: T = source
 
         if target:
             self.target_name = self.target.name

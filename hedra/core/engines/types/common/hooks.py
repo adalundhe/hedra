@@ -1,6 +1,6 @@
 import asyncio
 from typing import Generic, TypeVar, Union
-from typing import Coroutine, List
+from typing import Coroutine, List, Dict
 
 
 A = TypeVar('A')
@@ -31,7 +31,7 @@ class Hooks(Generic[A]):
         self.notify = False
         self.listen = False
         self.channel_events: List[asyncio.Event] = []
-        self.listeners: List[A] = []
+        self.listeners: Dict[str, A] = {}
         self.channels: List[Coroutine] = []
 
     @property
@@ -61,7 +61,7 @@ class Hooks(Generic[A]):
         names['channels'] = self.channel_hook_names
 
         names['listeners'] = [
-            listener.name for listener in self.listeners
+            listener_name for listener_name in self.listeners
         ]
 
         return names

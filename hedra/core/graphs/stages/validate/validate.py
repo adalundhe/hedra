@@ -55,6 +55,15 @@ class Validate(Stage):
             HookType.TRANSFORM,
             HookType.VALIDATE, 
         ]
+        
+        self.source_internal_events = [
+            'validate_stages'
+        ]
+
+        self.internal_events = [
+            'validate_stages',
+            'validate_hooks'
+        ]
 
     @Internal()
     async def run(self):

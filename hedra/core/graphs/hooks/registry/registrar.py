@@ -8,6 +8,7 @@ from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.validation_types.action import ActionValidator
 from hedra.core.graphs.hooks.validation_types.after import AfterValidator
 from hedra.core.graphs.hooks.validation_types.before import BeforeValidator
+from hedra.core.graphs.hooks.validation_types.channel import ChannelValidator
 from hedra.core.graphs.hooks.validation_types.check import CheckValidator
 from hedra.core.graphs.hooks.validation_types.condition import ConditionValidator
 from hedra.core.graphs.hooks.validation_types.context import ContextValidator
@@ -71,6 +72,7 @@ class Registrar:
             HookType.ACTION: lambda *args, **kwargs: ActionValidator(*args, **kwargs),
             HookType.AFTER: lambda *args, **kwargs: AfterValidator(*args, **kwargs),
             HookType.BEFORE: lambda *args, **kwargs: BeforeValidator(*args, **kwargs),
+            HookType.CHANNEL: lambda *args, **kwargs: ChannelValidator(*args, **kwargs),
             HookType.CHECK: lambda *args, **kwargs: CheckValidator(*args, **kwargs),
             HookType.CONDITION: lambda *args, **kwargs: ConditionValidator(*args, **kwargs),
             HookType.CONTEXT: lambda *args, **kwargs: ContextValidator(*args, **kwargs),

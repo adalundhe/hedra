@@ -81,6 +81,25 @@ class Analyze(Stage):
         self.analysis_execution_time_start = 0
         self._executor = ThreadPoolExecutor(max_workers=1)
 
+        self.source_internal_events = [
+            'initialize_raw_results'
+        ]
+
+        self.internal_events = [
+            'initialize_raw_results',
+            'partition_results_batches',
+            'get_custom_metric_hooks',
+            'create_stage_batches',
+            'assign_stage_batches',
+            'analyze_stage_batches',
+            'reduce_stage_contexts',
+            'merge_events_groups',
+            'calculate_custom_metrics',
+            'generate_metrics_sets',
+            'generate_summary',
+            'complete'
+        ]
+
     @Internal()
     async def run(self):  
         await self.setup_events()
@@ -459,3 +478,7 @@ class Analyze(Stage):
         return {
             'summary_metrics': summaries
         }
+
+    @event('generate_summary')
+    async def complete(self):
+        return {}

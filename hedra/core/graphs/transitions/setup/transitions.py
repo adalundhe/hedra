@@ -24,7 +24,7 @@ async def setup_transition(current_stage: Setup, next_stage: Stage):
 
     if current_stage.state in valid_states:
 
-        current_stage.state = StageStates.EXECUTING
+        current_stage.state = StageStates.SETTING_UP
         logger = HedraLogger()
         logger.initialize()
 

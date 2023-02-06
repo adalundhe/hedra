@@ -52,9 +52,6 @@ async def execute_transition(current_stage: Execute, next_stage: Stage, logger: 
     if next_stage.context['results'] is None:
         next_stage.context['results'] = {}
 
-    if next_stage.context['results_stages'] is None:
-        next_stage.context['results_stages'] = []
-
     if next_stage.context['visited'] is None:
         next_stage.context['visited']  = []
 
@@ -75,9 +72,6 @@ async def execute_transition(current_stage: Execute, next_stage: Stage, logger: 
             if stage.context['results'] is None:
                 stage.context['results'] = {}
 
-            if stage.context['results_stages'] is None:
-                stage.context['results_stages'] = []
-
             if stage.context['visited'] is None:
                 stage.context['visited']  = []
 
@@ -90,7 +84,6 @@ async def execute_transition(current_stage: Execute, next_stage: Stage, logger: 
                 })
             })
 
-    next_stage.context['results_stages'].append(current_stage)
     next_stage.context['visited'].append(current_stage.name)
 
     return current_stage, next_stage

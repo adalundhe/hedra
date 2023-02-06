@@ -305,6 +305,12 @@ def optimize_stage(serialized_config: str):
                 'execute_hooks'
             ]
 
+            for key, value in stage.context:
+                try:
+                    dill.dumps(value)
+                except ValueError:
+                    stage.context.ignore_serialization_filters.append(key)
+
             serializable_context = stage.context.as_serializable()
             context.update({
                 context_key: context_value for context_key, context_value in serializable_context

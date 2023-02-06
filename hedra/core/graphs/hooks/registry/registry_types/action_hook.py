@@ -13,10 +13,7 @@ class ActionHook(Hook):
         *names: Tuple[str, ...],
         weight: int=1, 
         order: int=1, 
-        metadata: Dict[str, Union[str, int]]={}, 
-        checks: List[Coroutine]=[],
-        notify: List[str]=[],
-        listen: List[str]=[]
+        metadata: Dict[str, Union[str, int]]={}
     ) -> None:
         super().__init__(
             name, 
@@ -31,10 +28,11 @@ class ActionHook(Hook):
         self.checks = []
         self.before: List[str] = []
         self.after: List[str] = []
-        self.is_notifier = len(notify) > 0
-        self.is_listener = len(listen) > 0
-        self.notifiers: List[str] = notify
-        self.listeners: List[str] = listen
+        self.is_notifier = False
+        self.is_listener = False
+        self.channels: List[Any] = []
+        self.notifiers: List[Any] = []
+        self.listeners: List[Any] = []
         self.order = order
         self.metadata = HookMetadata(
             weight=weight,
