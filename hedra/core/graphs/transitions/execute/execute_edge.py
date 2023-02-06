@@ -1,4 +1,5 @@
 import asyncio
+import dill
 from typing import Dict, Any
 from collections import defaultdict
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
@@ -22,10 +23,9 @@ class ExecuteEdge(BaseEdge[Execute]):
 
         self.history = {
             'execute_stage_setup_hooks': {},
-            'execute_stage_setup_by': [],
+            'execute_stage_setup_by': None,
             'execute_stage_setup_config': None,
             'setup_stage_ready_stages': defaultdict(dict),
-            'setup_by': None,
             'execute_stage_results': {}
         }
 

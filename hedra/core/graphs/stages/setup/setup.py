@@ -465,7 +465,7 @@ class Setup(Stage, Generic[Unpack[T]]):
             execute_stage.client.intercept = False
             execute_stage.hooks[HookType.ACTION] = actions_by_stage[execute_stage.name]
             execute_stage.hooks[HookType.TASK] = tasks_by_stage[execute_stage.name]
-            execute_stage.context['execute_hooks'] = [
+            execute_stage.context['execute_stage_setup_hooks'] = [
                 *actions_by_stage[execute_stage.name],
                 *tasks_by_stage[execute_stage.name]
             ]
@@ -481,7 +481,7 @@ class Setup(Stage, Generic[Unpack[T]]):
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Generated - {tasks_generated_count} - Tasks for Execute stage - {execute_stage.name}')
     
         return {
-            'setup_stage_target_config': setup_stage_target_config,
+            'execute_stage_setup_config': setup_stage_target_config,
             'setup_stage_ready_stages': setup_stage_target_stages
         }
 

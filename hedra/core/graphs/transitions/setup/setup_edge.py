@@ -137,7 +137,7 @@ class SetupEdge(BaseEdge[Setup]):
 
         self.next_history[destination.name] = {
             'setup_stage_candidates': [],
-            'setup_config': None,
+            'execute_stage_setup_config': None,
             'execute_stage_setup_by': None   
         }
 

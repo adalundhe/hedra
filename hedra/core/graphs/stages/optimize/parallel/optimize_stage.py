@@ -308,7 +308,11 @@ def optimize_stage(serialized_config: str):
             for key, value in stage.context:
                 try:
                     dill.dumps(value)
+                
                 except ValueError:
+                    stage.context.ignore_serialization_filters.append(key)
+                
+                except TypeError:
                     stage.context.ignore_serialization_filters.append(key)
 
             serializable_context = stage.context.as_serializable()
