@@ -87,24 +87,12 @@ async def start_execution(
 
     await setup_stage.run_internal()
 
-    stages: Dict[str, Stage] =  setup_stage.context['ready_stages']
+    stages: Dict[str, Stage] =  setup_stage.context['setup_stage_ready_stages']
 
     setup_execute_stage: Stage = stages.get(source_stage_name)
     setup_execute_stage.logger = logger
 
-    actions = {
-        hook.name: hook for hook in setup_execute_stage.hooks[HookType.ACTION]
-    }
-
-    actions.update({
-        hook.name: hook for hook in setup_execute_stage.hooks[HookType.TASK]
-    })
-
-    actions_and_tasks: List[Union[ActionHook, TaskHook]] = [
-        *setup_execute_stage.hooks.get(HookType.ACTION, []),
-        *setup_execute_stage.hooks.get(HookType.TASK, [])
-    ]
-
+    actions_and_tasks: List[Union[ActionHook, TaskHook]] = setup_execute_stage.context['execute_stage_setup_hooks']
 
     execution_hooks_count = len(actions_and_tasks)
     await logger.filesystem.aio['hedra.core'].info(
@@ -312,8 +300,8 @@ def execute_actions(parallel_config: str):
         setup_stage.context = SimpleContext()
         setup_stage.config = source_stage_config
         setup_stage.generation_setup_candidates = 1
-        setup_stage.context['setup_config'] = source_stage_config
-        setup_stage.context['setup_stages'] = {
+        setup_stage.context['setup_stage_target_config'] = source_stage_config
+        setup_stage.context['setup_stage_target_stages'] = {
             execute_stage.name: execute_stage
         }
   

@@ -41,7 +41,6 @@ class AnalyzeEdge(BaseEdge[Analyze]):
     
     async def transition(self):
         self.source.state = StageStates.ANALYZING
-
         raw_results = dict(self.history.get('execute_stage_results', {}))
         execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
         submit_stages = self.stages_by_type.get(StageTypes.SUBMIT)
@@ -62,11 +61,10 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         self.history['analyze_stage_target_stages'] = target_stages
         
         for event in self.source.dispatcher.events_by_name.values():
-            if event.source.shortname in self.source.internal_events:
-                event.context.update(self.history)
-                
-                if event.source.context:
-                    event.source.context.update(self.history)
+            event.context.update(self.history)
+            
+            if event.source.context:
+                event.source.context.update(self.history)
                     
         if len(results_to_calculate) > 0:
 

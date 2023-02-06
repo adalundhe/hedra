@@ -61,11 +61,10 @@ class ExecuteEdge(BaseEdge[Execute]):
         self.source.total_concurrent_execute_stages = len(total_concurrent_execute_stages)
 
         for event in self.source.dispatcher.events_by_name.values():
-            if event.source.shortname in self.source.internal_events:
-                event.context.update(self.history)
-                
-                if event.source.context:
-                    event.source.context.update(self.history)
+            event.context.update(self.history)
+            
+            if event.source.context:
+                event.source.context.update(self.history)
 
         if self.timeout:
             await asyncio.wait_for(self.source.run(), timeout=self.timeout)

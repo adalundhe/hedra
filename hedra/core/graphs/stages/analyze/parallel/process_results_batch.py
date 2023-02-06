@@ -7,6 +7,7 @@ import json
 import threading
 import os
 import signal 
+import pickle
 from collections import defaultdict
 from typing import Any, Dict, List
 from hedra.core.engines.types.common.base_result import BaseResult
@@ -191,15 +192,6 @@ def process_results_batch(config: Dict[str, Any]):
 
         context = {}
         for stage in pipeline_stage.values():
-            for key, value in stage.context:
-                try:
-                    dill.dumps(value)
-                
-                except ValueError:
-                    stage.context.ignore_serialization_filters.append(key)
-                
-                except TypeError:
-                    stage.context.ignore_serialization_filters.append(key)
                     
             serializable_context = stage.context.as_serializable()
             context.update({

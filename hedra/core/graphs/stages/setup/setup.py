@@ -383,9 +383,12 @@ class Setup(Stage, Generic[Unpack[T]]):
         }
     
     @condition('collect_task_hooks')
-    async def check_tasks_setup_needed(self, tasks: List[ActionHook]=[]):
+    async def check_tasks_setup_needed(
+        self, 
+        setup_stage_tasks: List[ActionHook]=[]
+    ):
         return {
-            'setup_stage_has_tasks': len(tasks) > 0
+            'setup_stage_has_tasks': len(setup_stage_tasks) > 0
         }
 
     @transform('check_tasks_setup_needed')

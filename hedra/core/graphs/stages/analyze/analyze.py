@@ -86,7 +86,7 @@ class Analyze(Stage):
         ]
 
         self.internal_events = [
-            'initialize_raw_results',
+            'initialize_results_analysis',
             'partition_results_batches',
             'get_custom_metric_hooks',
             'create_stage_batches',
@@ -108,7 +108,7 @@ class Analyze(Stage):
     @context()
     async def initialize_results_analysis(
         self,
-        raw_results: RawResultsSet={}
+        analyze_stage_raw_results: RawResultsSet={}
     ):
         await self.logger.filesystem.aio.create_logfile('hedra.reporting.log')
         self.logger.filesystem.create_filelogger('hedra.reporting.log')
@@ -123,7 +123,7 @@ class Analyze(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Generated custom Event - {plugin.event.type} - for Reporter plugin - {plugin_name}')
 
-        all_results = list(raw_results.items())
+        all_results = list(analyze_stage_raw_results.items())
 
         self.context.ignore_serialization_filters = [
             'analyze_stage_all_results',
@@ -132,7 +132,7 @@ class Analyze(Stage):
         ]
         
         return {
-            'analyze_stage_raw_results': raw_results,
+            'analyze_stage_raw_results': analyze_stage_raw_results,
             'analyze_stage_all_results': all_results
         }
 
