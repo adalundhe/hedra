@@ -25,11 +25,11 @@ class CheckpointEdge(BaseEdge[Checkpoint]):
         else:
             await self.source.run()
 
-        self.destination.update(self.history)
+        self.destination.context.update(self.history)
 
         self.source.state = StageStates.CHECKPOINTED
 
-        if self.destination.source.context is None:
-            self.destination.source.context = SimpleContext()
+        if self.destination.context is None:
+            self.destination.context = SimpleContext()
 
-        return None, self.destination.source.stage_type
+        return None, self.destination.stage_type
