@@ -208,7 +208,7 @@ class Execute(Stage, Generic[Unpack[T]]):
 
             return {
                 stage_name: stage_contexts,
-                'results':  ResultsSet({
+                'execute_stage_results':  ResultsSet({
                     'stage_results': aggregate_results,
                     'total_results': total_results,
                     'total_elapsed': total_elapsed
@@ -292,7 +292,7 @@ class Execute(Stage, Generic[Unpack[T]]):
             await self.logger.spinner.set_default_message(f'Stage - {self.name} completed {total_results} actions at {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
 
             return {
-                'results': ResultsSet({
+                'execute_stage_results': ResultsSet({
                     'stage_results': results,
                     'total_results': total_results,
                     'total_elapsed': total_elapsed

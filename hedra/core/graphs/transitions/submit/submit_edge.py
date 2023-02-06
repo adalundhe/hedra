@@ -19,14 +19,14 @@ class SubmitEdge(BaseEdge[Submit]):
         )
 
         self.history = {
-            'summaries': {}
+            'analyze_stage_summaries': {}
         }
 
         self.requires = [
-            'summaries'
+            'analyze_stage_summaries'
         ]
         self.provides = [
-            'summaries'
+            'analyze_stage_summaries'
         ]
 
     async def transition(self):
@@ -61,6 +61,6 @@ class SubmitEdge(BaseEdge[Submit]):
     def _update(self, destination: Stage):
         self.next_history.update({
             destination.name: {
-                'summaries': self.history['summaries'] 
+                'analyze_stage_summaries': self.history['analyze_stage_summaries'] 
             }
         })

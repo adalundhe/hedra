@@ -21,14 +21,16 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         )
 
         self.history = {
-            'results': {}
+            'execute_stage_results': {},
+            'analyze_stage_raw_results': {},
+            'analyze_stage_target_stages': {}
         }
 
         self.requires = [
-            'results'
+            'execute_stage_results'
         ]
         self.provides = [
-            'summaries'
+            'analyze_stage_summaries'
         ]
 
         self.valid_states = [
@@ -40,7 +42,7 @@ class AnalyzeEdge(BaseEdge[Analyze]):
     async def transition(self):
         self.source.state = StageStates.ANALYZING
 
-        raw_results = dict(self.history.get('results', {}))
+        raw_results = dict(self.history.get('execute_stage_results', {}))
         execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
         submit_stages = self.stages_by_type.get(StageTypes.SUBMIT)
 
@@ -56,8 +58,8 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                 results_to_calculate[stage_name] = raw_results.get(stage_name)
                 target_stages[stage_name] = stage
         
-        self.history['raw_results'] = results_to_calculate
-        self.history['target_stages'] = target_stages
+        self.history['analyze_stage_raw_results'] = results_to_calculate
+        self.history['analyze_stage_target_stages'] = target_stages
         
         for event in self.source.dispatcher.events_by_name.values():
             if event.source.shortname in self.source.internal_events:
@@ -74,7 +76,7 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             else:
                 await self.source.run()
 
-        self.history['summary_metrics'] = self.source.context['summary_metrics']
+        self.history['analyze_stage_summary_metrics'] = self.source.context['analyze_stage_summary_metrics']
 
         self.destination.state = StageStates.ANALYZED
 
@@ -103,6 +105,6 @@ class AnalyzeEdge(BaseEdge[Analyze]):
     def _update(self, destination: Stage):
         self.next_history.update({
             destination.name: {
-                'summaries': self.history.get('summary_metrics', {})
+                'analyze_stage_summaries': self.history.get('analyze_stage_summary_metrics', {})
             }
         })

@@ -37,7 +37,7 @@ class ExecuteEdge(BaseEdge[Execute]):
         ]
 
         self.provides = [
-            'results'
+            'execute_stage_results'
         ]
 
         self.valid_states = [
@@ -105,11 +105,11 @@ class ExecuteEdge(BaseEdge[Execute]):
         next_results = self.next_history.get(destination.name)
         if next_results is None:
             next_results = {
-                'results': {}
+                'execute_stage_results': {}
             }
 
-        next_results['results'].update({
-            self.source.name:  self.history['results']
+        next_results['execute_stage_results'].update({
+            self.source.name:  self.history['execute_stage_results']
         })
 
         self.next_history.update({
