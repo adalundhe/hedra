@@ -25,6 +25,7 @@ class BaseEdge(Generic[T]):
         self.source = source
         self.destination = destination
         self.timeout = None
+        self.folded = False
 
         self.edges_by_name: Dict[str, Stage] = {}
 
@@ -40,7 +41,10 @@ class BaseEdge(Generic[T]):
         
 
     async def transition(self):
-        pass
+        raise NotImplementedError('Err. - Please implement this method in the Edge class inheriting BaseEdge')
 
     async def update(self, destingation: Stage):
-        pass
+        raise NotImplementedError('Err. - Please implement this method in the Edge class inheriting BaseEdge')
+
+    async def fold(self, edge: BaseEdge) -> None:
+        raise NotImplementedError('Err. - Please implement this method in the Edge class inheriting BaseEdge')

@@ -21,14 +21,11 @@ from hedra.logging import HedraLogger
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.reporter.reporter_plugin import ReporterPlugin
 from hedra.plugins.types.plugin_types import PluginType
+from .transition_group import TransitionGroup
 from .transition import Transition
+from .common.transtition_metadata import TransitionMetadata
 from .common.base_edge import BaseEdge
-from .common import (
-    invalid_transition
-)
-from .idle import (
-    invalid_idle_transition
-)
+
 
 
 async def empty_call(*args):
@@ -139,7 +136,7 @@ class TransitionAssembler:
         
         for generation in topological_generations:
 
-            generation_transitions = []
+            generation_transitions = TransitionGroup()
 
             stage_pool_size = self.cpus
 
@@ -206,12 +203,12 @@ class TransitionAssembler:
                 for neighbor in neighbors:
                     neighbor_stage = self.generated_stages.get(neighbor)
 
-                    transition_action = self.transition_types.get((
+                    transition_action: TransitionMetadata = self.transition_types.get((
                         stage.stage_type,
                         neighbor_stage.stage_type
                     ))
 
-                    if transition_action == invalid_transition or transition_action == invalid_idle_transition:
+                    if transition_action.is_valid is False:
                         invalid_transition_error, _ = self.loop.run_until_complete(
                             transition_action(stage, neighbor_stage)
                         )
@@ -231,9 +228,9 @@ class TransitionAssembler:
 
                     self.edges_by_name[(transition.from_stage.name, transition.to_stage.name)] = transition.edge
 
-                    generation_transitions.append(transition)
+                    generation_transitions.add_transition(transition)
 
-            if len(generation_transitions) > 0:
+            if generation_transitions.count > 0:
                 transitions.append(generation_transitions)
 
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Transition matrix assemmbly complete')

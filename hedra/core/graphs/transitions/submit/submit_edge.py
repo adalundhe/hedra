@@ -68,6 +68,8 @@ class SubmitEdge(BaseEdge[Submit]):
         history = self.history[self.from_stage_name]
         self.next_history.update({
             destination.name: {
-                'analyze_stage_summary_metrics': history['analyze_stage_summary_metrics'] 
+                self.source.name: {
+                    'analyze_stage_summary_metrics': history['analyze_stage_summary_metrics'] 
+                }
             }
         })
