@@ -41,10 +41,11 @@ class ValidateEdge(BaseEdge[Validate]):
         
         self.destination.state = StageStates.VALIDATED
 
-
         return None, self.destination.stage_type
 
     def _update(self, destination: Stage):
         self.next_history.update({
-            destination.name: {}
+            destination.name: {
+                self.source.name: {}
+            }
         })

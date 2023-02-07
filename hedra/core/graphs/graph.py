@@ -208,14 +208,21 @@ class Graph:
                     await status_spinner.system.debug(f'{self.metadata_string} - Completed stage Transtition - {transition.transition_id} -  from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
                     
                     if transition.to_stage.stage_type is not StageTypes.COMPLETE:
-                        for stage_name in transition.edge.next_history:
-                            self.runner.edges_by_name[stage_name].history.update(
-                                transition.edge.next_history[stage_name]
-                            )
-                            self.runner.edges_by_name[stage_name].stages_by_type = transition.edge.stages_by_type
-                            self.runner.edges_by_name[stage_name].all_paths = transition.edge.all_paths
-                            self.runner.edges_by_name[stage_name].path_lengths = transition.edge.path_lengths
-                            self.runner.edges_by_name[stage_name].visited.extend(transition.edge.visited)
+                        for destination_name in transition.edge.next_history:
+                            for source_name in transition.edge.next_history[destination_name]:
+                                for neighbor in self.runner.adjacency_list[destination_name]:
+                                    source_history: Dict[str, Any] = transition.edge.next_history[destination_name][source_name]
+                                    required_keys = self.runner.edges_by_name[(destination_name, neighbor)].requires
+
+                                    self.runner.edges_by_name[(destination_name, neighbor)].from_stage_name = source_name
+                                    self.runner.edges_by_name[(destination_name, neighbor)].history.update({
+                                        source_name: {
+                                            key: value for key, value in source_history.items() if key in required_keys
+                                        }
+                                    })
+
+                    
+                                
 
                 completed_transitions_count = len(results)
                 await status_spinner.system.debug(f'{self.metadata_string} - Completed -  {completed_transitions_count} - transitions')

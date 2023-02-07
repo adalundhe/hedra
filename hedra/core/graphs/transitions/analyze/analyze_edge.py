@@ -20,11 +20,7 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             destination
         )
 
-        self.history = {
-            'execute_stage_results': {},
-            'analyze_stage_raw_results': {},
-            'analyze_stage_target_stages': {}
-        }
+        self.history = {}
 
         self.requires = [
             'execute_stage_results'
@@ -41,6 +37,15 @@ class AnalyzeEdge(BaseEdge[Analyze]):
     
     async def transition(self):
         self.source.state = StageStates.ANALYZING
+   
+        raw_results = {
+            'execute_stage_results': {}
+        }
+        for stage_name in self.history:
+            raw_results['execute_stage_results'].update(
+                self.history[stage_name].get('execute_stage_results', {})
+            )
+
         raw_results = dict(self.history.get('execute_stage_results', {}))
         execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
         submit_stages = self.stages_by_type.get(StageTypes.SUBMIT)
@@ -96,6 +101,7 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                     stage.state = StageStates.ANALYZED
 
         self.source.state = StageStates.ANALYZED
+
         self.visited.append(self.source.name)
 
         return None, self.destination.stage_type

@@ -1,6 +1,7 @@
 import asyncio
 from typing import Dict, Any
 from hedra.core.graphs.simple_context import SimpleContext
+from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.teardown.teardown import Teardown
@@ -22,4 +23,14 @@ class TeardownEdge(BaseEdge[Teardown]):
         )
 
     async def transition(self):
-        pass
+        self.source.state = StageStates.TEARDOWN_INITIALIZED
+
+        if self.timeout:
+            await asyncio.wait_for(self.timeout.run(), timeout=self.timeout)
+
+        else:
+            await self.source.run()
+
+        self.source.state = StageStates.TEARDOWN_COMPLETE
+
+        return None, self.destination.stage_type

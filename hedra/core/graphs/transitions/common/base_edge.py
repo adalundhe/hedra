@@ -14,6 +14,7 @@ class BaseEdge(Generic[T]):
         self.requires = []
         self.provides = []
         
+        self.from_stage_name: str = None
         self.stages_by_type: Dict[StageTypes, Dict[str, Stage]] = {}
         self.path_lengths: Dict[str, int] = {}
         self.history = {}

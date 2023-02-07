@@ -27,4 +27,6 @@ class CompleteEdge(BaseEdge[Complete]):
 
         self.source.state = StageStates.COMPLETE
 
+        self.visited.append(self.source.name)
+
         return None, None

@@ -191,8 +191,7 @@ def process_results_batch(config: Dict[str, Any]):
         )
 
         context = {}
-        for stage in pipeline_stage.values():
-                    
+        for stage in pipeline_stage.values():                
             serializable_context = stage.context.as_serializable()
             context.update({
                 context_key: context_value for context_key, context_value in serializable_context

@@ -57,6 +57,8 @@ class SubmitEdge(BaseEdge[Submit]):
         if self.destination.context is None:
             self.destination.context = SimpleContext()
 
+        self.visited.append(self.source.name)
+
         return None, self.destination.stage_type
 
     def _update(self, destination: Stage):

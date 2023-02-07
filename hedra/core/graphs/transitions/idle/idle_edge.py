@@ -43,5 +43,7 @@ class IdleEdge(BaseEdge[Idle]):
 
     def _update(self, destination: Stage):
         self.next_history.update({
-            destination.name: {}
+            destination.name: {
+                self.source.name: {}
+            }
         })

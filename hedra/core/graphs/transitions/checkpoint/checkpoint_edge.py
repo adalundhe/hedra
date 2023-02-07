@@ -32,4 +32,6 @@ class CheckpointEdge(BaseEdge[Checkpoint]):
         if self.destination.context is None:
             self.destination.context = SimpleContext()
 
+        self.visited.append(self.source.name)
+
         return None, self.destination.stage_type

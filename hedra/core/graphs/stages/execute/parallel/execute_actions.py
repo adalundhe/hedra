@@ -4,7 +4,7 @@ import os
 import time
 import signal
 import dill
-import asyncio
+import pickle
 from collections import defaultdict
 from typing import Dict, Any, List, Union, Tuple
 from hedra.core.engines.client.config import Config
@@ -147,14 +147,18 @@ async def start_execution(
     context = {}
 
     for stage in pipeline_stages.values():
-        for key, value in stage.context:
+
+        for key, value in stage.context.as_serializable():    
             try:
                 dill.dumps(value)
-                
+            
             except ValueError:
                 stage.context.ignore_serialization_filters.append(key)
             
             except TypeError:
+                stage.context.ignore_serialization_filters.append(key)
+
+            except pickle.PicklingError:
                 stage.context.ignore_serialization_filters.append(key)
 
         serializable_context = stage.context.as_serializable()

@@ -36,8 +36,10 @@ class ErrorEdge(BaseEdge[Error]):
             await asyncio.wait_for(self.destination.source.run(), timeout=self.timeout)
         
         else:
-            await self.destination.source.run()
+            await self.destination.run()
 
         self.source.state = StageStates.ERRORED
+
+        self.visited.append(self.source.name)
 
         return None, None

@@ -67,6 +67,7 @@ class TransitionAssembler:
         self._process_id = os.getpid()
         self.all_hooks = []
         self.edges_by_name: Dict[str, BaseEdge] = {}
+        self.adjacency_list = defaultdict(list)
 
         self._graph_metadata_log_string = f'Graph - {self.graph_name}:{self.graph_id} - thread:{self._thread_id} - process:{self._process_id} - '
 
@@ -225,8 +226,10 @@ class TransitionAssembler:
                         stage,
                         neighbor_stage
                     )
+                    
+                    self.adjacency_list[stage.name].append(neighbor_stage.name)
 
-                    self.edges_by_name[transition.from_stage.name] = transition.edge
+                    self.edges_by_name[(transition.from_stage.name, transition.to_stage.name)] = transition.edge
 
                     generation_transitions.append(transition)
 
@@ -240,9 +243,10 @@ class TransitionAssembler:
 
     def map_to_setup_stages(self, graph: networkx.DiGraph):
 
+        
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Mapping stages to requisite Setup stages')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Mapping stages to requisite Setup stages')
-        idle_stage_name = ''
+
         idle_stages = self.instances_by_type.get(StageTypes.IDLE)
         for idle_stage in idle_stages:
             idle_stage.context.stages = {}
@@ -253,9 +257,17 @@ class TransitionAssembler:
             idle_stage.context.paths = {}
             idle_stage.context.path_lengths = {}
             
-            idle_stage_name = idle_stage.__class__.__name__
+            idle_stage.name = idle_stage.__class__.__name__
+
 
         complete_stage = self.instances_by_type.get(StageTypes.COMPLETE)[0]
+
+        stages_by_type = defaultdict(dict)
+        for stage_type in self.instances_by_type:
+            for stage in self.instances_by_type[stage_type]:
+                stages_by_type[stage_type][stage.name] = stage
+
+        all_paths = {}
 
         for stage_type in StageTypes:
 
@@ -265,14 +277,8 @@ class TransitionAssembler:
 
                 stage_name = stage.__class__.__name__
 
-                has_path = networkx.has_path(
-                    graph, 
-                    idle_stage_name,
-                    stage_name
-                )
-
-                if has_path:
-                    self.edges_by_name[idle_stage.name].stages_by_type[stage_type][stage_name] = stage
+                for neighbor in self.adjacency_list[stage.name]:
+                    self.edges_by_name[(stage.name, neighbor)].stages_by_type = stages_by_type
                     paths = networkx.all_shortest_paths(graph, stage_name, complete_stage.name)
                 
                     stage_paths = []
@@ -280,7 +286,7 @@ class TransitionAssembler:
                         stage_paths.extend(path)
                     
                     # idle_stage.context.paths[stage_name] = stage_paths
-                    self.edges_by_name[idle_stage.name].all_paths[stage_name] = stage_paths
+                    all_paths[stage_name] = stage_paths
                     
                     path_lengths = networkx.all_pairs_shortest_path_length(graph)
 
@@ -290,7 +296,12 @@ class TransitionAssembler:
                         del path_lengths_set[path_stage_name]
                         stage_path_lengths[path_stage_name] = path_lengths_set
 
-                    self.edges_by_name[idle_stage.name].path_lengths[stage_name] = stage_path_lengths.get(stage_name)
+                    self.edges_by_name[(stage.name, neighbor)].path_lengths[stage_name] = stage_path_lengths.get(stage_name)
+
+        for stage in self.generated_stages.values():
+            for neighbor in self.adjacency_list[stage.name]:
+                self.edges_by_name[(stage.name, neighbor)].all_paths = all_paths
+
 
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')

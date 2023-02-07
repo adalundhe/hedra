@@ -47,9 +47,12 @@ class OptimizeEdge(BaseEdge[Optimize]):
         
 
     async def transition(self):
-        execute_stages: Dict[str, Execute] = self.history['setup_stage_ready_stages']
+        history = self.history[self.from_stage_name]
+
+        execute_stages: Dict[str, Execute] = history['setup_stage_ready_stages']
         optimize_stages = self.stages_by_type.get(StageTypes.OPTIMIZE).items()
         paths = self.all_paths.get(self.source.name)
+        path_lengths: Dict[str, int] = self.path_lengths.get(self.source.name)
 
         execute_stages = {
             stage_name: stage for stage_name, stage in execute_stages.items() if stage_name in paths and stage_name not in self.visited
@@ -74,46 +77,64 @@ class OptimizeEdge(BaseEdge[Optimize]):
                     for path in optimize_stages_in_path.values():
                         if stage_name not in path:
                             stage.state = StageStates.OPTIMIZING
-                            stage.context['execute_stage_setup_config'] = self.history['execute_stage_setup_config']
-                            stage.context['execute_stage_setup_by'] = self.history['execute_stage_setup_by']
+                            stage.context['execute_stage_setup_config'] = history['execute_stage_setup_config']
+                            stage.context['execute_stage_setup_by'] = history['execute_stage_setup_by']
                             optimization_candidates[stage_name] = stage
 
                 else:
                     stage.state = StageStates.OPTIMIZING
-                    stage.context['execute_stage_setup_config'] = self.history['execute_stage_setup_config']
-                    stage.context['execute_stage_setup_by'] = self.history['execute_stage_setup_by']
+                    stage.context['execute_stage_setup_config'] = history['execute_stage_setup_config']
+                    stage.context['execute_stage_setup_by'] = history['execute_stage_setup_by']
                     optimization_candidates[stage_name] = stage
 
-        self.history['optimize_stage_candidates'] = optimization_candidates
+
+        selected_optimization_candidates: Dict[str, Stage] = {}
+        following_opimize_stage_distances = [
+            path_length for stage_name, path_length in path_lengths.items() if stage_name in optimize_stages
+        ]
+
+        for stage_name in path_lengths.keys():
+            stage_distance = path_lengths.get(stage_name)
+
+            if stage_name in optimization_candidates:
+
+                if len(following_opimize_stage_distances) > 0 and stage_distance < min(following_opimize_stage_distances):
+                    selected_optimization_candidates[stage_name] = optimization_candidates.get(stage_name)
+
+                elif len(following_opimize_stage_distances) == 0:
+                    selected_optimization_candidates[stage_name] = optimization_candidates.get(stage_name)
+                    
+
+        history['optimize_stage_candidates'] = selected_optimization_candidates
 
         for event in self.source.dispatcher.events_by_name.values():
-            event.context.update(self.history)
+            event.context.update(history)
             
             if event.source.context:
-                event.source.context.update(self.history)
+                event.source.context.update(history)
 
-        if len(optimization_candidates) > 0:
-            self.source.generation_optimization_candidates = len(optimization_candidates)
+        if len(selected_optimization_candidates) > 0:
+            self.source.generation_optimization_candidates = len(selected_optimization_candidates)
 
             if self.timeout:
-                await asyncio.wait_for(self.source.run(optimization_candidates), timeout=self.timeout)
+                await asyncio.wait_for(self.source.run(), timeout=self.timeout)
 
             else:
                 await self.source.run()
 
         for provided in self.provides:
-            self.history[provided] = self.source.context[provided]
+            history[provided] = self.source.context[provided]
 
         if self.destination.context is None:
             self.destination.context = SimpleContext()
         
         self._update(self.destination)
-        if len(optimization_candidates) > 0:
+        if len(selected_optimization_candidates) > 0:
 
             if self.destination.context is None:
                 self.destination.context = SimpleContext()
 
-            for optimization_candidate in optimization_candidates.values():
+            for optimization_candidate in selected_optimization_candidates.values():
 
                 if optimization_candidate.context is None:
                     optimization_candidate.context = SimpleContext()
@@ -122,27 +143,28 @@ class OptimizeEdge(BaseEdge[Optimize]):
 
                 optimization_candidate.state = StageStates.OPTIMIZED
 
+        self.visited.append(self.source.name)
+
         return None, self.destination.stage_type
 
 
     def _update(self, destination: Stage):
 
+        history = self.history[self.from_stage_name]
 
-            optimized_config: Stage = self.history['optimize_stage_optimized_configs'].get(destination.name)
-            optimzied_hooks: Stage = self.history['optimzie_stage_optimized_hooks'].get(destination.name)
-            stage_setup_by: str = self.history['execute_stages_setup_by'].get(destination.name)
-            if optimized_config and optimzied_hooks and stage_setup_by:
+        optimized_config: Stage = history['optimize_stage_optimized_configs'].get(destination.name)
+        optimzied_hooks: Stage = history['optimzie_stage_optimized_hooks'].get(destination.name)
+        stage_setup_by: str = history['execute_stages_setup_by'].get(destination.name)
+        if optimized_config and optimzied_hooks and stage_setup_by:
 
-                self.next_history[destination.name] = {
-                    'setup_stage_candidates': [],
-                    'execute_stage_setup_config': None,
-                    'execute_stage_setup_hooks': {},
-                    'execute_stage_setup_by': None   
+            self.next_history[destination.name] = {
+                self.source.name: {
+                    'optimize_stage_optimized_params': history['optimize_stage_optimized_params'],
+                    'setup_stage_candidates': list(history['optimize_stage_candidates'].keys()),
+                    'setup_stage_ready_stages': history['setup_stage_ready_stages'],
+                    'execute_stage_setup_config': optimized_config,
+                    'execute_stage_setup_hooks': optimzied_hooks,
+                    'execute_stage_setup_by': stage_setup_by   
                 }
-
-                self.next_history[destination.name]['optimize_stage_optimized_params'] = self.history['optimize_stage_optimized_params']
-                self.next_history[destination.name]['setup_stage_candidates'] = list(self.history['optimize_stage_candidates'].keys())
-                self.next_history[destination.name]['execute_stage_setup_config'] = optimized_config
-                self.next_history[destination.name]['execute_stage_setup_hooks'] = optimzied_hooks
-                self.next_history[destination.name]['execute_stage_setup_by'] = stage_setup_by
+            }
 
