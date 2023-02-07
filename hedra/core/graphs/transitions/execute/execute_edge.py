@@ -21,7 +21,7 @@ class ExecuteEdge(BaseEdge[Execute]):
             destination
         )
 
-        history = {
+        self.history = {
             'execute_stage_setup_hooks': {},
             'execute_stage_setup_by': None,
             'execute_stage_setup_config': None,
@@ -64,6 +64,7 @@ class ExecuteEdge(BaseEdge[Execute]):
         self.source.total_concurrent_execute_stages = len(total_concurrent_execute_stages)
 
         for event in self.source.dispatcher.events_by_name.values():
+            self.source.context.update(history)
             event.context.update(history)
             
             if event.source.context:
@@ -76,9 +77,8 @@ class ExecuteEdge(BaseEdge[Execute]):
             await self.source.run()
 
         for provided in self.provides:
-            history[provided] = self.source.context[provided]
+            self.history[self.from_stage_name][provided] = self.source.context[provided]
         
-
         if self.destination.context is None:
             self.destination.context = SimpleContext()
 
@@ -119,9 +119,7 @@ class ExecuteEdge(BaseEdge[Execute]):
         next_results = {
             self.source.name: {
                 'execute_stage_results': {
-                    self.source.name: {
-                        history['execute_stage_results']
-                    }
+                    self.source.name: history['execute_stage_results']
                 },
                 'execute_stage_setup_config': history['execute_stage_setup_config'],
                 'execute_stage_setup_hooks': history['execute_stage_setup_hooks'],

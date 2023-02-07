@@ -42,7 +42,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
             'optimize_stage_optimized_params',
             'optimize_stage_optimized_configs',
             'optimzie_stage_optimized_hooks',
-            'execute_stages_setup_by'
+            'execute_stage_setup_by'
         ]
         
 
@@ -108,6 +108,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         history['optimize_stage_candidates'] = selected_optimization_candidates
 
         for event in self.source.dispatcher.events_by_name.values():
+            self.source.context.update(history)
             event.context.update(history)
             
             if event.source.context:
@@ -154,7 +155,8 @@ class OptimizeEdge(BaseEdge[Optimize]):
 
         optimized_config: Stage = history['optimize_stage_optimized_configs'].get(destination.name)
         optimzied_hooks: Stage = history['optimzie_stage_optimized_hooks'].get(destination.name)
-        stage_setup_by: str = history['execute_stages_setup_by'].get(destination.name)
+        stage_setup_by: str = history['execute_stage_setup_by'].get(destination.name)
+
         if optimized_config and optimzied_hooks and stage_setup_by:
 
             self.next_history[destination.name] = {

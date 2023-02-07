@@ -58,16 +58,15 @@ class Submit(Stage, Generic[T]):
     async def collect_process_results_and_metrics(
         self,
         analyze_stage_events: List[T]=[],
-        analyze_stage_summaries: Dict[str, Any]={}
+        analyze_stage_summary_metrics: Dict[str, Any]={}
 
     ):
-
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Initializing results submission')
 
-        session_total = analyze_stage_summaries.get('session_total', 0)
+        session_total = analyze_stage_summary_metrics.get('session_total', 0)
         metrics = []
 
-        stage_summaries = analyze_stage_summaries.get('stages', {})
+        stage_summaries = analyze_stage_summary_metrics.get('stages', {})
         for stage in stage_summaries.values():
             metrics.extend(list(
                 stage.get('actions', {}).values()
@@ -144,6 +143,8 @@ class Submit(Stage, Generic[T]):
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {submit_stage_reporter_name}:{submit_stage_reporter.reporter_id} - Submitted - {submit_stage_session_total} - Events')
 
+        return {}
+
     @event('initialize_reporter')
     async def submit_stage_metrics(
         self,
@@ -154,6 +155,8 @@ class Submit(Stage, Generic[T]):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {submit_stage_reporter_name}:{submit_stage_reporter.reporter_id} - Submitting Common Metrics')
         await submit_stage_reporter.submit_common(submit_stage_metrics)
 
+        return {}
+
     @event('initialize_reporter')
     async def submit_main_metrics(
         self,
@@ -163,6 +166,8 @@ class Submit(Stage, Generic[T]):
     ):
         await submit_stage_reporter.submit_metrics(submit_stage_metrics)
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {submit_stage_reporter_name}:{submit_stage_reporter.reporter_id} - Submitting Metrics')
+
+        return {}
 
     @event('initialize_reporter')
     async def submit_error_metrics(

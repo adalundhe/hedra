@@ -59,6 +59,8 @@ class SetupEdge(BaseEdge[Setup]):
     async def transition(self):
         self.source.state = StageStates.SETTING_UP
 
+        history = self.history[self.from_stage_name]
+
         execute_stages = self.stages_by_type.get(StageTypes.EXECUTE).items()
         paths = self.all_paths.get(self.source.name)
         path_lengths: Dict[str, int] = self.path_lengths.get(self.source.name)
@@ -88,14 +90,15 @@ class SetupEdge(BaseEdge[Setup]):
 
         self.source.generation_setup_candidates = len(setup_candidates)
 
-        self.history['setup_stage_target_stages'] = setup_candidates
-        self.history['setup_stage_target_config'] = self.source.config
+        history['setup_stage_target_stages'] = setup_candidates
+        history['setup_stage_target_config'] = self.source.config
 
         for event in self.source.dispatcher.events_by_name.values():
-            event.context.update(self.history)
+            self.source.context.update(history)
+            event.context.update(history)
             
             if event.source.context:
-                event.source.context.update(self.history)
+                event.source.context.update(history)
         
         if self.timeout:
             await asyncio.wait_for(self.source.run(), timeout=self.timeout)
@@ -103,9 +106,9 @@ class SetupEdge(BaseEdge[Setup]):
             await self.source.run()
 
         for provided in self.provides:
-            self.history[provided] = self.source.context[provided]
+            history[provided] = self.source.context[provided]
 
-        self.history['setup_stage_candidates'] = setup_candidates
+        history['setup_stage_candidates'] = setup_candidates
 
         self._update(self.destination)
 
@@ -126,9 +129,12 @@ class SetupEdge(BaseEdge[Setup]):
 
     def _update(self, destination: Stage):
 
-        ready_stages = self.history.get('setup_stage_ready_stages', {})
-        setup_candidates = self.history.get('setup_stage_candidates', {})
-        setup_config = self.history.get('execute_stage_setup_config')
+        history = self.history[self.from_stage_name]
+
+
+        ready_stages = history.get('setup_stage_ready_stages', {})
+        setup_candidates = history.get('setup_stage_candidates', {})
+        setup_config = history.get('execute_stage_setup_config')
         execute_stage_setup_hooks = []
         setup_execute_stage: Execute = ready_stages.get(self.source.name)
 

@@ -26,7 +26,7 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             'execute_stage_results'
         ]
         self.provides = [
-            'analyze_stage_summaries'
+            'analyze_stage_summary_metrics'
         ]
 
         self.valid_states = [
@@ -38,15 +38,12 @@ class AnalyzeEdge(BaseEdge[Analyze]):
     async def transition(self):
         self.source.state = StageStates.ANALYZING
    
-        raw_results = {
-            'execute_stage_results': {}
-        }
+        raw_results = {}
         for stage_name in self.history:
-            raw_results['execute_stage_results'].update(
+            raw_results.update(
                 self.history[stage_name].get('execute_stage_results', {})
             )
 
-        raw_results = dict(self.history.get('execute_stage_results', {}))
         execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
         submit_stages = self.stages_by_type.get(StageTypes.SUBMIT)
 
@@ -54,22 +51,23 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         target_stages = {}
         for stage_name in raw_results.keys():
             stage = execute_stages.get(stage_name)
-
-            in_path = self.source.name in self.all_paths.get(stage.name)
+            in_path = self.source.name in self.all_paths.get(stage_name)
 
             if stage.state in self.valid_states and in_path:
                 stage.state = StageStates.ANALYZING
                 results_to_calculate[stage_name] = raw_results.get(stage_name)
                 target_stages[stage_name] = stage
         
-        self.history['analyze_stage_raw_results'] = results_to_calculate
-        self.history['analyze_stage_target_stages'] = target_stages
+        history = self.history[self.from_stage_name]
+        history['analyze_stage_raw_results'] = results_to_calculate
+        history['analyze_stage_target_stages'] = target_stages
         
         for event in self.source.dispatcher.events_by_name.values():
-            event.context.update(self.history)
+            self.source.context.update(history)
+            event.context.update(history)
             
             if event.source.context:
-                event.source.context.update(self.history)
+                event.source.context.update(history)
                     
         if len(results_to_calculate) > 0:
 
@@ -78,8 +76,10 @@ class AnalyzeEdge(BaseEdge[Analyze]):
 
             else:
                 await self.source.run()
+        
 
-        self.history['analyze_stage_summary_metrics'] = self.source.context['analyze_stage_summary_metrics']
+        for provided in self.provides:
+            self.history[self.from_stage_name][provided] = self.source.context[provided]
 
         self.destination.state = StageStates.ANALYZED
 
@@ -107,8 +107,9 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         return None, self.destination.stage_type
 
     def _update(self, destination: Stage):
+        history = self.history[self.from_stage_name]
         self.next_history.update({
             destination.name: {
-                'analyze_stage_summaries': self.history.get('analyze_stage_summary_metrics', {})
+                'analyze_stage_summary_metrics': history.get('analyze_stage_summary_metrics', {})
             }
         })

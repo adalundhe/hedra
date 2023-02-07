@@ -98,7 +98,8 @@ class Execute(Stage, Generic[Unpack[T]]):
         execute_stage_setup_hooks: List[Union[ActionHook , TaskHook]] = []
     ):
         self.context.ignore_serialization_filters = [
-            'execute_stage_setup_hooks'
+            'execute_stage_setup_hooks',
+            'setup_stage_ready_stages'
         ]
         persona_type_name = execute_stage_setup_config.persona_type.capitalize()
 
@@ -108,7 +109,7 @@ class Execute(Stage, Generic[Unpack[T]]):
         return {
             'execute_stage_setup_hooks': execute_stage_setup_hooks,
             'execute_stage_setup_by': execute_stage_setup_by,
-            'execute_stage_config': execute_stage_setup_config
+            'execute_stage_setup_config': execute_stage_setup_config
         }
 
     @event('get_stage_config')
@@ -142,15 +143,15 @@ class Execute(Stage, Generic[Unpack[T]]):
     async def run_multiple_worker_jobs(
         self,
         execute_stage_has_multiple_workers: bool = False,
-        execute_stage_config: Config=None,
+        execute_stage_setup_config: Config=None,
         execute_stage_plugins: Dict[str, List[Any]]={},
         execute_stage_setup_by: str=None
     ):
         if execute_stage_has_multiple_workers:
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting execution for - {self.workers} workers')
 
-            serializable_context = self.context.as_serializable()   
-
+            serializable_context = self.context.as_serializable() 
+            
             results_sets = await self.executor.execute_stage_batch(
                 execute_actions,
                 [
@@ -165,7 +166,7 @@ class Execute(Stage, Generic[Unpack[T]]):
                         'source_setup_stage_name': execute_stage_setup_by,
                         'source_stage_id': self.stage_id,
                         'source_stage_plugins': execute_stage_plugins,
-                        'source_stage_config': execute_stage_config,
+                        'source_stage_config': execute_stage_setup_config,
                         'partition_method': PartitionMethod.BATCHES,
                         'workers': self.workers,
                         'worker_id': idx + 1
@@ -220,12 +221,12 @@ class Execute(Stage, Generic[Unpack[T]]):
     async def setup_single_worker_job(
         self,
         execute_stage_has_multiple_workers: bool = False,
-        execute_stage_config: Config=None,
+        execute_stage_setup_config: Config=None,
     ):
 
         if execute_stage_has_multiple_workers is False:
 
-            persona_config = execute_stage_config
+            persona_config = execute_stage_setup_config
             persona = get_persona(persona_config)
             persona.setup(self.hooks, self.metadata_string)
 

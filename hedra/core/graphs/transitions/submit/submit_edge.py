@@ -20,25 +20,28 @@ class SubmitEdge(BaseEdge[Submit]):
 
         self.history = {
             'analyze_stage_events': [],
-            'analyze_stage_summaries': {}
+            'analyze_stage_summary_metrics': {}
         }
 
         self.requires = [
             'analyze_stage_events',
-            'analyze_stage_summaries'
+            'analyze_stage_summary_metrics'
         ]
         self.provides = [
-            'analyze_stage_summaries'
+            'analyze_stage_summary_metrics'
         ]
 
     async def transition(self):
         self.source.state = StageStates.SUBMITTING
 
+        history = self.history[self.from_stage_name]
+
         for event in self.source.dispatcher.events_by_name.values():
-            event.context.update(self.history)
+            self.source.context.update(history)
+            event.context.update(history)
             
             if event.source.context:
-                event.source.context.update(self.history)
+                event.source.context.update(history)
 
         if self.timeout:
             await asyncio.wait_for(self.source.run(), timeout=self.timeout)
@@ -47,7 +50,7 @@ class SubmitEdge(BaseEdge[Submit]):
             await self.source.run()
         
         for provided in self.provides:
-            self.history[provided] = self.source.context[provided]
+            self.history[self.from_stage_name][provided] = self.source.context[provided]
 
         self._update(self.destination)
 
@@ -62,8 +65,9 @@ class SubmitEdge(BaseEdge[Submit]):
         return None, self.destination.stage_type
 
     def _update(self, destination: Stage):
+        history = self.history[self.from_stage_name]
         self.next_history.update({
             destination.name: {
-                'analyze_stage_summaries': self.history['analyze_stage_summaries'] 
+                'analyze_stage_summary_metrics': history['analyze_stage_summary_metrics'] 
             }
         })

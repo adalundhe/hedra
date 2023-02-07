@@ -23,13 +23,17 @@ class ValidateEdge(BaseEdge[Validate]):
     async def transition(self):
         self.source.state = StageStates.VALIDATING
 
-        self.history['validation_stages'] = self.stages_by_type
+        history = self.history[self.from_stage_name]
+
+
+        history['validation_stages'] = self.stages_by_type
         for event in self.source.dispatcher.events_by_name.values():
             if event.source.shortname in self.source.internal_events:
-                event.context.update(self.history)
+                self.source.context.update(history)
+                event.context.update(history)
                 
                 if event.source.context:
-                    event.source.context.update(self.history)
+                    event.source.context.update(history)
         
         if self.timeout:
             await asyncio.wait_for(self.source.run(), timeout=self.timeout)

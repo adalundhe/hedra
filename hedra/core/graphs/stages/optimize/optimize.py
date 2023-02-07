@@ -1,13 +1,10 @@
 import asyncio
 import dill
 import time
+import pickle
 from collections import defaultdict
 from typing import Dict, List, Tuple, Any, Union
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.hooks.registry.registry_types import (
-    ActionHook,
-    TaskHook
-)
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.hooks.hook_types.context import context
 from hedra.core.graphs.hooks.hook_types.event import event
@@ -65,7 +62,9 @@ class Optimize(Stage):
         self.context.ignore_serialization_filters = [
             'optimize_stage_workers_map',
             'optimize_stage_batched_stages',
-            'optimize_stage_candidates'
+            'optimize_stage_candidates',
+            'setup_stage_ready_stages',
+            'execute_stage_setup_hooks'
         ]
 
         stage_names = ', '.join(list(optimize_stage_candidates.keys()))
@@ -234,7 +233,7 @@ class Optimize(Stage):
 
             stage = optimize_stage_candidates.get(stage_name)
             optimized_configs[stage.name] = optimized_config
-            stages_setup_by[stage.name] = stage.context['setup_by']
+            stages_setup_by[stage.name] = stage.context['execute_stage_setup_by']
 
             for hook in stage.hooks[HookType.ACTION]:
                 hook.session.pool.size = optimize_stage_batch_size
@@ -274,7 +273,7 @@ class Optimize(Stage):
         return {
             'optimzie_stage_optimized_hooks': optimzied_hooks,
             'optimize_stage_optimized_configs': optimized_configs,
-            'execute_stages_setup_by': stages_setup_by,
+            'execute_stage_setup_by': stages_setup_by,
             'optimize_stage_optimzations': stage_optimzations,
             'optimize_stage_context': stage_context
         }
