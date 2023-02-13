@@ -21,14 +21,6 @@ class ExecuteEdge(BaseEdge[Execute]):
             destination
         )
 
-        self.history = {
-            'execute_stage_setup_hooks': {},
-            'execute_stage_setup_by': None,
-            'execute_stage_setup_config': None,
-            'setup_stage_ready_stages': defaultdict(dict),
-            'execute_stage_results': {}
-        }
-
         self.requires = [
             'setup_stage_ready_stages',
             'setup_stage_candidates',
@@ -49,7 +41,7 @@ class ExecuteEdge(BaseEdge[Execute]):
     async def transition(self):
         self.source.state = StageStates.EXECUTING
 
-        history = self.history[self.from_stage_name]
+        history = self.history[(self.from_stage_name, self.source.name)]
 
         execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
         analyze_stages: Dict[str, Stage] = self.stages_by_type.get(StageTypes.ANALYZE)
@@ -77,7 +69,7 @@ class ExecuteEdge(BaseEdge[Execute]):
             await self.source.run()
 
         for provided in self.provides:
-            self.history[self.from_stage_name][provided] = self.source.context[provided]
+            self.history[(self.from_stage_name, self.source.name)][provided] = self.source.context[provided]
         
         if self.destination.context is None:
             self.destination.context = SimpleContext()
@@ -106,29 +98,27 @@ class ExecuteEdge(BaseEdge[Execute]):
         return None, self.destination.stage_type
 
     def _update(self, destination: Stage):
-
-        history = self.history[self.from_stage_name]
+        history = self.history[(self.from_stage_name, self.source.name)]
         next_results = self.next_history.get(destination.name)
         if next_results is None:
             next_results = {
-                self.source.name: {
-                    'execute_stage_results': {}
-                }
+                'execute_stage_results': {}
             }
 
         next_results = {
-            self.source.name: {
-                'execute_stage_results': {
-                    self.source.name: history['execute_stage_results']
-                },
-                'execute_stage_setup_config': history['execute_stage_setup_config'],
-                'execute_stage_setup_hooks': history['execute_stage_setup_hooks'],
-                'execute_stage_setup_by': history['execute_stage_setup_by'],
-                'setup_stage_ready_stages': history['setup_stage_ready_stages'],
-                'setup_stage_candidates': history['setup_stage_candidates']
-            }
+            'execute_stage_results': {
+                self.source.name: history['execute_stage_results']
+            },
+            'execute_stage_setup_config': history['execute_stage_setup_config'],
+            'execute_stage_setup_hooks': history['execute_stage_setup_hooks'],
+            'execute_stage_setup_by': history['execute_stage_setup_by'],
+            'setup_stage_ready_stages': history['setup_stage_ready_stages'],
+            'setup_stage_candidates': history['setup_stage_candidates']
         }
 
         self.next_history.update({
-            destination.name: next_results
+            (self.source.name, destination.name): next_results
         })
+
+    def split(self) -> None:
+        pass

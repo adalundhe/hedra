@@ -43,3 +43,11 @@ class ErrorEdge(BaseEdge[Error]):
         self.visited.append(self.source.name)
 
         return None, None
+    
+    def _update(self, destination: Stage):
+        self.next_history.update({
+            (self.source.name, destination.name): {}
+        })
+    
+    def split(self) -> None:
+        pass

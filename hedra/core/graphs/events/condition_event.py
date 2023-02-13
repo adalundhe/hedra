@@ -18,3 +18,16 @@ class ConditionEvent(BaseEvent[ConditionHook]):
         )
 
         self.event_type = EventType.CONDITION
+
+    def copy(self):
+        condtion_event = ConditionEvent(
+            self.target.copy(),
+            self.source.copy()
+        )
+
+        condtion_event.execution_path = self.execution_path
+        condtion_event.previous_map = self.previous_map
+        condtion_event.next_map = self.next_map
+        condtion_event.next_args = self.next_args
+
+        return condtion_event

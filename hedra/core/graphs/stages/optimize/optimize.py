@@ -50,7 +50,7 @@ class Optimize(Stage):
     @Internal()
     async def run(self):
         await self.setup_events()
-        await self.dispatcher.dispatch_events()
+        await self.dispatcher.dispatch_events(self.name)
 
     @context()
     async def collect_optimization_stages(

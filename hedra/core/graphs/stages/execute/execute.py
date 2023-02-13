@@ -88,7 +88,7 @@ class Execute(Stage, Generic[Unpack[T]]):
     @Internal()
     async def run(self):
         await self.setup_events()
-        await self.dispatcher.dispatch_events()
+        await self.dispatcher.dispatch_events(self.name)
 
     @context()
     async def get_stage_config(
@@ -151,7 +151,7 @@ class Execute(Stage, Generic[Unpack[T]]):
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting execution for - {self.workers} workers')
 
             serializable_context = self.context.as_serializable() 
-            
+
             results_sets = await self.executor.execute_stage_batch(
                 execute_actions,
                 [

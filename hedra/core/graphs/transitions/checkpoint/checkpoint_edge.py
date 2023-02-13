@@ -25,7 +25,8 @@ class CheckpointEdge(BaseEdge[Checkpoint]):
         else:
             await self.source.run()
 
-        self.destination.context.update(self.history)
+        history = self.history[(self.from_stage_name, self.source.name)]
+        self.destination.context.update(history)
 
         self.source.state = StageStates.CHECKPOINTED
 
@@ -35,3 +36,13 @@ class CheckpointEdge(BaseEdge[Checkpoint]):
         self.visited.append(self.source.name)
 
         return None, self.destination.stage_type
+
+    def _update(self, destination: Stage):
+        self.next_history.update({
+            (self.source.name, destination.name): {}
+        })
+
+    def split(self) -> None:
+        pass
+
+

@@ -173,7 +173,7 @@ class EventGraph:
             if len(event.previous_map) < 1 and event.event_name in hook_names:
 
                 event.source.stage_instance.dispatcher.source_name = event.stage
-                event.source.stage_instance.dispatcher.initial_events.append(event)
+                event.source.stage_instance.dispatcher.initial_events[event.source.stage].append(event)
             
             for layer in event.execution_path:
                 for event_name in layer:

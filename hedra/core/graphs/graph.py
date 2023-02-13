@@ -9,7 +9,7 @@ from yaspin.spinners import Spinners
 from typing import Dict, List, Any
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.core.graphs.transitions.transition import Transition
+from hedra.core.graphs.transitions.transition_group import TransitionGroup
 from hedra.logging import HedraLogger
 from .transitions import TransitionAssembler, local_transitions
 from .status import GraphStatus
@@ -46,7 +46,7 @@ class Graph:
         self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Changed status to - {GraphStatus.INITIALIZING.name} - {GraphStatus.IDLE.name}')
 
         self.transitions_graph = []
-        self._transitions: List[List[Transition]] = []
+        self._transitions: List[TransitionGroup] = []
         self._results = None
 
         self.logger.hedra.sync.debug(f'{self.metadata_string} - Found - {len(stages)} - stages')
@@ -168,6 +168,8 @@ class Graph:
 
         for transition_group in self._transitions:
 
+            # transition_group.sort_and_map_transitions()
+
             current_stages = ', '.join(
                 list(set([transition.from_stage.name for transition in transition_group]))
             )
@@ -206,23 +208,7 @@ class Graph:
                 
                 for transition in transition_group:
                     await status_spinner.system.debug(f'{self.metadata_string} - Completed stage Transtition - {transition.transition_id} -  from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
-                    
-                    if transition.to_stage.stage_type is not StageTypes.COMPLETE:
-                        for destination_name in transition.edge.next_history:
-                            for source_name in transition.edge.next_history[destination_name]:
-                                for neighbor in self.runner.adjacency_list[destination_name]:
-                                    source_history: Dict[str, Any] = transition.edge.next_history[destination_name][source_name]
-                                    required_keys = self.runner.edges_by_name[(destination_name, neighbor)].requires
 
-                                    self.runner.edges_by_name[(destination_name, neighbor)].from_stage_name = source_name
-                                    self.runner.edges_by_name[(destination_name, neighbor)].history.update({
-                                        source_name: {
-                                            key: value for key, value in source_history.items() if key in required_keys
-                                        }
-                                    })
-
-                    
-                                
 
                 completed_transitions_count = len(results)
                 await status_spinner.system.debug(f'{self.metadata_string} - Completed -  {completed_transitions_count} - transitions')

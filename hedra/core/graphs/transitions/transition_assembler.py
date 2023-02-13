@@ -14,7 +14,6 @@ from hedra.core.graphs.stages.error import Error
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, HookType
-from hedra.core.graphs.stages.complete.complete import Complete
 from hedra.core.graphs.stages.base.parallel.batch_executor import BatchExecutor
 from hedra.core.graphs.transitions.exceptions.exceptions import IsolatedStageError
 from hedra.logging import HedraLogger
@@ -63,12 +62,12 @@ class TransitionAssembler:
         self._thread_id = threading.current_thread().ident
         self._process_id = os.getpid()
         self.all_hooks = []
-        self.edges_by_name: Dict[str, BaseEdge] = {}
-        self.adjacency_list = defaultdict(list)
+        self.edges_by_name: Dict[Tuple[str, str], BaseEdge] = {}
+        self.adjacency_list: Dict[str, List[Transition]] = defaultdict(list)
 
         self._graph_metadata_log_string = f'Graph - {self.graph_name}:{self.graph_id} - thread:{self._thread_id} - process:{self._process_id} - '
 
-    def generate_stages(self, stages: Dict[str, Stage]):
+    def generate_stages(self, stages: Dict[str, Stage]) -> None:
 
         stages_count = len(stages)
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Generating - {stages_count} - stages')
@@ -98,9 +97,8 @@ class TransitionAssembler:
             stage.worker_id = self.worker_id
 
             for hook_shortname, hook in registrar.reserved[stage.name].items():
-                    hook._call = hook._call.__get__(stage, stage.__class__)
-                    setattr(stage, hook_shortname, hook._call)
-
+                hook._call = hook._call.__get__(stage, stage.__class__)
+                setattr(stage, hook_shortname, hook._call)
 
             stage = set_stage_hooks(stage, generated_hooks)
 
@@ -116,12 +114,12 @@ class TransitionAssembler:
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Successfully generated - {stages_count} - stages')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Successfully generated - {stages_count} - stages')
 
-    def build_transitions_graph(self, topological_generations: List[List[str]], graph: networkx.Graph):
+    def build_transitions_graph(self, topological_generations: List[List[str]], graph: networkx.DiGraph) -> List[TransitionGroup]:
 
         self.logging.hedra.sync.debug(f'Buiding transitions matrix')
         self.logging.filesystem.sync['hedra.core'].debug(f'Buiding transitions matrix')
 
-        transitions: List[List[Transition]] = []
+        transitions: List[TransitionGroup] = []
         plugins: Dict[PluginType, Dict[str, Union[EnginePlugin, ReporterPlugin]]] = {
             PluginType.ENGINE: {},
             PluginType.OPTIMIZER: {},
@@ -223,8 +221,11 @@ class TransitionAssembler:
                         stage,
                         neighbor_stage
                     )
+
+                    transition.predecessors = list(graph.predecessors(stage.name))
+                    transition.descendants = list(graph.successors(stage.name))
                     
-                    self.adjacency_list[stage.name].append(neighbor_stage.name)
+                    self.adjacency_list[stage.name].append(transition)
 
                     self.edges_by_name[(transition.from_stage.name, transition.to_stage.name)] = transition.edge
 
@@ -233,12 +234,20 @@ class TransitionAssembler:
             if generation_transitions.count > 0:
                 transitions.append(generation_transitions)
 
+        for transition_group in transitions:
+            transition_group.adjacency_list = self.adjacency_list
+            transition_group.edges_by_name = self.edges_by_name
+
+            for transition in transition_group:
+                transition.adjacency_list = self.adjacency_list
+                transition.edges_by_name = self.edges_by_name
+
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Transition matrix assemmbly complete')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Transition matrix assemmbly complete')
 
         return transitions
 
-    def map_to_setup_stages(self, graph: networkx.DiGraph):
+    def map_to_setup_stages(self, graph: networkx.DiGraph) -> None:
 
         
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Mapping stages to requisite Setup stages')
@@ -275,7 +284,7 @@ class TransitionAssembler:
                 stage_name = stage.__class__.__name__
 
                 for neighbor in self.adjacency_list[stage.name]:
-                    self.edges_by_name[(stage.name, neighbor)].stages_by_type = stages_by_type
+                    self.edges_by_name[(stage.name, neighbor.edge.destination.name)].stages_by_type = stages_by_type
                     paths = networkx.all_shortest_paths(graph, stage_name, complete_stage.name)
                 
                     stage_paths = []
@@ -293,17 +302,17 @@ class TransitionAssembler:
                         del path_lengths_set[path_stage_name]
                         stage_path_lengths[path_stage_name] = path_lengths_set
 
-                    self.edges_by_name[(stage.name, neighbor)].path_lengths[stage_name] = stage_path_lengths.get(stage_name)
+                    self.edges_by_name[(stage.name, neighbor.edge.destination.name)].path_lengths[stage_name] = stage_path_lengths.get(stage_name)
 
         for stage in self.generated_stages.values():
             for neighbor in self.adjacency_list[stage.name]:
-                self.edges_by_name[(stage.name, neighbor)].all_paths = all_paths
+                self.edges_by_name[(stage.name, neighbor.edge.destination.name)].all_paths = all_paths
 
 
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')
     
-    def create_error_transition(self, error: Exception):
+    def create_error_transition(self, error: Exception) -> Transition:
 
         from_stage = error.from_stage
             

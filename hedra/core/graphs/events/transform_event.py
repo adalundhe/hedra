@@ -18,3 +18,16 @@ class TransformEvent(BaseEvent[TransformHook]):
         )
         
         self.event_type = EventType.TRANSFORM
+
+    def copy(self):
+        transform_event = TransformEvent(
+            self.target.copy(),
+            self.source.copy()
+        )
+
+        transform_event.execution_path = self.execution_path
+        transform_event.previous_map = self.previous_map
+        transform_event.next_map = self.next_map
+        transform_event.next_args = self.next_args
+
+        return transform_event

@@ -1,5 +1,5 @@
 import asyncio
-from typing import Dict, Any
+from typing import List
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
@@ -23,7 +23,7 @@ class ValidateEdge(BaseEdge[Validate]):
     async def transition(self):
         self.source.state = StageStates.VALIDATING
 
-        history = self.history[self.from_stage_name]
+        history = self.history[(self.from_stage_name, self.source.name)]
 
 
         history['validation_stages'] = self.stages_by_type
@@ -49,7 +49,8 @@ class ValidateEdge(BaseEdge[Validate]):
 
     def _update(self, destination: Stage):
         self.next_history.update({
-            destination.name: {
-                self.source.name: {}
-            }
+            (self.source.name, destination.name): {}
         })
+
+    def split(self, edges: List[BaseEdge]) -> None:
+        pass

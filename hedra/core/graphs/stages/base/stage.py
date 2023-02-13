@@ -93,3 +93,15 @@ class Stage:
                 event.source.context.update(self.context)
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing events')
+
+    @Internal()
+    def to_copy_dict(self):
+
+        copy_dict = {}
+
+        for attr_name, value in self.__dict__.items():
+            if not attr_name.startswith('__'):
+                copy_dict[attr_name] = value
+
+        return copy_dict
+

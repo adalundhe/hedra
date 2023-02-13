@@ -89,7 +89,6 @@ def set_stage_hooks(stage: Stage, generated_hooks: Dict[str, Hook]) -> Stage:
 
             elif generated_hooks.get(hook) == 'created':
 
-                generated_hooks[hook] = 'copied'
                 copied_hook = hook.copy()
                 
                 copied_hook.stage = stage.name

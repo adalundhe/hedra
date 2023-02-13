@@ -22,3 +22,11 @@ class WaitEdge(BaseEdge[Wait]):
 
     async def transition(self):
         pass
+
+    def _update(self, destination: Stage):
+        self.next_history.update({
+            (self.source.name, destination.name): {}
+        })
+        
+    def split(self) -> None:
+        pass

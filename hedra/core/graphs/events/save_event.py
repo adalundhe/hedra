@@ -18,3 +18,16 @@ class SaveEvent(BaseEvent[SaveHook]):
         )
 
         self.event_type = EventType.SAVE
+
+    def copy(self):
+        save_event = SaveEvent(
+            self.target.copy(),
+            self.source.copy()
+        )
+
+        save_event.execution_path = self.execution_path
+        save_event.previous_map = self.previous_map
+        save_event.next_map = self.next_map
+        save_event.next_args = self.next_args
+
+        return save_event

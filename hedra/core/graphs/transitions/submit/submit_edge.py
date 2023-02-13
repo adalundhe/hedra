@@ -17,12 +17,7 @@ class SubmitEdge(BaseEdge[Submit]):
             source,
             destination
         )
-
-        self.history = {
-            'analyze_stage_events': [],
-            'analyze_stage_summary_metrics': {}
-        }
-
+        
         self.requires = [
             'analyze_stage_events',
             'analyze_stage_summary_metrics'
@@ -34,7 +29,7 @@ class SubmitEdge(BaseEdge[Submit]):
     async def transition(self):
         self.source.state = StageStates.SUBMITTING
 
-        history = self.history[self.from_stage_name]
+        history = self.history[(self.from_stage_name, self.source.name)]
 
         for event in self.source.dispatcher.events_by_name.values():
             self.source.context.update(history)
@@ -50,7 +45,7 @@ class SubmitEdge(BaseEdge[Submit]):
             await self.source.run()
         
         for provided in self.provides:
-            self.history[self.from_stage_name][provided] = self.source.context[provided]
+            self.history[(self.from_stage_name, self.source.name)][provided] = self.source.context[provided]
 
         self._update(self.destination)
 
@@ -65,11 +60,12 @@ class SubmitEdge(BaseEdge[Submit]):
         return None, self.destination.stage_type
 
     def _update(self, destination: Stage):
-        history = self.history[self.from_stage_name]
+        history = self.history[(self.from_stage_name, self.source.name)]
         self.next_history.update({
-            destination.name: {
-                self.source.name: {
-                    'analyze_stage_summary_metrics': history['analyze_stage_summary_metrics'] 
-                }
+            (self.source.name, destination.name): {
+                'analyze_stage_summary_metrics': history['analyze_stage_summary_metrics'] 
             }
         })
+
+    def split(self) -> None:
+        pass

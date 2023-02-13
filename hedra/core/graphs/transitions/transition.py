@@ -1,4 +1,6 @@
+from __future__ import annotations
 import uuid
+from typing import List, Dict, Tuple, Any
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from .analyze.analyze_edge import AnalyzeEdge, BaseEdge
@@ -16,6 +18,9 @@ from .validate.validate_edge import ValidateEdge
 from .wait.wait_edge import WaitEdge
 
 
+HistoryUpdate = Dict[Tuple[str, str], Any]
+
+
 class Transition:
 
     def __init__(self, metadata: TransitionMetadata, from_stage: Stage, to_stage: Stage) -> None:
@@ -23,7 +28,11 @@ class Transition:
         self.metadata = metadata
         self.from_stage = from_stage
         self.to_stage = to_stage
-
+        self.edges_by_name: Dict[Tuple[str, str], BaseEdge] = {}
+        self.adjacency_list: Dict[str, List[Transition]] = []
+        self.predecessors = []
+        self.descendants = []
+        self.transition_idx = 0
         edge_types = {
             StageTypes.ANALYZE: AnalyzeEdge,
             StageTypes.CHECKPOINT: CheckpointEdge,
@@ -45,4 +54,28 @@ class Transition:
         )
 
     async def execute(self):
-        return await self.edge.transition()
+        
+        result = await self.edge.transition()
+
+
+        if self.to_stage.stage_type is not StageTypes.COMPLETE:
+            source_name = self.edge.source.name
+            destination_name = self.edge.destination.name
+
+            neighbors: Tuple[str, str] = [
+                (destination_name, transition.edge.destination.name) for transition in self.adjacency_list[destination_name]
+            ]
+
+            source_history: HistoryUpdate = self.edge.next_history[(source_name, destination_name)]
+
+            for neighbor in neighbors:
+                required_keys = self.edges_by_name[neighbor].requires
+                self.edges_by_name[neighbor].from_stage_name = source_name
+
+                self.edges_by_name[neighbor].history.update({
+                    (source_name, destination_name): {
+                        key: value for key, value in source_history.items() if key in required_keys
+                    }
+                })
+
+        return result

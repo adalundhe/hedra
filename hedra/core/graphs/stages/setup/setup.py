@@ -172,18 +172,19 @@ class Setup(Stage, Generic[Unpack[T]]):
     @Internal()
     async def run(self):
         await self.setup_events()
-        await self.dispatcher.dispatch_events()
+        await self.dispatcher.dispatch_events(self.name)
 
     @Internal()
     async def run_internal(self):
         await self.setup_events()
         
-        initial_events = self.dispatcher.initial_events
-        self.dispatcher.initial_events = [
-            initial_event for initial_event in self.dispatcher.initial_events if initial_event.source.shortname in self.source_internal_events
-        ]
+        initial_events = dict(**self.dispatcher.initial_events)
+        for stage in self.dispatcher.initial_events:
+            self.dispatcher.initial_events[stage] = [
+                initial_event for initial_event in self.dispatcher.initial_events[stage] if initial_event.source.shortname in self.source_internal_events
+            ]
 
-        await self.dispatcher.dispatch_events()
+        await self.dispatcher.dispatch_events(self.name)
         self.dispatcher.initial_events = initial_events
     
     @context()
@@ -491,3 +492,4 @@ class Setup(Stage, Generic[Unpack[T]]):
     @event('apply_channels')
     async def complete(self):
         return {}
+

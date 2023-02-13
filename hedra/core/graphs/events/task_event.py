@@ -18,3 +18,16 @@ class TaskEvent(BaseEvent[TaskHook]):
         )
 
         self.event_type = EventType.TASK
+
+    def copy(self):
+        task_event = TaskEvent(
+            self.target.copy(),
+            self.source.copy()
+        )
+
+        task_event.execution_path = self.execution_path
+        task_event.previous_map = self.previous_map
+        task_event.next_map = self.next_map
+        task_event.next_args = self.next_args
+
+        return task_event

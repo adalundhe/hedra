@@ -20,4 +20,15 @@ class ContextEvent(BaseEvent[ContextHook]):
 
         self.event_type = EventType.CONTEXT
 
-    
+    def copy(self):
+        context_event = ContextEvent(
+            self.target.copy(),
+            self.source.copy()
+        )
+
+        context_event.execution_path = self.execution_path
+        context_event.previous_map = self.previous_map
+        context_event.next_map = self.next_map
+        context_event.next_args = self.next_args
+
+        return context_event

@@ -18,3 +18,16 @@ class LoadEvent(BaseEvent[LoadHook]):
         )
 
         self.event_type = EventType.LOAD
+
+    def copy(self):
+        load_event = LoadEvent(
+            self.target.copy(),
+            self.source.copy()
+        )
+
+        load_event.execution_path = self.execution_path
+        load_event.previous_map = self.previous_map
+        load_event.next_map = self.next_map
+        load_event.next_args = self.next_args
+
+        return load_event

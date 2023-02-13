@@ -17,3 +17,15 @@ class Event(BaseEvent[EventHook]):
 
         self.event_type = EventType.EVENT
 
+    def copy(self):
+        event = Event(
+            self.target.copy(),
+            self.source.copy()
+        )
+
+        event.execution_path = self.execution_path
+        event.previous_map = self.previous_map
+        event.next_map = self.next_map
+        event.next_args = self.next_args
+
+        return event

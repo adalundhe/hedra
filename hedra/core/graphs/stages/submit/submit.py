@@ -52,7 +52,7 @@ class Submit(Stage, Generic[T]):
     async def run(self):
 
         await self.setup_events()
-        await self.dispatcher.dispatch_events()
+        await self.dispatcher.dispatch_events(self.name)
 
     @context()
     async def collect_process_results_and_metrics(

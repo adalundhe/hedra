@@ -20,8 +20,6 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             destination
         )
 
-        self.history = {}
-
         self.requires = [
             'execute_stage_results'
         ]
@@ -39,9 +37,9 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         self.source.state = StageStates.ANALYZING
    
         raw_results = {}
-        for stage_name in self.history:
+        for source_name, destination_name in self.history:
             raw_results.update(
-                self.history[stage_name].get('execute_stage_results', {})
+                self.history[(source_name, destination_name)].get('execute_stage_results', {})
             )
 
         execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
@@ -58,7 +56,7 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                 results_to_calculate[stage_name] = raw_results.get(stage_name)
                 target_stages[stage_name] = stage
         
-        history = self.history[self.from_stage_name]
+        history = self.history[(self.from_stage_name, self.source.name)]
         history['analyze_stage_raw_results'] = results_to_calculate
         history['analyze_stage_target_stages'] = target_stages
         
@@ -79,7 +77,7 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         
 
         for provided in self.provides:
-            self.history[self.from_stage_name][provided] = self.source.context[provided]
+            self.history[(self.from_stage_name, self.source.name)][provided] = self.source.context[provided]
 
         self.destination.state = StageStates.ANALYZED
 
@@ -107,11 +105,12 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         return None, self.destination.stage_type
 
     def _update(self, destination: Stage):
-        history = self.history[self.from_stage_name]
+        history = self.history[(self.from_stage_name, self.source.name)]
         self.next_history.update({
-            destination.name: {
-                self.source.name: {
-                    'analyze_stage_summary_metrics': history.get('analyze_stage_summary_metrics', {})
-                }
+            (self.source.name, destination.name): {
+                'analyze_stage_summary_metrics': history.get('analyze_stage_summary_metrics', {})
             }
         })
+
+    def split(self) -> None:
+        pass

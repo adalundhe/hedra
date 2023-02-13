@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Generic, TypeVar, Dict, List
+from typing import Any, Generic, TypeVar, Dict, List, Union
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -10,7 +10,7 @@ T = TypeVar('T')
 
 class BaseEdge(Generic[T]):
 
-    def __init__(self, source: T, destination: Stage) -> None:
+    def __init__(self, source: Union[T, Stage], destination: Stage) -> None:
         self.requires = []
         self.provides = []
         
@@ -26,6 +26,7 @@ class BaseEdge(Generic[T]):
         self.destination = destination
         self.timeout = None
         self.folded = False
+        self.transition_idx = 0
 
         self.edges_by_name: Dict[str, Stage] = {}
 
@@ -43,8 +44,8 @@ class BaseEdge(Generic[T]):
     async def transition(self):
         raise NotImplementedError('Err. - Please implement this method in the Edge class inheriting BaseEdge')
 
-    async def update(self, destingation: Stage):
+    def update(self, destingation: Stage):
         raise NotImplementedError('Err. - Please implement this method in the Edge class inheriting BaseEdge')
 
-    async def fold(self, edge: BaseEdge) -> None:
+    def split(self) -> None:
         raise NotImplementedError('Err. - Please implement this method in the Edge class inheriting BaseEdge')

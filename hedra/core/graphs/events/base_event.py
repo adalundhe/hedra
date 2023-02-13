@@ -1,5 +1,4 @@
 from __future__ import annotations
-import asyncio
 from collections import defaultdict
 from typing import Any, Dict, TypeVar, Generic, List
 from hedra.core.graphs.simple_context import SimpleContext
@@ -80,6 +79,7 @@ class BaseEvent(Generic[T]):
             'next_args',
             'previous_map',
             'next_map',
+            'copy'
         ]
       
         source = object.__getattribute__(self, 'source')
@@ -109,7 +109,8 @@ class BaseEvent(Generic[T]):
                 'execution_path',
                 'next_args',
                 'previous_map',
-                'next_map'
+                'next_map',
+                'copy'
             ]
 
             if source and hasattr(source, name) and name not in event_attrs:
@@ -168,3 +169,16 @@ class BaseEvent(Generic[T]):
             results = await source.call(results)
 
         return results
+
+    def copy(self) -> BaseEvent[Hook]:
+        base_event = BaseEvent(
+            self.target.copy(),
+            self.source.copy()
+        )
+
+        base_event.execution_path = self.execution_path
+        base_event.previous_map = self.previous_map
+        base_event.next_map = self.next_map
+        base_event.next_args = self.next_args
+
+        return base_event

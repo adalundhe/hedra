@@ -18,3 +18,16 @@ class ChannelEvent(BaseEvent[ChannelHook]):
         )
 
         self.event_type = EventType.CHANNEL
+
+    def copy(self):
+        channel_event = ChannelEvent(
+            self.target.copy(),
+            self.source.copy()
+        )
+
+        channel_event.execution_path = self.execution_path
+        channel_event.previous_map = self.previous_map
+        channel_event.next_map = self.next_map
+        channel_event.next_args = self.next_args
+
+        return channel_event

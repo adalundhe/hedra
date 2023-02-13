@@ -1,18 +1,4 @@
-class IdleEdge:
-
-    def __init__(self) -> None:
-        self.wants = []
-        self.provides = []
-
-        self.values = {}
-        self.paths = []
-
-    async def connect(self):
-        pass
-
-
-import asyncio
-from typing import Dict, Any
+from typing import List
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.idle.idle import Idle
@@ -43,7 +29,8 @@ class IdleEdge(BaseEdge[Idle]):
 
     def _update(self, destination: Stage):
         self.next_history.update({
-            destination.name: {
-                self.source.name: {}
-            }
+            (self.source.name, destination.name): {}
         })
+
+    def split(self, edges: List[BaseEdge]) -> None:
+        pass

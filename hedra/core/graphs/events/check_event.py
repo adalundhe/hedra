@@ -18,3 +18,16 @@ class CheckEvent(BaseEvent[CheckHook]):
         )
 
         self.event_type = EventType.CHECK
+
+    def copy(self):
+        check_event = CheckEvent(
+            self.target.copy(),
+            self.source.copy()
+        )
+
+        check_event.execution_path = self.execution_path
+        check_event.previous_map = self.previous_map
+        check_event.next_map = self.next_map
+        check_event.next_args = self.next_args
+
+        return check_event

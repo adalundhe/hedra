@@ -34,3 +34,11 @@ class TeardownEdge(BaseEdge[Teardown]):
         self.source.state = StageStates.TEARDOWN_COMPLETE
 
         return None, self.destination.stage_type
+
+    def _update(self, destination: Stage):
+        self.next_history.update({
+            (self.source.name, destination.name): {}
+        })
+
+    def split(self) -> None:
+        pass
