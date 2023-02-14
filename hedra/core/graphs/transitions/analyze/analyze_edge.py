@@ -4,7 +4,6 @@ from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.analyze.analyze import Analyze
-from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 
@@ -36,13 +35,16 @@ class AnalyzeEdge(BaseEdge[Analyze]):
     async def transition(self):
         self.source.state = StageStates.ANALYZING
 
-        print(self.history)
-
         raw_results = {}
         for source_name, destination_name in self.history:
-            raw_results.update(
-                self.history[(source_name, destination_name)].get('execute_stage_results', {})
-            )
+            
+            stage_results = self.history[(
+                source_name, 
+                destination_name
+            )].get('execute_stage_results')
+
+            if destination_name == self.source.name and stage_results:
+                raw_results.update(stage_results)
 
         execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
         submit_stages = self.stages_by_type.get(StageTypes.SUBMIT)

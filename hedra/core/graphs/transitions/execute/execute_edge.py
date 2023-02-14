@@ -98,6 +98,16 @@ class ExecuteEdge(BaseEdge[Execute]):
 
     def _update(self, destination: Stage):
 
+        for edge_name in self.history:
+
+            history = self.history[edge_name]
+
+            self.next_history[edge_name] = {}
+
+            self.next_history[edge_name].update({
+                key: value for key, value  in history.items() if key in self.provides
+            })
+
         history = self.history[(self.from_stage_name, self.source.name)]
         next_results = self.next_history.get((self.source.name, destination.name))
         if next_results is None:
