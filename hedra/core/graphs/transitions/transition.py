@@ -63,19 +63,28 @@ class Transition:
             destination_name = self.edge.destination.name
 
             neighbors: Tuple[str, str] = [
-                (destination_name, transition.edge.destination.name) for transition in self.adjacency_list[destination_name]
+                (
+                    destination_name, 
+                    transition.edge.destination.name
+                ) for transition in self.adjacency_list[destination_name]
             ]
 
-            source_history: HistoryUpdate = self.edge.next_history[(source_name, destination_name)]
+            source_history: HistoryUpdate = self.edge.next_history[(
+                source_name, 
+                destination_name
+            )]
 
             for neighbor in neighbors:
                 required_keys = self.edges_by_name[neighbor].requires
                 self.edges_by_name[neighbor].from_stage_name = source_name
 
-                self.edges_by_name[neighbor].history.update({
-                    (source_name, destination_name): {
-                        key: value for key, value in source_history.items() if key in required_keys
-                    }
-                })
+                for edge_name in self.edge.next_history:
+                    source_history: HistoryUpdate = self.edge.next_history[edge_name]
+
+                    self.edges_by_name[neighbor].history.update({
+                        edge_name: {
+                            key: value for key, value in source_history.items() if key in required_keys
+                        }
+                    })
 
         return result

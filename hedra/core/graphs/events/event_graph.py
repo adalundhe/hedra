@@ -17,7 +17,8 @@ from hedra.core.graphs.hooks.registry.registry_types import (
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, HookType
 
 
-EventTypeHook = Union[EventHook, TransformHook, ContextHook, ConditionHook, SaveHook]
+EventTypeHook = Union[EventHook, TransformHook, ContextHook, 
+ConditionHook, SaveHook, ActionHook, TaskHook]
 
 
 class EventGraph:

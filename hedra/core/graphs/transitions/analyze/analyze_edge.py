@@ -35,7 +35,9 @@ class AnalyzeEdge(BaseEdge[Analyze]):
     
     async def transition(self):
         self.source.state = StageStates.ANALYZING
-   
+
+        print(self.history)
+
         raw_results = {}
         for source_name, destination_name in self.history:
             raw_results.update(
