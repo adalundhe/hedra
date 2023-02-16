@@ -113,6 +113,17 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         return None, self.destination.stage_type
 
     def _update(self, destination: Stage):
+
+        for edge_name in self.history:
+
+            history = self.history[edge_name]
+
+            self.next_history[edge_name] = {}
+
+            self.next_history[edge_name].update({
+                key: value for key, value  in history.items() if key in self.provides
+            })
+
         history = self.history[(self.from_stage_name, self.source.name)]
         self.next_history.update({
             (self.source.name, destination.name): {
