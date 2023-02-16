@@ -102,7 +102,7 @@ async def process_batch(
 
         await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Results aggregation complete - Took: {round(elapsed, 2)} seconds')
 
-        return dill.dumps(events)
+        return events
 
 
 def process_results_batch(config: Dict[str, Any]):

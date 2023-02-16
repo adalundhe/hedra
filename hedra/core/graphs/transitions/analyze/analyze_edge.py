@@ -1,5 +1,4 @@
 import asyncio
-from typing import Dict, Any
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
@@ -81,7 +80,10 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         
 
         for provided in self.provides:
-            self.history[(self.from_stage_name, self.source.name)][provided] = self.source.context[provided]
+            self.history[(
+                self.from_stage_name, 
+                self.source.name
+            )][provided] = self.source.context[provided]
 
         self.destination.state = StageStates.ANALYZED
 
@@ -93,7 +95,9 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             self._update(self.destination)
  
             for stage in submit_stages.values():
-                if stage.name in self.all_paths.get(self.source.name) and stage.state == StageStates.INITIALIZED:
+                if stage.name in self.all_paths.get(
+                    self.source.name
+                ) and stage.state == StageStates.INITIALIZED:
 
                     if stage.context is None:
                         stage.context = SimpleContext()
@@ -112,7 +116,10 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         history = self.history[(self.from_stage_name, self.source.name)]
         self.next_history.update({
             (self.source.name, destination.name): {
-                'analyze_stage_summary_metrics': history.get('analyze_stage_summary_metrics', {})
+                'analyze_stage_summary_metrics': history.get(
+                    'analyze_stage_summary_metrics', 
+                    {}
+                )
             }
         })
 

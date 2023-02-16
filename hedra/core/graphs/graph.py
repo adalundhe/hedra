@@ -5,7 +5,6 @@ import networkx
 import threading
 import os
 import time
-from yaspin.spinners import Spinners
 from typing import Dict, List, Any
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -222,6 +221,8 @@ class Graph:
                 status_spinner.group_finalize()
 
                 await status_spinner.ok('✔')
+
+                results = None
             
         if self.status == GraphStatus.RUNNING:
             await self.logger.spinner.system.debug(f'{self.metadata_string} - Changed status to - {GraphStatus.COMPLETE.name} - from - {GraphStatus.RUNNING.name}')
@@ -231,7 +232,17 @@ class Graph:
 
         self.execution_time = execution_start - time.monotonic()
 
-        return self._results
+        for transition_group in self._transitions:
+            for transition in transition_group:
+                transition.edge.source.context = None
+                transition.edge.destination.context = None
+                transition.edge.history = None
+            
+            transition_group.destination_groups = None
+            transition_group.transitions = None
+            transition_group.transitions_by_type = None
+            transition_group.edges_by_name = None
+            transition_group.adjacency_list = None
 
     async def check(self, graph_path: str):
         

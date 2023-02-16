@@ -39,14 +39,4 @@ class TransitionGroup:
     
     def sort_and_map_transitions(self):
         pass
-        # for transitions in self.destination_groups.values():
-            
-        #     if len(transitions) > 1:
-
-        #         edges: List[BaseEdge] = [group_transition.edge for group_transition in transitions]
-
-        #         for edge in edges:
-        #             edge.split(edges)
-
-
 

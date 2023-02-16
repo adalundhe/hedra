@@ -329,7 +329,7 @@ class Analyze(Stage):
 
 
             batch_results: List[Dict[str, Union[dict, ProcessedResultsGroup]]] = [
-                dill.loads(group.get('events')) for group in stage_results
+                group.get('events') for group in stage_results
             ]
 
             stage_events =  defaultdict(ProcessedResultsGroup)
@@ -481,4 +481,5 @@ class Analyze(Stage):
 
     @event('generate_summary')
     async def complete(self):
+        await self.executor.shutdown()
         return {}

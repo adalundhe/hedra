@@ -99,7 +99,8 @@ class Execute(Stage, Generic[Unpack[T]]):
     ):
         self.context.ignore_serialization_filters = [
             'execute_stage_setup_hooks',
-            'setup_stage_ready_stages'
+            'setup_stage_ready_stages',
+            'execute_stage_results'
         ]
         persona_type_name = execute_stage_setup_config.persona_type.capitalize()
 
@@ -303,4 +304,5 @@ class Execute(Stage, Generic[Unpack[T]]):
 
     @event('aggregate_multiple_worker_results', 'setup_single_worker_job')
     async def complete(self):
+        await self.executor.shutdown()
         return {}

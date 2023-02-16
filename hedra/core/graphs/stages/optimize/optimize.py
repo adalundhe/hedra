@@ -64,7 +64,8 @@ class Optimize(Stage):
             'optimize_stage_batched_stages',
             'optimize_stage_candidates',
             'setup_stage_ready_stages',
-            'execute_stage_setup_hooks'
+            'execute_stage_setup_hooks',
+            'execute_stage_results'
         ]
 
         stage_names = ', '.join(list(optimize_stage_candidates.keys()))
