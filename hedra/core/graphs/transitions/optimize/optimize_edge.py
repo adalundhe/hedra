@@ -88,6 +88,16 @@ class OptimizeEdge(BaseEdge[Optimize]):
 
     def _update(self, destination: Stage):
 
+        for edge_name in self.history:
+
+            history = self.history[edge_name]
+
+            self.next_history[edge_name] = {}
+
+            self.next_history[edge_name].update({
+                key: value for key, value  in history.items() if key in self.provides
+            })
+
         history = self.history[(self.from_stage_name, self.source.name)]
 
         optimized_config: Stage = history['optimize_stage_optimized_configs'].get(destination.name)
@@ -96,20 +106,17 @@ class OptimizeEdge(BaseEdge[Optimize]):
 
         if optimized_config and optimzied_hooks and stage_setup_by:
 
-            self.next_history[(self.source.name, destination.name)] = {
+            self.next_history[(self.source.name, destination.name)].update({
                 'optimize_stage_optimized_params': history['optimize_stage_optimized_params'],
                 'setup_stage_candidates': list(history['optimize_stage_candidates'].keys()),
                 'setup_stage_ready_stages': history['setup_stage_ready_stages'],
                 'execute_stage_setup_config': optimized_config,
                 'execute_stage_setup_hooks': optimzied_hooks,
                 'execute_stage_setup_by': stage_setup_by 
-            }
+            })
 
     def split(self, edges: List[BaseEdge]) -> None:
-        optimization_candidates = self.generate_optimization_candidates()
-
-        candidate_name = list(optimization_candidates.keys())[self.transition_idx]
-        self.assigned_candidate = candidate_name
+       pass
 
     def generate_optimization_candidates(self) -> Dict[str, Stage]:
 
