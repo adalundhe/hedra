@@ -49,6 +49,7 @@ class Optimize(Stage):
 
     @Internal()
     async def run(self):
+
         await self.setup_events()
         await self.dispatcher.dispatch_events(self.name)
 
@@ -311,5 +312,5 @@ class Optimize(Stage):
 
     @event('complete_optimization')
     async def complete(self):
-        pass
+        await self.executor.shutdown()
 

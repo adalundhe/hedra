@@ -75,8 +75,10 @@ class ExecuteEdge(BaseEdge[Execute]):
 
         self._update(self.destination)
 
+        all_paths = self.all_paths.get(self.source.name, [])
+
         for stage in analyze_stages.values():
-            if stage.name in self.all_paths.get(self.source.name) and stage.state == StageStates.INITIALIZED:
+            if stage.name in all_paths and stage.state == StageStates.INITIALIZED:
                 if stage.context is None:
                     stage.context = SimpleContext()
 

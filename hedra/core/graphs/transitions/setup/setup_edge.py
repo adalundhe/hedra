@@ -122,7 +122,8 @@ class SetupEdge(BaseEdge[Setup]):
 
             history = self.history[edge_name]
 
-            self.next_history[edge_name] = {}
+            if self.next_history.get(edge_name) is None:
+                self.next_history[edge_name] = {}
 
             self.next_history[edge_name].update({
                 key: value for key, value  in history.items() if key in self.provides
@@ -141,6 +142,9 @@ class SetupEdge(BaseEdge[Setup]):
 
         self.stages_by_type[StageTypes.EXECUTE].update(ready_stages)
 
+        if self.next_history.get((self.source.name, destination.name)) is None:
+            self.next_history[(self.source.name, destination.name)] = {}
+
         self.next_history[(self.source.name, destination.name)].update({
             'execute_stage_setup_hooks': execute_stage_setup_hooks,
             'setup_stage_ready_stages': ready_stages,
@@ -156,11 +160,12 @@ class SetupEdge(BaseEdge[Setup]):
     def get_setup_candidates(self) -> Dict[str, Execute]:
         execute_stages = [(stage_name, stage) for stage_name, stage in self.stages_by_type.get(StageTypes.EXECUTE).items()]
 
-        paths = self.all_paths.get(self.source.name)
+        all_paths = self.all_paths.get(self.source.name, [])
+
         path_lengths: Dict[str, int] = self.path_lengths.get(self.source.name)
 
         execute_stages: Dict[str, Execute] = {
-            stage_name: stage for stage_name, stage in execute_stages if stage_name in paths and stage_name not in self.visited
+            stage_name: stage for stage_name, stage in execute_stages if stage_name in all_paths and stage_name not in self.visited
         }
 
         setup_candidates: Dict[str, Execute] = {}

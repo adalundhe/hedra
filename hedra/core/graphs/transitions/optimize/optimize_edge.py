@@ -43,13 +43,13 @@ class OptimizeEdge(BaseEdge[Optimize]):
         selected_optimization_candidates = self.generate_optimization_candidates()
                     
         history['optimize_stage_candidates'] = selected_optimization_candidates
+        self.source.context.update(history)
 
-        for event in self.source.dispatcher.events_by_name.values():
-            self.source.context.update(history)
-            event.context.update(history)
+        # for event in self.source.dispatcher.events_by_name.values():
+        #     event.context.update(history)
             
-            if event.source.context:
-                event.source.context.update(history)
+        #     if event.source.context:
+        #         event.source.context.update(history)
 
         if len(selected_optimization_candidates) > 0:
             self.source.generation_optimization_candidates = len(selected_optimization_candidates)
@@ -104,6 +104,9 @@ class OptimizeEdge(BaseEdge[Optimize]):
         optimzied_hooks: Stage = history['optimzie_stage_optimized_hooks'].get(destination.name)
         stage_setup_by: str = history['execute_stage_setup_by'].get(destination.name)
 
+        if self.next_history.get((self.source.name, destination.name)) is None:
+            self.next_history[(self.source.name, destination.name)] = {}
+
         if optimized_config and optimzied_hooks and stage_setup_by:
 
             self.next_history[(self.source.name, destination.name)].update({
@@ -123,27 +126,19 @@ class OptimizeEdge(BaseEdge[Optimize]):
         history = self.history[(self.from_stage_name, self.source.name)]
         execute_stages: Dict[str, Execute] = history['setup_stage_ready_stages']
         optimize_stages = self.stages_by_type.get(StageTypes.OPTIMIZE).items()
-        paths = self.all_paths.get(self.source.name)
         path_lengths: Dict[str, int] = self.path_lengths.get(self.source.name)
 
-        execute_stages = {
-            stage_name: stage for stage_name, stage in execute_stages.items() if stage_name in paths and stage_name not in self.visited
-        }
+        all_paths = self.all_paths.get(self.source.name, [])
 
         optimize_stages_in_path = {}
         for stage_name, stage in optimize_stages:
-            if stage_name in paths and stage_name != self.source.name and stage_name not in self.visited:
+            if stage_name in all_paths and stage_name != self.source.name and stage_name not in self.visited:
                 optimize_stages_in_path[stage_name] = self.all_paths.get(stage_name)
 
         optimization_candidates: Dict[str, Stage] = {}
 
-        valid_states = [
-            StageStates.INITIALIZED,
-            StageStates.SETUP,
-        ]
-
         for stage_name, stage in execute_stages.items():
-            if stage_name in paths and stage.state in valid_states:
+            if stage_name in all_paths:
 
                 if len(optimize_stages_in_path) > 0:
                     for path in optimize_stages_in_path.values():
@@ -154,11 +149,9 @@ class OptimizeEdge(BaseEdge[Optimize]):
                             optimization_candidates[stage_name] = stage
 
                 else:
-                    stage.state = StageStates.OPTIMIZING
                     stage.context['execute_stage_setup_config'] = history['execute_stage_setup_config']
                     stage.context['execute_stage_setup_by'] = history['execute_stage_setup_by']
                     optimization_candidates[stage_name] = stage
-
 
         selected_optimization_candidates: Dict[str, Stage] = {}
         following_opimize_stage_distances = [

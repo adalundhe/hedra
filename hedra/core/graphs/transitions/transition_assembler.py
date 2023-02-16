@@ -285,13 +285,12 @@ class TransitionAssembler:
 
                 for neighbor in self.adjacency_list[stage.name]:
                     self.edges_by_name[(stage.name, neighbor.edge.destination.name)].stages_by_type = stages_by_type
-                    paths = networkx.all_shortest_paths(graph, stage_name, complete_stage.name)
+                    paths = networkx.all_simple_paths(graph, stage_name, complete_stage.name)
                 
                     stage_paths = []
                     for path in paths:
                         stage_paths.extend(path)
                     
-                    # idle_stage.context.paths[stage_name] = stage_paths
                     all_paths[stage_name] = stage_paths
                     
                     path_lengths = networkx.all_pairs_shortest_path_length(graph)

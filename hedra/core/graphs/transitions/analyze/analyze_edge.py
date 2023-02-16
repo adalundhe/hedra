@@ -48,11 +48,16 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
         submit_stages = self.stages_by_type.get(StageTypes.SUBMIT)
 
+
         results_to_calculate = {}
         target_stages = {}
         for stage_name in raw_results.keys():
             stage = execute_stages.get(stage_name)
-            in_path = self.source.name in self.all_paths.get(stage_name)
+
+
+            all_paths = self.all_paths.get(stage_name)
+
+            in_path = self.source.name in all_paths
 
             if stage.state in self.valid_states and in_path:
                 stage.state = StageStates.ANALYZING
@@ -93,11 +98,13 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         if len(results_to_calculate) > 0:
 
             self._update(self.destination)
+
+            all_paths = []
+            for path_set in self.all_paths.get(self.source.name, []):
+                all_paths.extend(path_set)
  
             for stage in submit_stages.values():
-                if stage.name in self.all_paths.get(
-                    self.source.name
-                ) and stage.state == StageStates.INITIALIZED:
+                if stage.name in all_paths and stage.state == StageStates.INITIALIZED:
 
                     if stage.context is None:
                         stage.context = SimpleContext()
@@ -125,6 +132,10 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             })
 
         history = self.history[(self.from_stage_name, self.source.name)]
+
+        if self.next_history.get((self.source.name, destination.name)) is None:
+            self.next_history[(self.source.name, destination.name)] = {}
+
         self.next_history.update({
             (self.source.name, destination.name): {
                 'analyze_stage_summary_metrics': history.get(
