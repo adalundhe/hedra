@@ -16,8 +16,25 @@ class CheckpointEdge(BaseEdge[Checkpoint]):
             destination
         )
 
+        self.requires = [
+            'setup_stage_ready_stages',
+            'setup_stage_candidates',
+            'execute_stage_setup_config',
+            'execute_stage_setup_by',
+            'execute_stage_setup_hooks',
+            'execute_stage_results'
+        ]
+
+        self.provides = [
+            'execute_stage_results'
+        ]
+
     async def transition(self):
         self.source.state = StageStates.CHECKPOINTING
+
+        history = self.history[(self.from_stage_name, self.source.name)]
+
+        await self.source.context.update(history)
         
         if self.timeout:
             await asyncio.wait_for(self.source.run(), timeout=self.timeout)
@@ -25,19 +42,36 @@ class CheckpointEdge(BaseEdge[Checkpoint]):
         else:
             await self.source.run()
 
-        history = self.history[(self.from_stage_name, self.source.name)]
-        self.destination.context.update(history)
-
-        self.source.state = StageStates.CHECKPOINTED
+        for provided in self.provides:
+            history[provided] = self.source.context[provided]
 
         if self.destination.context is None:
             self.destination.context = SimpleContext()
+
+        self._update(self.destination)
+
+        self.source.state = StageStates.CHECKPOINTED
 
         self.visited.append(self.source.name)
 
         return None, self.destination.stage_type
 
     def _update(self, destination: Stage):
+
+        for edge_name in self.history:
+
+            history = self.history[edge_name]
+
+            if self.next_history.get(edge_name) is None:
+                self.next_history[edge_name] = {}
+
+            self.next_history[edge_name].update({
+                key: value for key, value  in history.items() if key in self.provides
+            })
+
+        if self.next_history.get((self.source.name, destination.name)) is None:
+            self.next_history[(self.source.name, destination.name)] = {}
+
         self.next_history.update({
             (self.source.name, destination.name): {}
         })

@@ -27,13 +27,15 @@ class OptimizeEdge(BaseEdge[Optimize]):
             'execute_stage_setup_by',
             'setup_stage_ready_stages',
             'setup_stage_candidates',
+            'execute_stage_results'
         ]
 
         self.provides = [
             'optimize_stage_optimized_params',
             'optimize_stage_optimized_configs',
             'optimzie_stage_optimized_hooks',
-            'execute_stage_setup_by'
+            'execute_stage_setup_by',
+            'execute_stage_results'
         ]
         
 
@@ -44,12 +46,6 @@ class OptimizeEdge(BaseEdge[Optimize]):
                     
         history['optimize_stage_candidates'] = selected_optimization_candidates
         self.source.context.update(history)
-
-        # for event in self.source.dispatcher.events_by_name.values():
-        #     event.context.update(history)
-            
-        #     if event.source.context:
-        #         event.source.context.update(history)
 
         if len(selected_optimization_candidates) > 0:
             self.source.generation_optimization_candidates = len(selected_optimization_candidates)
@@ -92,7 +88,8 @@ class OptimizeEdge(BaseEdge[Optimize]):
 
             history = self.history[edge_name]
 
-            self.next_history[edge_name] = {}
+            if self.next_history.get(edge_name) is None:
+                self.next_history[edge_name] = {}
 
             self.next_history[edge_name].update({
                 key: value for key, value  in history.items() if key in self.provides
@@ -139,7 +136,6 @@ class OptimizeEdge(BaseEdge[Optimize]):
 
         for stage_name, stage in execute_stages.items():
             if stage_name in all_paths:
-
                 if len(optimize_stages_in_path) > 0:
                     for path in optimize_stages_in_path.values():
                         if stage_name not in path:
