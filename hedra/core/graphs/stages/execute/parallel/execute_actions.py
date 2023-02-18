@@ -90,7 +90,7 @@ async def start_execution(
     setup_execute_stage: Stage = stages.get(source_stage_name)
     setup_execute_stage.logger = logger
 
-    actions_and_tasks: List[Union[ActionHook, TaskHook]] = setup_execute_stage.context['execute_stage_setup_hooks']
+    actions_and_tasks: List[Union[ActionHook, TaskHook]] = setup_stage.context['execute_stage_setup_hooks'].get(source_stage_name)
 
     execution_hooks_count = len(actions_and_tasks)
     await logger.filesystem.aio['hedra.core'].info(
@@ -225,7 +225,6 @@ def execute_actions(parallel_config: str):
         discovered: Dict[str, Stage] = import_stages(graph_path)
         plugins_by_type = import_plugins(graph_path)
 
-        
         initialized_stages = {}
         hooks_by_type = defaultdict(dict)
         hooks_by_name = {}

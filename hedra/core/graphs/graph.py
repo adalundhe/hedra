@@ -167,7 +167,7 @@ class Graph:
 
         for transition_group in self._transitions:
 
-            # transition_group.sort_and_map_transitions()
+            transition_group.sort_and_map_transitions()
 
             current_stages = ', '.join(
                 list(set([transition.from_stage.name for transition in transition_group]))

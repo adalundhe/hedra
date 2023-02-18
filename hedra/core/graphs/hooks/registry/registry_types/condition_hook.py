@@ -42,10 +42,14 @@ class ConditionHook(Hook):
         }
     
     def copy(self):
-        return ConditionHook(
+        condition_hook = ConditionHook(
             self.name,
             self.shortname,
             self._call,
             *self.names,
             order=self.order
         )
+
+        condition_hook.stage = self.stage
+
+        return condition_hook

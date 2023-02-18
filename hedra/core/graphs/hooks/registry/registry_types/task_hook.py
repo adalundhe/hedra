@@ -43,7 +43,7 @@ class TaskHook(Hook):
         )
 
     def copy(self):
-        return TaskHook(
+        task_hook = TaskHook(
             self.name,
             self.shortname,
             self._call,
@@ -53,3 +53,7 @@ class TaskHook(Hook):
             notify=self.notifiers,
             listen=self.listeners
         )
+
+        task_hook.stage = self.stage
+
+        return task_hook

@@ -6,7 +6,8 @@ from hedra.core.graphs.hooks.registry.registry_types import (
     ActionHook,
     TaskHook,
     ChannelHook,
-    ConditionHook
+    ConditionHook,
+    ContextHook
 )
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
@@ -57,6 +58,39 @@ class EventDispatcher:
 
     def __getitem__(self, event_type: EventType):
         return self.events[event_type]
+    
+    def copy(self):
+        dispatcher = EventDispatcher(timeout=self.timeout)
+
+        for event in self.events_by_name.values():
+            dispatcher.add_event(
+                event.copy()
+            )
+
+        for event in self.events_by_name.values():
+            event.context = SimpleContext()
+            event.source.context = SimpleContext()
+
+            for graph_event_name in event.events:
+
+                if graph_event_name in dispatcher.events_by_name:
+                    dispatcher.events_by_name[event.event_name].events[graph_event_name] = dispatcher.events_by_name.get(graph_event_name)
+
+                else:
+                    dispatcher.events_by_name[event.event_name].events[graph_event_name] = event.events.get(graph_event_name)
+
+        for stage in self.initial_events:
+            initial_event_names = [
+                event.event_name for event in self.initial_events[stage]
+            ]
+
+            dispatcher.initial_events[stage] = [
+                event for event in dispatcher.events_by_name.values() if event.event_name in initial_event_names
+            ]
+
+        dispatcher.assemble_action_and_task_subgraphs()
+
+        return dispatcher
 
     def set_events(self, events: List[BaseEvent[Hook]]) -> None:
         for event in events:
@@ -189,7 +223,6 @@ class EventDispatcher:
         return execution_path
 
     async def _execute_batch(self, initial_event: BaseEvent[Hook]):
-
         for layer in initial_event.execution_path:
                 layer_events = [
                     self.events_by_name.get(event_name) for event_name in layer
@@ -221,7 +254,6 @@ class EventDispatcher:
 
                     for next_event in next_events:
                         if isinstance(event, (BaseEvent, ConditionHook)):
-
                             next_event.context.update(event.context)
 
                         next_event.next_args[next_event.event_name].update(result)

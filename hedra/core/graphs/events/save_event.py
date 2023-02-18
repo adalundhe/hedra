@@ -1,5 +1,4 @@
-import asyncio
-from typing import Any, Tuple
+from collections import defaultdict
 from hedra.core.graphs.hooks.registry.registry_types import SaveHook
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from .event_types import EventType
@@ -25,9 +24,9 @@ class SaveEvent(BaseEvent[SaveHook]):
             self.source.copy()
         )
 
-        save_event.execution_path = self.execution_path
-        save_event.previous_map = self.previous_map
-        save_event.next_map = self.next_map
-        save_event.next_args = self.next_args
+        save_event.execution_path = list(self.execution_path)
+        save_event.previous_map = list(self.previous_map)
+        save_event.next_map = list(self.next_map)
+        save_event.next_args = defaultdict(dict)
 
         return save_event

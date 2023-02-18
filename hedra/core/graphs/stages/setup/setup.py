@@ -211,7 +211,7 @@ class Setup(Stage, Generic[Unpack[T]]):
         setup_stage_target_stages: Dict[str, Stage]={},
         setup_stage_target_config: Config=None
     ):
-    
+
         execute_stage_names = ', '.join(list(setup_stage_target_stages.keys()))
 
         await self.logger.spinner.append_message(f'Setting up - {execute_stage_names}')
@@ -257,7 +257,6 @@ class Setup(Stage, Generic[Unpack[T]]):
         self,
         setup_stage_target_stages: Dict[str, Stage]={}
     ):
-    
         actions: List[ActionHook] = []
         for execute_stage in setup_stage_target_stages.values():
             actions.extend(execute_stage.hooks[HookType.ACTION])
@@ -272,6 +271,7 @@ class Setup(Stage, Generic[Unpack[T]]):
         self, 
         setup_stage_actions: List[ActionHook]=[]
     ):
+        
         return {
             'setup_stage_has_actions': len(setup_stage_actions) > 0
         }
@@ -464,6 +464,8 @@ class Setup(Stage, Generic[Unpack[T]]):
         for task in setup_stage_tasks:
             tasks_by_stage[task.stage].append(task)
 
+        execute_stage_setup_hooks = defaultdict(list)
+
         for execute_stage in setup_stage_target_stages.values():
 
             execute_stage.client.intercept = False
@@ -473,6 +475,11 @@ class Setup(Stage, Generic[Unpack[T]]):
                 *actions_by_stage[execute_stage.name],
                 *tasks_by_stage[execute_stage.name]
             ]
+
+            execute_stage_setup_hooks[execute_stage.name].extend([
+                *actions_by_stage[execute_stage.name],
+                *tasks_by_stage[execute_stage.name]
+            ])
 
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Client intercept set to {execute_stage.client.intercept} - Action calls for client id - {execute_stage.client.client_id} - will not be suspended on execution')
 
@@ -485,6 +492,8 @@ class Setup(Stage, Generic[Unpack[T]]):
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Generated - {tasks_generated_count} - Tasks for Execute stage - {execute_stage.name}')
     
         return {
+            'execute_stage_setup_by': self.name,
+            'execute_stage_setup_hooks': execute_stage_setup_hooks,
             'execute_stage_setup_config': setup_stage_target_config,
             'setup_stage_ready_stages': setup_stage_target_stages
         }

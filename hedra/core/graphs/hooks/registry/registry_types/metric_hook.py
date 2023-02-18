@@ -38,10 +38,14 @@ class MetricHook(Hook):
         }
 
     def copy(self):
-        return MetricHook(
+        metric_hook = MetricHook(
             self.name,
             self.shortname,
             self._call,
             self.group,
             order=self.order
         )
+
+        metric_hook.stage = self.stage
+
+        return metric_hook

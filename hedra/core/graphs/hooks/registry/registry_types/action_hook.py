@@ -41,7 +41,7 @@ class ActionHook(Hook):
         )
 
     def copy(self):
-        return ActionHook(
+        action_hook = ActionHook(
             self.name,
             self.shortname,
             self._call,
@@ -51,6 +51,10 @@ class ActionHook(Hook):
             notify=self.notifiers,
             listen=self.listeners
         )
+
+        action_hook.stage = self.stage
+
+        return action_hook
 
     async def call(self, *args, **kwargs):
         return await self._call(*args, **kwargs)

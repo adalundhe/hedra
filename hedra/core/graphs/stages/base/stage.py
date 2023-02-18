@@ -95,7 +95,7 @@ class Stage:
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing events')
 
     @Internal()
-    def to_copy_dict(self):
+    def to_copy_dict(self) -> Dict[str, Any]:
 
         copy_dict = {}
 

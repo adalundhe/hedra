@@ -145,9 +145,6 @@ class Optimize(Stage):
                     'execute_stage_plugins': execute_stage_plugins,
                     'optimizer_iterations': self.optimize_iterations,
                     'optimizer_algorithm': self.algorithm,
-                    'execute_stage_hooks': [
-                        hook.name for hook in stage.context['execute_stage_setup_hooks']
-                    ],
                     'time_limit': self.time_limit
                 })
 
@@ -237,27 +234,16 @@ class Optimize(Stage):
             optimized_configs[stage.name] = optimized_config
             stages_setup_by[stage.name] = stage.context['execute_stage_setup_by']
 
-            for hook in stage.hooks[HookType.ACTION]:
-                hook.session.pool.size = optimize_stage_batch_size
-                hook.session.sem = asyncio.Semaphore(optimize_stage_batch_size)
-                hook.session.pool.connections = []
-                hook.session.pool.create_pool()
+            for hook in stage.dispatcher.actions_and_tasks.values():
+                if hook.source.session:
+                    hook.source.session.pool.size = optimize_stage_batch_size
+                    hook.source.session.sem = asyncio.Semaphore(optimize_stage_batch_size)
+                    hook.source.session.pool.connections = []
+                    hook.source.session.pool.create_pool()
 
-                optimzied_hooks[stage.name].append(hook)
+                    optimzied_hooks[hook.source.stage].append(hook)
 
-            
-            for hook in stage.hooks[HookType.TASK]:
-                hook.session.pool.size = optimize_stage_batch_size
-                hook.session.sem = asyncio.Semaphore(optimize_stage_batch_size)
-                hook.session.pool.connections = []
-                hook.session.pool.create_pool()
-
-                optimzied_hooks[stage.name].append(hook)
-
-            stage.context['execute_stage_setup_hooks'] = [
-                *stage.hooks[HookType.ACTION],
-                *stage.hooks[HookType.TASK]
-            ]
+            stage.context['execute_stage_setup_hooks'] = list(stage.dispatcher.actions_and_tasks.values())
             
             pipeline_context = optimization_result.get('context', {})
             for context_key, context_value in pipeline_context.items():
@@ -273,7 +259,7 @@ class Optimize(Stage):
             optimized_stages[stage.name] = stage
 
         return {
-            'optimzie_stage_optimized_hooks': optimzied_hooks,
+            'optimize_stage_optimized_hooks': optimzied_hooks,
             'optimize_stage_optimized_configs': optimized_configs,
             'execute_stage_setup_by': stages_setup_by,
             'optimize_stage_optimzations': stage_optimzations,

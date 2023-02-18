@@ -29,7 +29,11 @@ class ExecuteEdge(BaseEdge[Execute]):
         ]
 
         self.provides = [
-            'execute_stage_results'
+            'execute_stage_results',
+            'execute_stage_setup_hooks',
+            'execute_stage_setup_config',
+            'execute_stage_setup_by',
+            'setup_stage_ready_stages'
         ]
 
         self.valid_states = [
@@ -38,6 +42,7 @@ class ExecuteEdge(BaseEdge[Execute]):
         ]
 
     async def transition(self):
+
         self.source.state = StageStates.EXECUTING
 
         history = self.history[(self.from_stage_name, self.source.name)]
@@ -104,13 +109,15 @@ class ExecuteEdge(BaseEdge[Execute]):
 
             history = self.history[edge_name]
 
-            self.next_history[edge_name] = {}
+            if self.next_history.get(edge_name) is None:
+                self.next_history[edge_name] = {}
 
             self.next_history[edge_name].update({
                 key: value for key, value  in history.items() if key in self.provides
             })
 
         history = self.history[(self.from_stage_name, self.source.name)]
+
         next_results = self.next_history.get((self.source.name, destination.name))
         if next_results is None:
             next_results = {}

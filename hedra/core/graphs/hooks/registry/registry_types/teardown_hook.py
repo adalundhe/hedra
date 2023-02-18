@@ -50,7 +50,7 @@ class TeardownHook(Hook):
         }
 
     def copy(self):
-        return TeardownHook(
+        teardown_hook = TeardownHook(
             self.name,
             self.shortname,
             self._call,
@@ -63,3 +63,7 @@ class TeardownHook(Hook):
                 'tags': self.metadata.tags
             }
         )
+
+        teardown_hook.stage = self.stage
+
+        return teardown_hook

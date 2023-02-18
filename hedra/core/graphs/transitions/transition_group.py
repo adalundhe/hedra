@@ -13,7 +13,7 @@ class TransitionGroup:
 
     def __init__(self) -> None:
         self.transitions: List[Transition]  = []
-        self.transitions_by_type: Dict[str, List[Transition]] = defaultdict(list)
+        self.transitions_by_type: Dict[StageTypes, List[Transition]] = defaultdict(list)
         self.destination_groups: Dict[Tuple[str, StageTypes], List[Transition]] = defaultdict(list)
         self.targets: Dict[str, Stage] = {}
 
@@ -38,5 +38,12 @@ class TransitionGroup:
         self.transition_idx += 1
     
     def sort_and_map_transitions(self):
-        pass
+
+        for transition in self.transitions:
+            destinations = self.adjacency_list[transition.edge.source.name]
+            if len(destinations)> 1:
+                transition.edge.split([transition.edge for transition in destinations])
+            
+
+            
 

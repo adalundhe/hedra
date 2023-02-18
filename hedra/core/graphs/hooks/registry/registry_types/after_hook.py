@@ -39,12 +39,16 @@ class AfterHook(Hook):
         }
 
     def copy(self):
-        return AfterHook(
+        after_hook = AfterHook(
             self.name,
             self.shortname,
             self._call,
             *self.names
         )
+
+        after_hook.stage = self.stage
+
+        return after_hook
 
     
     

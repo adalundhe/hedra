@@ -40,10 +40,14 @@ class ChannelHook(Hook):
         }
 
     def copy(self):
-        return ChannelHook(
+        channel_hook = ChannelHook(
             self.name,
             self.shortname,
             self._call,
             *self.names,
             order=self.order
         )
+
+        channel_hook.stage = self.stage
+
+        return channel_hook

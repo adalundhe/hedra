@@ -1,4 +1,4 @@
-import asyncio
+from collections import defaultdict
 from typing import Any, Tuple
 from hedra.core.graphs.hooks.registry.registry_types import TaskHook
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
@@ -25,9 +25,9 @@ class ActionEvent(BaseEvent[TaskHook]):
             self.source.copy()
         )
         
-        action_event.execution_path = self.execution_path
-        action_event.previous_map = self.previous_map
-        action_event.next_map = self.next_map
-        action_event.next_args = self.next_args
+        action_event.execution_path = list(self.execution_path)
+        action_event.previous_map = list(self.previous_map)
+        action_event.next_map = list(self.next_map)
+        action_event.next_args = defaultdict(dict)
 
         return action_event
