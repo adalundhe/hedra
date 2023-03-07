@@ -35,10 +35,10 @@ class ValidateEdge(BaseEdge[Validate]):
                 if event.source.context:
                     event.source.context.update(history)
         
-        if self.timeout:
+        if self.timeout and self.skip_stage is False:
             await asyncio.wait_for(self.source.run(), timeout=self.timeout)
 
-        else:
+        elif self.skip_stage is False:
             await self.source.run()
 
         self._update(self.destination)

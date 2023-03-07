@@ -23,6 +23,7 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         )
 
         self.requires = [
+            'execute_stage_skipped',
             'execute_stage_results'
         ]
         self.provides = [
@@ -48,7 +49,12 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                 destination_name
             )].get('execute_stage_results')
 
-            if destination_name == self.source.name and stage_results:
+            stage_skipped = self.history[(
+                source_name, 
+                destination_name
+            )].get('execute_stage_skipped')
+
+            if destination_name == self.source.name and stage_results and stage_skipped is False:
                 raw_results.update(stage_results)
 
         execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
@@ -69,12 +75,13 @@ class AnalyzeEdge(BaseEdge[Analyze]):
 
             in_path = self.source.name in all_paths
 
-            if stage.state in self.valid_states and in_path:
+            if in_path:
                 stage.state = StageStates.ANALYZING
                 results_to_calculate[stage_name] = raw_results.get(stage_name)
                 target_stages[stage_name] = stage
         
-        history = self.history[(self.from_stage_name, self.source.name)]
+        history = self.history.get((self.from_stage_name, self.source.name), {})
+        
         history['analyze_stage_raw_results'] = results_to_calculate
         history['analyze_stage_target_stages'] = target_stages
         
@@ -87,17 +94,19 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                     
         if len(results_to_calculate) > 0:
 
-            if self.timeout:
+            if self.timeout and self.skip_stage is False:
                 await asyncio.wait_for(self.source.run(), timeout=self.timeout)
 
-            else:
+            elif self.skip_stage is False:
                 await self.source.run()
         
         for provided in self.provides:
+            history[provided] = self.source.context[provided]
+
             self.history[(
                 self.from_stage_name, 
                 self.source.name
-            )][provided] = self.source.context[provided]
+            )] = history
 
         self.destination.state = StageStates.ANALYZED
 
@@ -140,19 +149,28 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                 key: value for key, value  in history.items() if key in self.provides
             })
 
-        history = self.history[(self.from_stage_name, self.source.name)]
-
+        
         if self.next_history.get((self.source.name, destination.name)) is None:
             self.next_history[(self.source.name, destination.name)] = {}
 
-        self.next_history.update({
-            (self.source.name, destination.name): {
-                'analyze_stage_summary_metrics': history.get(
-                    'analyze_stage_summary_metrics', 
-                    {}
-                )
-            }
-        })
+        if self.skip_stage:
+            self.next_history.update({
+                (self.source.name, destination.name): {
+                    'analyze_stage_summary_metrics': {}
+                }
+            })
+
+        else:
+            history = self.history[(self.from_stage_name, self.source.name)]
+
+            self.next_history.update({
+                (self.source.name, destination.name): {
+                    'analyze_stage_summary_metrics': history.get(
+                        'analyze_stage_summary_metrics', 
+                        {}
+                    )
+                }
+            })
 
     def split(self, edges: List[AnalyzeEdge]) -> None:
         submit_candidates = self.generate_submit_candidates()
@@ -167,7 +185,7 @@ class AnalyzeEdge(BaseEdge[Analyze]):
 
         submit_stage_copy.dispatcher = self.source.dispatcher.copy()
 
-        edge_candidates = self._generate_edge_analyze_candidates(edges)
+        edge_candidates = self._generate_edge_submit_candidates(edges)
 
         destination_path = self.all_paths.get(self.destination.name)
 
@@ -199,7 +217,7 @@ class AnalyzeEdge(BaseEdge[Analyze]):
           
         self.source = submit_stage_copy
 
-    def _generate_edge_analyze_candidates(self, edges: List[AnalyzeEdge]):
+    def _generate_edge_submit_candidates(self, edges: List[AnalyzeEdge]):
 
         candidates = []
 

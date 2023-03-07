@@ -1,10 +1,9 @@
 import dill
 import time
 import statistics
-import asyncio
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from typing import Union, List, Dict, Union, Any, Tuple
+from typing import Union, List, Dict, Any, Tuple
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.processed_result import ProcessedResultsGroup
 from hedra.reporting.metric import MetricsSet

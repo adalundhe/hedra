@@ -1,12 +1,15 @@
 import json
+import asyncio
 import threading
 import os
 import time
 import signal
 import dill
 import pickle
+import traceback
+from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
-from typing import Dict, Any, List, Union, Tuple
+from typing import Dict, Any, List, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.registry import RequestTypes
@@ -165,12 +168,14 @@ async def start_execution(
             context_key: context_value for context_key, context_value in serializable_context
         })   
 
-    return {
+    results_dict =  {
         'results': results,
         'total_results': len(results),
         'total_elapsed': persona.total_elapsed,
         'context': context
     }
+
+    return results_dict
 
 
 def execute_actions(parallel_config: str):
@@ -320,7 +325,6 @@ def execute_actions(parallel_config: str):
         return result
 
     except BrokenPipeError:
-        
         try:
             loop.close()
         except RuntimeError:

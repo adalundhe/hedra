@@ -42,10 +42,10 @@ class TeardownEdge(BaseEdge[Teardown]):
 
         await self.source.context.update(history)
 
-        if self.timeout:
+        if self.timeout and self.skip_stage is False:
             await asyncio.wait_for(self.timeout.run(), timeout=self.timeout)
 
-        else:
+        elif self.skip_stage is False:
             await self.source.run()
 
         for provided in self.provides:

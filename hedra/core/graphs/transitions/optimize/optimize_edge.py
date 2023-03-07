@@ -7,7 +7,6 @@ from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.optimize.optimize import Optimize
 from hedra.core.graphs.stages.execute.execute import Execute
-from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 
@@ -59,10 +58,10 @@ class OptimizeEdge(BaseEdge[Optimize]):
         if len(selected_optimization_candidates) > 0:
             self.source.generation_optimization_candidates = len(selected_optimization_candidates)
 
-            if self.timeout:
+            if self.timeout and self.skip_stage is False:
                 await asyncio.wait_for(self.source.run(), timeout=self.timeout)
 
-            else:
+            elif self.skip_stage is False:
                 await self.source.run()
 
         for provided in self.provides:
@@ -104,16 +103,31 @@ class OptimizeEdge(BaseEdge[Optimize]):
                 key: value for key, value  in history.items() if key in self.provides
             })
 
-        history = self.history[(self.from_stage_name, self.source.name)]
 
-        optimized_config: Stage = history['optimize_stage_optimized_configs'].get(destination.name)
-        optimzied_hooks: Stage = history['optimize_stage_optimized_hooks'].get(destination.name)
-        stage_setup_by: str = history['execute_stage_setup_by'].get(destination.name)
 
         if self.next_history.get((self.source.name, destination.name)) is None:
             self.next_history[(self.source.name, destination.name)] = {}
 
-        if optimized_config and optimzied_hooks and stage_setup_by:
+        if self.skip_stage:
+
+            history = self.history[(self.from_stage_name, self.source.name)]
+            stage_setup_by: str = history['execute_stage_setup_by'].get(destination.name)
+
+            self.next_history[(self.source.name, destination.name)].update({
+                'optimize_stage_optimized_params': {},
+                'setup_stage_candidates': [],
+                'setup_stage_ready_stages': history['setup_stage_ready_stages'],
+                'execute_stage_setup_config': None,
+                'execute_stage_setup_hooks': None,
+                'execute_stage_setup_by': stage_setup_by 
+            })
+
+        else:
+            history = self.history[(self.from_stage_name, self.source.name)]
+
+            optimized_config: Stage = history['optimize_stage_optimized_configs'].get(destination.name)
+            optimzied_hooks: Stage = history['optimize_stage_optimized_hooks'].get(destination.name)
+            stage_setup_by: str = history['execute_stage_setup_by'].get(destination.name)
 
             self.next_history[(self.source.name, destination.name)].update({
                 'optimize_stage_optimized_params': history['optimize_stage_optimized_params'],
@@ -123,6 +137,8 @@ class OptimizeEdge(BaseEdge[Optimize]):
                 'execute_stage_setup_hooks': optimzied_hooks,
                 'execute_stage_setup_by': stage_setup_by 
             })
+
+            
 
     def split(self, edges: List[OptimizeEdge]) -> None:
         optimze_candidates = self.generate_optimization_candidates()

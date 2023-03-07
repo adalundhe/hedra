@@ -21,6 +21,7 @@ class BaseEdge(Generic[T]):
         self.next_history = {}
         self.visited = []
         self.valid_states = []
+        self.descendants = []
         self.all_paths: Dict[str, List[str]] = {}
         self.source = source
         self.destination = destination
@@ -32,6 +33,8 @@ class BaseEdge(Generic[T]):
 
         for stage_type in StageTypes:
             self.stages_by_type[stage_type] = {}
+
+        self.skip_stage = self.source.skip
 
     def __getitem__(self, key: str):
         return self.history.get(key)

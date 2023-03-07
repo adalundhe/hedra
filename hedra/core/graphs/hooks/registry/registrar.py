@@ -2,7 +2,7 @@ import inspect
 import functools
 from collections import defaultdict
 from types import FunctionType
-from typing import Any, Dict
+from typing import Any, Dict, List
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.validation_types.action import ActionValidator
@@ -43,7 +43,7 @@ from .registry_types import (
 
 
 class Registrar:
-    all: Dict[str, Hook] = {}
+    all: Dict[str, List[Hook]] = {}
     reserved: Dict[str, Dict[str, Hook]] = defaultdict(dict)
     module_paths: Dict[str, str] = {}
 

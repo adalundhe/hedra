@@ -1,7 +1,6 @@
 from __future__ import annotations
 import asyncio
 import inspect
-from collections import defaultdict
 from typing import Dict, List, Any
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.events.event_types import EventType
@@ -12,18 +11,6 @@ from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.core.graphs.simple_context import SimpleContext
-from typing import TypeVar
-
-Cls = TypeVar('Cls')
-
-
-def copy_class(cls: Cls) -> Cls:
-    copy_cls = type(f'{cls.__class__.__name__}', cls.__class__.__bases__, dict(cls.__dict__))()
-    for name, attr in cls.__dict__.items():
-        if not name.startswith('__'):
-            setattr(copy_cls, name, attr)
-    return copy_cls
 
 
 class SetupEdge(BaseEdge[Setup]):
@@ -79,9 +66,9 @@ class SetupEdge(BaseEdge[Setup]):
             if event.source.context:
                 event.source.context.update(history)
         
-        if self.timeout:
+        if self.timeout and self.skip_stage is False:
             await asyncio.wait_for(self.source.run(), timeout=self.timeout)
-        else:
+        elif self.skip_stage is False:
             await self.source.run()
 
         for provided in self.provides:
@@ -121,28 +108,39 @@ class SetupEdge(BaseEdge[Setup]):
 
         history = self.history[(self.from_stage_name, self.source.name)]
 
-        ready_stages = history.get('setup_stage_ready_stages', {})
-        setup_candidates = history.get('setup_stage_candidates', {})
-        setup_config = history.get('execute_stage_setup_config')
-        execute_stage_setup_hooks = []
-        setup_execute_stage: Execute = ready_stages.get(self.source.name)
-
-        if setup_execute_stage:
-            execute_stage_setup_hooks = setup_execute_stage.context['execute_stage_setup_hooks']
-
-        self.stages_by_type[StageTypes.EXECUTE].update(ready_stages)
-
         if self.next_history.get((self.source.name, destination.name)) is None:
             self.next_history[(self.source.name, destination.name)] = {}
 
-        self.next_history[(self.source.name, destination.name)].update({
-            'execute_stage_setup_hooks': execute_stage_setup_hooks,
-            'setup_stage_ready_stages': ready_stages,
-            'setup_stage_candidates': list(setup_candidates.keys()),
-            'execute_stage_setup_config': setup_config,
-            'execute_stage_setup_by': self.source.name   
-        })
-        
+        if self.skip_stage:
+            self.next_history[(self.source.name, destination.name)].update({
+                'execute_stage_setup_hooks': [],
+                'setup_stage_ready_stages': {},
+                'setup_stage_candidates': [],
+                'execute_stage_setup_config': None,
+                'execute_stage_setup_by': self.source.name   
+            })
+
+        else:
+
+            ready_stages = history.get('setup_stage_ready_stages', {})
+            setup_candidates = history.get('setup_stage_candidates', {})
+            setup_config = history.get('execute_stage_setup_config')
+            execute_stage_setup_hooks = []
+            setup_execute_stage: Execute = ready_stages.get(self.source.name)
+
+            if setup_execute_stage:
+                execute_stage_setup_hooks = setup_execute_stage.context['execute_stage_setup_hooks']
+
+            self.stages_by_type[StageTypes.EXECUTE].update(ready_stages)
+
+            self.next_history[(self.source.name, destination.name)].update({
+                'execute_stage_setup_hooks': execute_stage_setup_hooks,
+                'setup_stage_ready_stages': ready_stages,
+                'setup_stage_candidates': list(setup_candidates.keys()),
+                'execute_stage_setup_config': setup_config,
+                'execute_stage_setup_by': self.source.name   
+            })
+            
 
     def split(self, edges: List[SetupEdge]) -> None:
         setup_candidates = self.get_setup_candidates()

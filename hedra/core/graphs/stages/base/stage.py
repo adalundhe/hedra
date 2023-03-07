@@ -65,7 +65,7 @@ class Stage:
 
         self.internal_hooks = ['run']
         self.dispatcher = EventDispatcher()
-        self.linked_events = defaultdict(list)
+        self.skip = False
 
     @Internal()
     async def run(self):

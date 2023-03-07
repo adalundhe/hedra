@@ -1,4 +1,6 @@
+from __future__ import annotations
 import asyncio
+from typing import List
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
@@ -36,10 +38,10 @@ class CheckpointEdge(BaseEdge[Checkpoint]):
 
         await self.source.context.update(history)
         
-        if self.timeout:
+        if self.timeout and self.skip_stage is False:
             await asyncio.wait_for(self.source.run(), timeout=self.timeout)
         
-        else:
+        elif self.skip_stage is False:
             await self.source.run()
 
         for provided in self.provides:
@@ -72,11 +74,18 @@ class CheckpointEdge(BaseEdge[Checkpoint]):
         if self.next_history.get((self.source.name, destination.name)) is None:
             self.next_history[(self.source.name, destination.name)] = {}
 
-        self.next_history.update({
-            (self.source.name, destination.name): {}
-        })
+        if self.skip_stage:
+            self.next_history.update({
+                (self.source.name, destination.name): {}
+            })
 
-    def split(self) -> None:
+        else:
+            self.next_history.update({
+                (self.source.name, destination.name): {}
+            })
+
+    def split(self, edges: List[CheckpointEdge]) -> None:
         pass
+
 
 

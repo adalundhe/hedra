@@ -57,8 +57,14 @@ class Transition:
         
         result = await self.edge.transition()
 
+        self.edge.descendants = {
+            descendant: self.edges_by_name.get((
+                self.edge.source.name,
+                descendant
+            )) for descendant in self.descendants
+        }
 
-        if self.to_stage.stage_type is not StageTypes.COMPLETE:
+        if self.to_stage.stage_type is not StageTypes.COMPLETE and self.edge.skip_stage is False:
             source_name = self.edge.source.name
             destination_name = self.edge.destination.name
 
@@ -69,10 +75,10 @@ class Transition:
                 ) for transition in self.adjacency_list[destination_name]
             ]
 
-            source_history: HistoryUpdate = self.edge.next_history[(
+            source_history: HistoryUpdate = self.edge.next_history.get((
                 source_name, 
                 destination_name
-            )]
+            ), {})
 
             for neighbor in neighbors:
                 required_keys = self.edges_by_name[neighbor].requires

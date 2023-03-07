@@ -1,5 +1,6 @@
+from __future__ import annotations
 import asyncio
-from hedra.core.graphs.simple_context import SimpleContext
+from typing import List
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.complete.complete import Complete
@@ -18,12 +19,8 @@ class CompleteEdge(BaseEdge[Complete]):
         )
 
     async def transition(self):
-        
-        if self.timeout:
-            await asyncio.wait_for(self.source.run(), timeout=self.timeout)
-        
-        else:
-            await self.source.run()
+
+        await self.source.run()
 
         self.source.state = StageStates.COMPLETE
 
@@ -36,7 +33,7 @@ class CompleteEdge(BaseEdge[Complete]):
             (self.source.name, destination.name): {}
         })
 
-    def split(self) -> None:
+    def split(self, edges: List[CompleteEdge]) -> None:
         pass
         
 

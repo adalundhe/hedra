@@ -1,18 +1,6 @@
-class ErrorEdge:
-
-    def __init__(self) -> None:
-        self.wants = []
-        self.provides = []
-
-        self.values = {}
-        self.paths = []
-
-    async def connect(self):
-        pass
-
-
+from __future__  import annotations
 import asyncio
-from hedra.core.graphs.simple_context import SimpleContext
+from typing import List
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.error.error import Error
@@ -31,12 +19,8 @@ class ErrorEdge(BaseEdge[Error]):
         )
 
     async def transition(self):
-        
-        if self.timeout:
-            await asyncio.wait_for(self.destination.source.run(), timeout=self.timeout)
-        
-        else:
-            await self.destination.run()
+
+        await self.destination.run()
 
         self.source.state = StageStates.ERRORED
 
@@ -49,5 +33,5 @@ class ErrorEdge(BaseEdge[Error]):
             (self.source.name, destination.name): {}
         })
     
-    def split(self) -> None:
+    def split(self, edges: List[ErrorEdge]) -> None:
         pass

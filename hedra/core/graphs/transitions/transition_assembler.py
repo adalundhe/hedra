@@ -4,7 +4,8 @@ import inspect
 import threading
 import networkx
 import os
-import copy
+import networkx
+import matplotlib.pyplot as plt
 from typing import List, Dict, Union, Any, Tuple, Coroutine
 from collections import defaultdict
 from hedra.core.graphs.events.event_graph import EventGraph

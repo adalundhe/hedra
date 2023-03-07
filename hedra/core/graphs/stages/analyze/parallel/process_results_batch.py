@@ -7,7 +7,7 @@ import json
 import threading
 import os
 import signal 
-import pickle
+from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
 from typing import Any, Dict, List
 from hedra.core.engines.types.common.base_result import BaseResult

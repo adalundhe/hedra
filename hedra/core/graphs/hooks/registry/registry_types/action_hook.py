@@ -47,11 +47,12 @@ class ActionHook(Hook):
             self._call,
             weight=self.metadata.weight,
             order=self.metadata.order,
-            checks=self.checks,
-            notify=self.notifiers,
-            listen=self.listeners
+            metadata={
+                **self.metadata.copy()
+            }
         )
 
+        action_hook.checks = list(self.checks)
         action_hook.stage = self.stage
 
         return action_hook

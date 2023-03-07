@@ -150,10 +150,4 @@ class BatchExecutor:
         return batches
 
     async def shutdown(self):
-        await self.loop.run_in_executor(
-            None, 
-            functools.partial(
-                self.pool.shutdown,
-                wait=True
-            )
-        )
+        self.pool.shutdown()

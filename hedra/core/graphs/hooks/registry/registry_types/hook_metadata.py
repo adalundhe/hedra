@@ -16,3 +16,10 @@ class HookMetadata:
         self.env = env
         self.user = user
         self.tags = tags
+
+    def copy(self):
+        return {
+            'env': self.env,
+            'user': self.user,
+            'tags': list(self.tags)
+        }

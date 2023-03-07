@@ -1,5 +1,6 @@
+from __future__  import annotations
 import asyncio
-from typing import Dict, Any
+from typing import List
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.submit.submit import Submit
@@ -38,10 +39,10 @@ class SubmitEdge(BaseEdge[Submit]):
             if event.source.context:
                 event.source.context.update(history)
 
-        if self.timeout:
+        if self.timeout and self.skip_stage is False:
             await asyncio.wait_for(self.source.run(), timeout=self.timeout)
         
-        else:
+        elif self.skip_stage is False:
             await self.source.run()
         
         for provided in self.provides:
@@ -60,12 +61,25 @@ class SubmitEdge(BaseEdge[Submit]):
         return None, self.destination.stage_type
 
     def _update(self, destination: Stage):
-        history = self.history[(self.from_stage_name, self.source.name)]
-        self.next_history.update({
-            (self.source.name, destination.name): {
-                'analyze_stage_summary_metrics': history['analyze_stage_summary_metrics'] 
-            }
-        })
 
-    def split(self) -> None:
-        pass
+        if self.skip_stage:
+            self.next_history.update({
+                (self.source.name, destination.name): {
+                    'analyze_stage_summary_metrics': {}
+                }
+            })
+
+        else:
+            history = self.history[(self.from_stage_name, self.source.name)]
+            self.next_history.update({
+                (self.source.name, destination.name): {
+                    'analyze_stage_summary_metrics': history['analyze_stage_summary_metrics'] 
+                }
+            })
+
+    def split(self, edges: List[SubmitEdge]) -> None:
+
+        transition_idxs = [edge.transition_idx for edge in edges]
+        
+        if self.transition_idx != min(transition_idxs):
+            self.skip_stage = True

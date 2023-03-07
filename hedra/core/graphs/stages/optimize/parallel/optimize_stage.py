@@ -3,10 +3,9 @@ import dill
 import threading
 import os
 import signal
-import os
 import pickle
 from collections import defaultdict
-from typing import Any, Dict, List, Union, Tuple
+from typing import Any, Dict, List, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.graphs.stages.optimize.optimization import Optimizer
 from hedra.core.graphs.stages.base.stage import Stage

@@ -49,11 +49,12 @@ class TaskHook(Hook):
             self._call,
             weight=self.metadata.weight,
             order=self.metadata.order,
-            checks=self.checks,
-            notify=self.notifiers,
-            listen=self.listeners
+            metadata={
+                **self.metadata.copy()
+            }
         )
 
+        task_hook.checks = list(self.checks)
         task_hook.stage = self.stage
 
         return task_hook

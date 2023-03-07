@@ -135,7 +135,6 @@ class Optimize(Stage):
                     },
                     'source_stage_name': self.name,
                     'source_stage_id': self.stage_id,
-                    'source_stage_target_events': self.linked_events,
                     'execute_stage_name': stage_name,
                     'execute_stage_generation_count': assigned_workers_count,
                     'execute_stage_id': stage.execution_stage_id,
