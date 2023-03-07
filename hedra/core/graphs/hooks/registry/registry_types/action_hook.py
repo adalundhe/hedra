@@ -13,10 +13,7 @@ class ActionHook(Hook):
         *names: Tuple[str, ...],
         weight: int=1, 
         order: int=1, 
-        metadata: Dict[str, Union[str, int]]={}, 
-        checks: List[Coroutine]=[],
-        notify: List[str]=[],
-        listen: List[str]=[]
+        metadata: Dict[str, Union[str, int]]={}
     ) -> None:
         super().__init__(
             name, 
@@ -31,10 +28,11 @@ class ActionHook(Hook):
         self.checks = []
         self.before: List[str] = []
         self.after: List[str] = []
-        self.is_notifier = len(notify) > 0
-        self.is_listener = len(listen) > 0
-        self.notifiers: List[str] = notify
-        self.listeners: List[str] = listen
+        self.is_notifier = False
+        self.is_listener = False
+        self.channels: List[Any] = []
+        self.notifiers: List[Any] = []
+        self.listeners: List[Any] = []
         self.order = order
         self.metadata = HookMetadata(
             weight=weight,
@@ -43,16 +41,21 @@ class ActionHook(Hook):
         )
 
     def copy(self):
-        return ActionHook(
+        action_hook = ActionHook(
             self.name,
             self.shortname,
             self._call,
             weight=self.metadata.weight,
             order=self.metadata.order,
-            checks=self.checks,
-            notify=self.notifiers,
-            listen=self.listeners
+            metadata={
+                **self.metadata.copy()
+            }
         )
+
+        action_hook.checks = list(self.checks)
+        action_hook.stage = self.stage
+
+        return action_hook
 
     async def call(self, *args, **kwargs):
         return await self._call(*args, **kwargs)

@@ -103,12 +103,6 @@ class MercuryTaskRunner(BaseEngine[Task, Union[BaseResult, TaskResult]]):
                     result = await self.execute_after(task, result)
 
                 if task.hooks.notify:
-                    await asyncio.gather(*[
-                        asyncio.create_task(
-                            channel.call(result, task.hooks.listeners)
-                        ) for channel in task.hooks.channels
-                    ])
-
                     for listener in task.hooks.listeners: 
                         if len(listener.hooks.channel_events) > 0:
                             event = listener.hooks.channel_events.pop()

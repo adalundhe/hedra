@@ -2,12 +2,13 @@ import inspect
 import functools
 from collections import defaultdict
 from types import FunctionType
-from typing import Any, Dict
+from typing import Any, Dict, List
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
 from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.hooks.validation_types.action import ActionValidator
 from hedra.core.graphs.hooks.validation_types.after import AfterValidator
 from hedra.core.graphs.hooks.validation_types.before import BeforeValidator
+from hedra.core.graphs.hooks.validation_types.channel import ChannelValidator
 from hedra.core.graphs.hooks.validation_types.check import CheckValidator
 from hedra.core.graphs.hooks.validation_types.condition import ConditionValidator
 from hedra.core.graphs.hooks.validation_types.context import ContextValidator
@@ -42,7 +43,7 @@ from .registry_types import (
 
 
 class Registrar:
-    all: Dict[str, Hook] = {}
+    all: Dict[str, List[Hook]] = {}
     reserved: Dict[str, Dict[str, Hook]] = defaultdict(dict)
     module_paths: Dict[str, str] = {}
 
@@ -71,6 +72,7 @@ class Registrar:
             HookType.ACTION: lambda *args, **kwargs: ActionValidator(*args, **kwargs),
             HookType.AFTER: lambda *args, **kwargs: AfterValidator(*args, **kwargs),
             HookType.BEFORE: lambda *args, **kwargs: BeforeValidator(*args, **kwargs),
+            HookType.CHANNEL: lambda *args, **kwargs: ChannelValidator(*args, **kwargs),
             HookType.CHECK: lambda *args, **kwargs: CheckValidator(*args, **kwargs),
             HookType.CONDITION: lambda *args, **kwargs: ConditionValidator(*args, **kwargs),
             HookType.CONTEXT: lambda *args, **kwargs: ContextValidator(*args, **kwargs),

@@ -24,11 +24,6 @@ class SimpleContext:
         for kwarg_name, kwarg in kwargs.items():
             object.__setattr__(self, kwarg_name, kwarg)
 
-    def __str__(self) -> str:
-        return str({
-            key: value for key, value in self.__dict__.items() if key.startswith('__') is False
-        })
-
     def __iter__(self):
 
         ignore_items = [

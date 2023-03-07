@@ -3,9 +3,9 @@ import dill
 import threading
 import os
 import signal
-import os
+import pickle
 from collections import defaultdict
-from typing import Any, Dict, List, Union, Tuple
+from typing import Any, Dict, List, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.graphs.stages.optimize.optimization import Optimizer
 from hedra.core.graphs.stages.base.stage import Stage
@@ -48,14 +48,14 @@ async def setup_action_channels_and_playwright(
 
     setup_stage.context = SimpleContext()
     setup_stage.generation_setup_candidates = 1
-    setup_stage.context['setup_config'] = persona_config
-    setup_stage.context['setup_stages'] = {
+    setup_stage.context['setup_stage_target_config'] = persona_config
+    setup_stage.context['setup_stage_target_stages'] = {
         execute_stage.name: execute_stage
     }
 
     await setup_stage.run_internal()
     
-    stages: Dict[str, Stage] =  setup_stage.context['ready_stages']
+    stages: Dict[str, Stage] =  setup_stage.context['setup_stage_ready_stages']
     setup_execute_stage: Stage = stages.get(execute_stage.name)
 
     setup_execute_stage_hooks = {}
@@ -64,29 +64,9 @@ async def setup_action_channels_and_playwright(
             hook.name: hook for hook in setup_execute_stage.hooks[hook_type]
         })
 
+    actions_and_tasks: List[Union[ActionHook, TaskHook]] = setup_execute_stage.context['execute_stage_setup_hooks']
 
-    actions = {
-        hook.name: hook for hook in setup_execute_stage.hooks[HookType.ACTION]
-    }
-
-    actions.update({
-        hook.name: hook for hook in setup_execute_stage.hooks[HookType.TASK]
-    })
-
-    actions_and_tasks: List[Union[ActionHook, TaskHook]] = [
-        *setup_execute_stage.hooks.get(HookType.ACTION, []),
-        *setup_execute_stage.hooks.get(HookType.TASK, [])
-    ]
-
-    hooks_by_type = defaultdict(list)
     for hook in actions_and_tasks:
-
-        hooks_by_type[hook.hook_type].append(hook)
-
-        if hook.action.hooks.notify:
-            for idx, listener_name in enumerate(hook.action.hooks.listeners):
-                hook.action.hooks.listeners[idx] = actions.get(listener_name)
-
 
         if hook.action.type == RequestTypes.PLAYWRIGHT and isinstance(hook.session, MercuryPlaywrightClient):
 
@@ -294,16 +274,27 @@ def optimize_stage(serialized_config: str):
         execute_stage_config.batch_interval = results.get('optimized_batch_interval', execute_stage_config.batch_gradient)
         execute_stage_config.batch_gradient = results.get('optimized_batch_gradient', execute_stage_config.batch_gradient)
 
-
         logger.filesystem.sync['hedra.optimize'].info(f'{optimizer.metadata_string} - Optimization complete')
-
 
         context = {}
         for stage in pipeline_stages.values():
             
             stage.context.ignore_serialization_filters = [
-                'execute_hooks'
+                'execute_stage_setup_hooks'
             ]
+
+            for key, value in stage.context.as_serializable():
+                try:
+                    dill.dumps(value)
+                
+                except ValueError:
+                    stage.context.ignore_serialization_filters.append(key)
+                
+                except TypeError:
+                    stage.context.ignore_serialization_filters.append(key)
+
+                except pickle.PicklingError:
+                    stage.context.ignore_serialization_filters.append(key)
 
             serializable_context = stage.context.as_serializable()
             context.update({

@@ -1,12 +1,15 @@
 import json
+import asyncio
 import threading
 import os
 import time
 import signal
 import dill
-import asyncio
+import pickle
+import traceback
+from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
-from typing import Dict, Any, List, Union, Tuple
+from typing import Dict, Any, List, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.registry import RequestTypes
@@ -14,11 +17,9 @@ from hedra.core.engines.types.registry import registered_engines
 from hedra.core.graphs.hooks.registry.registrar import registrar
 from hedra.core.personas import get_persona
 from hedra.core.personas.persona_registry import registered_personas
-from hedra.core.graphs.events.base_event import BaseEvent
 from hedra.core.graphs.events.event_graph import EventGraph
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
-from hedra.core.graphs.hooks.hook_types.hook_type import HookType
 from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.base.import_tools import (
@@ -87,24 +88,12 @@ async def start_execution(
 
     await setup_stage.run_internal()
 
-    stages: Dict[str, Stage] =  setup_stage.context['ready_stages']
+    stages: Dict[str, Stage] =  setup_stage.context['setup_stage_ready_stages']
 
     setup_execute_stage: Stage = stages.get(source_stage_name)
     setup_execute_stage.logger = logger
 
-    actions = {
-        hook.name: hook for hook in setup_execute_stage.hooks[HookType.ACTION]
-    }
-
-    actions.update({
-        hook.name: hook for hook in setup_execute_stage.hooks[HookType.TASK]
-    })
-
-    actions_and_tasks: List[Union[ActionHook, TaskHook]] = [
-        *setup_execute_stage.hooks.get(HookType.ACTION, []),
-        *setup_execute_stage.hooks.get(HookType.TASK, [])
-    ]
-
+    actions_and_tasks: List[Union[ActionHook, TaskHook]] = setup_stage.context['execute_stage_setup_hooks'].get(source_stage_name)
 
     execution_hooks_count = len(actions_and_tasks)
     await logger.filesystem.aio['hedra.core'].info(
@@ -113,11 +102,6 @@ async def start_execution(
 
 
     for hook in actions_and_tasks:
-
-        if hook.action.hooks.notify:
-            for idx, listener_name in enumerate(hook.action.hooks.listeners):
-                hook.action.hooks.listeners[idx] = actions.get(listener_name)
-
 
         if hook.action.type == RequestTypes.PLAYWRIGHT and isinstance(hook.session, MercuryPlaywrightClient):
 
@@ -154,7 +138,6 @@ async def start_execution(
 
     await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Execution complete - Time (including addtional setup) took: {round(elapsed, 2)} seconds')
 
-    
     for result in results:
         result.checks = [
             [
@@ -165,17 +148,34 @@ async def start_execution(
     context = {}
 
     for stage in pipeline_stages.values():
+
+        for key, value in stage.context.as_serializable():    
+            try:
+                dill.dumps(value)
+            
+            except ValueError:
+                stage.context.ignore_serialization_filters.append(key)
+            
+            except TypeError:
+                stage.context.ignore_serialization_filters.append(key)
+
+            except pickle.PicklingError:
+                stage.context.ignore_serialization_filters.append(key)
+
         serializable_context = stage.context.as_serializable()
+
         context.update({
             context_key: context_value for context_key, context_value in serializable_context
         })   
 
-    return {
+    results_dict =  {
         'results': results,
         'total_results': len(results),
         'total_elapsed': persona.total_elapsed,
         'context': context
     }
+
+    return results_dict
 
 
 def execute_actions(parallel_config: str):
@@ -230,7 +230,6 @@ def execute_actions(parallel_config: str):
         discovered: Dict[str, Stage] = import_stages(graph_path)
         plugins_by_type = import_plugins(graph_path)
 
-        
         initialized_stages = {}
         hooks_by_type = defaultdict(dict)
         hooks_by_name = {}
@@ -307,8 +306,8 @@ def execute_actions(parallel_config: str):
         setup_stage.context = SimpleContext()
         setup_stage.config = source_stage_config
         setup_stage.generation_setup_candidates = 1
-        setup_stage.context['setup_config'] = source_stage_config
-        setup_stage.context['setup_stages'] = {
+        setup_stage.context['setup_stage_target_config'] = source_stage_config
+        setup_stage.context['setup_stage_target_stages'] = {
             execute_stage.name: execute_stage
         }
   
@@ -326,7 +325,6 @@ def execute_actions(parallel_config: str):
         return result
 
     except BrokenPipeError:
-        
         try:
             loop.close()
         except RuntimeError:

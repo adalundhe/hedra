@@ -10,10 +10,7 @@ def task(
     *names: Tuple[str, ...],
     weight: int=1, 
     order: int=1, 
-    metadata: Dict[str, Union[str, int]]={}, 
-    checks: List[str]=[],
-    notify: List[str]=[], 
-    listen: List[str]=[]
+    metadata: Dict[str, Union[str, int]]={}
 ):
 
     def wrapper(func) -> Hook:

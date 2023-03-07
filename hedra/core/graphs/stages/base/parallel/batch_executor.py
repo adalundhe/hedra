@@ -2,6 +2,7 @@ import asyncio
 import math
 import multiprocessing
 import psutil
+import functools
 from types import FunctionType
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing.pool import Pool
@@ -147,3 +148,6 @@ class BatchExecutor:
                 ))
 
         return batches
+
+    async def shutdown(self):
+        self.pool.shutdown()

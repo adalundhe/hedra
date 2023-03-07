@@ -105,10 +105,14 @@ class LoadHook(Hook):
         }
 
     def copy(self):
-        return LoadHook(
+        load_hook = LoadHook(
             self.name,
             self.shortname,
             self._call,
             self.load_path,
             order=self.order
         )
+
+        load_hook.stage = self.stage
+
+        return load_hook

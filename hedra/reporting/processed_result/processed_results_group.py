@@ -14,6 +14,10 @@ from .types.task_processed_result import TaskProcessedResult
 from .types.base_processed_result import BaseProcessedResult
 
 
+def default_count():
+    return 0
+
+
 class ProcessedResultsGroup:
 
     __slots__ = (
@@ -44,7 +48,7 @@ class ProcessedResultsGroup:
         self.total = 0
         self.succeeded = 0
         self.failed = 0
-        self.errors = defaultdict(lambda: 0)
+        self.errors = defaultdict(default_count)
 
         self._streaming_mean = defaultdict(Mean)
         self._streaming_variance = defaultdict(Variance)

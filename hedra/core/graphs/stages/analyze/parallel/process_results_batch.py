@@ -7,6 +7,7 @@ import json
 import threading
 import os
 import signal 
+from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
 from typing import Any, Dict, List
 from hedra.core.engines.types.common.base_result import BaseResult
@@ -101,7 +102,7 @@ async def process_batch(
 
         await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Results aggregation complete - Took: {round(elapsed, 2)} seconds')
 
-        return dill.dumps(events)
+        return events
 
 
 def process_results_batch(config: Dict[str, Any]):
@@ -190,7 +191,7 @@ def process_results_batch(config: Dict[str, Any]):
         )
 
         context = {}
-        for stage in pipeline_stage.values():
+        for stage in pipeline_stage.values():                
             serializable_context = stage.context.as_serializable()
             context.update({
                 context_key: context_value for context_key, context_value in serializable_context

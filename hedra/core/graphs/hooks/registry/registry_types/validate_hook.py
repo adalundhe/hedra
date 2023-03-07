@@ -37,9 +37,13 @@ class ValidateHook(Hook):
         }
 
     def copy(self):
-        return ValidateHook(
+        validate_hook = ValidateHook(
             self.name,
             self.shortname,
             self._call,
             *self.names
         )
+
+        validate_hook.stage = self.stage
+
+        return validate_hook

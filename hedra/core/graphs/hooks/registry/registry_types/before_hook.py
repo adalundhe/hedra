@@ -39,9 +39,13 @@ class BeforeHook(Hook):
         }
 
     def copy(self):
-        return BeforeHook(
+        before_hook = BeforeHook(
             self.name,
             self.shortname,
             self._call,
             *self.names
         )
+
+        before_hook.stage = self.stage
+
+        return before_hook

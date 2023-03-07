@@ -108,10 +108,14 @@ class SaveHook(Hook):
         return kwargs    
 
     def copy(self):
-        return SaveHook(
+        save_hook = SaveHook(
             self.name,
             self.shortname,
             self._call,
             self.save_path,
             order=self.order
         )
+
+        save_hook.stage = self.stage
+
+        return save_hook

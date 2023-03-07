@@ -43,7 +43,7 @@ class EventHook(Hook):
         }
 
     def copy(self):
-        return EventHook(
+        event_hook = EventHook(
             self.name,
             self.shortname,
             self._call,
@@ -52,3 +52,7 @@ class EventHook(Hook):
             key=self.key,
             order=self.order
         )
+
+        event_hook.stage = self.stage
+
+        return event_hook

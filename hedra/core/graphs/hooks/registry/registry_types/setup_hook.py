@@ -46,7 +46,7 @@ class SetupHook(Hook):
         }
 
     def copy(self):
-        return SetupHook(
+        setup_hook = SetupHook(
             self.name,
             self.shortname,
             self._call,
@@ -59,3 +59,7 @@ class SetupHook(Hook):
                 'tags': self.metadata.tags
             }
         )
+
+        setup_hook.stage = self.stage
+        
+        return setup_hook

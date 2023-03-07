@@ -1,10 +1,9 @@
 import dill
 import time
 import statistics
-import asyncio
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from typing import Union, List, Dict, Union, Any, Tuple
+from typing import Union, List, Dict, Any, Tuple
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.processed_result import ProcessedResultsGroup
 from hedra.reporting.metric import MetricsSet
@@ -81,15 +80,34 @@ class Analyze(Stage):
         self.analysis_execution_time_start = 0
         self._executor = ThreadPoolExecutor(max_workers=1)
 
+        self.source_internal_events = [
+            'initialize_raw_results'
+        ]
+
+        self.internal_events = [
+            'initialize_results_analysis',
+            'partition_results_batches',
+            'get_custom_metric_hooks',
+            'create_stage_batches',
+            'assign_stage_batches',
+            'analyze_stage_batches',
+            'reduce_stage_contexts',
+            'merge_events_groups',
+            'calculate_custom_metrics',
+            'generate_metrics_sets',
+            'generate_summary',
+            'complete'
+        ]
+
     @Internal()
     async def run(self):  
         await self.setup_events()
-        await self.dispatcher.dispatch_events()
+        await self.dispatcher.dispatch_events(self.name)
 
     @context()
-    async def initialize_raw_results(
+    async def initialize_results_analysis(
         self,
-        raw_results: RawResultsSet={}
+        analyze_stage_raw_results: RawResultsSet={}
     ):
         await self.logger.filesystem.aio.create_logfile('hedra.reporting.log')
         self.logger.filesystem.create_filelogger('hedra.reporting.log')
@@ -104,31 +122,31 @@ class Analyze(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Generated custom Event - {plugin.event.type} - for Reporter plugin - {plugin_name}')
 
-        all_results = list(raw_results.items())
+        all_results = list(analyze_stage_raw_results.items())
 
         self.context.ignore_serialization_filters = [
-            'all_results',
-            'raw_results',
-            'target_stages'
+            'analyze_stage_all_results',
+            'analyze_stage_raw_results',
+            'analyze_stage_target_stages'
         ]
         
         return {
-            'raw_results': raw_results,
-            'all_results': all_results
+            'analyze_stage_raw_results': analyze_stage_raw_results,
+            'analyze_stage_all_results': all_results
         }
 
-    @event('initialize_raw_results')
+    @event('initialize_results_analysis')
     async def partition_results_batches(
         self,
-        raw_results: RawResultsSet={},
-        all_results: List[RawResultsPairs]=[]
+        analyze_stage_raw_results: RawResultsSet={},
+        analyze_stage_all_results: List[RawResultsPairs]=[]
     ):
-        batches = self.executor.partion_stage_batches(all_results)
+        batches = self.executor.partion_stage_batches(analyze_stage_all_results)
         total_group_results = 0
 
         elapsed_times = []
         for stage_name, _, _ in batches:
-            stage_results: ResultsSet = raw_results.get(stage_name)
+            stage_results: ResultsSet = analyze_stage_raw_results.get(stage_name)
             total_group_results += stage_results.total_results
             elapsed_times.append(
                 stage_results.total_elapsed
@@ -137,9 +155,9 @@ class Analyze(Stage):
         await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Paritioned {len(batches)} batches of results')
 
         return {
-            'batches': batches,
-            'total_group_results': total_group_results,
-            'elapsed_times': elapsed_times
+            'analyze_stage_batches': batches,
+            'analyze_stage_total_group_results': total_group_results,
+            'analyze_stage_elapsed_times': elapsed_times
         }
     
     @event('partition_results_batches')
@@ -151,25 +169,25 @@ class Analyze(Stage):
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Loaded custom Metric hook - {metric_hook_name}')
 
         return {
-            'metric_hook_names': metric_hook_names,
-            'custom_metric_hooks':  self.hooks[HookType.METRIC]
+            'analyze_stage_metric_hook_names': metric_hook_names,
+            'analyze_stage_custom_metric_hooks':  self.hooks[HookType.METRIC]
         }
 
     @event('get_custom_metric_hooks')
     async def create_stage_batches(
         self,
-        raw_results: RawResultsSet=[],
-        batches: List[Tuple[str, Any, int]]=[],
+        analyze_stage_raw_results: RawResultsSet=[],
+        analyze_stage_batches: List[Tuple[str, Any, int]]=[],
     ):
 
         stage_total_times = {}
         stage_batch_sizes = {}
 
-        for stage_name, _, assigned_workers_count in batches:
+        for stage_name, _, assigned_workers_count in analyze_stage_batches:
             
             stage_batches: List[List[Any]] = []
 
-            stage_results = raw_results.get(stage_name)
+            stage_results = analyze_stage_raw_results.get(stage_name)
             results = stage_results.results
             stage_total_time = stage_results.total_elapsed
             
@@ -195,23 +213,23 @@ class Analyze(Stage):
             stage_batch_sizes[stage_name] = stage_batches
 
         return {
-            'target_stages': {},
-            'stage_total_times': stage_total_times,
-            'stage_batch_sizes': stage_batch_sizes
+            'analyze_stage_target_stages': {},
+            'analyze_stage_total_times': stage_total_times,
+            'analyze_stage_batch_sizes': stage_batch_sizes
         }
 
     @context('create_stage_batches')
     async def assign_stage_batches(
         self,
-        batches: List[Tuple[str, Any, int]]=[],
-        stage_batch_sizes: Dict[str, List[List[Any]]]=[],
-        metric_hook_names: List[str]=[]
+        analyze_stage_batches: List[Tuple[str, Any, int]]=[],
+        analyze_stage_batch_sizes: Dict[str, List[List[Any]]]=[],
+        analyze_stage_metric_hook_names: List[str]=[]
     ):
 
         stage_configs = []
         serializable_context = self.context.as_serializable()
 
-        for stage_name, _, assigned_workers_count in batches:
+        for stage_name, _, assigned_workers_count in analyze_stage_batches:
 
             stage_configs.append((
                 stage_name,
@@ -227,9 +245,9 @@ class Analyze(Stage):
                         },
                         'source_stage_id': self.stage_id,
                         'analyze_stage_name': stage_name,
-                        'analyze_stage_metric_hooks': list(metric_hook_names),
+                        'analyze_stage_metric_hooks': list(analyze_stage_metric_hook_names),
                         'analyze_stage_batched_results': batch
-                    } for batch in stage_batch_sizes[stage_name]
+                    } for batch in analyze_stage_batch_sizes[stage_name]
                 ]
             ))
             
@@ -239,55 +257,55 @@ class Analyze(Stage):
         stages_count = len(stage_configs)
 
         return {
-            'stage_configs': stage_configs,
-            'stages_count': stages_count
+            'analyze_stage_configs': stage_configs,
+            'analyze_stage_stages_count': stages_count
         }
 
     @event('assign_stage_batches')
-    async def analyze_stage_batches(
+    async def execute_batched_analysis(
         self,
-        stages_count: int=0,
-        elapsed_times: List[float]=[],
-        total_group_results: int=0,
-        stage_configs: List[Tuple[str, Any, int]]=[],
+        analyze_stage_stages_count: int=0,
+        analyze_stage_elapsed_times: List[float]=[],
+        analyze_stage_total_group_results: int=0,
+        analyze_stage_configs: List[Tuple[str, Any, int]]=[],
     ):
 
         await self.logger.spinner.append_message(
-            f'Calculating results for - {stages_count} - stages'
+            f'Calculating results for - {analyze_stage_stages_count} - stages'
         )
 
-        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Processing results or - {stages_count} - stages')
+        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Processing results or - {analyze_stage_stages_count} - stages')
         
-        median_execution_time = round(statistics.median(elapsed_times))
-        await self.logger.spinner.append_message(f'Calculating stats for - {total_group_results} - actions executed over a median stage execution time of {median_execution_time} seconds')
+        median_execution_time = round(statistics.median(analyze_stage_elapsed_times))
+        await self.logger.spinner.append_message(f'Calculating stats for - {analyze_stage_total_group_results} - actions executed over a median stage execution time of {median_execution_time} seconds')
 
-        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Calculating stats for - {total_group_results} - actions over a median stage execution time of {median_execution_time} seconds')
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Calculating stats for - {analyze_stage_total_group_results} - actions over a median stage execution time of {median_execution_time} seconds')
 
-        stage_batches = await self.executor.execute_batches(
-            stage_configs,
+        stage_batch_results = await self.executor.execute_batches(
+            analyze_stage_configs,
             process_results_batch
         )
 
-        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Completed parital results aggregation for - {stages_count} - stages')
+        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Completed parital results aggregation for - {analyze_stage_stages_count} - stages')
 
         return {
-            'stage_batches': stage_batches
+            'analyze_stage_batch_results': stage_batch_results
         }
 
-    @event('analyze_stage_batches')
+    @event('execute_batched_analysis')
     async def reduce_stage_contexts(
         self,
-        stages_count: int=0,
-        stage_batches: List[Tuple[str, List[Any]]]=[]
+        analyze_stage_stages_count: int=0,
+        analyze_stage_batch_results: List[Tuple[str, List[Any]]]=[]
     ):
 
-        self.logger.spinner.set_message_at(2, f'Converting aggregate results to metrics for - {stages_count} - stages.')
+        self.logger.spinner.set_message_at(2, f'Converting aggregate results to metrics for - {analyze_stage_stages_count} - stages.')
 
-        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Starting stage results aggregation for {stages_count} stages')
+        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Starting stage results aggregation for {analyze_stage_stages_count} stages')
         
         stage_contexts = defaultdict(list)
 
-        for _, stage_results in stage_batches:
+        for _, stage_results in analyze_stage_batch_results:
 
             for group in stage_results:
                 pipeline_context = group.get('context', {})
@@ -295,22 +313,22 @@ class Analyze(Stage):
                     stage_contexts[context_key].append(context_value)
 
         return {
-            'stage_contexts': stage_contexts
+            'analyze_stage_contexts': stage_contexts
         }
         
     @event('reduce_stage_contexts')
     async def merge_events_groups(
         self,
-        stage_batches: List[Tuple[str, List[Any]]]=[]
+        analyze_stage_batch_results: List[Tuple[str, List[Any]]]=[]
     ):
 
         stage_events_set = {}
 
-        for stage_name, stage_results in stage_batches:
+        for stage_name, stage_results in analyze_stage_batch_results:
 
 
             batch_results: List[Dict[str, Union[dict, ProcessedResultsGroup]]] = [
-                dill.loads(group.get('events')) for group in stage_results
+                group.get('events') for group in stage_results
             ]
 
             stage_events =  defaultdict(ProcessedResultsGroup)
@@ -322,30 +340,30 @@ class Analyze(Stage):
             stage_events_set[stage_name] = stage_events
 
         return {
-            'stage_events_set': stage_events_set
+            'analyze_stage_events_set': stage_events_set
         }
 
     @event('merge_events_groups')
     async def calculate_custom_metrics(
         self,
-        raw_results: RawResultsSet=[],
-        stage_events_set: EventsSet={},
-        custom_metric_hooks: List[str]=[]
+        analyze_stage_raw_results: RawResultsSet=[],
+        analyze_stage_events_set: EventsSet={},
+        analyze_stage_custom_metric_hooks: List[str]=[]
     ):
 
 
         custom_metrics_set = {}
 
-        for stage_name, stage_events in stage_events_set.items():    
+        for stage_name, stage_events in analyze_stage_events_set.items():    
 
             stage_custom_metrics = {}
 
             for event_group_name in stage_events.keys():  
 
                 custom_metrics = defaultdict(dict)
-                for custom_metric in custom_metric_hooks:
+                for custom_metric in analyze_stage_custom_metric_hooks:
                     custom_metrics[custom_metric.group][custom_metric.shortname] = await custom_metric.call(
-                        raw_results.get(
+                        analyze_stage_raw_results.get(
                             stage_name
                         ).get('results')
                     )
@@ -356,26 +374,26 @@ class Analyze(Stage):
             custom_metrics_set[stage_name] = stage_custom_metrics
 
         return {
-            'custom_metrics_set': custom_metrics_set
+            'analyze_stage_custom_metrics_set': custom_metrics_set
         }
 
     @event('calculate_custom_metrics')
     async def generate_metrics_sets(
         self,
-        custom_metrics_set: CustoMetricsSet={},
-        stage_events_set: EventsSet={},
-        stage_total_times: Dict[str, float]={},
+        analyze_stage_custom_metrics_set: CustoMetricsSet={},
+        analyze_stage_events_set: EventsSet={},
+        analyze_stage_total_times: Dict[str, float]={},
     ):
 
         processed_results = []
         
-        for stage_name, stage_events in stage_events_set.items():    
+        for stage_name, stage_events in analyze_stage_events_set.items():    
 
             grouped_stats = {}
 
             stage_total = 0
-            stage_total_time = stage_total_times.get(stage_name)
-            stage_custom_metrics = custom_metrics_set.get(stage_name)
+            stage_total_time = analyze_stage_total_times.get(stage_name)
+            stage_custom_metrics = analyze_stage_custom_metrics_set.get(stage_name)
 
             for event_group_name, events_group in stage_events.items():  
 
@@ -426,26 +444,26 @@ class Analyze(Stage):
             })
 
         return {
-            'processed_results': processed_results
+            'analyze_stage_processed_results': processed_results
         }
 
     @context('generate_metrics_sets')
     async def generate_summary(
         self,
-        stages_count: int=0,
-        total_group_results: int=0,
-        processed_results: ProcessedResultsSet={},
-        stage_contexts: Dict[str, Any]={}
+        analyze_stage_stages_count: int=0,
+        analyze_stage_total_group_results: int=0,
+        analyze_stage_processed_results: ProcessedResultsSet={},
+        analyze_stage_contexts: Dict[str, Any]={}
     ):
 
-        self.context[self.name] = stage_contexts
+        self.context[self.name] = analyze_stage_contexts
         
         summaries = {
             'session_total': 0,
             'stages': {}
         }
 
-        for result in processed_results:
+        for result in analyze_stage_processed_results:
             summaries['stages'].update(result.get('stage_metrics'))
             summaries['session_total'] += result.get('stage_total')
 
@@ -453,9 +471,14 @@ class Analyze(Stage):
             time.monotonic() - self.analysis_execution_time_start
         )
 
-        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed results analysis for - {stages_count} - stages in - {self.analysis_execution_time} seconds')
-        await self.logger.spinner.set_default_message(f'Completed results analysis for {total_group_results} actions and {stages_count} stages over {self.analysis_execution_time} seconds')
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed results analysis for - {analyze_stage_stages_count} - stages in - {self.analysis_execution_time} seconds')
+        await self.logger.spinner.set_default_message(f'Completed results analysis for {analyze_stage_total_group_results} actions and {analyze_stage_stages_count} stages over {self.analysis_execution_time} seconds')
 
         return {
-            'summary_metrics': summaries
+            'analyze_stage_summary_metrics': summaries
         }
+
+    @event('generate_summary')
+    async def complete(self):
+        await self.executor.shutdown()
+        return {}

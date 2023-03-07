@@ -1,13 +1,14 @@
+import uvloop
+uvloop.install()
 import asyncio
 import os
 import inspect
 import json
-import uvloop
-uvloop.install()
 import sys
 import importlib
 import ntpath
 from pathlib import Path
+from typing import List
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs import Graph
 from hedra.logging import (
@@ -23,6 +24,7 @@ import os
 def run_graph(
     path: str, 
     cpus: int, 
+    skip: str,
     log_level: str, 
     logfiles_directory: str,
     bypass_connection_validation: bool,
@@ -107,6 +109,8 @@ def run_graph(
     if hedra_graphs.get(graph_name) is None:
         hedra_graphs[graph_name] = module.__file__
 
+    graph_skipped_stages = skip.split(',')
+
 
     hedra_config['logging'] = {
         'logfiles_directory': logfiles_directory,
@@ -128,16 +132,35 @@ def run_graph(
         config={
             **hedra_core_config,
             'graph_path': path,
-            'graph_module': module.__name__
+            'graph_module': module.__name__,
+            'graph_skipped_stages': graph_skipped_stages
         },
         cpus=cpus
     )
 
     def handle_loop_stop(signame):
         try:
-            loop.close()
 
-        except BrokenPipeError:
+            loop.stop()
+            executors_shutdown: List[asyncio.Future] = []
+            for transition_group in graph._transitions:
+                for transition in transition_group:
+                    if transition.edge.source.executor:
+                        executors_shutdown.append(
+                            asyncio.ensure_future(
+                                transition.edge.source.executor.shutdown()
+                            )
+                        )
+
+            for executor_shutdown in executors_shutdown:
+                if not executor_shutdown.done():
+                    executor_shutdown.set_result(None)
+
+                executor_shutdown.result()
+
+            loop.close()
+        except BrokenPipeError:   
+            logger.console.sync.critical('\n\nAborted.\n')    
             os._exit(1)
 
         except RuntimeError:

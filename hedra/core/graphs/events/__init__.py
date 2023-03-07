@@ -8,9 +8,11 @@ from hedra.core.graphs.hooks.registry.registry_types import (
     ContextHook,
     SaveHook,
     LoadHook,
-    CheckHook
+    CheckHook,
+    ChannelHook
 )
 from .action_event import ActionEvent
+from .channel_event import ChannelEvent
 from .check_event import CheckEvent
 from .condition_event import ConditionEvent
 from .context_event import ContextEvent
@@ -30,6 +32,7 @@ HedraEvent = Union[Event, TransformEvent, ConditionEvent, ContextEvent, SaveEven
 def get_event(target: Hook, source: T) -> HedraEvent:
     event_types: Dict[HookType, HedraEvent] = {
         HookType.ACTION: ActionEvent,
+        HookType.CHANNEL: ChannelEvent,
         HookType.CHECK: CheckEvent,
         HookType.CONDITION: ConditionEvent,
         HookType.CONTEXT: ContextEvent,

@@ -38,10 +38,14 @@ class CheckHook(Hook):
         }
 
     def copy(self):
-        return CheckHook(
+        check_hook = CheckHook(
             self.name,
             self.shortname,
             self._call,
             *self.names,
             oreder=self.order
         )
+
+        check_hook.stage = self.stage
+
+        return check_hook

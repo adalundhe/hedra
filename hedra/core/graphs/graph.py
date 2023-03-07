@@ -5,11 +5,10 @@ import networkx
 import threading
 import os
 import time
-from yaspin.spinners import Spinners
 from typing import Dict, List, Any
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.core.graphs.transitions.transition import Transition
+from hedra.core.graphs.transitions.transition_group import TransitionGroup
 from hedra.logging import HedraLogger
 from .transitions import TransitionAssembler, local_transitions
 from .status import GraphStatus
@@ -33,6 +32,7 @@ class Graph:
         self.graph_name = graph_name
         self.graph_path = config.get('graph_path')
         self.graph_id = str(uuid.uuid4())
+        self.graph_skipped_stages = config.get('graph_skipped_stages', [])
         self.status = GraphStatus.INITIALIZING
         self.graph = networkx.DiGraph()
         self.logger = HedraLogger()
@@ -46,7 +46,7 @@ class Graph:
         self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Changed status to - {GraphStatus.INITIALIZING.name} - {GraphStatus.IDLE.name}')
 
         self.transitions_graph = []
-        self._transitions: List[List[Transition]] = []
+        self._transitions: List[TransitionGroup] = []
         self._results = None
 
         self.logger.hedra.sync.debug(f'{self.metadata_string} - Found - {len(stages)} - stages')
@@ -92,6 +92,7 @@ class Graph:
             graph_name=self.graph_name,
             graph_path=self.graph_path,
             graph_id=self.graph_id,
+            graph_skipped_stages=self.graph_skipped_stages,
             cpus=cpus,
             worker_id=worker_id,
             core_config=self.core_config
@@ -168,6 +169,8 @@ class Graph:
 
         for transition_group in self._transitions:
 
+            transition_group.sort_and_map_transitions()
+
             current_stages = ', '.join(
                 list(set([transition.from_stage.name for transition in transition_group]))
             )
@@ -177,24 +180,13 @@ class Graph:
                 await self.logger.spinner.append_message(f"Executing stages - {current_stages}")
                 
                 for transition in transition_group:
-
                     await status_spinner.system.debug(f'{self.metadata_string} - Executing stage Transtition - {transition.transition_id} -  from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
                     await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing stage Transition - {transition.transition_id} - from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
                     await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing stage - {transition.from_stage.name}:{transition.from_stage.stage_id}')
 
                 results = await asyncio.gather(*[
-                    asyncio.create_task(transition.transition(
-                        transition.from_stage, 
-                        transition.to_stage
-                    )) for transition in transition_group
+                    asyncio.create_task(transition.execute()) for transition in transition_group
                 ])
-
-                for transition in transition_group:
-                    await status_spinner.system.debug(f'{self.metadata_string} - Completed stage Transtition - {transition.transition_id} -  from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
-
-                completed_transitions_count = len(results)
-                await status_spinner.system.debug(f'{self.metadata_string} - Completed -  {completed_transitions_count} - transitions')
-                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Completed -  {completed_transitions_count} - transitions')
 
                 for error, next_stage in results:
                     
@@ -214,6 +206,14 @@ class Graph:
                             error_transtiton.from_stage,
                             error_transtiton.to_stage
                         ) 
+                
+                for transition in transition_group:
+                    await status_spinner.system.debug(f'{self.metadata_string} - Completed stage Transtition - {transition.transition_id} -  from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
+
+
+                completed_transitions_count = len(results)
+                await status_spinner.system.debug(f'{self.metadata_string} - Completed -  {completed_transitions_count} - transitions')
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Completed -  {completed_transitions_count} - transitions')
                     
                 if self.status == GraphStatus.FAILED:
                     status_spinner.finalize()
@@ -223,6 +223,8 @@ class Graph:
                 status_spinner.group_finalize()
 
                 await status_spinner.ok('✔')
+
+                results = None
             
         if self.status == GraphStatus.RUNNING:
             await self.logger.spinner.system.debug(f'{self.metadata_string} - Changed status to - {GraphStatus.COMPLETE.name} - from - {GraphStatus.RUNNING.name}')
@@ -232,7 +234,17 @@ class Graph:
 
         self.execution_time = execution_start - time.monotonic()
 
-        return self._results
+        for transition_group in self._transitions:
+            for transition in transition_group:
+                transition.edge.source.context = None
+                transition.edge.destination.context = None
+                transition.edge.history = None
+            
+            transition_group.destination_groups = None
+            transition_group.transitions = None
+            transition_group.transitions_by_type = None
+            transition_group.edges_by_name = None
+            transition_group.adjacency_list = None
 
     async def check(self, graph_path: str):
         

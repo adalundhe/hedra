@@ -1,24 +1,27 @@
+from __future__ import annotations
 import asyncio
-from itertools import chain
 from collections import OrderedDict, defaultdict
-from typing import List, Union, Dict, Any, Tuple
+from typing import List, Union, Dict, Any, Tuple, Union
 from hedra.core.graphs.hooks.registry.registry_types import (
     ActionHook,
     TaskHook,
-    EventHook,
-    TransformHook,
-    ContextHook,
-    ConditionHook
+    ChannelHook,
+    ConditionHook,
+    ContextHook
 )
+from hedra.core.graphs.simple_context import SimpleContext
+from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from .action_event import ActionEvent
+from .task_event import TaskEvent
+from .channel_event import ChannelEvent
 from .base_event import BaseEvent
 from .event_types import EventType
-
 
 
 class EventDispatcher:
 
     def __init__(self, timeout: Union[int, float]=None) -> None:
-        self.events: OrderedDict[EventType, List[BaseEvent]]= OrderedDict()
+        self.events: OrderedDict[EventType, List[BaseEvent[Hook]]]= OrderedDict()
         self.priority_map = {
             EventType.CONTEXT: 0,
             EventType.LOAD: 1,
@@ -29,6 +32,7 @@ class EventDispatcher:
             EventType.ACTION: 4,
             EventType.TASK: 4,
             EventType.CHECK: 5,
+            EventType.CHANNEL: 5
         }
 
         event_orderings = list(sorted(
@@ -39,10 +43,11 @@ class EventDispatcher:
         for event_type_name, _ in event_orderings:
             self.events[event_type_name] = []
             
-        self.events_by_name: Dict[str, BaseEvent] = {}
+        self.events_by_name: Dict[str, BaseEvent[Hook]] = {}
         self.timeout = timeout
-        self.initial_events: List[BaseEvent] = []
-        self.actions_and_tasks: Dict[str, BaseEvent] = {}
+        self.initial_events: Dict[str, List[BaseEvent]]= defaultdict(list)
+        self.actions_and_tasks: Dict[str, Union[ActionEvent, TaskEvent]] = {}
+        self.channels: Dict[str, ChannelEvent] = {}
         self.skip_list = []
         self.source_name = None
 
@@ -53,17 +58,54 @@ class EventDispatcher:
 
     def __getitem__(self, event_type: EventType):
         return self.events[event_type]
+    
+    def copy(self):
+        dispatcher = EventDispatcher(timeout=self.timeout)
 
-    def set_events(self, events: List[BaseEvent]) -> None:
+        for event in self.events_by_name.values():
+            dispatcher.add_event(
+                event.copy()
+            )
+
+        for event in self.events_by_name.values():
+            event.context = SimpleContext()
+            event.source.context = SimpleContext()
+
+            for graph_event_name in event.events:
+
+                if graph_event_name in dispatcher.events_by_name:
+                    dispatcher.events_by_name[event.event_name].events[graph_event_name] = dispatcher.events_by_name.get(graph_event_name)
+
+                else:
+                    dispatcher.events_by_name[event.event_name].events[graph_event_name] = event.events.get(graph_event_name)
+
+        for stage in self.initial_events:
+            initial_event_names = [
+                event.event_name for event in self.initial_events[stage]
+            ]
+
+            dispatcher.initial_events[stage] = [
+                event for event in dispatcher.events_by_name.values() if event.event_name in initial_event_names
+            ]
+
+        dispatcher.assemble_action_and_task_subgraphs()
+
+        return dispatcher
+
+    def set_events(self, events: List[BaseEvent[Hook]]) -> None:
         for event in events:
             self.events_by_name[event.event_name] = event
-            self.events[event.event_type].append(event)       
+            self.events[event.event_type].append(event)
 
-    def add_event(self, event: BaseEvent):
+    def add_event(self, event: BaseEvent[Hook]):
 
         if isinstance(event.source, (ActionHook, TaskHook)):
 
             self.actions_and_tasks[event.event_name] = event
+
+        elif isinstance(event.source, ChannelHook):
+            self.channels[event.event_name] = event
+            self.skip_list.append(event.event_name)
 
         self.events_by_name[event.event_name] = event
         self.events[event.event_type].append(event)
@@ -72,11 +114,17 @@ class EventDispatcher:
         for event_name, event in self.actions_and_tasks.items():
             self.skip_list.append(event_name)
 
-            for dependency_name in event.names:
+            for dependency_name in event.source.names:
                 self.skip_list.append(dependency_name)
                 
                 dependency_event = self.events_by_name.get(dependency_name)
-                event.before.extend(
+                # If we specify a Channel hook as a dependency of an Action
+                # or Task - that Action/Task listens to the Channel.
+                if isinstance(dependency_event.source, ChannelHook):
+                    event.source.is_listener = True
+                    dependency_event.source.listeners.append(event)
+
+                event.source.before.extend(
                     self._prepend_action_or_task_event(
                         dependency_event,
                         event
@@ -84,25 +132,31 @@ class EventDispatcher:
                 )
 
         for event_name, event in self.events_by_name.items():
-            for dependency_name in event.names:
-                action_or_task_event: BaseEvent = self.actions_and_tasks.get(dependency_name)
+            for dependency_name in event.source.names:
+                action_or_task_event = self.actions_and_tasks.get(dependency_name)
                 if action_or_task_event:
                     self.skip_list.append(event_name)
-                    action_or_task_event.after.extend(
+                    action_or_task_event.source.after.extend(
                         self._append_action_or_task_event(
                             event,
                             action_or_task_event
                         )
                     )
+                
+                if isinstance(event.source, ChannelHook):
+                    action_or_task_event.source.is_notifier = True
+                    action_or_task_event.source.channels.append(dependency_event)
+                    event.source.notifiers.append(action_or_task_event)
+                
                     
         for event in self.actions_and_tasks.values():
             for idx, layer in enumerate(event.before):
-                event.before[idx] = [
+                event.source.before[idx] = [
                     self.events_by_name.get(event_name) for event_name in layer
                 ]
 
             for idx, layer in enumerate(event.after):
-                event.after[idx] = [
+                event.source.after[idx] = [
                     self.events_by_name.get(event_name) for event_name in layer
                 ]
 
@@ -111,8 +165,21 @@ class EventDispatcher:
                     self.events_by_name.get(event_name) for event_name in layer
                 ]
 
+        # Add listeners for a channel to the channel's notifiers
+        for channel_event_name, channel_event in self.channels.items():
+            for notifier in channel_event.source.notifiers:
+                notifier.listeners.extend(channel_event.listeners)
 
-    def _prepend_action_or_task_event(self, dependency_event: BaseEvent, action_or_task: BaseEvent):
+            self.channels[channel_event_name] = channel_event
+
+    async def dispatch_events(self, stage_name: str):
+        await asyncio.gather(*[
+            asyncio.create_task(
+                self._execute_batch(initial_event)
+            ) for initial_event in self.initial_events[stage_name] if initial_event.event_name not in self.skip_list
+        ])        
+
+    def _prepend_action_or_task_event(self, dependency_event: BaseEvent[Hook], action_or_task: BaseEvent[Hook]):
         execution_path = list(dependency_event.execution_path)
 
         event_layer_found = False
@@ -130,7 +197,7 @@ class EventDispatcher:
 
         return dependency_event.execution_path
 
-    def _append_action_or_task_event(self, dependant_event: BaseEvent, action_or_task: BaseEvent):
+    def _append_action_or_task_event(self, dependant_event: BaseEvent[Hook], action_or_task: BaseEvent[Hook]):
         execution_path = []
 
         if dependant_event.event_type == EventType.CHECK:
@@ -155,15 +222,7 @@ class EventDispatcher:
 
         return execution_path
 
-    async def dispatch_events(self):
-        await asyncio.gather(*[
-            asyncio.create_task(
-                self._execute_batch(initial_event)
-            ) for initial_event in self.initial_events if initial_event.event_name not in self.skip_list
-        ])
-            
-    async def _execute_batch(self, initial_event: BaseEvent):
-
+    async def _execute_batch(self, initial_event: BaseEvent[Hook]):
         for layer in initial_event.execution_path:
                 layer_events = [
                     self.events_by_name.get(event_name) for event_name in layer
@@ -195,7 +254,6 @@ class EventDispatcher:
 
                     for next_event in next_events:
                         if isinstance(event, (BaseEvent, ConditionHook)):
-
                             next_event.context.update(event.context)
 
                         next_event.next_args[next_event.event_name].update(result)

@@ -29,6 +29,7 @@ class BaseEngine(Generic[A, R]):
         action.action_args = {
             'action': action
         }
+        
         for before_batch in action.hooks.before:
             results: List[Dict[str, Any]] = await asyncio.gather(*[
                 before.call(**{
@@ -49,8 +50,13 @@ class BaseEngine(Generic[A, R]):
         return action
 
     async def execute_after(self, action: A, response: R) -> Coroutine[Any, Any, R]:
-        
+        action.action_args['action'] = action
         action.action_args['result'] = response
+
+        if action.hooks.notify:
+            action.action_args.update({
+                name: action_or_task.action for name, action_or_task in action.hooks.listeners.items()
+            })
 
         for after_batch in action.hooks.after:
             results: List[Dict[str, Any]] = await asyncio.gather(*[

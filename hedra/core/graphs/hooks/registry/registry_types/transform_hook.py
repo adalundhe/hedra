@@ -95,7 +95,7 @@ class TransformHook(Hook):
             }
 
     def copy(self):
-        return TransformHook(
+        transform_hook = TransformHook(
             self.name,
             self.shortname,
             self._call,
@@ -104,3 +104,7 @@ class TransformHook(Hook):
             pre=self.pre,
             order=self.order
         )
+        
+        transform_hook.stage = self.stage
+
+        return transform_hook

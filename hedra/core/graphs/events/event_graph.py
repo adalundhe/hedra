@@ -17,7 +17,8 @@ from hedra.core.graphs.hooks.registry.registry_types import (
 from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, HookType
 
 
-EventTypeHook = Union[EventHook, TransformHook, ContextHook, ConditionHook, SaveHook]
+EventTypeHook = Union[EventHook, TransformHook, ContextHook, 
+ConditionHook, SaveHook, ActionHook, TaskHook]
 
 
 class EventGraph:
@@ -44,6 +45,10 @@ class EventGraph:
         self.event_hooks: List[EventTypeHook] = [
             *list(self.hooks_by_type.get(
                 HookType.ACTION, 
+                {}
+            ).values()),
+            *list(self.hooks_by_type.get(
+                HookType.CHANNEL,
                 {}
             ).values()),
             *list(self.hooks_by_type.get(
@@ -169,7 +174,7 @@ class EventGraph:
             if len(event.previous_map) < 1 and event.event_name in hook_names:
 
                 event.source.stage_instance.dispatcher.source_name = event.stage
-                event.source.stage_instance.dispatcher.initial_events.append(event)
+                event.source.stage_instance.dispatcher.initial_events[event.source.stage].append(event)
             
             for layer in event.execution_path:
                 for event_name in layer:

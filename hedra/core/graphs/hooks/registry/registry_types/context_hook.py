@@ -77,7 +77,7 @@ class ContextHook(Hook):
         }
 
     def copy(self):
-        return ContextHook(
+        context_hook = ContextHook(
             self.name,
             self.shortname,
             self._call,
@@ -87,3 +87,7 @@ class ContextHook(Hook):
             pre=self.pre,
             order=self.order
         )
+
+        context_hook.stage = self.stage
+
+        return context_hook
