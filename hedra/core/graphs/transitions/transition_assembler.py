@@ -40,6 +40,7 @@ class TransitionAssembler:
         graph_name: str=None,
         graph_path: str=None,
         graph_id: str=None,
+        graph_skipped_stages: List[str]=[],
         cpus: int=None, 
         worker_id: int=None,
         core_config: Dict[str, Any]={}
@@ -49,6 +50,7 @@ class TransitionAssembler:
         self.graph_name = graph_name
         self.graph_path = graph_path
         self.graph_id = graph_id
+        self.graph_skipped_stages: List[str] = graph_skipped_stages
         self.generated_stages = {}
         self.transitions = {}
         self.instances_by_type: Dict[str, List[Stage]] = {}
@@ -83,12 +85,19 @@ class TransitionAssembler:
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Found - {stage_types_count} - unique stage types')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Found - {stage_types_count} - unique stage types')
 
+
+        print(self.graph_skipped_stages)   
+
         self.generated_stages: Dict[str, Stage] = {
-            stage_name: stage() for stage_name, stage in stages.items()
+            stage_name: stage() for stage_name, stage in stages.items() 
         }
 
         generated_hooks = {}
         for stage in self.generated_stages.values():
+
+            if stage.name in self.graph_skipped_stages:
+                stage.skip = True
+
             stage.core_config = self.core_config
             stage.graph_name = self.graph_name
             stage.graph_path = self.graph_path

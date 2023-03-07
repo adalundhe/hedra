@@ -25,6 +25,11 @@ def graph():
     help='Set log level.'
 )
 @click.option(
+    '--skip',
+    default='',
+    help='Comma-delimited list of Stage names to skip.'
+)
+@click.option(
     '--log-directory',
     default=f'{os.getcwd()}/logs',
     help='Output directory for logfiles. If the directory does not exist it will be created.'
@@ -44,6 +49,7 @@ def graph():
 def run(
     path: str, 
     cpus: int, 
+    skip: str,
     log_level: str, 
     log_directory: str,
     bypass_connection_validation: bool,
@@ -51,7 +57,8 @@ def run(
 ):
     run_graph(
         path, 
-        cpus, 
+        cpus,
+        skip, 
         log_level, 
         log_directory,
         bypass_connection_validation,

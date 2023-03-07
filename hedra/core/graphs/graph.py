@@ -32,6 +32,7 @@ class Graph:
         self.graph_name = graph_name
         self.graph_path = config.get('graph_path')
         self.graph_id = str(uuid.uuid4())
+        self.graph_skipped_stages = config.get('graph_skipped_stages', [])
         self.status = GraphStatus.INITIALIZING
         self.graph = networkx.DiGraph()
         self.logger = HedraLogger()
@@ -91,6 +92,7 @@ class Graph:
             graph_name=self.graph_name,
             graph_path=self.graph_path,
             graph_id=self.graph_id,
+            graph_skipped_stages=self.graph_skipped_stages,
             cpus=cpus,
             worker_id=worker_id,
             core_config=self.core_config
