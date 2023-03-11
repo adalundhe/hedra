@@ -14,13 +14,13 @@ from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.registry import RequestTypes
 from hedra.core.engines.types.registry import registered_engines
-from hedra.core.graphs.hooks.types.base.registrar import registrar
+from hedra.core.hooks.types.base.registrar import registrar
 from hedra.core.personas import get_persona
 from hedra.core.personas.persona_registry import registered_personas
-from hedra.core.graphs.hooks.types.base.event_graph import EventGraph
-from hedra.core.graphs.simple_context import SimpleContext
-from hedra.core.graphs.hooks.types.action.hook import ActionHook
-from hedra.core.graphs.hooks.types.task.hook import TaskHook
+from hedra.core.hooks.types.base.event_graph import EventGraph
+from hedra.core.hooks.types.base.simple_context import SimpleContext
+from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.base.import_tools import (

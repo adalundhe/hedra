@@ -3,13 +3,13 @@ import asyncio
 import inspect
 from typing import Dict, List, Any
 from hedra.core.engines.types.common.results_set import ResultsSet
-from hedra.core.graphs.hooks.types.base.hook import Hook
-from hedra.core.graphs.hooks.types.base.registrar import registrar
+from hedra.core.hooks.types.base.hook import Hook
+from hedra.core.hooks.types.base.registrar import registrar
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.execute.execute import Execute
 from hedra.core.graphs.stages.analyze.analyze import Analyze
-from hedra.core.graphs.simple_context import SimpleContext
+from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 

@@ -1,4 +1,4 @@
-from .core.graphs.hooks import (
+from .core.hooks import (
     action,
     channel,
     check,

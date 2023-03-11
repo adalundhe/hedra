@@ -4,13 +4,13 @@ import threading
 import os
 from typing import List, Dict, Union, Any, Tuple, Coroutine
 from collections import defaultdict
-from hedra.core.graphs.hooks.types.base.event_graph import EventGraph
+from hedra.core.hooks.types.base.event_graph import EventGraph
 from hedra.core.graphs.stages.base.import_tools import set_stage_hooks
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.error import Error
 from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.core.graphs.hooks.types.base.registrar import registrar
-from hedra.core.graphs.hooks.types.base.hook import Hook, HookType
+from hedra.core.hooks.types.base.registrar import registrar
+from hedra.core.hooks.types.base.hook import Hook, HookType
 from hedra.core.graphs.stages.base.parallel.batch_executor import BatchExecutor
 from hedra.core.graphs.transitions.exceptions.exceptions import (
     IsolatedStageError, 

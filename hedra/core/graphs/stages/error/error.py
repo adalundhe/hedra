@@ -1,9 +1,9 @@
 import inspect
-from hedra.core.graphs.hooks.types.base.hook import Hook
-from hedra.core.graphs.hooks.types.base.hook_type import HookType
-from hedra.core.graphs.hooks.types.base.registrar import registrar
+from hedra.core.hooks.types.base.hook import Hook
+from hedra.core.hooks.types.base.hook_type import HookType
+from hedra.core.hooks.types.base.registrar import registrar
 from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.core.graphs.hooks.types.internal.decorator import Internal
+from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.graphs.stages.base.exceptions.reserved_method_error import ReservedMethodError
 from hedra.core.graphs.stages.base.stage import Stage
 

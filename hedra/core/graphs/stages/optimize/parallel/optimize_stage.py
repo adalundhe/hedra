@@ -10,17 +10,17 @@ from hedra.core.engines.client.config import Config
 from hedra.core.graphs.stages.optimize.optimization import Optimizer
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.setup.setup import Setup
-from hedra.core.graphs.hooks.types.base.event_graph import EventGraph
+from hedra.core.hooks.types.base.event_graph import EventGraph
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.registry import registered_engines
 from hedra.core.personas.persona_registry import registered_personas
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
-from hedra.core.graphs.hooks.types.base.hook_type import HookType
-from hedra.core.graphs.simple_context import SimpleContext
-from hedra.core.graphs.hooks.types.action.hook import ActionHook
-from hedra.core.graphs.hooks.types.task.hook import TaskHook
+from hedra.core.hooks.types.base.hook_type import HookType
+from hedra.core.hooks.types.base.simple_context import SimpleContext
+from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.engines.types.registry import RequestTypes
 from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.base.import_tools import (

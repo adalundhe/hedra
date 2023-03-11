@@ -2,7 +2,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 from typing import Dict, List, Any
-from hedra.core.graphs.simple_context import SimpleContext
+from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.optimize.optimize import Optimize

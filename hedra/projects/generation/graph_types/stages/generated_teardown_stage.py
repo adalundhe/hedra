@@ -1,5 +1,5 @@
 from hedra.core.graphs.stages import Teardown
-from hedra.core.graphs.hooks import teardown
+from hedra.core.hooks import teardown
 
 
 class TeardownStage(Teardown):

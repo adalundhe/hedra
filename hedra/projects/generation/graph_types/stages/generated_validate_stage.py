@@ -1,7 +1,7 @@
 from typing import Awaitable
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.core.graphs.stages import Validate
-from hedra.core.graphs.hooks import validate
+from hedra.core.hooks import validate
 
 
 class ValidateStage(Validate):

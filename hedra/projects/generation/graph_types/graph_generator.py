@@ -48,8 +48,8 @@ from .stages.submit import (
     SubmitTimescaleDBResultsStage
 )
 
-from hedra.core.graphs.hooks import depends
-from hedra.core.graphs.hooks.types.base.registrar import registrar
+from hedra.core.hooks import depends
+from hedra.core.hooks.types.base.registrar import registrar
 from hedra.projects.generation.generator import Generator
 
 

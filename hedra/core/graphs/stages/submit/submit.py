@@ -1,9 +1,9 @@
 from typing import Generic, TypeVar, List, Any, Dict
-from hedra.core.graphs.hooks.types.condition.decorator import condition
-from hedra.core.graphs.hooks.types.context.decorator import context
-from hedra.core.graphs.hooks.types.event.decorator import event
-from hedra.core.graphs.hooks.types.base.hook_type import HookType
-from hedra.core.graphs.hooks.types.internal.decorator import Internal
+from hedra.core.hooks.types.condition.decorator import condition
+from hedra.core.hooks.types.context.decorator import context
+from hedra.core.hooks.types.event.decorator import event
+from hedra.core.hooks.types.base.hook_type import HookType
+from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting import Reporter

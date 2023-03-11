@@ -1,6 +1,6 @@
 from typing import Union
-from hedra.core.graphs.hooks.types.action.hook import ActionHook
-from hedra.core.graphs.hooks.types.task.hook import TaskHook
+from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.task.hook import TaskHook
 
 
 class CompletedCounter:

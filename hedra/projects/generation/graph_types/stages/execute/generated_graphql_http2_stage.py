@@ -2,7 +2,7 @@ from hedra.core.graphs.stages import (
     Execute,
 )
 
-from hedra.core.graphs.hooks import (
+from hedra.core.hooks import (
     action
 )
 

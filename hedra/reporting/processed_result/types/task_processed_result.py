@@ -1,5 +1,5 @@
 from typing import Any, Tuple, Dict
-from hedra.core.graphs.hooks.types.base.hook_type import HookType
+from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.engines.types.task.result import TaskResult
 from .base_processed_result import BaseProcessedResult
 

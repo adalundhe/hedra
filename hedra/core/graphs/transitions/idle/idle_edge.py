@@ -2,7 +2,7 @@ from typing import List
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.idle.idle import Idle
-from hedra.core.graphs.simple_context import SimpleContext
+from hedra.core.hooks.types.base.simple_context import SimpleContext
 
 
 class IdleEdge(BaseEdge[Idle]):

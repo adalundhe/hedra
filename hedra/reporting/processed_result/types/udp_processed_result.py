@@ -1,6 +1,6 @@
 import json
 from typing import Any, Tuple, Dict
-from hedra.core.graphs.hooks.types.base.hook_type import HookType
+from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.engines.types.udp import UDPResult
 from .base_processed_result import BaseProcessedResult
 

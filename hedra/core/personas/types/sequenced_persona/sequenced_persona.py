@@ -1,9 +1,9 @@
 import uuid
 from typing import Dict, List, Union
 from hedra.core.personas.types.default_persona import DefaultPersona
-from hedra.core.graphs.hooks.types.action.hook import ActionHook
-from hedra.core.graphs.hooks.types.task.hook import TaskHook
-from hedra.core.graphs.hooks.types.base.hook_type import HookType
+from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.task.hook import TaskHook
+from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.types.types import PersonaTypes
 

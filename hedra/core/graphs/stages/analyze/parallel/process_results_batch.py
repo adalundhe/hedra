@@ -11,8 +11,8 @@ from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
 from typing import Any, Dict, List
 from hedra.core.engines.types.common.base_result import BaseResult
-from hedra.core.graphs.hooks.types.base.event_graph import EventGraph
-from hedra.core.graphs.hooks.types.base.registrar import registrar
+from hedra.core.hooks.types.base.event_graph import EventGraph
+from hedra.core.hooks.types.base.registrar import registrar
 from hedra.core.graphs.stages.base.import_tools import (
     import_stages,
     set_stage_hooks

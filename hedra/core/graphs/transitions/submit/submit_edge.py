@@ -4,7 +4,7 @@ from typing import List
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.submit.submit import Submit
-from hedra.core.graphs.simple_context import SimpleContext
+from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.stages.types.stage_states import StageStates
 
 

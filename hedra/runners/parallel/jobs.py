@@ -4,7 +4,7 @@ import traceback
 
 from pycli_tools.arguments.bundler import Bundler
 from hedra.core import Executor
-from hedra.core.graphs.hooks import (
+from hedra.core.hooks import (
     Execute
 )
 from hedra.core.graphs.stages.base.stage import Stage

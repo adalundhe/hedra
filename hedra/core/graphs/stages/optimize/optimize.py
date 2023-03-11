@@ -4,11 +4,11 @@ import time
 import pickle
 from collections import defaultdict
 from typing import Dict, List, Tuple, Any, Union
-from hedra.core.graphs.hooks.types.base.hook_type import HookType
+from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.core.graphs.hooks.types.context.decorator import context
-from hedra.core.graphs.hooks.types.event.decorator import event
-from hedra.core.graphs.hooks.types.internal.decorator import Internal
+from hedra.core.hooks.types.context.decorator import context
+from hedra.core.hooks.types.event.decorator import event
+from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.engines.client.time_parser import TimeParser
 from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.base.stage import Stage

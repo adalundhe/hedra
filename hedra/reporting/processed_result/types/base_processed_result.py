@@ -3,10 +3,10 @@ import asyncio
 import uuid
 import inspect
 from typing import Any, Coroutine, List, Dict, Any
-from hedra.core.graphs.hooks.types.base.event import BaseEvent
-from hedra.core.graphs.hooks.types.base.event_types import EventType
+from hedra.core.hooks.types.base.event import BaseEvent
+from hedra.core.hooks.types.base.event_types import EventType
 from hedra.core.engines.types.common.base_result import BaseResult
-from hedra.core.graphs.hooks.types.base.registrar import registrar
+from hedra.core.hooks.types.base.registrar import registrar
 from hedra.reporting.tags import Tag
 
 

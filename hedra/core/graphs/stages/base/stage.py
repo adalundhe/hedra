@@ -5,15 +5,15 @@ import uuid
 from collections import defaultdict
 from typing import Any, Dict, List
 from hedra.core.engines.client.time_parser import TimeParser
-from hedra.core.graphs.hooks.types.base.event import BaseEvent
-from hedra.core.graphs.hooks.types.base.event_dispatch import EventDispatcher
-from hedra.core.graphs.hooks.types.internal.decorator import Internal
-from hedra.core.graphs.hooks.types.base.hook_type import HookType
-from hedra.core.graphs.hooks.types.base.hook import Hook
+from hedra.core.hooks.types.base.event import BaseEvent
+from hedra.core.hooks.types.base.event_dispatch import EventDispatcher
+from hedra.core.hooks.types.internal.decorator import Internal
+from hedra.core.hooks.types.base.hook_type import HookType
+from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.graphs.stages.base.parallel.batch_executor import BatchExecutor
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.core.graphs.simple_context import SimpleContext
+from hedra.core.hooks.types.base.simple_context import SimpleContext
 
 from hedra.logging import HedraLogger
 from hedra.plugins.types.common.plugin import Plugin
