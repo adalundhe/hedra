@@ -6,7 +6,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List
 from hedra.logging import HedraLogger
-from hedra.core.graphs.events.event import Event, EventHook
+from hedra.core.graphs.hooks.types.event.event import Event, EventHook
 from hedra.core.graphs.hooks.types.base.registrar import registrar
 from hedra.core.graphs.hooks.types.base.hook import Hook
 from hedra.plugins.types.plugin_types import PluginType

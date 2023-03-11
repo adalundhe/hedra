@@ -1,8 +1,8 @@
 from collections import defaultdict
 from hedra.core.graphs.hooks.types.transform.hook import TransformHook
 from hedra.core.graphs.hooks.types.base.hook import Hook
-from ..hooks.types.base.event_types import EventType
-from ..hooks.types.base.event import BaseEvent
+from hedra.core.graphs.hooks.types.base.event import BaseEvent
+from hedra.core.graphs.hooks.types.base.event_types import EventType
 
 
 class TransformEvent(BaseEvent[TransformHook]):
