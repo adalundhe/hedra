@@ -3,8 +3,6 @@ from enum import Enum
 
 class HookType(Enum):
     ACTION='ACTION'
-    AFTER='AFTER'
-    BEFORE='BEFORE'
     CHANNEL='CHANNEL'
     CHECK='CHECK'
     CONTEXT='CONTEXT'
@@ -14,8 +12,5 @@ class HookType(Enum):
     METRIC='METRIC'
     LOAD='LOAD'
     SAVE='SAVE'
-    SETUP='SETUP'
     TASK='TASK'
-    TEARDOWN='TEARDOWN'
     TRANSFORM='TRANSFORM'
-    VALIDATE='VALIDATE'

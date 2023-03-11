@@ -28,6 +28,18 @@ class IdleEdge(BaseEdge[Idle]):
         return None, self.destination.stage_type
 
     def _update(self, destination: Stage):
+        for edge_name in self.history:
+
+            history = self.history[edge_name]
+
+            if self.next_history.get(edge_name) is None:
+                self.next_history[edge_name] = {}
+
+            self.next_history[edge_name].update({
+                key: value for key, value  in history.items() if key in self.provides
+            })
+
+
         self.next_history.update({
             (self.source.name, destination.name): {}
         })

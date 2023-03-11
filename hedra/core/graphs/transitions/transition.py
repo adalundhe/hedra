@@ -4,7 +4,6 @@ from typing import List, Dict, Tuple, Any
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from .analyze.analyze_edge import AnalyzeEdge, BaseEdge
-from .checkpoint.checkpoint_edge import CheckpointEdge
 from .common.transtition_metadata import TransitionMetadata
 from .common.complete_edge import CompleteEdge
 from .common.error_edge import ErrorEdge
@@ -13,9 +12,6 @@ from .idle.idle_edge import IdleEdge
 from .optimize.optimize_edge import OptimizeEdge
 from .setup.setup_edge import SetupEdge
 from .submit.submit_edge import SubmitEdge
-from .teardown.teardown_edge import TeardownEdge
-from .validate.validate_edge import ValidateEdge
-from .wait.wait_edge import WaitEdge
 
 
 HistoryUpdate = Dict[Tuple[str, str], Any]
@@ -35,7 +31,6 @@ class Transition:
         self.transition_idx = 0
         edge_types = {
             StageTypes.ANALYZE: AnalyzeEdge,
-            StageTypes.CHECKPOINT: CheckpointEdge,
             StageTypes.COMPLETE: CompleteEdge,
             StageTypes.ERROR: ErrorEdge,
             StageTypes.EXECUTE: ExecuteEdge,
@@ -43,9 +38,6 @@ class Transition:
             StageTypes.OPTIMIZE: OptimizeEdge,
             StageTypes.SETUP: SetupEdge,
             StageTypes.SUBMIT: SubmitEdge,
-            StageTypes.TEARDOWN: TeardownEdge,
-            StageTypes.VALIDATE: ValidateEdge,
-            StageTypes.WAIT: WaitEdge
         }
 
         self.edge: BaseEdge = edge_types.get(from_stage.stage_type)(
@@ -64,7 +56,20 @@ class Transition:
             )) for descendant in self.descendants
         }
 
-        if self.to_stage.stage_type is not StageTypes.COMPLETE and self.edge.skip_stage is False:
+        skip_next_stages = [
+            StageTypes.COMPLETE,
+            StageTypes.ERROR,
+        ]
+
+        skip_next_stage = self.to_stage.stage_type in skip_next_stages
+        edge_skipped = self.edge.skip_stage is True
+        invalid_transition = self.metadata.is_valid is False
+
+        pass_to_next = (
+            skip_next_stage or edge_skipped or invalid_transition
+        ) is False
+
+        if pass_to_next:
             source_name = self.edge.source.name
             destination_name = self.edge.destination.name
 

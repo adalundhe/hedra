@@ -50,16 +50,12 @@ class Execute(Stage, Generic[Unpack[T]]):
         
         self.accepted_hook_types = [ 
             HookType.ACTION,
-            HookType.AFTER,
-            HookType.BEFORE, 
             HookType.CHANNEL, 
             HookType.CHECK,
             HookType.CONDITION,
             HookType.CONTEXT,
             HookType.EVENT,
-            HookType.SETUP, 
             HookType.TASK,
-            HookType.TEARDOWN,
             HookType.TRANSFORM
         ]
 

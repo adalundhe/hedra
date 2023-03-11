@@ -105,15 +105,6 @@ class Graph:
         self.logger.hedra.sync.debug(f'{self.metadata_string} - Changed status to - {GraphStatus.ASSEMBLING.name} - from - {GraphStatus.INITIALIZING.name}')
         self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Changed status to - {GraphStatus.ASSEMBLING.name} - from - {GraphStatus.INITIALIZING.name}')
 
-        # If we havent specified a Validate stage for save aggregated results,
-        # append one.
-
-        if len(self.instances.get(StageTypes.VALIDATE)) < 1:
-            self.logger.hedra.sync.debug(f'{self.metadata_string} - Prepending {StageTypes.VALIDATE.name} stage')
-            self.logger.filesystem.sync['hedra.core'].debug(f'{self.metadata_string} - Prepending {StageTypes.VALIDATE.name} stage')
-
-            self._prepend_stage(StageTypes.VALIDATE)
-
         # A user will never specify an Idle stage. Instead, we prepend one to 
         # serve as the source node for a graphs, ensuring graphs have a 
         # valid starting point and preventing the user from forgetting things
