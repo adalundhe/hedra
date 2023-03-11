@@ -2,12 +2,12 @@ from __future__ import annotations
 import asyncio
 from collections import OrderedDict, defaultdict
 from typing import List, Union, Dict, Any, Tuple
-from hedra.core.hooks.types.base.simple_context import SimpleContext
-from ..action.event import ActionEvent
-from ..task.event import TaskEvent
-from ..channel.event import ChannelEvent
+from hedra.core.hooks.types.action.event import ActionEvent
+from hedra.core.hooks.types.task.event import TaskEvent
+from hedra.core.hooks.types.channel.event import ChannelEvent
 from .event import BaseEvent
 from .event_types import EventType
+from .simple_context import SimpleContext
 
 
 class EventDispatcher:
