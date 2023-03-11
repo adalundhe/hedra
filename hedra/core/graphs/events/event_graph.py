@@ -3,7 +3,7 @@ import networkx
 from collections import defaultdict
 from typing import List, Union, Dict
 from hedra.core.graphs.events import get_event
-from hedra.core.graphs.events.base_event import BaseEvent
+from hedra.core.graphs.hooks.types.base.event import BaseEvent
 
 from hedra.core.graphs.hooks.types.base.hook import Hook, HookType
 

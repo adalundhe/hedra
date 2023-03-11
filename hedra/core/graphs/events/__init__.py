@@ -1,8 +1,8 @@
 from typing import TypeVar, Dict, Union
 from hedra.core.graphs.hooks.types.base.hook_type import HookType
 from hedra.core.graphs.hooks.types.base.hook import Hook
-from .action_event import ActionEvent
-from .channel_event import ChannelEvent
+from ..hooks.types.action.event import ActionEvent
+from ..hooks.types.channel.event import ChannelEvent
 from .check_event import CheckEvent
 from .condition_event import ConditionEvent
 from .context_event import ContextEvent

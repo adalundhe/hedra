@@ -5,7 +5,7 @@ import uuid
 from collections import defaultdict
 from typing import Any, Dict, List
 from hedra.core.engines.client.time_parser import TimeParser
-from hedra.core.graphs.events.base_event import BaseEvent
+from hedra.core.graphs.hooks.types.base.event import BaseEvent
 from hedra.core.graphs.events.event_dispatch import EventDispatcher
 from hedra.core.graphs.hooks.types.internal.decorator import Internal
 from hedra.core.graphs.hooks.types.base.hook_type import HookType

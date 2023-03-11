@@ -1,8 +1,8 @@
 from collections import defaultdict
 from hedra.core.graphs.hooks.types.action.hook import ActionHook
 from hedra.core.graphs.hooks.types.base.hook import Hook
-from .event_types import EventType
-from .base_event import BaseEvent
+from hedra.core.graphs.hooks.types.base.event import BaseEvent
+from hedra.core.graphs.hooks.types.base.event_types import EventType
 
 
 class ActionEvent(BaseEvent[ActionHook]):

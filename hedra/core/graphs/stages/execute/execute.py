@@ -24,7 +24,11 @@ from hedra.core.graphs.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
 from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.core.personas.persona_registry import get_persona, registered_personas, DefaultPersona
+from hedra.core.personas.persona_registry import (
+    get_persona, 
+    registered_personas, 
+    DefaultPersona
+)
 from hedra.plugins.types.plugin_types import PluginType
 from .parallel import execute_actions
 

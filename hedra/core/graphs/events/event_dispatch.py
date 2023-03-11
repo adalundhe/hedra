@@ -8,11 +8,11 @@ from hedra.core.graphs.hooks.types.condition.hook import ConditionHook
 from hedra.core.graphs.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.hooks.types.base.hook import Hook
-from .action_event import ActionEvent
+from ..hooks.types.action.event import ActionEvent
 from .task_event import TaskEvent
-from .channel_event import ChannelEvent
-from .base_event import BaseEvent
-from .event_types import EventType
+from ..hooks.types.channel.event import ChannelEvent
+from ..hooks.types.base.event import BaseEvent
+from ..hooks.types.base.event_types import EventType
 
 
 class EventDispatcher:

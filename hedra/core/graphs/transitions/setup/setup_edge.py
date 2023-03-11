@@ -3,7 +3,7 @@ import asyncio
 import inspect
 from typing import Dict, List, Any
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
-from hedra.core.graphs.events.event_types import EventType
+from hedra.core.graphs.hooks.types.base.event_types import EventType
 from hedra.core.graphs.hooks.types.base.hook_type import HookType
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.setup.setup import Setup

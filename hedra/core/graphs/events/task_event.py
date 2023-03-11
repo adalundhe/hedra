@@ -1,8 +1,8 @@
 from collections import defaultdict
 from hedra.core.graphs.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.hooks.types.base.hook import Hook
-from .event_types import EventType
-from .base_event import BaseEvent
+from ..hooks.types.base.event_types import EventType
+from ..hooks.types.base.event import BaseEvent
 
 
 class TaskEvent(BaseEvent[TaskHook]):
