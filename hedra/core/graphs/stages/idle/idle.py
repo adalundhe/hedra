@@ -1,6 +1,6 @@
 import asyncio
 from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.core.graphs.hooks.hook_types.internal import Internal
+from hedra.core.graphs.hooks.types.internal.decorator import Internal
 from hedra.core.graphs.stages.base.stage import Stage
 
 class Idle(Stage):

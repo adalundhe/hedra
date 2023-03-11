@@ -7,11 +7,11 @@ from typing import Union, List, Dict, Any, Tuple
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.processed_result import ProcessedResultsGroup
 from hedra.reporting.metric import MetricsSet
-from hedra.core.graphs.hooks.hook_types.context import context
-from hedra.core.graphs.hooks.hook_types.event import event  
+from hedra.core.graphs.hooks.types.context.decorator import context
+from hedra.core.graphs.hooks.types.event.decorator import event  
 from hedra.core.engines.types.common.results_set import ResultsSet
-from hedra.core.graphs.hooks.hook_types.internal import Internal
-from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.core.graphs.hooks.types.internal.decorator import Internal
+from hedra.core.graphs.hooks.types.base.hook_type import HookType
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.reporting.processed_result import results_types
 from hedra.reporting.processed_result.types import (

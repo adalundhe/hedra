@@ -1,9 +1,6 @@
 from typing import Union
-from hedra.core.graphs.hooks.registry.registry_types import (
-    ActionHook,
-    TaskHook
-)
-
+from hedra.core.graphs.hooks.types.action.hook import ActionHook
+from hedra.core.graphs.hooks.types.task.hook import TaskHook
 
 
 class CompletedCounter:

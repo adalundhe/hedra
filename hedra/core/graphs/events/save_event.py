@@ -1,6 +1,6 @@
 from collections import defaultdict
-from hedra.core.graphs.hooks.registry.registry_types import SaveHook
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.hooks.types.save.hook import SaveHook
+from hedra.core.graphs.hooks.types.base.hook import Hook
 from .event_types import EventType
 from .base_event import BaseEvent
 

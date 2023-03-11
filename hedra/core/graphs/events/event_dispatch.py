@@ -1,16 +1,13 @@
 from __future__ import annotations
 import asyncio
 from collections import OrderedDict, defaultdict
-from typing import List, Union, Dict, Any, Tuple, Union
-from hedra.core.graphs.hooks.registry.registry_types import (
-    ActionHook,
-    TaskHook,
-    ChannelHook,
-    ConditionHook,
-    ContextHook
-)
+from typing import List, Union, Dict, Any, Tuple
+from hedra.core.graphs.hooks.types.action.hook import ActionHook
+from hedra.core.graphs.hooks.types.channel.hook import ChannelHook
+from hedra.core.graphs.hooks.types.condition.hook import ConditionHook
+from hedra.core.graphs.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.simple_context import SimpleContext
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.hooks.types.base.hook import Hook
 from .action_event import ActionEvent
 from .task_event import TaskEvent
 from .channel_event import ChannelEvent

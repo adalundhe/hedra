@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any, Dict, List
 from hedra.logging import HedraLogger
 from hedra.core.graphs.events.event import Event, EventHook
-from hedra.core.graphs.hooks.registry.registrar import registrar
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.hooks.types.base.registrar import registrar
+from hedra.core.graphs.hooks.types.base.hook import Hook
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.common.plugin import Plugin
 from .stage import Stage

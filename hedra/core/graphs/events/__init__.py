@@ -1,16 +1,6 @@
 from typing import TypeVar, Dict, Union
-from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
-from hedra.core.graphs.hooks.registry.registry_types import (
-    ConditionHook,
-    EventHook,
-    TransformHook,
-    ContextHook,
-    SaveHook,
-    LoadHook,
-    CheckHook,
-    ChannelHook
-)
+from hedra.core.graphs.hooks.types.base.hook_type import HookType
+from hedra.core.graphs.hooks.types.base.hook import Hook
 from .action_event import ActionEvent
 from .channel_event import ChannelEvent
 from .check_event import CheckEvent
@@ -23,7 +13,7 @@ from .task_event import TaskEvent
 from .transform_event import TransformEvent
 
 
-T = TypeVar('T', EventHook, TransformHook, ConditionHook, ContextHook, SaveHook, LoadHook, CheckHook)
+T = TypeVar('T')
 
 
 HedraEvent = Union[Event, TransformEvent, ConditionEvent, ContextEvent, SaveEvent, LoadEvent, CheckEvent]

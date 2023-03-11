@@ -7,14 +7,11 @@ from typing import Dict, List, Union
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.tools.helpers import awaitable
-from asyncio import Task, Future
-from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from asyncio import Task
+from hedra.core.graphs.hooks.types.base.hook_type import HookType
 from hedra.core.personas.batching.batch import Batch
-from hedra.core.graphs.hooks.registry.registry_types import (
-    ActionHook,
-    TaskHook
-)
-from hedra.core.personas.batching import Batch
+from hedra.core.graphs.hooks.types.action.hook import ActionHook
+from hedra.core.graphs.hooks.types.task.hook import TaskHook
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.types.types import PersonaTypes
 

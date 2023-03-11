@@ -1,24 +1,11 @@
 from __future__ import annotations
 import networkx
-import matplotlib.pyplot as plt
 from collections import defaultdict
 from typing import List, Union, Dict
 from hedra.core.graphs.events import get_event
 from hedra.core.graphs.events.base_event import BaseEvent
-from hedra.core.graphs.hooks.registry.registry_types import (
-    EventHook, 
-    TransformHook,
-    ContextHook,
-    ConditionHook,
-    SaveHook,
-    ActionHook,
-    TaskHook
-)
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, HookType
 
-
-EventTypeHook = Union[EventHook, TransformHook, ContextHook, 
-ConditionHook, SaveHook, ActionHook, TaskHook]
+from hedra.core.graphs.hooks.types.base.hook import Hook, HookType
 
 
 class EventGraph:
@@ -42,7 +29,7 @@ class EventGraph:
             ) for hook_name, hook in self.hooks_by_name.items()
         ])
 
-        self.event_hooks: List[EventTypeHook] = [
+        self.event_hooks: List[Hook] = [
             *list(self.hooks_by_type.get(
                 HookType.ACTION, 
                 {}

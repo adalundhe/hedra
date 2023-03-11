@@ -1,4 +1,4 @@
-from .hook_types import (
+from .types import (
     action,
     channel,
     check,

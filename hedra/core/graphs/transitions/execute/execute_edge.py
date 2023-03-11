@@ -3,8 +3,8 @@ import asyncio
 import inspect
 from typing import Dict, List, Any
 from hedra.core.engines.types.common.results_set import ResultsSet
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
-from hedra.core.graphs.hooks.registry.registrar import registrar
+from hedra.core.graphs.hooks.types.base.hook import Hook
+from hedra.core.graphs.hooks.types.base.registrar import registrar
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.execute.execute import Execute

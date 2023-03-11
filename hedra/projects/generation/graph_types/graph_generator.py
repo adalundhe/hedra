@@ -49,7 +49,7 @@ from .stages.submit import (
 )
 
 from hedra.core.graphs.hooks import depends
-from hedra.core.graphs.hooks.registry.registrar import registrar
+from hedra.core.graphs.hooks.types.base.registrar import registrar
 from hedra.projects.generation.generator import Generator
 
 

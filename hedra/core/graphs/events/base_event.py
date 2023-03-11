@@ -2,17 +2,11 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any, Dict, TypeVar, Generic, List
 from hedra.core.graphs.simple_context import SimpleContext
-from hedra.core.graphs.hooks.registry.registry_types import (
-    EventHook,
-    TransformHook,
-    ContextHook,
-    ConditionHook
-)
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.graphs.hooks.types.base.hook import Hook
 from .event_types import EventType
 
 
-T = TypeVar('T', EventHook, TransformHook, ContextHook, ConditionHook)
+T = TypeVar('T')
 
 
 class BaseEvent(Generic[T]):
@@ -125,7 +119,7 @@ class BaseEvent(Generic[T]):
         if len(self.next_args[self.event_name]) == 0:
             self.next_args[self.event_name] = kwargs
 
-        if isinstance(self.source, (BaseEvent, ContextHook)):
+        if isinstance(self.source, BaseEvent):
             self.source.context = self.context
 
         results = await self.source.call(**self.next_args[self.event_name])
@@ -142,7 +136,7 @@ class BaseEvent(Generic[T]):
         ]
 
         for event in next_events:
-            if isinstance(event, (BaseEvent, ContextHook)):
+            if isinstance(event, BaseEvent):
                 event.context = self.context
 
             self.next_args[event.event_name].update(results)

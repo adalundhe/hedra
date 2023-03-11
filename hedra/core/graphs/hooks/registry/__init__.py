@@ -1,1 +1,0 @@
-from .registrar import Registrar

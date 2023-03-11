@@ -17,9 +17,10 @@ from hedra.core.personas.persona_registry import registered_personas
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
-from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.core.graphs.hooks.types.base.hook_type import HookType
 from hedra.core.graphs.simple_context import SimpleContext
-from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
+from hedra.core.graphs.hooks.types.action.hook import ActionHook
+from hedra.core.graphs.hooks.types.task.hook import TaskHook
 from hedra.core.engines.types.registry import RequestTypes
 from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.base.import_tools import (
