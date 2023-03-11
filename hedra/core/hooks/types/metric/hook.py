@@ -10,6 +10,7 @@ class MetricHook(Hook):
         name: str, 
         shortname: str, 
         call: Callable[..., Awaitable[Any]], 
+        metric_type: str,
         group: Optional[str] = None,
         order: int=1
     ) -> None:        
@@ -19,12 +20,15 @@ class MetricHook(Hook):
             call, 
             hook_type=HookType.METRIC
         )
-
+        
+        self.metric_type = metric_type
         self.group = group
         self.order = order
 
     async def call(self, **kwargs):
-        metric = await super().call(**{name: value for name, value in kwargs.items() if name in self.params})
+        metric = await super().call(**{
+            name: value for name, value in kwargs.items() if name in self.params
+        })
 
         if isinstance(metric, dict):
             return {

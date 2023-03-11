@@ -5,10 +5,15 @@ from hedra.core.hooks.types.base.registrar import registrar
 from .validator import MetricHookValidator
 
 
+
+
 @registrar(HookType.METRIC)
-def metric(group: Optional[str]='user_metrics'):
+def metric(metric_type: str, group: Optional[str]='user_metrics'):
     
-    MetricHookValidator(group=group)
+    MetricHookValidator(
+        metric_type=metric_type,
+        group=group
+    )
     
     def wrapper(func):
 
