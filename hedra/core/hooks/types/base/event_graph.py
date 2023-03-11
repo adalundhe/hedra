@@ -57,6 +57,10 @@ class EventGraph:
                 {}
             ).values()),
             *list(self.hooks_by_type.get(
+                HookType.METRIC,
+                {}
+            ).values()),
+            *list(self.hooks_by_type.get(
                 HookType.SAVE,
                 {}
             ).values()),

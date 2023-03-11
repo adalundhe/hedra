@@ -24,7 +24,8 @@ class EventDispatcher:
             EventType.ACTION: 4,
             EventType.TASK: 4,
             EventType.CHECK: 5,
-            EventType.CHANNEL: 5
+            EventType.CHANNEL: 5,
+            EventType.METRIC: 6
         }
 
         event_orderings = list(sorted(
