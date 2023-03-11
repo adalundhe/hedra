@@ -2,13 +2,14 @@ from enum import Enum
 
 
 class EventType(Enum):
+    ACTION='ACTION'
     CHANNEL='CHANNEL'
     CHECK='CHECK'
     CONDITION='CONDITION'
     CONTEXT='CONTEXT'
     EVENT='EVENT'
-    TRANSFORM='TRANSFORM'
-    SAVE='SAVE'
     LOAD='LOAD'
-    ACTION='ACTION'
+    METRIC='METRIC'
+    SAVE='SAVE'
     TASK='TASK'
+    TRANSFORM='TRANSFORM'
