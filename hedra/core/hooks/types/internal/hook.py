@@ -1,6 +1,6 @@
 from hedra.core.hooks.types.base.hook_type import HookType
-from typing import Type, Callable, Awaitable, Any
-from ..base.hook import Hook
+from typing import Callable, Awaitable, Any
+from hedra.core.hooks.types.base.hook import Hook
 
 
 class InternallHook(Hook):

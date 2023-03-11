@@ -1,6 +1,6 @@
-from typing import Coroutine, List, Type, Callable, Awaitable, Any
+from typing import List, Callable, Awaitable, Any
 from hedra.core.hooks.types.base.hook_type import HookType
-from ..base.hook import Hook
+from hedra.core.hooks.types.base.hook import Hook
 
 
 class CheckHook(Hook):

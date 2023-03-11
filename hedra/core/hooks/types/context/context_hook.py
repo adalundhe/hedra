@@ -1,9 +1,7 @@
 import inspect
 from typing import Any, Callable, Awaitable, Optional, Tuple
-from hedra.core.hooks.types.base.simple_context import SimpleContext
-from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.hooks.types.base.hook_type import HookType
-from ..base.hook import Hook
+from hedra.core.hooks.types.base.hook import Hook
 
 
 class ContextHook(Hook):
