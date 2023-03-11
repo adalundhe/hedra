@@ -10,7 +10,7 @@ from hedra.core.engines.client.config import Config
 from hedra.core.graphs.stages.optimize.optimization import Optimizer
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.setup.setup import Setup
-from hedra.core.graphs.events.event_graph import EventGraph
+from hedra.core.graphs.hooks.types.base.event_graph import EventGraph
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.registry import registered_engines
 from hedra.core.personas.persona_registry import registered_personas

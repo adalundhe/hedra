@@ -17,7 +17,7 @@ from hedra.core.engines.types.registry import registered_engines
 from hedra.core.graphs.hooks.types.base.registrar import registrar
 from hedra.core.personas import get_persona
 from hedra.core.personas.persona_registry import registered_personas
-from hedra.core.graphs.events.event_graph import EventGraph
+from hedra.core.graphs.hooks.types.base.event_graph import EventGraph
 from hedra.core.graphs.simple_context import SimpleContext
 from hedra.core.graphs.hooks.types.action.hook import ActionHook
 from hedra.core.graphs.hooks.types.task.hook import TaskHook

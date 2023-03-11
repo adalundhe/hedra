@@ -3,11 +3,11 @@ import asyncio
 from collections import OrderedDict, defaultdict
 from typing import List, Union, Dict, Any, Tuple
 from hedra.core.graphs.simple_context import SimpleContext
-from ..hooks.types.action.event import ActionEvent
-from ..hooks.types.task.event import TaskEvent
-from ..hooks.types.channel.event import ChannelEvent
-from ..hooks.types.base.event import BaseEvent
-from ..hooks.types.base.event_types import EventType
+from ..action.event import ActionEvent
+from ..task.event import TaskEvent
+from ..channel.event import ChannelEvent
+from .event import BaseEvent
+from .event_types import EventType
 
 
 class EventDispatcher:

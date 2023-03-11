@@ -4,7 +4,7 @@ import threading
 import os
 from typing import List, Dict, Union, Any, Tuple, Coroutine
 from collections import defaultdict
-from hedra.core.graphs.events.event_graph import EventGraph
+from hedra.core.graphs.hooks.types.base.event_graph import EventGraph
 from hedra.core.graphs.stages.base.import_tools import set_stage_hooks
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.error import Error
