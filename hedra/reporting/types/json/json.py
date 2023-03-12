@@ -6,6 +6,7 @@ import uuid
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
+from hedra.reporting.metric.custom_metric import CustomMetric
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
 from .json_config import JSONConfig
@@ -61,10 +62,13 @@ class JSON:
         for metrics_set in metrics:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
             
-            groups = metrics_set.custom_metrics
-
+            groups = {}
             for group_name, group in metrics_set.groups.items():
                 groups[group_name] = group.record
+
+            groups['custom'] = {
+                metric.metric_shortname: metric.metric_value for metric in metrics_set.custom_metrics.values()
+            }
 
             records[metrics_set.name] = {
                 'name': metrics_set.name,

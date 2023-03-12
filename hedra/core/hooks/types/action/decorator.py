@@ -1,7 +1,6 @@
 import functools
 from typing import Dict, Union, Tuple
 from hedra.core.hooks.types.base.hook_type import HookType
-from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.registrar import registrar
 from .validator import ActionHookValidator
 
@@ -20,7 +19,7 @@ def action(
         metadata=metadata
     )
     
-    def wrapper(func) -> Hook:
+    def wrapper(func):
 
         @functools.wraps(func)
         def decorator(*args, **kwargs):

@@ -39,7 +39,7 @@ class Registrar:
             HookType.TRANSFORM: lambda *args, **kwargs: TransformHook(*args, **kwargs),
         }
 
-    def __call__(self, hook: FunctionType):
+    def __call__(self, hook):
         self.module_paths[hook.__name__] = hook.__module__
 
         @functools.wraps(hook)

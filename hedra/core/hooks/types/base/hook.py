@@ -43,7 +43,7 @@ class Hook:
 
             return {
                 **kwargs,
-                'next': result
+                self.name: result
             }
 
 

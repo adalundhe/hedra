@@ -9,7 +9,7 @@ class MetricHookValidator(BaseModel):
     def validate_names(cls, val):
         
         valid_metric_types = [
-            "counter",
+            "count",
             "rate",
             "distribution",
             "set",

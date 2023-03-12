@@ -7,6 +7,7 @@ from typing import Union, List, Dict, Any, Tuple
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.processed_result import ProcessedResultsGroup
 from hedra.reporting.metric import MetricsSet
+from hedra.reporting.metric.custom_metric import CustomMetric
 from hedra.core.hooks.types.context.decorator import context
 from hedra.core.hooks.types.event.decorator import event  
 from hedra.core.engines.types.common.results_set import ResultsSet
@@ -161,19 +162,6 @@ class Analyze(Stage):
         }
     
     @event('partition_results_batches')
-    async def get_custom_metric_hooks(self):
-
-        metric_hook_names: List[str] = [hook.name for hook in self.hooks[HookType.METRIC]]
-        
-        for metric_hook_name in metric_hook_names:
-            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Loaded custom Metric hook - {metric_hook_name}')
-
-        return {
-            'analyze_stage_metric_hook_names': metric_hook_names,
-            'analyze_stage_custom_metric_hooks':  self.hooks[HookType.METRIC]
-        }
-
-    @event('get_custom_metric_hooks')
     async def create_stage_batches(
         self,
         analyze_stage_raw_results: RawResultsSet=[],
@@ -344,34 +332,14 @@ class Analyze(Stage):
         }
 
     @event('merge_events_groups')
-    async def calculate_custom_metrics(
-        self,
-        analyze_stage_raw_results: RawResultsSet=[],
-        analyze_stage_events_set: EventsSet={},
-        analyze_stage_custom_metric_hooks: List[str]=[]
-    ):
+    async def calculate_custom_metrics(self):
 
+        custom_metrics_set = defaultdict(dict)
 
-        custom_metrics_set = {}
+        for context_key, context_value in self.context:
 
-        for stage_name, stage_events in analyze_stage_events_set.items():    
-
-            stage_custom_metrics = {}
-
-            for event_group_name in stage_events.keys():  
-
-                custom_metrics = defaultdict(dict)
-                for custom_metric in analyze_stage_custom_metric_hooks:
-                    custom_metrics[custom_metric.group][custom_metric.shortname] = await custom_metric.call(
-                        analyze_stage_raw_results.get(
-                            stage_name
-                        ).get('results')
-                    )
-
-                stage_custom_metrics[event_group_name] = custom_metrics
-
-
-            custom_metrics_set[stage_name] = stage_custom_metrics
+            if isinstance(context_value, CustomMetric):
+                custom_metrics_set[context_value.metric_group][context_key] = context_value
 
         return {
             'analyze_stage_custom_metrics_set': custom_metrics_set
@@ -393,11 +361,10 @@ class Analyze(Stage):
 
             stage_total = 0
             stage_total_time = analyze_stage_total_times.get(stage_name)
-            stage_custom_metrics = analyze_stage_custom_metrics_set.get(stage_name)
 
             for event_group_name, events_group in stage_events.items():  
 
-                custom_metrics = stage_custom_metrics.get(event_group_name)
+                custom_metrics = analyze_stage_custom_metrics_set.get(event_group_name)
 
                 events_group.calculate_quantiles()
 

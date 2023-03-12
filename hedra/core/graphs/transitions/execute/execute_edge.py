@@ -2,7 +2,6 @@ from __future__ import annotations
 import asyncio
 import inspect
 from typing import Dict, List, Any
-from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.registrar import registrar
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
@@ -192,7 +191,6 @@ class ExecuteEdge(BaseEdge[Execute]):
         execute_stage_copy.context = SimpleContext()
         for event in execute_stage_copy.dispatcher.events_by_name.values():
             event.source.stage_instance = execute_stage_copy 
-            event.source.stage_instance = execute_stage_copy
             event.source.stage_instance.context = execute_stage_copy.context
             event.source.context = execute_stage_copy.context
 

@@ -1,5 +1,4 @@
-from .reporter import (
-    Reporter,
+from .types import (
     AWSLambdaConfig,
     AWSTimestreamConfig,
     BigQueryConfig,
@@ -30,5 +29,9 @@ from .reporter import (
     TelegrafConfig,
     TelegrafStatsDConfig,
     TimescaleDBConfig,
+)
+
+from .reporter import (
+    Reporter,
     ReporterType
 )

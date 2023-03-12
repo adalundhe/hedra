@@ -2,6 +2,8 @@ from __future__ import annotations
 import asyncio
 import inspect
 from typing import Dict, List, Any
+from hedra.core.hooks.types.base.hook import Hook
+from hedra.core.hooks.types.base.registrar import registrar
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
@@ -149,18 +151,8 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                 key: value for key, value  in history.items() if key in self.provides
             })
 
-        
-        if self.next_history.get((self.source.name, destination.name)) is None:
-            self.next_history[(self.source.name, destination.name)] = {}
+        if self.skip_stage is False:
 
-        if self.skip_stage:
-            self.next_history.update({
-                (self.source.name, destination.name): {
-                    'analyze_stage_summary_metrics': {}
-                }
-            })
-
-        else:
             history = self.history[(self.from_stage_name, self.source.name)]
 
             self.next_history.update({
@@ -175,24 +167,30 @@ class AnalyzeEdge(BaseEdge[Analyze]):
     def split(self, edges: List[AnalyzeEdge]) -> None:
         submit_candidates = self.generate_submit_candidates()
 
-        submit_stage_config: Dict[str, Any] = self.source.to_copy_dict()
+        analyze_stage_config: Dict[str, Any] = self.source.to_copy_dict()
 
-        submit_stage_copy = type(self.source.name, (Analyze, ), {})()
+        analyze_stage_copy = type(self.source.name, (Analyze, ), {})()
         
-        for copied_attribute_name, copied_attribute_value in submit_stage_config.items():
+        for copied_attribute_name, copied_attribute_value in analyze_stage_config.items():
             if inspect.ismethod(copied_attribute_value) is False:
-                setattr(submit_stage_copy, copied_attribute_name, copied_attribute_value)
+                setattr(analyze_stage_copy, copied_attribute_name, copied_attribute_value)
 
-        submit_stage_copy.dispatcher = self.source.dispatcher.copy()
+        user_hooks: Dict[str, Hook] = {}
+        for hooks in registrar.all.values():
+            for hook in hooks:
+                if hasattr(self.source, hook.shortname) and not hasattr(Analyze, hook.shortname):
+                    user_hooks = {
+                        hook.shortname: hook._call
+                    }
+
+        analyze_stage_copy.dispatcher = self.source.dispatcher.copy()
 
         edge_candidates = self._generate_edge_submit_candidates(edges)
-
-        destination_path = self.all_paths.get(self.destination.name)
 
         minimum_edge_idx = min([edge.transition_idx for edge in edges])
 
         assigned_candidates = [
-            candidate_name for candidate_name in submit_candidates if candidate_name in destination_path
+            candidate_name for candidate_name in submit_candidates if candidate_name
         ]
 
         for candidate in assigned_candidates:
@@ -203,19 +201,30 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             elif candidate not in edge_candidates:
                 self.assigned_candidates.append(candidate)
 
-        submit_stage_copy.context = SimpleContext()
-        for event in submit_stage_copy.dispatcher.events_by_name.values():
-            event.context = submit_stage_copy.context 
-            event.source.stage_instance = submit_stage_copy
-            event.source.stage_instance.context = submit_stage_copy.context
-            event.source.context = submit_stage_copy.context
-
-            event.source._call = getattr(submit_stage_copy, event.source.shortname)
+        analyze_stage_copy.context = SimpleContext()
+        for event in analyze_stage_copy.dispatcher.events_by_name.values():
+            event.context = analyze_stage_copy.context 
+            event.source.stage_instance = analyze_stage_copy
+            event.source.stage_instance.context = analyze_stage_copy.context
+            event.source.context = analyze_stage_copy.context
             
-            event.source._call = event.source._call.__get__(submit_stage_copy, submit_stage_copy.__class__)
-            setattr(submit_stage_copy, event.source.shortname, event.source._call)
+            if event.source.shortname in user_hooks:
+                hook_call = user_hooks.get(event.source.shortname)
+
+                hook_call = hook_call.__get__(analyze_stage_copy, analyze_stage_copy.__class__)
+                setattr(analyze_stage_copy, event.source.shortname, hook_call)
+
+                event.source._call = hook_call
+
+            else:            
+                event.source._call = getattr(analyze_stage_copy, event.source.shortname)
+                event.source._call = event.source._call.__get__(analyze_stage_copy, analyze_stage_copy.__class__)
+                setattr(analyze_stage_copy, event.source.shortname, event.source._call)
           
-        self.source = submit_stage_copy
+        self.source = analyze_stage_copy
+
+        if minimum_edge_idx < self.transition_idx:
+            self.skip_stage = True
 
     def _generate_edge_submit_candidates(self, edges: List[AnalyzeEdge]):
 
