@@ -146,6 +146,6 @@ class Transition:
                         }
                     })
 
-                    
+        self.edge.edge_data = {}
 
         return result

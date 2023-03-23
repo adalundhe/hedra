@@ -68,6 +68,8 @@ class SubmitEdge(BaseEdge[Submit]):
 
         self.visited.append(self.source.name)
 
+        print(self.source.name, 'DONE!')
+
         return None, self.destination.stage_type
 
     def _update(self, destination: Stage):
@@ -115,7 +117,7 @@ class SubmitEdge(BaseEdge[Submit]):
                 'stage_totals', 
                 {}
             )
-            
+
             for stage_name, stage_total in stage_totals.items():
 
                 if session_totals.get(stage_name) is None:   

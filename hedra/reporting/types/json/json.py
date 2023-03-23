@@ -18,7 +18,7 @@ class JSON:
     def __init__(self, config: JSONConfig) -> None:
         self.events_filepath = config.events_filepath
         self.metrics_filepath = config.metrics_filepath
-        self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
+        self._executor = ThreadPoolExecutor(max_workers=1)
         self._loop = asyncio.get_event_loop()
 
         self.session_uuid = str(uuid.uuid4())
@@ -98,4 +98,5 @@ class JSON:
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping Error Metrics')
 
     async def close(self):
+        self._executor.shutdown()
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')
