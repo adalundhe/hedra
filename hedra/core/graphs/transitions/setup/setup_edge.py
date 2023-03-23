@@ -43,8 +43,6 @@ class SetupEdge(BaseEdge[Setup]):
     async def transition(self):
         self.source.state = StageStates.SETTING_UP
 
-        history = self.history[(self.from_stage_name, self.source.name)]
-
         setup_candidates = self.get_setup_candidates()
 
         if len(self.assigned_candidates) > 0:
@@ -57,18 +55,18 @@ class SetupEdge(BaseEdge[Setup]):
         for setup_candidate in setup_candidates.values():
             setup_candidate.context = SimpleContext()
 
-        history['setup_stage_target_stages'] = setup_candidates
-        history['setup_stage_target_config'] = self.source.config
+        self.edge_data['setup_stage_target_stages'] = setup_candidates
+        self.edge_data['setup_stage_target_config'] = self.source.config
 
-        self.source.context.update(history)
+        self.source.context.update(self.edge_data)
 
         for event in self.source.dispatcher.events_by_name.values():
             event.source.stage_instance = self.source
-            self.source.context.update(history)
-            event.context.update(history)
+            self.source.context.update(self.edge_data)
+            event.context.update(self.edge_data)
             
             if event.source.context:
-                event.source.context.update(history)
+                event.source.context.update(self.edge_data)
         
         if self.timeout and self.skip_stage is False:
             await asyncio.wait_for(self.source.run(), timeout=self.timeout)
@@ -76,9 +74,9 @@ class SetupEdge(BaseEdge[Setup]):
             await self.source.run()
 
         for provided in self.provides:
-            history[provided] = self.source.context[provided]
+            self.edge_data[provided] = self.source.context[provided]
 
-        history['setup_stage_candidates'] = setup_candidates
+        self.edge_data['setup_stage_candidates'] = setup_candidates
 
         self._update(self.destination)
 
@@ -110,7 +108,6 @@ class SetupEdge(BaseEdge[Setup]):
                 key: value for key, value  in history.items() if key in self.provides
             })
 
-        history = self.history[(self.from_stage_name, self.source.name)]
 
         if self.next_history.get((self.source.name, destination.name)) is None:
             self.next_history[(self.source.name, destination.name)] = {}
@@ -126,9 +123,9 @@ class SetupEdge(BaseEdge[Setup]):
 
         else:
 
-            ready_stages = history.get('setup_stage_ready_stages', {})
-            setup_candidates = history.get('setup_stage_candidates', {})
-            setup_config = history.get('execute_stage_setup_config')
+            ready_stages = self.edge_data.get('setup_stage_ready_stages', {})
+            setup_candidates = self.edge_data.get('setup_stage_candidates', {})
+            setup_config = self.edge_data.get('execute_stage_setup_config')
             execute_stage_setup_hooks = []
             setup_execute_stage: Execute = ready_stages.get(self.source.name)
 

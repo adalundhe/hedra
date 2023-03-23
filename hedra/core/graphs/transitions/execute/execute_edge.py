@@ -1,8 +1,11 @@
 from __future__ import annotations
 import asyncio
 import inspect
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Union
+from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.base.hook import Hook
+from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.hooks.types.base.registrar import registrar
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
@@ -11,6 +14,9 @@ from hedra.core.graphs.stages.analyze.analyze import Analyze
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
+
+
+ExecuteHooks = List[Union[ActionHook , TaskHook]]
 
 
 class ExecuteEdge(BaseEdge[Execute]):
@@ -53,8 +59,6 @@ class ExecuteEdge(BaseEdge[Execute]):
 
         self.source.state = StageStates.EXECUTING
 
-        history = self.history[(self.from_stage_name, self.source.name)]
-
         execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
         analyze_stages: Dict[str, Stage] = self.generate_analyze_candidates()
 
@@ -63,14 +67,14 @@ class ExecuteEdge(BaseEdge[Execute]):
                 stage_name: stage for stage_name, stage in analyze_stages.items() if stage_name in self.assigned_candidates
             }
 
-        self.source.context.update(history)
+        self.source.context.update(self.edge_data)
         
         for event in self.source.dispatcher.events_by_name.values():
             event.source.stage_instance = self.source
-            event.context.update(history)
+            event.context.update(self.edge_data)
             
             if event.source.context:
-                event.source.context.update(history)
+                event.source.context.update(self.edge_data)
 
         if self.timeout and self.skip_stage is False:
             await asyncio.wait_for(self.source.run(), timeout=self.timeout)
@@ -79,7 +83,7 @@ class ExecuteEdge(BaseEdge[Execute]):
             await self.source.run()
 
         for provided in self.provides:
-            self.history[(self.from_stage_name, self.source.name)][provided] = self.source.context[provided]
+            self.edge_data[provided] = self.source.context[provided]
         
         if self.destination.context is None:
             self.destination.context = SimpleContext()
@@ -128,17 +132,15 @@ class ExecuteEdge(BaseEdge[Execute]):
 
         if self.skip_stage is False:
 
-            history = self.history[(self.from_stage_name, self.source.name)]
-
             next_results.update({
                 'execute_stage_results': {
-                    self.source.name: history['execute_stage_results']
+                    self.source.name: self.edge_data['execute_stage_results']
                 },
-                'execute_stage_setup_config': history['execute_stage_setup_config'],
-                'execute_stage_setup_hooks': history['execute_stage_setup_hooks'],
-                'execute_stage_setup_by': history['execute_stage_setup_by'],
-                'setup_stage_ready_stages': history['setup_stage_ready_stages'],
-                'setup_stage_candidates': history['setup_stage_candidates']
+                'execute_stage_setup_config': self.edge_data['execute_stage_setup_config'],
+                'execute_stage_setup_hooks': self.edge_data['execute_stage_setup_hooks'],
+                'execute_stage_setup_by': self.edge_data['execute_stage_setup_by'],
+                'setup_stage_ready_stages': self.edge_data['setup_stage_ready_stages'],
+                'setup_stage_candidates': self.edge_data['setup_stage_candidates']
             })
 
             self.next_history.update({
@@ -271,4 +273,51 @@ class ExecuteEdge(BaseEdge[Execute]):
         return selected_submit_candidates
     
     def setup(self) -> None:
-        return super().setup()
+
+        max_batch_size = 0
+        execute_stage_setup_config: Config = None
+        execute_stage_setup_hooks: Dict[str, ExecuteHooks] = {}
+        execute_stage_setup_by: str = None
+        setup_stage_ready_stages: List[Stage] = []
+        setup_stage_candidates: List[Stage] = []
+
+        for from_stage_name in self.from_stage_names:
+            previous_history = self.history[(from_stage_name, self.source.name)]
+
+            execute_config: Config = previous_history['execute_stage_setup_config']
+            setup_by = previous_history['execute_stage_setup_by']
+
+            if execute_config.optimized:
+                execute_stage_setup_config = execute_config
+                max_batch_size = execute_config.batch_size
+                execute_stage_setup_by = setup_by
+
+            elif execute_config.batch_size > max_batch_size:
+                execute_stage_setup_config = execute_config
+                max_batch_size = execute_config.batch_size
+                execute_stage_setup_by = setup_by
+
+            execute_hooks: ExecuteHooks = previous_history['execute_stage_setup_hooks']
+            for setup_hook in execute_hooks:
+                execute_stage_setup_hooks[setup_hook.name] = setup_hook
+
+            ready_stages = previous_history['setup_stage_ready_stages']
+
+            for ready_stage in ready_stages:
+                if ready_stage not in setup_stage_ready_stages:
+                    setup_stage_ready_stages.append(ready_stage)
+
+            stage_candidates: List[Stage] = previous_history['setup_stage_candidates']
+            for stage_candidate in stage_candidates:
+                if stage_candidate not in setup_stage_candidates:
+                    setup_stage_candidates.append(stage_candidate)
+            
+
+        self.edge_data = {
+            'execute_stage_setup_config': execute_stage_setup_config,
+            'execute_stage_setup_hooks': execute_stage_setup_hooks,
+            'execute_stage_setup_by': execute_stage_setup_by,
+            'setup_stage_ready_stages': setup_stage_ready_stages,
+            'setup_stage_candidates': setup_stage_candidates
+
+        }
