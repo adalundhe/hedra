@@ -52,24 +52,16 @@ class Submit(Stage, Generic[T]):
     @context()
     async def collect_process_results_and_metrics(
         self,
+        analyze_stage_session_total: int = 0,
         analyze_stage_events: List[T]=[],
-        analyze_stage_summary_metrics: Dict[str, Any]={}
+        analyze_stage_summary_metrics: List[Any]=[]
 
     ):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Initializing results submission')
 
-        session_total = analyze_stage_summary_metrics.get('session_total', 0)
-        metrics = []
-
-        stage_summaries = analyze_stage_summary_metrics.get('stages', {})
-        for stage in stage_summaries.values():
-            metrics.extend(list(
-                stage.get('actions', {}).values()
-            ))
-
         return {
-            'submit_stage_session_total': session_total,
-            'submit_stage_metrics': metrics,
+            'submit_stage_session_total': analyze_stage_session_total,
+            'submit_stage_metrics': analyze_stage_summary_metrics,
             'submit_stage_events': analyze_stage_events
         }
 

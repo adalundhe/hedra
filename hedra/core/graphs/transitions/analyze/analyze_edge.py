@@ -42,54 +42,24 @@ class AnalyzeEdge(BaseEdge[Analyze]):
     
     async def transition(self):
         self.source.state = StageStates.ANALYZING
-
-        raw_results = {}
-        for source_name, destination_name in self.history:
-            
-            stage_results = self.history[(
-                source_name, 
-                destination_name
-            )].get('execute_stage_results')
-
-            if destination_name == self.source.name and stage_results:
-                raw_results.update(stage_results)
-
-        execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
         submit_candidates = self.generate_submit_candidates()
 
         if len(self.assigned_candidates) > 0:
             submit_candidates = {
                 stage_name: stage for stage_name, stage in submit_candidates.items() if stage_name in self.assigned_candidates
             }
-
-        results_to_calculate = {}
-        target_stages = {}
-        for stage_name in raw_results.keys():
-            stage = execute_stages.get(stage_name)
-            all_paths = self.all_paths.get(stage_name)
-
-            in_path = self.source.name in all_paths
-
-            if in_path:
-                stage.state = StageStates.ANALYZING
-                results_to_calculate[stage_name] = raw_results.get(stage_name)
-                target_stages[stage_name] = stage
         
-        history = self.history.get((self.from_stage_name, self.source.name), {})
-        
-        history['analyze_stage_raw_results'] = results_to_calculate
-        history['analyze_stage_target_stages'] = target_stages
-        
-        self.source.context.update(history)
+        self.source.context.update(self.edge_data)
         
         for event in self.source.dispatcher.events_by_name.values():
             event.source.stage_instance = self.source
-            event.context.update(history)
+            event.context.update(self.edge_data)
             
             if event.source.context:
-                event.source.context.update(history)
+                event.source.context.update(self.edge_data)
         
-        if len(results_to_calculate) > 0:
+
+        if self.edge_data['analyze_stage_has_results']:
 
             if self.timeout and self.skip_stage is False:
                 await asyncio.wait_for(self.source.run(), timeout=self.timeout)
@@ -98,19 +68,14 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                 await self.source.run()
         
         for provided in self.provides:
-            history[provided] = self.source.context[provided]
-
-            self.history[(
-                self.from_stage_name, 
-                self.source.name
-            )] = history
+            self.edge_data[provided] = self.source.context[provided]
 
         self.destination.state = StageStates.ANALYZED
 
         if self.destination.context is None:
             self.destination.context = SimpleContext()
 
-        if len(results_to_calculate) > 0:
+        if self.edge_data['analyze_stage_has_results']:
 
             self._update(self.destination)
 
@@ -148,15 +113,13 @@ class AnalyzeEdge(BaseEdge[Analyze]):
 
         if self.skip_stage is False:
 
-            history = self.history[(self.from_stage_name, self.source.name)]
-
             self.next_history.update({
                 (self.source.name, destination.name): {
-                    'analyze_stage_summary_metrics': history.get(
+                    'analyze_stage_summary_metrics': self.edge_data.get(
                         'analyze_stage_summary_metrics', 
                         {}
                     ),
-                    'analyze_stage_custom_metrics_set': history.get(
+                    'analyze_stage_custom_metrics_set': self.edge_data.get(
                         'analyze_stage_custom_metrics_set',
                         {}
                     )
@@ -282,3 +245,36 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                     selected_submit_candidates[stage_name] = submit_candidates.get(stage_name)
 
         return selected_submit_candidates
+
+    def setup(self) -> None:
+
+        raw_results = {}
+        for from_stage_name in self.from_stage_names:
+            
+            stage_results = self.history[(
+                from_stage_name, 
+                self.source.name
+            )].get('execute_stage_results')
+
+            if stage_results:
+                raw_results.update(stage_results)
+
+        execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
+
+        results_to_calculate = {}
+        target_stages = {}
+        for stage_name in raw_results.keys():
+            stage = execute_stages.get(stage_name)
+            all_paths = self.all_paths.get(stage_name)
+
+            in_path = self.source.name in all_paths
+
+            if in_path:
+                stage.state = StageStates.ANALYZING
+                results_to_calculate[stage_name] = raw_results.get(stage_name)
+                target_stages[stage_name] = stage
+        
+        
+        self.edge_data['analyze_stage_raw_results'] = results_to_calculate
+        self.edge_data['analyze_stage_target_stages'] = target_stages
+        self.edge_data['analyze_stage_has_results'] = len(results_to_calculate) > 0

@@ -269,3 +269,6 @@ class ExecuteEdge(BaseEdge[Execute]):
                     selected_submit_candidates[stage_name] = submit_candidates.get(stage_name)
 
         return selected_submit_candidates
+    
+    def setup(self) -> None:
+        return super().setup()

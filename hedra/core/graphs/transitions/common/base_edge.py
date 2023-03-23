@@ -18,6 +18,7 @@ class BaseEdge(Generic[T]):
         self.stages_by_type: Dict[StageTypes, Dict[str, Stage]] = {}
         self.path_lengths: Dict[str, int] = {}
         self.history = {}
+        self.edge_data = {}
         self.next_history = {}
         self.visited = []
         self.valid_states = []
@@ -52,7 +53,10 @@ class BaseEdge(Generic[T]):
 
     def split(self) -> None:
         raise NotImplementedError('Err. - Please implement this method in the Edge class inheriting BaseEdge')
-    
 
     def merge(self) -> None:
         raise NotImplementedError('Err. - Please implement this method in the Edge class inheriting BaseEdge')
+    
+    def setup(self) -> None:
+        pass
+        #raise NotImplementedError('Err. - Please implement this method in the Edge class inheriting BaseEdge')

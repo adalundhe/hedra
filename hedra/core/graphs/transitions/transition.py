@@ -50,11 +50,7 @@ class Transition:
 
     async def execute(self):
 
-        next_history = {}
-
-        if len(self.edge.from_stage_names) > 1:
-            # We need to merge the histories.
-            self.edge.merge()
+        self.edge.setup()
 
         self.edge.source.context = SimpleContext()
         

@@ -404,16 +404,19 @@ class Analyze(Stage):
         
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Calculated results for - {stage_total} - actions from stage - {stage_name}')
 
-            processed_results.append({
-                'stage_metrics': {
-                    stage_name: {
-                        'total': stage_total,
-                        'actions_per_second': stage_total/stage_total_time,
-                        'actions': grouped_stats
-                    }
-                },
-                'stage_total': stage_total
-            })
+            processed_results.append((
+                stage_name,
+                {
+                    'stage_metrics': {
+                        stage_name: {
+                            'total': stage_total,
+                            'actions_per_second': stage_total/stage_total_time,
+                            'actions': grouped_stats
+                        }
+                    },
+                    'stage_total': stage_total
+                }
+            ))
 
         return {
             'analyze_stage_processed_results': processed_results
@@ -432,13 +435,14 @@ class Analyze(Stage):
         self.context[self.name] = analyze_stage_contexts
         
         summaries = {
-            'session_total': 0,
-            'stages': {}
+            'stages': {},
+            'source': self.name,
+            'stage_totals': {}
         }
 
-        for result in analyze_stage_processed_results:
+        for stage_name, result in analyze_stage_processed_results:
             summaries['stages'].update(result.get('stage_metrics'))
-            summaries['session_total'] += result.get('stage_total')
+            summaries['stage_totals'][stage_name] = result.get('stage_total')
 
         self.analysis_execution_time = round(
             time.monotonic() - self.analysis_execution_time_start
