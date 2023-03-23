@@ -12,7 +12,6 @@ class MetricHookValidator(BaseModel):
             "count",
             "rate",
             "distribution",
-            "set",
             "sample"
         ]
 

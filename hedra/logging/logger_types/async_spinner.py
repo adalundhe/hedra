@@ -250,13 +250,19 @@ class AsyncSpinner(Yaspin):
             return log_result
 
     async def __aenter__(self):
-        self.display.group_timer.reset()
-        await self.start()
+
+        if self.logger_enabled:
+            self.display.group_timer.reset()
+            await self.start()
+
         return self
 
     async def __aexit__(self, exc_type, exc_val, traceback):
         # Avoid stop() execution for the 2nd time
-        if self.enabled and self._spin_thread.done() is False and self._spin_thread.cancelled() is False:
+
+        enabled = self.enabled and self.logger_enabled
+
+        if enabled and self._spin_thread.done() is False and self._spin_thread.cancelled() is False:
             await self.stop()
             
         return False  # nothing is handled

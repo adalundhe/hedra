@@ -1,11 +1,18 @@
 from __future__  import annotations
 import asyncio
-from typing import List
+from collections import defaultdict
+from typing import List, Dict, Any
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.submit.submit import Submit
+from hedra.reporting.metric import MetricsSet
+from hedra.reporting.metric.custom_metric import CustomMetric
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.stages.types.stage_states import StageStates
+
+
+CustomMetricSet = Dict[str, Dict[str, CustomMetric]]
+MetricsSetGroup = Dict[str, Dict[str, Dict[str, Dict[str, MetricsSet]]]]
 
 
 class SubmitEdge(BaseEdge[Submit]):
@@ -20,6 +27,7 @@ class SubmitEdge(BaseEdge[Submit]):
         )
         
         self.requires = [
+            'analyze_stage_custom_metrics_set',
             'analyze_stage_events',
             'analyze_stage_summary_metrics'
         ]
@@ -29,11 +37,13 @@ class SubmitEdge(BaseEdge[Submit]):
 
     async def transition(self):
         self.source.state = StageStates.SUBMITTING
-
+        
         history = self.history[(self.from_stage_name, self.source.name)]
+        
+        self.source.context.update(history)
 
         for event in self.source.dispatcher.events_by_name.values():
-            self.source.context.update(history)
+            event.source.stage_instance = self.source
             event.context.update(history)
             
             if event.source.context:
@@ -83,3 +93,41 @@ class SubmitEdge(BaseEdge[Submit]):
         
         if self.transition_idx != min(transition_idxs):
             self.skip_stage = True
+
+    def merge(self):
+
+        metrics: List[MetricsSet] = []
+        for from_stage_name in self.from_stage_names:
+            previous_history = self.history[(from_stage_name, self.source.name)]
+            analyze_stage_summary_metrics: MetricsSetGroup = previous_history['analyze_stage_summary_metrics']
+            stage_summaries = analyze_stage_summary_metrics.get('stages', {})
+            for stage in stage_summaries.values():
+                metrics.extend(list(
+                    stage.get('actions', {}).values()
+                ))
+
+        metrics_set_counts = defaultdict(lambda: 0)
+
+        for metrics_set in metrics:
+            metrics_set_counts[metrics_set.name] += 1
+
+        custom_metrics: Dict[str, CustomMetric] = {}
+        for from_stage in self.from_stage_names:
+            previous_history = self.history[(from_stage, self.source.name)]
+            analyze_stage_custom_metrics_set: CustomMetricSet = previous_history['analyze_stage_custom_metrics_set']
+            
+            for custom_metrics_set in analyze_stage_custom_metrics_set.values():
+                custom_metrics.update(custom_metrics_set)
+
+    
+        for metric_set in metrics:
+            set_count = metrics_set_counts.get(metric_set.name)
+
+            if set_count > 1:
+                # If two of the same set exist we merge their custom metrics.
+                metric_set.custom_metrics = custom_metrics
+
+
+
+
+

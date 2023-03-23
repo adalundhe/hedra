@@ -169,6 +169,8 @@ def optimize_stage(serialized_config: str):
 
         generated_stages = {}
         for stage in discovered.values():
+            stage.context = SimpleContext()
+            
             initialized_stage =  set_stage_hooks(
                 stage(),
                 generated_stages

@@ -139,13 +139,6 @@ async def start_execution(
 
     await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Execution complete - Time (including addtional setup) took: {round(elapsed, 2)} seconds')
 
-    for result in results:
-        result.checks = [
-            [
-                event.event_name for event in layer
-            ] for layer in list(result.checks)
-        ]
-
     context = {}
 
     for stage in pipeline_stages.values():
@@ -239,6 +232,7 @@ def execute_actions(parallel_config: str):
         generated_hooks = {}
         for stage in discovered.values():
             stage: Stage = stage()
+            stage.context = SimpleContext()
             stage.graph_name = graph_name
             stage.graph_path = graph_path
             stage.graph_id = graph_id

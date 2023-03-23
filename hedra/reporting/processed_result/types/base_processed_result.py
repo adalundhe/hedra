@@ -45,18 +45,6 @@ class BaseProcessedResult:
 
         self.time = self.timings.get('total', 0)
 
-        action_or_task_event = stage.dispatcher.actions_and_tasks.get(result.name)
-
-        if action_or_task_event:
-            self.checks = [
-                [
-                    stage.dispatcher.events_by_name.get(check_name) for check_name in layer
-                ] for layer in result.checks
-            ]
-
-        else:
-            self.checks = []
-
         self.tags = [
             Tag(
                 tag.get('name'),
@@ -64,41 +52,6 @@ class BaseProcessedResult:
             ) for tag in result.tags
         ]
         self.stage = None
-
-    async def check_result(self, result: Any):
-        next_args = {
-            'result': result
-        }
-        for layer in self.checks:
-            results = await asyncio.gather(*[
-                asyncio.create_task(
-                    self._run_check(event, next_args)
-                ) for event in layer
-            ])
-
-            for result in results:
-                next_args.update(result)
-
-    async def _run_check(self, check: BaseEvent, hook_args: Dict[str, Any]) -> Dict[str, Any]:
-
-        try:
-            result = await check.call(**hook_args)
-            if isinstance(result, dict) is False:
-                result = {
-                    check.event_name: result
-                }
-
-        except AssertionError:              
-            error_message = traceback.format_exc().split(
-                '\n'
-            )[-3].strip()
-
-            self.error = f'Check - {error_message} - for action - {self.name} - failed.'
-            result = {
-                check.event_name: Exception(f'Check - {error_message} - for action - {self.name} - failed.')
-            }
-
-        return result
 
 
     @property

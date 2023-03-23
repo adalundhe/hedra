@@ -3,7 +3,6 @@ import asyncio
 from collections import OrderedDict, defaultdict
 from typing import List, Union, Dict, Any, Tuple
 from hedra.core.hooks.types.action.event import ActionEvent
-from hedra.core.hooks.types.metric.event import MetricEvent
 from hedra.core.hooks.types.task.event import TaskEvent
 from hedra.core.hooks.types.channel.event import ChannelEvent
 from .event import BaseEvent
@@ -167,6 +166,7 @@ class EventDispatcher:
             self.channels[channel_event_name] = channel_event
 
     async def dispatch_events(self, stage_name: str):
+
         await asyncio.gather(*[
             asyncio.create_task(
                 self._execute_batch(initial_event)
@@ -252,4 +252,5 @@ class EventDispatcher:
                         next_event.next_args[next_event.event_name].update(result)
                         event.context.update(next_event.next_args[next_event.event_name])
                         event.source.stage_instance.context.update(next_event.next_args[next_event.event_name])
+
                 

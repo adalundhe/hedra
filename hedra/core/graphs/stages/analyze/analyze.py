@@ -13,6 +13,7 @@ from hedra.core.hooks.types.event.decorator import event
 from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.hooks.types.base.hook_type import HookType
+from hedra.core.hooks.types.base.event_types import EventType
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.reporting.processed_result import results_types
 from hedra.reporting.processed_result.types import (
@@ -336,10 +337,14 @@ class Analyze(Stage):
 
         custom_metrics_set = defaultdict(dict)
 
-        for context_key, context_value in self.context:
+        metrics = [
+            metric_event for metric_event in self.dispatcher.events[EventType.METRIC]
+        ]
 
-            if isinstance(context_value, CustomMetric):
-                custom_metrics_set[context_value.metric_group][context_key] = context_value
+        for metric in metrics:
+            for context_key, context_value in metric.context:
+                if isinstance(context_value, CustomMetric):
+                    custom_metrics_set[context_value.metric_group][context_key] = context_value
 
         return {
             'analyze_stage_custom_metrics_set': custom_metrics_set
@@ -364,7 +369,7 @@ class Analyze(Stage):
 
             for event_group_name, events_group in stage_events.items():  
 
-                custom_metrics = analyze_stage_custom_metrics_set.get(event_group_name)
+                custom_metrics = analyze_stage_custom_metrics_set.get(event_group_name, {})
 
                 events_group.calculate_quantiles()
 
@@ -399,7 +404,7 @@ class Analyze(Stage):
         
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Calculated results for - {stage_total} - actions from stage - {stage_name}')
 
-            processed_results.append( {
+            processed_results.append({
                 'stage_metrics': {
                     stage_name: {
                         'total': stage_total,
@@ -417,6 +422,7 @@ class Analyze(Stage):
     @context('generate_metrics_sets')
     async def generate_summary(
         self,
+        analyze_stage_custom_metrics_set: CustoMetricsSet={},
         analyze_stage_stages_count: int=0,
         analyze_stage_total_group_results: int=0,
         analyze_stage_processed_results: ProcessedResultsSet={},
@@ -442,6 +448,7 @@ class Analyze(Stage):
         await self.logger.spinner.set_default_message(f'Completed results analysis for {analyze_stage_total_group_results} actions and {analyze_stage_stages_count} stages over {self.analysis_execution_time} seconds')
 
         return {
+            'analyze_stage_custom_metrics_set': analyze_stage_custom_metrics_set,
             'analyze_stage_summary_metrics': summaries
         }
 

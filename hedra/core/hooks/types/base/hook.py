@@ -19,6 +19,7 @@ class Hook:
         self.hook_id = str(uuid.uuid4())
         self.name = name
         self.shortname = shortname
+
         self._call: Callable[..., Awaitable[Any]] = call
         self.stage = stage
         self.hook_type = hook_type

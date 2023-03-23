@@ -3,9 +3,8 @@ import threading
 import os
 import uuid
 from collections import defaultdict
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from hedra.core.engines.client.time_parser import TimeParser
-from hedra.core.hooks.types.base.event import BaseEvent
 from hedra.core.hooks.types.base.event_dispatch import EventDispatcher
 from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.hooks.types.base.hook_type import HookType
@@ -48,7 +47,7 @@ class Stage:
         self.plugins_by_type: Dict[PluginType, Dict[str, Plugin]] = defaultdict(dict)
 
         self.core_config = {}
-        self.context = SimpleContext()
+        self.context: Optional[SimpleContext] = None
         self.logger: HedraLogger = HedraLogger()
         self.logger.initialize()
 
@@ -64,7 +63,7 @@ class Stage:
             self.timeout = None
 
         self.internal_hooks = ['run']
-        self.dispatcher = EventDispatcher()
+        self.dispatcher: EventDispatcher = EventDispatcher()
         self.skip = False
 
     @Internal()

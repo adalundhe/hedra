@@ -63,8 +63,10 @@ class ExecuteEdge(BaseEdge[Execute]):
                 stage_name: stage for stage_name, stage in analyze_stages.items() if stage_name in self.assigned_candidates
             }
 
+        self.source.context.update(history)
+        
         for event in self.source.dispatcher.events_by_name.values():
-            self.source.context.update(history)
+            event.source.stage_instance = self.source
             event.context.update(history)
             
             if event.source.context:
@@ -132,7 +134,6 @@ class ExecuteEdge(BaseEdge[Execute]):
                 'execute_stage_results': {
                     self.source.name: history['execute_stage_results']
                 },
-                'execute_stage_skipped': self.skip_stage,
                 'execute_stage_setup_config': history['execute_stage_setup_config'],
                 'execute_stage_setup_hooks': history['execute_stage_setup_hooks'],
                 'execute_stage_setup_by': history['execute_stage_setup_by'],

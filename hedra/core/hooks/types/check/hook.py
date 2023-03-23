@@ -11,6 +11,7 @@ class CheckHook(Hook):
         shortname: str, 
         call: Callable[..., Awaitable[Any]], 
         *names: List[str],
+        message: str='Did not return True.',
         order: int=1
     ) -> None:
         super().__init__(
@@ -20,11 +21,19 @@ class CheckHook(Hook):
             hook_type=HookType.CHECK
         )
 
+        self.message = message
         self.names = list(set(names))
         self.order = order
 
     async def call(self, **kwargs):
-        passed = await super().call(**{name: value for name, value in kwargs.items() if name in self.params})
+        passed = await self._call(**{
+            name: value for name, value in kwargs.items() if name in self.params
+        })
+
+        result = kwargs.get('result')
+
+        if passed is False and result:
+            result.error = f'Check - {self.name} - failed. Context - {self.message}'
 
         if isinstance(passed, dict):
             return {

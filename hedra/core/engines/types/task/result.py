@@ -26,7 +26,6 @@ class TaskResult(BaseResult):
             task.metadata.user,
             task.metadata.tags,
             RequestTypes.TASK,
-            [],
             error
         )
 

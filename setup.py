@@ -57,6 +57,7 @@ setup(
         'scikit-learn',
         'uvloop',
         'tdigest',
+        'pydantic',
         'GitPython'
     ],
     entry_points = {

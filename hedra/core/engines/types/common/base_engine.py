@@ -1,7 +1,5 @@
 import asyncio
-from typing import TypeVar, List, Dict, Any, Generic, Coroutine, Awaitable
-from .base_action import BaseAction
-from .base_result import BaseResult
+from typing import TypeVar, List, Dict, Any, Generic, Coroutine, Callable
 
 
 A = TypeVar('A')
@@ -76,3 +74,34 @@ class BaseEngine(Generic[A, R]):
                         })
  
         return response
+    
+    async def execute_checks(self, action: A, response: R) -> Coroutine[Any, Any, R]:
+        action.action_args['action'] = action
+        action.action_args['result'] = response
+
+        if response.error:
+            return response
+
+        if action.hooks.notify:
+            action.action_args.update({
+                name: action_or_task.action for name, action_or_task in action.hooks.listeners.items()
+            })
+            
+        for check_batch in action.hooks.checks:
+            results: List[Dict[str, Any]] = await asyncio.gather(*[
+                check.call(**{
+                    name: value for name, value in action.action_args.items() if name in check.params
+                }) for check in check_batch
+            ])
+
+            for check_event, result in zip(check_batch, results):
+                for data in result.values():
+                    if isinstance(result, dict):
+                        action.action_args.update(data)
+
+                    else:
+                        action.action_args.update({
+                            check_event.shortname: data
+                        })
+
+        return action.action_args.get('result')

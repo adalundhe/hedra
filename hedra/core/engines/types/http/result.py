@@ -37,7 +37,6 @@ class HTTPResult(BaseResult):
             action.metadata.user,
             action.metadata.tags,
             RequestTypes.HTTP,
-            action.hooks.checks,
             error
         )
 

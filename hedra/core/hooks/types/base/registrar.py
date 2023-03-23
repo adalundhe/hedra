@@ -42,9 +42,9 @@ class Registrar:
     def __call__(self, hook):
         self.module_paths[hook.__name__] = hook.__module__
 
-        @functools.wraps(hook)
+  
         def wrap_hook(*args, **kwargs):
-        
+
             def wrapped_method(func):
 
                 hook_name = func.__qualname__

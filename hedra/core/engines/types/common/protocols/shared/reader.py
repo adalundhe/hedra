@@ -138,7 +138,7 @@ class Reader:
 
         self._maybe_resume_transport()
         return data
-
+    
     async def readline_fast(self, sep=b'\n'):
         seplen = len(sep)
         if self._exception is not None:

@@ -1,7 +1,7 @@
-import asyncio
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.graphs.stages.base.stage import Stage
+
 
 class Idle(Stage):
     stage_type=StageTypes.IDLE
@@ -13,5 +13,5 @@ class Idle(Stage):
     @Internal()
     async def run(self):
         await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Starting graph execution')
-        await asyncio.sleep(1)
+
         

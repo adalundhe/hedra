@@ -136,8 +136,7 @@ class BaseEvent(Generic[T]):
         ]
 
         for event in next_events:
-            if isinstance(event, BaseEvent):
-                event.context = self.context
+            event.context = self.context
 
             self.next_args[event.event_name].update(results)
 

@@ -53,7 +53,15 @@ class OptimizeEdge(BaseEdge[Optimize]):
             }
                 
         history['optimize_stage_candidates'] = selected_optimization_candidates
+        
         self.source.context.update(history)
+        
+        for event in self.source.dispatcher.events_by_name.values():
+            event.source.stage_instance = self.source
+            event.context.update(history)
+            
+            if event.source.context:
+                event.source.context.update(history)
 
         if len(selected_optimization_candidates) > 0:
             self.source.generation_optimization_candidates = len(selected_optimization_candidates)

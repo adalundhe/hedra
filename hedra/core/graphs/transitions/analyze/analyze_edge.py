@@ -25,10 +25,10 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         )
 
         self.requires = [
-            'execute_stage_skipped',
             'execute_stage_results'
         ]
         self.provides = [
+            'analyze_stage_custom_metrics_set',
             'analyze_stage_summary_metrics'
         ]
 
@@ -51,12 +51,7 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                 destination_name
             )].get('execute_stage_results')
 
-            stage_skipped = self.history[(
-                source_name, 
-                destination_name
-            )].get('execute_stage_skipped')
-
-            if destination_name == self.source.name and stage_results and stage_skipped is False:
+            if destination_name == self.source.name and stage_results:
                 raw_results.update(stage_results)
 
         execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
@@ -71,8 +66,6 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         target_stages = {}
         for stage_name in raw_results.keys():
             stage = execute_stages.get(stage_name)
-
-
             all_paths = self.all_paths.get(stage_name)
 
             in_path = self.source.name in all_paths
@@ -87,13 +80,15 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         history['analyze_stage_raw_results'] = results_to_calculate
         history['analyze_stage_target_stages'] = target_stages
         
+        self.source.context.update(history)
+        
         for event in self.source.dispatcher.events_by_name.values():
-            self.source.context.update(history)
+            event.source.stage_instance = self.source
             event.context.update(history)
             
             if event.source.context:
                 event.source.context.update(history)
-                    
+        
         if len(results_to_calculate) > 0:
 
             if self.timeout and self.skip_stage is False:
@@ -159,6 +154,10 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                 (self.source.name, destination.name): {
                     'analyze_stage_summary_metrics': history.get(
                         'analyze_stage_summary_metrics', 
+                        {}
+                    ),
+                    'analyze_stage_custom_metrics_set': history.get(
+                        'analyze_stage_custom_metrics_set',
                         {}
                     )
                 }

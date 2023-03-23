@@ -4,6 +4,7 @@ from pydantic import BaseModel, validator, StrictStr, StrictInt
 
 class CheckHookValidator(BaseModel):
     names: Tuple[StrictStr, ...]
+    message: StrictStr
     order: StrictInt
 
     @validator('names')

@@ -29,12 +29,10 @@ class BaseResult:
         user: str,
         tags: List[Dict[str, str]],
         type: Union[RequestTypes, str],
-        checks: List[Coroutine], 
         error: Exception
     ) -> None:
         self.action_id = action_id
         self.name = name
-        self.checks = checks
         self.error = error
         self.source = source
         self.user = user

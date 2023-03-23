@@ -40,9 +40,24 @@ class TransitionGroup:
     def sort_and_map_transitions(self):
 
         for transition in self.transitions:
+
+            transition.edges = [
+                group_transition.edge for group_transition in self.transitions
+            ]
+
             destinations = self.adjacency_list[transition.edge.source.name]
+            transition.destinations = [
+                transition.edge.destination.name
+            ]
+
+
             if len(destinations)> 1:
                 transition.edge.split([transition.edge for transition in destinations])
+
+                transition.destinations = [
+                    destination_transition.edge.destination.name for destination_transition in destinations
+                ]
+
             
 
             

@@ -55,7 +55,7 @@ class ProcessedResultsGroup:
         self._streaming_stdev = defaultdict(StandardDeviation)
         self._streaming_median = defaultdict(Median)
 
-    async def add(
+    def add(
         self, 
         stage: Any, 
         result: Any, 
@@ -72,8 +72,6 @@ class ProcessedResultsGroup:
             self.source = processed_result.source
 
         self.tags.update(processed_result.tags_to_dict())
-    
-        await processed_result.check_result(result)
 
         if processed_result.error is None:
             self.succeeded += 1

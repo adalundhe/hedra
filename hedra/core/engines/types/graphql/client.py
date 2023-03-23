@@ -166,6 +166,9 @@ class MercuryGraphQLClient(MercuryHTTPClient[GraphQLAction, GraphQLResult]):
                     response = await self.execute_after(action, response)
                     action.setup()
 
+                if action.hooks.checks:
+                    response = await self.execute_checks(action, response)
+
                 if action.hooks.notify:
                     await asyncio.gather(*[
                         asyncio.create_task(

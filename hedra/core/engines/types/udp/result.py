@@ -34,7 +34,6 @@ class UDPResult(BaseResult):
             action.metadata.user,
             action.metadata.tags,
             RequestTypes.UDP,
-            action.hooks.checks,
             error
         )
 

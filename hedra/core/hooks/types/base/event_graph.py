@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import List, Union, Dict
 from hedra.core.hooks.types.base.event import BaseEvent
 from hedra.core.hooks.types.base.hook import Hook, HookType
+from .event_dispatch import EventDispatcher
 from .get_event import get_event
 
 class EventGraph:
@@ -159,6 +160,9 @@ class EventGraph:
 
             else:
                 event.source.stage_instance.hooks[event.hook_type].append(event)  
+
+            if event.source.stage_instance.dispatcher is None:
+                event.source.stage_instance.dispatcher = EventDispatcher()
                 
             if len(event.previous_map) < 1 and event.event_name in hook_names:
 

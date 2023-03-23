@@ -12,6 +12,7 @@ from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.hooks.types.base.registrar import registrar
 from hedra.core.hooks.types.base.hook import Hook, HookType
 from hedra.core.graphs.stages.base.parallel.batch_executor import BatchExecutor
+from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.transitions.exceptions.exceptions import (
     IsolatedStageError, 
     InvalidTransitionError
@@ -256,6 +257,7 @@ class TransitionAssembler:
 
         idle_stages = self.instances_by_type.get(StageTypes.IDLE)
         for idle_stage in idle_stages:
+            idle_stage.context = SimpleContext()
             idle_stage.context.stages = {}
             idle_stage.context.visited = []
             idle_stage.context.results = {}

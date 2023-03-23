@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Dict, List, Union, Any
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common.base_result import BaseResult
@@ -10,6 +11,7 @@ from hedra.core.engines.types.playwright import PlaywrightResult
 from hedra.core.engines.types.task import TaskResult
 from hedra.core.engines.types.udp import UDPResult
 from hedra.core.engines.types.websocket import WebsocketResult
+from hedra.reporting.processed_result.results import results_types
 
 
 ResultsBatch = Dict[str, Union[List[BaseResult], float]]
@@ -62,3 +64,10 @@ class ResultsSet:
                 HTTPResult
             ).from_dict(result) for result in self.serialized_results
         ]
+
+    def group(self) -> Dict[str, List[BaseResult]]:
+        grouped_results = defaultdict(list)
+        for result in self.results:
+            grouped_results[result.name].append(result)
+
+        return grouped_results

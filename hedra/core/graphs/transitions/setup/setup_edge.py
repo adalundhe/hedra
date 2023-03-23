@@ -54,15 +54,19 @@ class SetupEdge(BaseEdge[Setup]):
 
         self.source.generation_setup_candidates = len(setup_candidates)
 
+        for setup_candidate in setup_candidates.values():
+            setup_candidate.context = SimpleContext()
+
         history['setup_stage_target_stages'] = setup_candidates
         history['setup_stage_target_config'] = self.source.config
 
         self.source.context.update(history)
 
-        for event in self.source.dispatcher:
+        for event in self.source.dispatcher.events_by_name.values():
             event.source.stage_instance = self.source
+            self.source.context.update(history)
             event.context.update(history)
-
+            
             if event.source.context:
                 event.source.context.update(history)
         
