@@ -80,8 +80,6 @@ class CSV:
             events_file.close
         )
 
-        events_file.close()
-
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Events to file - {self.events_filepath}')
 
     async def submit_common(self, metrics_sets: List[MetricsSet]):
@@ -139,8 +137,6 @@ class CSV:
             shared_metrics_file.close
         )
 
-        shared_metrics_file.close()
-
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Shared Metrics to file - {self.metrics_filepath}')
 
     async def submit_metrics(self, metrics: List[MetricsSet]):
@@ -193,8 +189,6 @@ class CSV:
             self._executor,
             metrics_file.close
         )
-
-        metrics_file.close()
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Metrics to file - {self.metrics_filepath}')
         
@@ -265,8 +259,6 @@ class CSV:
                         custom_metrics_file.close
                     )
 
-                    custom_metrics_file.close()
-
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Custom Metrics to file - {self.metrics_filepath}')
 
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
@@ -326,8 +318,6 @@ class CSV:
             self._executor,
             errors_file.close
         )
-
-        errors_file.close()
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Error Metrics to file - {self.metrics_filepath}')
                 
