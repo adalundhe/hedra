@@ -1,15 +1,15 @@
 import asyncio
 import uuid
-from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-import uuid
 from datetime import datetime
 from typing import List
 
 import psutil
 from hedra.logging import HedraLogger
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
-from hedra.reporting.metric import MetricsSet
+from hedra.reporting.metric import (
+    MetricsSet
+)
 
 try:
     from google.cloud import bigtable
@@ -38,8 +38,8 @@ class BigTable:
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._events_column_family_id = f'{self.events_table_id}_columns'
         self._metrics_column_family_id = f'{self.metrics_table_id}_columns'
-        self._shared_metrics_column_family_id = 'stage_metrics_columns'
-        self._custom_metrics_column_family_ids = {}
+        self._shared_metrics_column_family_id = f'{self.metrics_table_id}_shared_columns'
+        self._custom_metrics_column_family_id = f'{self.metrics_table_id}_custom_columns'
         self._errors_column_family_id = f'{self.metrics_table_id}_errors_columns'
 
         self.instance = None
@@ -287,71 +287,67 @@ class BigTable:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to Table {self.metrics_table_id}')
 
-        rows = defaultdict(list)
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Group - Custom')
+
+        custom_metrics_table = self.instance.table(self.custom_metrics_table_id)
+
+        try:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Custom Metrics Column Family - {self._custom_metrics_column_family_id} - if not exists')
+            await self._loop.run_in_executor(
+                self._executor,
+                custom_metrics_table.create
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created Custom Metrics Column Family - {self._custom_metrics_column_family_id} - if not exists')
+        
+        except Exception:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping creation of Custom Metrics Column Family - {self._custom_metrics_column_family_id} - if not exists')
+
+        custom_metrics_table_columns = custom_metrics_table.column_family(
+            self.custom_metrics_table_id
+        )
+
+        try:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Custom Metrics Column for Column Family - {self._custom_metrics_column_family_id} - if not exists')
+            await self._loop.run_in_executor(
+                self._executor,
+                custom_metrics_table_columns.create
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created Custom Metrics Column for Column Family - {self._custom_metrics_column_family_id} - if not exists')
+
+        except Exception:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping creation of Custom Metrics Column for Column Family - {self._custom_metrics_column_family_id} - if not exists')
+
+        rows = []
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
-            for custom_group_name, custom_group in metrics_set.custom_metrics.items():
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Group - {custom_group_name}')
+            row_key = f'custom_{str(uuid.uuid4())}'
+            custom_metrics_table_row = custom_metrics_table.direct_row(row_key)
 
-                custom_metrics_table_id = f'{custom_group_name}_metrics'
-                custom_metrics_table = self.instance.table(custom_metrics_table_id)
-
-                try:
-                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Custom Metrics Column Family - {self._custom_metrics_column_family_ids.get(custom_group_name)} - if not exists')
-                    await self._loop.run_in_executor(
-                        self._executor,
-                        custom_metrics_table.create
-                    )
-
-                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created Custom Metrics Column Family - {self._custom_metrics_column_family_ids.get(custom_group_name)} - if not exists')
-                
-                except Exception:
-                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping creation of Custom Metrics Column Family - {self._custom_metrics_column_family_ids.get(custom_group_name)} - if not exists')
-
-                self._custom_metrics_tables[custom_metrics_table_id] = custom_metrics_table
-
-                custom_metrics_table_columns = custom_metrics_table.column_family(
-                    custom_metrics_table_id
-                )
-
-                try:
-                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Custom Metrics Column for Column Family - {self._custom_metrics_column_family_ids.get(custom_group_name)} - if not exists')
-                    await self._loop.run_in_executor(
-                        self._executor,
-                        custom_metrics_table_columns.create
-                    )
-
-                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created Custom Metrics Column for Column Family - {self._custom_metrics_column_family_ids.get(custom_group_name)} - if not exists')
-
-                except Exception:
-                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping creation of Custom Metrics Column for Column Family - {self._custom_metrics_column_family_ids.get(custom_group_name)} - if not exists')
-
-                row_key = f'{custom_metrics_table_id}_{str(uuid.uuid4())}'
-                custom_metrics_table_row = custom_metrics_table.direct_row(row_key)
-
-                custom_metrics_row_data = {
-                    'name': metrics_set.name,
-                    'stage': metrics_set.stage,
-                    'group': custom_group_name,
-                    **custom_group
+            custom_metrics_row_data = {
+                'name': metrics_set.name,
+                'stage': metrics_set.stage,
+                'group': 'custom',
+                **{
+                    metric.metric_shortname: metric.metric_value for metric in metrics_set.custom_metrics.values()
                 }
+            }
 
-                for field, value in custom_metrics_row_data.items():
-                    custom_metrics_table_row.set_cell(
-                        field,
-                        f'{value}'.encode()
-                    )
+            for field, value in custom_metrics_row_data.items():
+                custom_metrics_table_row.set_cell(
+                    field,
+                    f'{value}'.encode()
+                )
                 
-                rows[custom_metrics_table_id].append(custom_metrics_table_row)
+                rows.append(custom_metrics_table_row)
 
-        for table_id, table_rows in rows.items():
-            table = self._custom_metrics_tables.get(table_id)
-            await self._loop.run_in_executor(
-                self._executor,
-                table.mutate_rows,
-                table_rows
-            )
+        await self._loop.run_in_executor(
+            self._executor,
+            custom_metrics_table.mutate_rows,
+            rows
+        )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Table {self.metrics_table_id}')
 

@@ -1,4 +1,8 @@
 from typing import Union
+from .metric_types import (
+    metric_type_map,
+    MetricType
+)
 
 
 class CustomMetric:
@@ -15,4 +19,7 @@ class CustomMetric:
         self.metric_name: str = metric_name
         self.metric_value: Union[float, int] = metric_value
         self.metric_group = metric_group
-        self.metric_type = metric_type
+        self.metric_type = metric_type_map.get(
+            metric_type,
+            MetricType.SAMPLE
+        )

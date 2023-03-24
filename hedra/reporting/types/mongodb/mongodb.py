@@ -29,6 +29,7 @@ class MongoDB:
         self.metrics_collection = config.metrics_collection
         self.shared_metrics_collection = f'{self.metrics_collection}_common'
         self.errors_collection = f'{self.metrics_collection}_errors'
+        self.custom_metrics_collection = f'{self.metrics_collection}_custom'
 
         self.connection: AsyncIOMotorClient = None
         self.database = None
@@ -94,24 +95,23 @@ class MongoDB:
 
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
-        records = defaultdict(list)
+        records = []
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
-            for custom_group_name, group in metrics_set.custom_metrics.items():
-                records[custom_group_name].append({
-                    'name': metrics_set.name,
-                    'stage': metrics_set.stage,
-                    'group': custom_group_name,
-                    **group
-                })
+            records.append({
+                'name': metrics_set.name,
+                'stage': metrics_set.stage,
+                'group': 'custom',
+                **{
+                    custom_metric_name: custom_metric.metric_value for custom_metric_name, custom_metric in metrics_set.custom_metrics.items()
+                }
+            })
 
-        for group_name, records in records.items():
-            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to Bucket - {group_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to Bucket - {self.custom_metrics_collection}')
 
-            metrics_collection_name = f'{group_name}_metrics'
-            await self.database[metrics_collection_name].insert_many(records)
+        await self.database[self.custom_metrics_collection].insert_many(records)
 
-            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Bucket - {group_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Bucket - {self.custom_metrics_collection}')
 
     async def submit_errors(self, metrics: List[MetricsSet]):
 

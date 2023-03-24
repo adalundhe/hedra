@@ -4,11 +4,13 @@ import os
 import psutil
 import uuid
 from typing import List
-from numpy import float32, float64, int16, int32, int64
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
-from hedra.reporting.metric import MetricsSet
+from hedra.reporting.metric import (
+    MetricsSet,
+    MetricType
+)
 
 
 try:
@@ -44,9 +46,9 @@ class Cassandra:
         self.custom_fields = config.custom_fields
         self.events_table_name: str = config.events_table
         self.metrics_table_name: str = config.metrics_table
-        self.shared_metrics_table_name = 'stage_metrics'
-        self.custom_metrics_table_names = {}
-        self.errors_table_name = 'stage_errors'
+        self.shared_metrics_table_name = f'{config.metrics_table}_shared'
+        self.custom_metrics_table_name = f'{config.metrics_table}_custom'
+        self.errors_table_name = f'{config.metrics_table}_errors'
         self.replication_strategy = config.replication_strategy
         self.replication = config.replication       
         self.ssl = config.ssl
@@ -60,7 +62,7 @@ class Cassandra:
         self._errors_table = None
         self._events_table = None
         self._shared_metrics_table = None
-        self._custom_metrics_tables = {}
+        self._custom_metrics_table = None
 
         self._executor =ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._loop = asyncio.get_event_loop()
@@ -294,68 +296,69 @@ class Cassandra:
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics Set to - Keyspace: {self.keyspace} - Table: {self.metrics_table_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Group - Custom')
+
+        if self._custom_metrics_table is None:
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Custom Metrics table - {self.custom_metrics_table_name} - under keyspace - {self.keyspace}')
+            
+            custom_table = {
+                'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+                'name': columns.Text(min_length=1, index=True),
+                'stage': columns.Text(min_length=1),
+                'group': columns.Text(min_length=1)
+            }
+
+            for metrics_set in metrics_sets:
+                for custom_metric_name, custom_metric in metrics_set.custom_metrics.items():
+
+                    cassandra_column = columns.Integer()
+
+                    if custom_metric.metric_type == MetricType.COUNT:
+                        cassandra_column = columns.Integer()
+                    
+                    else:
+                        cassandra_column = columns.Float()
+
+                    custom_table[custom_metric_name] = cassandra_column
+                    custom_table[custom_metric_name] = cassandra_column
+
+            self._custom_metrics_table: Model = type(
+                self.custom_metrics_table_name.capitalize(), 
+                (Model, ), 
+                custom_table
+            )
+
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    sync_table,
+                    self._custom_metrics_table,
+                    keyspaces=[self.keyspace]
+                )
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Custom Metrics table - {self.custom_metrics_table_name} - under keyspace - {self.keyspace}')
+
 
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
-            
-            for custom_group_name, group in metrics_set.custom_metrics.items():
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Group - {custom_group_name}')
+                
 
-                custom_metrics_table_name = f'{custom_group_name}_metrics'
-                if self._custom_metrics_tables.get(custom_metrics_table_name):
-
-                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Custom Metrics table - {custom_metrics_table_name} - under keyspace - {self.keyspace}')
-                    
-                    custom_table = {
-                        'id': columns.UUID(primary_key=True, default=uuid.uuid4),
-                        'name': columns.Text(min_length=1, index=True),
-                        'stage': columns.Text(min_length=1),
-                        'group': columns.Text(min_length=1)
-                    }
-
-                    for field_name, value in group.items():
-
-                        cassandra_column = None
-                        if isinstance(value, (int, int16, int32, int64)):
-                            cassandra_column = columns.Integer()
-                        
-                        elif isinstance(value, (float, float32, float64)):
-                            cassandra_column = columns.Float()
-
-                        custom_table[field_name] = cassandra_column
-
-                    custom_metrics_table = type(
-                        custom_metrics_table_name.capitalize(), 
-                        (Model, ), 
-                        custom_table
-                    )
-
-                    await self._loop.run_in_executor(
-                        self._executor,
-                        functools.partial(
-                            sync_table,
-                            custom_metrics_table,
-                            keyspaces=[self.keyspace]
-                        )
-                    )
-
-                    self._custom_metrics_tables[custom_metrics_table_name] = custom_metrics_table
-
-                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Custom Metrics table - {custom_metrics_table_name} - under keyspace - {self.keyspace}')
-    
-                table = self._custom_metrics_tables.get(custom_metrics_table_name)
-                await self._loop.run_in_executor(
-                    self._executor,
-                    functools.partial(
-                        table.create,
-                        {
-                            'name': metrics_set.name,
-                            'stage': metrics_set.stage,
-                            'group': custom_group_name,
-                            **group
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self._custom_metrics_table.create,
+                    {
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        'group': 'Custom',
+                        **{
+                            custom_metric_name: custom_metric.metric_value for custom_metric_name, custom_metric in metrics_set.custom_metrics.items()
                         }
-                    )
+                    }
                 )
+            )
         
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics Set to - Keyspace: {self.keyspace} - Table: {self.metrics_table_name}')
 

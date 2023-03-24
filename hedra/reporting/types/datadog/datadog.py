@@ -2,7 +2,10 @@ import uuid
 from numpy import float32, float64, int16, int32, int64
 from hedra.logging import HedraLogger
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
-from hedra.reporting.metric.metrics_set import MetricsSet
+from hedra.reporting.metric import (
+    MetricsSet,
+    MetricType
+)
 
 try:
     # Datadog uses aiosonic
@@ -61,13 +64,20 @@ class Datadog:
         self._datadog_api_map = {
             'count': 1,
             'rate': 2,
-            'gauge': 3
+            'gauge': 3,
+            'histogram': 4,
         }
 
         self._config = None
         self._client = None
         self.events_api = None
         self.metrics_api = None
+        self.metric_types_map = {
+            MetricType.COUNT: 'count',
+            MetricType.RATE: 'rate',
+            MetricType.DISTRIBUTION: 'histogram',
+            MetricType.SAMPLE: 'gauge'
+        }
 
     async def connect(self):
 
@@ -184,6 +194,12 @@ class Datadog:
                     metric_type = self.types_map.get(field)
                     datadog_metric_type = self._datadog_api_map.get(metric_type)
 
+                    if isinstance(value, (int, int16, int32, int64)):
+                        value = int(value)
+
+                    elif isinstance(value, (float, float32, float64)):
+                        value = float(value)
+
                     series = MetricSeries(
                         f'{metrics_set.name}_{field}', 
                         [MetricPoint(
@@ -204,6 +220,12 @@ class Datadog:
 
                     await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Metric Quantile - {metrics_set.name}:{group_name}:{quantile_name}th Quantile')
 
+                    if isinstance(quantile_value, (int, int16, int32, int64)):
+                        quantile_value = int(quantile_value)
+
+                    elif isinstance(quantile_value, (float, float32, float64)):
+                        quantile_value = float(quantile_value)
+
                     datadog_metric_type = self._datadog_api_map.get('gauge')
                     series = MetricSeries(
                         f'{metrics_set.name}_{quantile_name}', 
@@ -221,35 +243,6 @@ class Datadog:
 
                     metrics_series.append(series)
      
-                for custom_field_name, value in group.custom.items():
-
-                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Custom Metric - {metrics_set.name}:{group_name}:{custom_field_name}')
-
-                    datadog_metric_type = group.custom_schemas.get(custom_field_name)
-                    datadog_type = self._datadog_api_map.get(datadog_metric_type)
-
-                    if isinstance(value, (int, int16, int32, int64)):
-                        value = int(value)
-
-                    elif isinstance(value, (float, float32, float64)):
-                        value = float(value)
-
-                    series = MetricSeries(
-                        f'{metrics_set.name}_{custom_field_name}', 
-                        [MetricPoint(
-                            timestamp=int(datetime.now().timestamp()),
-                            value=value
-                        )],
-                        type=datadog_type,
-                        tags=[
-                            *tags,
-                            f'metric_stage:{metrics_set.stage}',
-                            f'group:{group_name}'
-                        ]
-                    )
-
-                    metrics_series.append(series)
-            
             await self.metrics_api.submit_metrics(MetricPayload(metrics_series))
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics to Datadog API')
@@ -266,35 +259,30 @@ class Datadog:
                 f'{tag.name}:{tag.value}' for tag in metrics_set.tags
             ]
 
-            for custom_group_name, group in metrics_set.custom_metrics.items():
+            for custom_metric_name, custom_metric in metrics_set.custom_metrics.items():
 
-                for field, value in group.items():
-                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Custom Metric - {metrics_set.name}:{custom_group_name}:{field}')
-                    
-                    metric_type = None
-                    if isinstance(value, (int, int16, int32, int64)):
-                        value = int(value)
-                        metric_type = 'count'
+                metric_type = self.metric_types_map.get(
+                    custom_metric.metric_type,
+                    'gauge'
+                )
 
-                    elif isinstance(value, (float, float32, float64)):
-                        value = float(value)
-                        metric_type = 'gauge'
+                datadog_metric_type = self._datadog_api_map.get(metric_type)
 
-                    series = MetricSeries(
-                        f'{metrics_set.name}_{custom_group_name}_{field}',
-                        [MetricPoint(
-                            timestamp=int(datetime.now().timestamp()),
-                            value=value
-                        )],
-                        type=metric_type,
-                        tags=[
-                            *tags,
-                            f'metric_stage:{metrics_set.stage}',
-                            f'group:{custom_group_name}'
-                        ]
-                    )
+                series = MetricSeries(
+                    f'{metrics_set.name}_{custom_metric_name}',
+                    [MetricPoint(
+                        timestamp=int(datetime.now().timestamp()),
+                        value=custom_metric.metric_name
+                    )],
+                    type=datadog_metric_type,
+                    tags=[
+                        *tags,
+                        f'metric_stage:{metrics_set.stage}',
+                        'group:custom'
+                    ]
+                )
 
-                    metrics_series.append(series)
+                metrics_series.append(series)
 
         await self.metrics_api.submit_metrics(MetricPayload(metrics_series))
 

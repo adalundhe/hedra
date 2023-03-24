@@ -3,7 +3,6 @@ import csv
 import psutil
 import uuid
 import functools
-import os
 from typing import List
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -31,7 +30,7 @@ class CSV:
         self._metrics_csv_writer = None
         self._stage_metrics_csv_writer = None
         self._errors_csv_writer = None
-        self._custom_metrics_csv_writers = {}
+        self._custom_metrics_csv_writer = None
 
 
         filepath = Path(config.metrics_filepath)
@@ -39,6 +38,8 @@ class CSV:
         base_filename = filepath.stem
 
         self.shared_metrics_filepath = f'{base_filepath}/{base_filename}_shared.csv'
+        self.custom_metrics_filepath = f'{base_filepath}/{base_filename}_custom.csv'
+        self.errors_metrics_filepath = f'{base_filepath}/{base_filename}_errors.csv'
 
     async def connect(self):
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping connect')
@@ -196,68 +197,65 @@ class CSV:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Custom Metrics to file - {self.metrics_filepath}')
 
+        custom_metrics_file = None
+        
+        headers = [
+            'name',
+            'stage',
+            'group',
+        ]
+
+        if self._custom_metrics_csv_writer is None:
+
+            custom_metrics_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.custom_metrics_filepath,
+                    'w'
+                )       
+            )
+
+            for metrics_set in metrics_sets:
+                for custom_metric in metrics_set.custom_metrics.values():
+                    headers.append(
+                        custom_metric.metric_name
+                    )
+
+
+            self._custom_metrics_csv_writer = csv.DictWriter(custom_metrics_file, fieldnames=headers)
+            
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Writing headers to file - {self.metrics_filepath} - {", ".join(headers)}')
+
+            await self._loop.run_in_executor(
+                self._executor,
+                self._custom_metrics_csv_writer.writeheader
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Wrote headers to file - {self.metrics_filepath} - {", ".join(headers)}')
+
+
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
-                
-            for custom_group_name, group in metrics_set.custom_metrics.items():
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Group - {custom_group_name}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Group - Custom')
 
-                base_filepath = Path(self.metrics_filepath).parent
-                custom_metrics_filepath = f'{base_filepath}/{metrics_set.source}_{custom_group_name}.csv'
+            await self._loop.run_in_executor(
+                self._executor,
+                self._custom_metrics_csv_writer.writerow,
+                {
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
+                    'group': 'custom',
+                    **{
+                        custom_metric_name: custom_metric.metric_value for custom_metric_name, custom_metric in metrics_set.custom_metrics.items()
+                    }
+                }
+            )
 
-
-                exists = await self._loop.run_in_executor(
-                    self._executor,
-                    os.path.exists,
-                    custom_metrics_filepath
-                )
-
-                if exists is False:
-
-                    custom_metrics_file = await self._loop.run_in_executor(
-                        self._executor,
-                        functools.partial(
-                            open,
-                            custom_metrics_filepath,
-                            'w'
-                        )       
-                    )
-
-                    headers = [
-                        'group',
-                        *list(group.keys())
-                    ]
-                    
-                    if self._custom_metrics_csv_writers.get(custom_group_name) is None:
-
-                        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Writing headers to file - {self.metrics_filepath} - {", ".join(headers)}')
-
-                        custom_group_csv_writer = csv.DictWriter(custom_metrics_file, fieldnames=headers)
-                        self._custom_metrics_csv_writers[custom_group_name] = custom_group_csv_writer
-
-                        await self._loop.run_in_executor(
-                            self._executor,
-                            custom_group_csv_writer.writeheader
-                        )
-
-                        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Wrote headers to file - {self.metrics_filepath} - {", ".join(headers)}')
-
-
-                    await self._loop.run_in_executor(
-                        self._executor,
-                        self._custom_metrics_csv_writers[custom_group_name].writerow,
-                        {
-                            'name': metrics_set.name,
-                            'stage': metrics_set.stage,
-                            'group': custom_group_name,
-                            **group
-                        }
-                    )
-
-                    await self._loop.run_in_executor(
-                        self._executor,
-                        custom_metrics_file.close
-                    )
+        await self._loop.run_in_executor(
+            self._executor,
+            custom_metrics_file.close
+        )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Custom Metrics to file - {self.metrics_filepath}')
 

@@ -28,10 +28,9 @@ class InfluxDB:
         self.connect_timeout = config.connect_timeout
         self.events_bucket_name = config.events_bucket
         self.metrics_bucket_name = config.metrics_bucket
-        self.shared_metrics_bucket_name = 'stage_metrics'
-        self.errors_bucket_name = 'stage_errors'
-        self.events_database = None
-        self.metrics_database = None
+        self.shared_metrics_bucket_name = f'{config.metrics_bucket}_shared'
+        self.errors_bucket_name = f'{config.metrics_bucket}_errors'
+        self.custom_bucket_name = f'{config.metrics_bucket}_custom'
 
         self.client = None
         self.write_api = None
@@ -152,13 +151,13 @@ class InfluxDB:
 
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
-        points = defaultdict(list)
+        points = []
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
-            for custom_group_name, group in metrics_set.custom_metrics.items():
+            for custom_metric_name, custom_metric in metrics_set.custom_metrics.items():
 
-                point = Point(f'{metrics_set.name}_{custom_group_name}')
+                point = Point(f'{metrics_set.name}_{custom_metric_name}')
 
                 for tag in metrics_set.tags:
                     point.tag(tag.name, tag.value)
@@ -166,24 +165,24 @@ class InfluxDB:
                 metric_record = {
                     'name': metrics_set.name,
                     'stage': metrics_set.stage,
-                    'group': custom_group_name,
-                    **group
+                    'group': 'custom',
+                    custom_metric_name: custom_metric.metric_value
                 }
 
                 for field, value in metric_record.items():
-                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metric - {metrics_set.name}:{group_name}:{field}')
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metric - {metrics_set.name}:custom:{field}')
                     point.field(field, value)
 
-                points[custom_group_name].append(point)
+                points.append(point)
 
-        for group_name, points in points.items():
-            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to Bucket - {group_name}_metrics')
+        for point in points:
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to Bucket - {self.custom_bucket_name}_metrics')
             await self.write_api.write(
-                bucket=f'{group_name}_metrics',
+                bucket=self.custom_bucket_name,
                 record=points
             )
 
-            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Bucket - {group_name}_metrics')
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Bucket - {self.custom_bucket_name}_metrics')
 
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
 

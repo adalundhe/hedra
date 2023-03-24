@@ -169,21 +169,22 @@ class Cloudwatch:
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
-            for custom_group_name, group in metrics_set.custom_metrics.items():
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Group - {custom_group_name}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Group - Custom')
 
-                custom_metrics.append({
-                    'Time': datetime.datetime.now(),
-                    'Detail': json.dumps({
-                        'name': metrics_set.name,
-                        'stage': metrics_set.stage,
-                        'group': custom_group_name,
-                        **group
-                    }),
-                    'DetailType': self.metrics_rule_name,
-                    'Resources': self.aws_resource_arns,
-                    'Source': self.metrics_rule_name
-                })
+            custom_metrics.append({
+                'Time': datetime.datetime.now(),
+                'Detail': json.dumps({
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
+                    'group': 'custom',
+                    **{
+                        custom_metric_name: custom_metric.metric_value for custom_metric_name, custom_metric in metrics_set.custom_metrics.items()
+                    }
+                }),
+                'DetailType': self.metrics_rule_name,
+                'Resources': self.aws_resource_arns,
+                'Source': self.metrics_rule_name
+            })
 
         await asyncio.wait_for(
             self._loop.run_in_executor(

@@ -30,8 +30,9 @@ class S3:
         self.buckets_namespace = config.buckets_namespace
         self.events_bucket_name = config.events_bucket
         self.metrics_bucket_name = config.metrics_bucket
-        self.shared_metrics_bucket_name = 'stage-metrics'
-        self.errors_bucket_name = 'stage-errors'
+        self.shared_metrics_bucket_name = f'{config.metrics_bucket}_shared'
+        self.errors_bucket_name = f'{config.metrics_bucket}_errors'
+        self.custom_metrics_bucket_name = f'{config.metrics_bucket}_custom'
 
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self.client = None
@@ -82,13 +83,14 @@ class S3:
 
 
         for event in events:
-            timestamp = int(datetime.now().timestamp())
+            event_key = f'{event.name}_{event.event_id}'
+
             await self._loop.run_in_executor(
                 self._executor,
                 functools.partial(
                     self.client.put_object,
                     Bucket=events_bucket_name,
-                    Key=f'{event.name}-{timestamp}',
+                    Key=event_key,
                     Body=json.dumps(event.record)
                 )
             )
@@ -120,14 +122,15 @@ class S3:
         
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
-            
-            timestamp = int(datetime.now().timestamp())
+      
+            metrics_set_key = f'{metrics_set.name}_{metrics_set.metrics_set_id}'
+
             await self._loop.run_in_executor(
                 self._executor,
                 functools.partial(
                     self.client.put_object,
                     Bucket=shared_metrics_bucket_name,
-                    Key=f'{metrics_set.name}-{timestamp}',
+                    Key=metrics_set_key,
                     Body=json.dumps({
                         'name': metrics_set.name,
                         'stage': metrics_set.stage,
@@ -165,13 +168,14 @@ class S3:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for group_name, group in metrics_set.groups.items():
-                timestamp = int(datetime.now().timestamp())
+                metrics_set_key = f'{metrics_set.name}_{group_name}_{group.metrics_group_id}'
+                
                 await self._loop.run_in_executor(
                     self._executor,
                     functools.partial(
                         self.client.put_object,
                         Bucket=metrics_bucket_name,
-                        Key=f'{metrics_set.name}-{timestamp}',
+                        Key=metrics_set_key,
                         Body=json.dumps({
                             **group.record,
                             'group': group_name
@@ -183,47 +187,48 @@ class S3:
 
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
+        try:
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Custom Metrics Bucket - {self.custom_metrics_bucket_name} - if not exists')
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.create_bucket,
+                    Bucket=self.custom_metrics_bucket_name,
+                    CreateBucketConfiguration={
+                        'LocationConstraint': self.region_name
+                    }
+                )
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Custom Metrics Bucket - {self.custom_metrics_bucket_name}')
+
+        except Exception:
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Skipping creation of Custom Metrics Bucket - {self.custom_metrics_bucket_name}')
+
+
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
-            for custom_group_name, group in metrics_set.custom_metrics.items():
+               
+            custom_metric_key = f'{metrics_set.name}_custom_{metrics_set.metrics_set_id}'
 
-                custom_bucket_name = f'{self.buckets_namespace}-{custom_group_name}-metrics'
-                
-                try:
-                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Custom Metrics Bucket - {custom_bucket_name} - if not exists')
-                    await self._loop.run_in_executor(
-                        self._executor,
-                        functools.partial(
-                            self.client.create_bucket,
-                            Bucket=custom_bucket_name,
-                            CreateBucketConfiguration={
-                                'LocationConstraint': self.region_name
-                            }
-                        )
-                    )
-
-                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Custom Metrics Bucket - {custom_bucket_name}')
-
-                except Exception:
-                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Skipping creation of Custom Metrics Bucket - {custom_bucket_name}')
-
-                timestamp = int(datetime.now().timestamp())
-                await self._loop.run_in_executor(
-                    self._executor,
-                    functools.partial(
-                        self.client.put_object,
-                        Bucket=custom_bucket_name,
-                        Key=f'{metrics_set.name}-{custom_group_name}-{timestamp}',
-                        Body=json.dumps({
-                            'name': metrics_set.name,
-                            'stage': metrics_set.stage,
-                            'group': custom_group_name,
-                            **group
-                        })
-                    )
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.put_object,
+                    Bucket=self.custom_metrics_bucket_name,
+                    Key=custom_metric_key,
+                    Body=json.dumps({
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        'group': 'custom',
+                        **{
+                            custom_metric_name: custom_metric.metric_value for custom_metric_name, custom_metric in metrics_set.custom_metrics.items()
+                        }
+                    })
                 )
+            )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Bucket - {custom_bucket_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Bucket - {self.custom_metrics_bucket_name}')
 
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
 

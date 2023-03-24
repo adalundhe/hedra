@@ -27,10 +27,10 @@ class CosmosDB:
         self.events_container_name = config.events_container
         self.metrics_container_name = config.metrics_container
         self.shared_metrics_container_name = f'{self.metrics_container_name}_metrics'
+        self.custom_metrics_container_name = f'{self.metrics_container_name}_custom'
         self.errors_container_name = f'{self.metrics_container}_errors'
         self.events_partition_key = config.events_partition_key
         self.metrics_partition_key = config.metrics_partition_key
-        self.custom_metrics_containers = {}
 
         self.analytics_ttl = config.analytics_ttl
 
@@ -42,6 +42,7 @@ class CosmosDB:
         self.events_container = None
         self.metrics_container = None
         self.shared_metrics_container = None
+        self.custom_metrics_container = None
         self.errors_container = None
         self.client = None
         self.database = None
@@ -137,29 +138,30 @@ class CosmosDB:
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
-            for custom_group_name, group in metrics_set.custom_metrics.items():
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Group - {custom_group_name}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Group - Xuarom')
 
-                custom_metrics_container_name = f'{custom_group_name}_metrics'
-                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Custom Metrics container - {custom_metrics_container_name} with Partition Key /{custom_metrics_container_name} if not exists')
+            custom_metrics_container_name = f'{self.custom_metrics_container_name}_metrics'
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Custom Metrics container - {custom_metrics_container_name} with Partition Key /{custom_metrics_container_name} if not exists')
 
-                custom_container = await self.database.create_container_if_not_exists(
-                    custom_metrics_container_name,
-                    PartitionKey(f'/{self.metrics_partition_key}')
-                )
+            custom_container = await self.database.create_container_if_not_exists(
+                custom_metrics_container_name,
+                PartitionKey(f'/{self.metrics_partition_key}')
+            )
 
-                self.custom_metrics_containers[custom_metrics_container_name] = custom_container
+            self.custom_metrics_container = custom_container
 
 
-                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created or set Custom Metrics container - {custom_metrics_container_name} with Partition Key /{custom_metrics_container_name}')
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created or set Custom Metrics container - {custom_metrics_container_name} with Partition Key /{custom_metrics_container_name}')
 
-                await custom_container.upsert_item({
-                    'id': str(uuid.uuid4()),
-                    'name': metrics_set.name,
-                    'stage': metrics_set.stage,
-                    'group': custom_group_name,
-                    **group
-                })
+            await custom_container.upsert_item({
+                'id': str(uuid.uuid4()),
+                'name': metrics_set.name,
+                'stage': metrics_set.stage,
+                'group': 'custom',
+                **{
+                    custom_metric_name: custom_metric.metric_value for custom_metric_name, custom_metric in metrics_set.custom_metrics.items()
+                }
+            })
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics to container - {self.metrics_container_name} with Partition Key /{self.metrics_container_name}')
 

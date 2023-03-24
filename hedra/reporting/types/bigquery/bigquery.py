@@ -8,7 +8,10 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
-from hedra.reporting.metric import MetricsSet
+from hedra.reporting.metric import (
+    MetricsSet,
+    MetricType
+)
 
 try:
     from google.cloud import bigquery
@@ -31,7 +34,7 @@ class BigQuery:
         self.events_table_name = config.events_table
         self.metrics_table_name = config.metrics_table
         self.shared_metrics_table_name = f'{self.metrics_table_name}_shared'
-        self.custom_metrics_table_names = {}
+        self.custom_metrics_table_name = f'{self.metrics_table_name}_custom'
         self.errors_table_name = f'{self.metrics_table_name}_errors'
         self.custom_fields = config.custom_fields or []
 
@@ -46,7 +49,7 @@ class BigQuery:
         self._events_table = None
         self._errors_table = None
         self._metrics_table = None
-        self._custom_metrics_tables = {}
+        self._custom_metrics_table = None
         self._shared_metrics_table = None
 
         self._loop = asyncio.get_event_loop()
@@ -277,79 +280,81 @@ class BigQuery:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics - Project: {self.project_name} - Dataset: {self.dataset_name}')
 
-        rows = defaultdict(list)
-        for metrics_set in metrics_sets:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
-            
-            for custom_metrics_group_name, custom_metrics_group in metrics_set.custom_metrics.items():
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Group - {custom_metrics_group_name}')
+        if self._custom_metrics_table is None:
 
-                custom_metrics_table_name = f'{custom_metrics_group_name}_metrics'
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating table - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.custom_metrics_table_name} - if not exists')
 
-                if self._custom_metrics_tables.get(custom_metrics_table_name) is None:
+            table_schema = [
+                bigquery.SchemaField('name', 'STRING', mode='REQUIRED'),
+                bigquery.SchemaField('stage', 'STRING', mode='REQUIRED'),
+                bigquery.SchemaField('group', 'STRING', mode='REQUIRED')
+            ]
 
-                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating table - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {custom_metrics_table_name} - if not exists')
+            for metrics_set in metrics_sets:
+                for custom_metric in metrics_set.custom_metrics.values():
 
-                    table_schema = [
-                        bigquery.SchemaField('name', 'STRING', mode='REQUIRED'),
-                        bigquery.SchemaField('stage', 'STRING', mode='REQUIRED'),
-                        bigquery.SchemaField('group', 'STRING', mode='REQUIRED')
-                    ]
-
-                    for field, value in custom_metrics_group.items():
-
-                        if isinstance(value, (int, int16, int32, int64)):
-                            table_schema.append(
-                                bigquery.SchemaField(field, 'INTEGER', mode='REQUIRED')
+                    if custom_metric.metric_type == MetricType.COUNT:
+                        table_schema.append(
+                            bigquery.SchemaField(
+                                custom_metric.metric_name, 
+                                'INTEGER', 
+                                mode='REQUIRED'
                             )
-
-                        elif isinstance(value, (float, float32, float64)):
-                            table_schema.append(
-                                bigquery.SchemaField(field, 'FLOAT', mode='REQUIRED')
-                            )
-
-                    table_reference = bigquery.TableReference(
-                        bigquery.DatasetReference(
-                            self.project_name,
-                            self.dataset_name
-                        ),
-                        custom_metrics_table_name
-                    )
-
-                    custom_metrics_table = bigquery.Table(
-                        table_reference,
-                        schema=table_schema
-                    )
-
-                    await self._loop.run_in_executor(
-                        self._executor,
-                        functools.partial(
-                            self.client.create_table,
-                            custom_metrics_table,
-                            exists_ok=True
                         )
-                    )
 
-                    self._custom_metrics_tables[custom_metrics_table_name] = custom_metrics_table
+                    else:
+                        table_schema.append(
+                            bigquery.SchemaField(
+                                custom_metric.metric_name, 
+                                'FLOAT', 
+                                mode='REQUIRED'
+                            )
+                        )
 
-                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created table - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {custom_metrics_table_name} - if not exists')
-            
-                rows[custom_metrics_table_name].append({
-                    'name': metrics_set.name,
-                    'stage': metrics_set.stage,
-                    'group': custom_metrics_group_name,
-                    **custom_metrics_group
-                })
-        
-        for table_name, rows in rows.items():
+            table_reference = bigquery.TableReference(
+                bigquery.DatasetReference(
+                    self.project_name,
+                    self.dataset_name
+                ),
+                self._custom_metrics_table_name
+            )
 
-            table = self._custom_metrics_tables.get(table_name)
+            custom_metrics_table = bigquery.Table(
+                table_reference,
+                schema=table_schema
+            )
 
             await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.create_table,
+                    custom_metrics_table,
+                    exists_ok=True
+                )
+            )
+
+            self._custom_metrics_table = custom_metrics_table
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created table - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.custom_metrics_table_name} - if not exists')
+
+        rows = []
+        for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')   
+        
+            rows.append({
+                'name': metrics_set.name,
+                'stage': metrics_set.stage,
+                'group': 'custom',
+                **{
+                    custom_metric.metric_name: custom_metric.metric_value for custom_metric in metrics_set.custom_metrics.values()
+                }
+            })
+
+        await self._loop.run_in_executor(
             self._executor,
             functools.partial(
                 self.client.insert_rows_json,
-                table,
+                self._custom_metrics_table,
                 rows,
                 retry=bigquery.DEFAULT_RETRY.with_predicate(
                     lambda exc: exc is not None

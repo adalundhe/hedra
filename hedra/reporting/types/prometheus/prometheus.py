@@ -1,11 +1,14 @@
 import asyncio
 import uuid
 import functools
-from typing import List
+from typing import List, Dict
 from numpy import float32, float64, int16, int32, int64
 from hedra.logging import HedraLogger
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
-from hedra.reporting.metric import MetricsSet
+from hedra.reporting.metric import (
+    MetricsSet,
+    MetricType
+)
 
 try:
     from prometheus_client.exposition import basic_auth_handler
@@ -57,8 +60,12 @@ class Prometheus:
         self._events = {}
         self._metrics = {}
         self._shared_metrics = {}
-        self._custom_metrics = {}
+        self._custom_metrics: Dict[str, PrometheusMetric] = {}
         self._errors = {}
+
+        self.metric_types_map = {
+
+        }
 
         self.session_uuid = str(uuid.uuid4())
         self.metadata_string: str = None
@@ -283,62 +290,51 @@ class Prometheus:
 
             custom_metrics = self._custom_metrics.get(metrics_set.name)
             if custom_metrics is None:
-                custom_metrics = {}
+                custom_metrics = {
+                    MetricType.COUNT: 'count',
+                    MetricType.RATE: 'gauge',
+                    MetricType.DISTRIBUTION: 'histogram',
+                    MetricType.SAMPLE: 'gauge'
+                }
 
-                for custom_group_name, group in metrics_set.custom_metrics.items():
-                    group_metrics = custom_metrics.get(custom_group_name)
+                for custom_metric_name, custom_metric in metrics_set.custom_metrics.items():
+                    # group_metrics = custom_metrics.get(custom_group_name)
 
-                    if group_metrics is None:
+                    metric_type = self.metric_types_map.get(
+                        custom_metric.metric_type,
+                        'gauge'
+                    )
 
-                        for quantile_name in metrics_set.quantiles.keys():
-                            self.types_map[quantile_name] = 'gauge'
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metric - {metrics_set.name}:custom:{custom_metric_name}')
 
-                        fields = {}
+                    metric_name = f'{metrics_set.name}_{custom_metric_name}'.replace('.', '_')
 
-                        for field, value in group.items():
-                            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metric - {metrics_set.name}:{group_name}:{field}')
-                            
-                            metric_type = None
-                            if isinstance(value, (int, int16, int32, int64)):
-                                metric_type = 'count'
+                    tags = [
+                        f'{tag.name}:{tag.value}' for tag in metrics_set.tags
+                    ]
 
-                            elif isinstance(value, (float, float32, float64)):
-                                metric_type = 'gauge'
+                    prometheus_metric = PrometheusMetric(
+                        metric_name,
+                        metric_type,
+                        metric_description=f'{metrics_set.name} {custom_metric_name}',
+                        metric_labels=[
+                            *tags,
+                            f'stage:{metrics_set.stage}',
+                            'group:custom',
+                            f'type:{custom_metric.metric_type}'
+                        ],
+                        metric_namespace=self.namespace,
+                        registry=self.registry
+                    )
+                    prometheus_metric.create_metric()
 
-                            metric_name = f'{metrics_set.name}_{field}'.replace('.', '_')
+                    custom_metrics[custom_metric_name] = prometheus_metric
 
-                            tags = [
-                                f'{tag.name}:{tag.value}' for tag in metrics_set.tags
-                            ]
-
-                            prometheus_metric = PrometheusMetric(
-                                metric_name,
-                                metric_type,
-                                metric_description=f'{metrics_set.name} {field}',
-                                metric_labels=[
-                                    *tags,
-                                    f'stage:{metrics_set.stage}',
-                                    f'group:{custom_group_name}'
-                                ],
-                                metric_namespace=self.namespace,
-                                registry=self.registry
-                            )
-                            prometheus_metric.create_metric()
-
-                            fields[field] = prometheus_metric
-
-                        group_metrics[custom_group_name] = fields
-
-                custom_metrics[metrics_set.name] = group_metrics
 
             self._custom_metrics[metrics_set.name] = custom_metrics
-            for group_name, group in metrics_set.custom_metrics.items():
-                group_metrics = custom_metrics.get(group_name)
-
-                for field in group_metrics[group_name]:
-                    metric_value = group.get(field)
-                    field_metric = group_metrics.get(field)
-                    field_metric.update(metric_value)
+            for custom_metric_name, custom_metric in metrics_set.custom_metrics.items():
+                custom_metric_prometheus_value: PrometheusMetric = custom_metrics.get(custom_metric_name)
+                custom_metric_prometheus_value.update(custom_metric.metric_value)
 
         await self._submit_to_pushgateway()
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Prometheus - Namespace: {self.namespace}')

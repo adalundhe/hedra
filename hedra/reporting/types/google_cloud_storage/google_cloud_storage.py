@@ -1,6 +1,5 @@
 import asyncio
 import json
-import re
 import psutil
 import uuid
 from typing import List
@@ -27,8 +26,9 @@ class GoogleCloudStorage:
         self.bucket_namespace = config.bucket_namespace
         self.events_bucket_name = config.events_bucket
         self.metrics_bucket_name = config.metrics_bucket
-        self.shared_metrics_bucket_name = 'stage_metrics'
-        self.errors_bucket_name = 'stage_errors'
+        self.shared_metrics_bucket_name = f'{config.metrics_bucket}_shared'
+        self.errors_bucket_name = f'{config.metrics_bucket}_errors'
+        self.custom_metrics_bucket_name = f'{config.metrics_bucket}_custom'
 
         self.credentials = None
         self.client = None
@@ -37,7 +37,7 @@ class GoogleCloudStorage:
         self._shared_metrics_bucket = None
         self._metrics_bucket = None
         self._errors_bucket = None
-        self._custom_metrics_buckets = {}
+        self._custom_metrics_bucket = None
 
         self.session_uuid = str(uuid.uuid4())
         self.metadata_string: str = None
@@ -85,7 +85,7 @@ class GoogleCloudStorage:
             blob = await self._loop.run_in_executor(
                 self._executor,
                 self._events_bucket.blob,
-                event.name
+                f'{event.name}_{self.session_uuid}_{event.event_id}'
             )
 
             await self._loop.run_in_executor(
@@ -130,7 +130,7 @@ class GoogleCloudStorage:
             blob = await self._loop.run_in_executor(
                 self._executor,
                 self.metrics_bucket.blob,
-                metrics_set.name
+                f'{metrics_set.name}_shared_{self.session_uuid}'
             )
 
             await self._loop.run_in_executor(
@@ -181,7 +181,7 @@ class GoogleCloudStorage:
                 blob = await self._loop.run_in_executor(
                     self._executor,
                     self.metrics_bucket.blob,
-                    f'{metrics_set.name}_{group_name}'
+                    f'{metrics_set.name}_{group_name}_{self.session_uuid}'
                 )
 
                 await self._loop.run_in_executor(
@@ -197,57 +197,55 @@ class GoogleCloudStorage:
 
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
+        try:
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Custom Metrics bucket at - Namespace: {self.bucket_namespace} - Bucket: {self.custom_metrics_bucket_name} if not exists')
+
+            self._custom_metrics_bucket = await self._loop.run_in_executor(
+                self._executor,
+                self.client.get_bucket,
+                self.custom_metrics_bucket_name
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Custom Metrics bucket at - Namespace: {self.bucket_namespace} - Bucket: {self.custom_metrics_bucket_name}')
+        
+        except Exception:
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Setting Custom Metrics bucket at - Namespace: {self.bucket_namespace} - Bucket: {self.custom_metrics_bucket_name}')
+
+            self._custom_metrics_bucket = await self._loop.run_in_executor(
+                self._executor,
+                self.client.create_bucket,
+                self.custom_metrics_bucket_name
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Set Custom Metrics bucket at - Namespace: {self.bucket_namespace} - Bucket: {self.custom_metrics_bucket_name}')
+        
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to - Namespace: {self.bucket_namespace} - Bucket: {self.custom_metrics_bucket_name}')
+
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
-            for custom_group_name, group in metrics_set.custom_metrics.items():
+            blob = await self._loop.run_in_executor(
+                self._executor,
+                self.metrics_bucket.blob,
+                f'{metrics_set.name}_custom_{self.session_uuid}'
+            )
 
-                custom_bucket_name = f'{self.bucket_namespace}_{custom_group_name}_metrics'
+            await self._loop.run_in_executor(
+                self._executor,
+                blob.upload_from_string,
+                json.dumps({
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
+                    'group': 'custom',
+                    **{
+                        custom_metric_name: custom_metric.metric_value for custom_metric_name, custom_metric in metrics_set.custom_metrics.items()
+                    }
+                })
+            )
 
-                try:
-
-                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Custom Metrics bucket at - Namespace: {self.bucket_namespace} - Bucket: {custom_bucket_name} if not exists')
-
-                    self._custom_metrics_buckets[custom_bucket_name] = await self._loop.run_in_executor(
-                        self._executor,
-                        self.client.get_bucket,
-                        custom_bucket_name
-                    )
-
-                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Custom Metrics bucket at - Namespace: {self.bucket_namespace} - Bucket: {custom_bucket_name}')
-                
-                except Exception:
-
-                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Setting Custom Metrics bucket at - Namespace: {self.bucket_namespace} - Bucket: {custom_bucket_name}')
-
-                    self._custom_metrics_buckets[custom_bucket_name] = await self._loop.run_in_executor(
-                        self._executor,
-                        self.client.create_bucket,
-                        custom_bucket_name
-                    )
-
-                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Set Custom Metrics bucket at - Namespace: {self.bucket_namespace} - Bucket: {custom_bucket_name}')
-                
-                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to - Namespace: {self.bucket_namespace} - Bucket: {custom_bucket_name}')
-
-                blob = await self._loop.run_in_executor(
-                    self._executor,
-                    self.metrics_bucket.blob,
-                    f'{metrics_set.name}_{custom_group_name}'
-                )
-
-                await self._loop.run_in_executor(
-                    self._executor,
-                    blob.upload_from_string,
-                    json.dumps({
-                        'name': metrics_set.name,
-                        'stage': metrics_set.stage,
-                        'group': custom_group_name,
-                        **group
-                    })
-                )
-
-                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to - Namespace: {self.bucket_namespace} - Bucket: {custom_bucket_name}')
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to - Namespace: {self.bucket_namespace} - Bucket: {self.custom_metrics_bucket_name}')
 
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
 
@@ -281,19 +279,11 @@ class GoogleCloudStorage:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Errors Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             for error in metrics_set.errors:
-                error_message = re.sub(
-                    '[^0-9a-zA-Z]+', 
-                    '_',
-                    error.get(
-                        'message'
-                    ).lower()
-                )
-
                 
                 blob = await self._loop.run_in_executor(
                     self._executor,
                     self.metrics_bucket.blob,
-                    f'{metrics_set.name}_{error_message}'
+                    f'{metrics_set.name}_errors_{self.session_uuid}'
                 )
 
                 await self._loop.run_in_executor(
@@ -309,15 +299,15 @@ class GoogleCloudStorage:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Errors Metrics to - Namespace: {self.bucket_namespace} - Bucket: {self.errors_bucket_name}')
 
-            
-
     async def close(self):
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closing Google Cloud connection')
         await self._loop.run_in_executor(
-            None,
+            self._executor,
             self.client.close
         )
+
+        self._executor.shutdown()
 
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Session Closed - {self.session_uuid}')
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closed Google Cloud connection')
