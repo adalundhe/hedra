@@ -134,13 +134,13 @@ class Honeycomb:
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
-            for custom_group_name, group in metrics_set.custom_metrics.items():
+            for custm_metric_name, custom_metric in metrics_set.custom_metrics.items():
 
                 metric_record ={
                     'name': metrics_set.name,
                     'stage': metrics_set.stage,
-                    'group': custom_group_name,
-                    **group
+                    'group': 'custom',
+                    custm_metric_name: custom_metric.metric_value
                 }
 
                 honeycomb_event = libhoney.Event(data=metric_record)
@@ -194,6 +194,8 @@ class Honeycomb:
             self._executor,
             libhoney.close
         )
+
+        self._executor.shutdown()
 
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Session Closed - {self.session_uuid}')
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closed connection Honeycomb.IO')

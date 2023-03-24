@@ -1,5 +1,5 @@
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
-from hedra.core.graphs.hooks.hook_types.hook_type import HookType
+from hedra.core.hooks.types.base.hook import Hook
+from hedra.core.hooks.types.base.hook_type import HookType
 
 
 class HookSetupError(Exception):

@@ -7,7 +7,7 @@ from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.concurrency import Semaphore
 from hedra.core.engines.types.common.base_result import BaseResult
-from hedra.core.graphs.simple_context import SimpleContext
+from hedra.core.hooks.types.base.simple_context import SimpleContext
 from .task import Task
 from .result import TaskResult
 

@@ -30,6 +30,7 @@ class Redis:
         self.metrics_channel = config.metrics_channel
         self.shared_metrics_channel = f'{self.metrics_channel}_metrics'
         self.errors_channel = f'{self.metrics_channel}_errors'
+        self.custom_metrics_channel = f'{self.metrics_channel}_custom'
 
         self.channel_type = config.channel_type
         self.connection = None
@@ -140,37 +141,37 @@ class Redis:
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
-            for custom_group_name, group in metrics_set.custom_metrics.items():
+            if self.channel_type == 'channel':
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to Channel - {self.custom_metrics_channel} - Group: Custom')
+                await self.connection.publish(
+                    self.custom_metrics_channel,
+                    json.dumps({
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        'group': 'custom',
+                        **{
+                            custom_metric_name: custom_metric.metric_value for custom_metric_name, custom_metric in metrics_set.custom_metrics.items()
+                        }
+                    })
+                )
 
-                custom_metrics_channel_name = f'{custom_group_name}_metrics'
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Channel - {self.custom_metrics_channel} - Group: Custom')
 
-                if self.channel_type == 'channel':
-                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to Channel - {custom_metrics_channel_name} - Group: {custom_group_name}')
-                    await self.connection.publish(
-                        custom_metrics_channel_name,
-                        json.dumps({
-                            'name': metrics_set.name,
-                            'stage': metrics_set.stage,
-                            'group': custom_group_name,
-                            **group
-                        })
-                    )
+            else:
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to Redis Set - {self.custom_metrics_channel} - Group: Custom')
+                await self.connection.sadd(
+                    self.custom_metrics_channel,
+                    json.dumps({
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        'group': 'custom',
+                        **{
+                            custom_metric_name: custom_metric.metric_value for custom_metric_name, custom_metric in metrics_set.custom_metrics.items()
+                        }
+                    })
+                )
 
-                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Channel - {custom_metrics_channel_name} - Group: {custom_group_name}')
-
-                else:
-                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Custom Metrics to Redis Set - {custom_metrics_channel_name} - Group: {custom_group_name}')
-                    await self.connection.sadd(
-                        custom_metrics_channel_name,
-                        json.dumps({
-                            'name': metrics_set.name,
-                            'stage': metrics_set.stage,
-                            'group': custom_group_name,
-                            **group
-                        })
-                    )
-
-                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Redis Set - {custom_metrics_channel_name} - Group: {custom_group_name}')
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Redis Set - {self.custom_metrics_channel} - Group: Custom')
 
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
         

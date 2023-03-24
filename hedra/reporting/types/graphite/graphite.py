@@ -107,15 +107,13 @@ class Graphite(StatsD):
 
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
-            for custom_group_name, group in metrics_set.custom_metrics.items():
+            for custom_metric_name, custom_metric in metrics_set.custom_metrics.items():
 
-                for field, value in group.items():
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metric - {metrics_set.name}:custom:{custom_metric_name}')
 
-                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metric - {metrics_set.name}:{custom_group_name}:{field}')
-
-                    self.connection.send_graphite(
-                        f'{metrics_set.name}_{custom_group_name}_{field}', value
-                    )
+                self.connection.send_graphite(
+                    f'{metrics_set.name}_custom_{custom_metric_name}', custom_metric.metric_value
+                )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to {self.statsd_type}')
 

@@ -1,11 +1,8 @@
 from typing import List
 from .stages import (
     AnalyzeStage,
-    CheckpointStage,
     OptimizeStage,
     SetupStage,
-    TeardownStage,
-    ValidateStage
 )
 from .stages.execute import (
     ExecuteGraphQLStage,
@@ -51,8 +48,8 @@ from .stages.submit import (
     SubmitTimescaleDBResultsStage
 )
 
-from hedra.core.graphs.hooks import depends
-from hedra.core.graphs.hooks.registry.registrar import registrar
+from hedra.core.hooks import depends
+from hedra.core.hooks.types.base.registrar import registrar
 from hedra.projects.generation.generator import Generator
 
 
@@ -66,7 +63,6 @@ class GraphGenerator(Generator):
             'big-query': SubmitBigQueryResultsStage,
             'big-table': SubmitBigTableResultsStage,
             'cassandra': SubmitCassandraResultsStage,
-            'checkpoint': CheckpointStage,
             'cloudwatch': SubmitCloudwatchResultsStage,
             'cosmosdb': SubmitCosmosDBResultsStage,
             'csv': SubmitCSVResultsStage,
@@ -97,12 +93,10 @@ class GraphGenerator(Generator):
             'sqlite': SubmitSQLiteResultsStage,
             'statsd': SubmitStatsDResultsStage,
             'task': ExecuteTaskStage,
-            'teardown': TeardownStage,
             'telegraf': SubmitTelegrafResultsStage,
             'telegraf-statsd': SubmitTelegrafStatsDResultsStage,
             'timescaledb': SubmitTimescaleDBResultsStage,
             'udp': ExecuteUDPStage,
-            'validate': ValidateStage,
             'websocket': ExecuteWebsocketStage,
             'depends': depends
         }, registrar.module_paths)

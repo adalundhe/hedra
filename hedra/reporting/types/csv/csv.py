@@ -2,6 +2,7 @@ import asyncio
 import csv
 import psutil
 import uuid
+import functools
 from typing import List
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -16,7 +17,7 @@ class CSV:
 
     def __init__(self, config: CSVConfig) -> None:
         self.events_filepath = config.events_filepath
-        self.metrics_filepath = config.metrics_filepath
+        self.metrics_filepath = Path(config.metrics_filepath).absolute()
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._loop = asyncio.get_event_loop()
 
@@ -29,7 +30,16 @@ class CSV:
         self._metrics_csv_writer = None
         self._stage_metrics_csv_writer = None
         self._errors_csv_writer = None
-        self._custom_metrics_csv_writers = {}
+        self._custom_metrics_csv_writer = None
+
+
+        filepath = Path(config.metrics_filepath)
+        base_filepath = filepath.parent
+        base_filename = filepath.stem
+
+        self.shared_metrics_filepath = f'{base_filepath}/{base_filename}_shared.csv'
+        self.custom_metrics_filepath = f'{base_filepath}/{base_filename}_custom.csv'
+        self.errors_metrics_filepath = f'{base_filepath}/{base_filename}_errors.csv'
 
     async def connect(self):
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping connect')
@@ -37,26 +47,39 @@ class CSV:
     async def submit_events(self, events: List[BaseProcessedResult]):
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Events to file - {self.events_filepath}')
-        with open(self.events_filepath, 'w') as events_file:
+        
+        events_file = await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                open,
+                self.events_filepath,
+                'w'
+            )
+        )        
 
-            for event in events:
-                if self._events_csv_writer is None:
-                    self._events_csv_writer = csv.DictWriter(events_file, fieldnames=event.fields)
-                    
-                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Writing headers to file - {self.metrics_filepath} - {", ".join(event.fields)}')
-
-                    await self._loop.run_in_executor(
-                        self._executor,
-                        self._events_csv_writer.writeheader
-                    )
-
-                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Wrote headers to file - {self.metrics_filepath} - {", ".join(event.fields)}')
+        for event in events:
+            if self._events_csv_writer is None:
+                self._events_csv_writer = csv.DictWriter(events_file, fieldnames=event.fields)
+                
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Writing headers to file - {self.metrics_filepath} - {", ".join(event.fields)}')
 
                 await self._loop.run_in_executor(
                     self._executor,
-                    self._events_csv_writer.writerow,
-                    event.record
+                    self._events_csv_writer.writeheader
                 )
+
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Wrote headers to file - {self.metrics_filepath} - {", ".join(event.fields)}')
+
+            await self._loop.run_in_executor(
+                self._executor,
+                self._events_csv_writer.writerow,
+                event.record
+            )
+
+        await self._loop.run_in_executor(
+            self._executor,
+            events_file.close
+        )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Events to file - {self.events_filepath}')
 
@@ -74,35 +97,46 @@ class CSV:
             'actions_per_second'
         ]
 
-        base_filepath = Path(self.metrics_filepath).parent
-        with open(f'{base_filepath}/stage_metrics.csv', 'w') as shared_metrics_file:
-
-            if self._stage_metrics_csv_writer is None:
-                self._stage_metrics_csv_writer = csv.DictWriter(shared_metrics_file, fieldnames=headers)
-
-
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Writing headers to file - {self.metrics_filepath} - {", ".join(headers)}')
-
-                await self._loop.run_in_executor(
-                    self._executor,
-                    self._stage_metrics_csv_writer.writeheader
+        shared_metrics_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.shared_metrics_filepath,
+                    'w'
                 )
+        )
 
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Wrote headers to file - {self.metrics_filepath} - {", ".join(headers)}')
+        if self._stage_metrics_csv_writer is None:
+            self._stage_metrics_csv_writer = csv.DictWriter(shared_metrics_file, fieldnames=headers)
 
-            for metrics_set in metrics_sets:
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
-                await self._loop.run_in_executor(
-                    self._executor,
-                    self._stage_metrics_csv_writer.writerow,
-                    {
-                        'name': metrics_set.name,
-                        'stage': metrics_set.stage,
-                        'group': 'common',
-                        **metrics_set.common_stats
-                    }
-                )
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Writing headers to file - {self.metrics_filepath} - {", ".join(headers)}')
+
+            await self._loop.run_in_executor(
+                self._executor,
+                self._stage_metrics_csv_writer.writeheader
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Wrote headers to file - {self.metrics_filepath} - {", ".join(headers)}')
+
+        for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
+
+            await self._loop.run_in_executor(
+                self._executor,
+                self._stage_metrics_csv_writer.writerow,
+                {
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
+                    'group': 'common',
+                    **metrics_set.common_stats
+                }
+            )
+
+        await self._loop.run_in_executor(
+            self._executor,
+            shared_metrics_file.close
+        )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Shared Metrics to file - {self.metrics_filepath}')
 
@@ -110,86 +144,118 @@ class CSV:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Metrics to file - {self.metrics_filepath}')
 
-        with open(self.metrics_filepath, 'w') as metrics_file:
+        metrics_file = await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                open,
+                self.metrics_filepath, 
+                'w'
+            )
+        )
 
-            for metrics_set in metrics:
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
+        for metrics_set in metrics:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
-                if self._metrics_csv_writer is None:
+            if self._metrics_csv_writer is None:
 
-                    headers = [
-                        *metrics_set.fields,
-                        'group'
-                    ]
+                headers = [
+                    *metrics_set.fields,
+                    'group'
+                ]
 
-                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Writing headers to file - {self.metrics_filepath} - {", ".join(headers)}')
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Writing headers to file - {self.metrics_filepath} - {", ".join(headers)}')
 
-                    self._metrics_csv_writer = csv.DictWriter(metrics_file, fieldnames=headers)
+                self._metrics_csv_writer = csv.DictWriter(metrics_file, fieldnames=headers)
 
-                    await self._loop.run_in_executor(
-                        self._executor,
-                        self._metrics_csv_writer.writeheader
-                    )
+                await self._loop.run_in_executor(
+                    self._executor,
+                    self._metrics_csv_writer.writeheader
+                )
 
-                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Wrote headers to file - {self.metrics_filepath} - {", ".join(headers)}')
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Wrote headers to file - {self.metrics_filepath} - {", ".join(headers)}')
 
-                for group_name, group in metrics_set.groups.items():
-                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Group - {group_name}:{group.metrics_group_id}')
+            for group_name, group in metrics_set.groups.items():
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Group - {group_name}:{group.metrics_group_id}')
 
-                    await self._loop.run_in_executor(
-                        self._executor,
-                        self._metrics_csv_writer.writerow,
-                        {
-                            **group.record,
-                            'group': group_name
-                        }
-                    )
+                await self._loop.run_in_executor(
+                    self._executor,
+                    self._metrics_csv_writer.writerow,
+                    {
+                        **group.record,
+                        'group': group_name
+                    }
+                )
+
+        await self._loop.run_in_executor(
+            self._executor,
+            metrics_file.close
+        )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Metrics to file - {self.metrics_filepath}')
-
+        
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Custom Metrics to file - {self.metrics_filepath}')
 
+        custom_metrics_file = None
+        
+        headers = [
+            'name',
+            'stage',
+            'group',
+        ]
+
+        if self._custom_metrics_csv_writer is None:
+
+            custom_metrics_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.custom_metrics_filepath,
+                    'w'
+                )       
+            )
+
+            for metrics_set in metrics_sets:
+                for custom_metric in metrics_set.custom_metrics.values():
+                    headers.append(
+                        custom_metric.metric_name
+                    )
+
+
+            self._custom_metrics_csv_writer = csv.DictWriter(custom_metrics_file, fieldnames=headers)
+            
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Writing headers to file - {self.metrics_filepath} - {", ".join(headers)}')
+
+            await self._loop.run_in_executor(
+                self._executor,
+                self._custom_metrics_csv_writer.writeheader
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Wrote headers to file - {self.metrics_filepath} - {", ".join(headers)}')
+
+
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
-                
-            for custom_group_name, group in metrics_set.custom_metrics.items():
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Group - {custom_group_name}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Group - Custom')
 
-                base_filepath = Path(self.metrics_filepath).parent
-                with open(f'{base_filepath}/{custom_group_name}.csv', 'w') as custom_metrics_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self._custom_metrics_csv_writer.writerow,
+                {
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
+                    'group': 'custom',
+                    **{
+                        custom_metric_name: custom_metric.metric_value for custom_metric_name, custom_metric in metrics_set.custom_metrics.items()
+                    }
+                }
+            )
 
-                    headers = [
-                        'group',
-                        *list(group.keys())
-                    ]
-                    
-                    if self._custom_metrics_csv_writers.get(custom_group_name) is None:
-
-                        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Writing headers to file - {self.metrics_filepath} - {", ".join(headers)}')
-
-                        custom_group_csv_writer = csv.DictWriter(custom_metrics_file, fieldnames=headers)
-                        self._custom_metrics_csv_writers[custom_group_name] = custom_group_csv_writer
-
-                        await self._loop.run_in_executor(
-                            self._executor,
-                            custom_group_csv_writer.writeheader
-                        )
-
-                        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Wrote headers to file - {self.metrics_filepath} - {", ".join(headers)}')
-
-
-                    await self._loop.run_in_executor(
-                        self._executor,
-                        self._custom_metrics_csv_writers[custom_group_name].writerow,
-                        {
-                            'name': metrics_set.name,
-                            'stage': metrics_set.stage,
-                            'group': custom_group_name,
-                            **group
-                        }
-                    )
+        await self._loop.run_in_executor(
+            self._executor,
+            custom_metrics_file.close
+        )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Custom Metrics to file - {self.metrics_filepath}')
 
@@ -204,38 +270,56 @@ class CSV:
             'error_count'
         ]
 
-        base_filepath = Path(self.metrics_filepath).parent
-        with open (f'{base_filepath}/stage_errors.csv', 'w') as errors_file:
+        filepath = Path(self.metrics_filepath)
+        base_filepath = filepath.parent
+        base_filename = filepath.stem
+
+        errors_filepath = f'{base_filepath}/{base_filename}_errors,csv'
+
+        errors_file = await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                open,
+                errors_filepath,
+                'w'
+            )
+        )
             
-            if self._errors_csv_writer is None:
+        if self._errors_csv_writer is None:
 
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Writing headers to file - {self.metrics_filepath} - {", ".join(error_csv_headers)}')
-                error_csv_writer = csv.DictWriter(errors_file, fieldnames=error_csv_headers)
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Writing headers to file - {self.metrics_filepath} - {", ".join(error_csv_headers)}')
+            error_csv_writer = csv.DictWriter(errors_file, fieldnames=error_csv_headers)
 
+            await self._loop.run_in_executor(
+                self._executor,
+                error_csv_writer.writeheader
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Wrote headers to file - {self.metrics_filepath} - {", ".join(error_csv_headers)}')
+
+        for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Error Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
+
+            for error in metrics_set.errors:
                 await self._loop.run_in_executor(
                     self._executor,
-                    error_csv_writer.writeheader
+                    error_csv_writer.writerow,
+                    {
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        'error_message': error.get('message'),
+                        'error_count': error.get('count')
+                    }
                 )
 
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Wrote headers to file - {self.metrics_filepath} - {", ".join(error_csv_headers)}')
-
-            for metrics_set in metrics_sets:
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Error Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
-
-                for error in metrics_set.errors:
-                    await self._loop.run_in_executor(
-                        self._executor,
-                        error_csv_writer.writerow,
-                        {
-                            'name': metrics_set.name,
-                            'stage': metrics_set.stage,
-                            'error_message': error.get('message'),
-                            'error_count': error.get('count')
-                        }
-                    )
+        await self._loop.run_in_executor(
+            self._executor,
+            errors_file.close
+        )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Error Metrics to file - {self.metrics_filepath}')
                 
     async def close(self):
+        self._executor.shutdown()
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')
 

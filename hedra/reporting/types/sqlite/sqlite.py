@@ -3,7 +3,10 @@ from typing import List
 from numpy import float32, float64, int16, int32, int64
 from hedra.logging import HedraLogger
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
-from hedra.reporting.metric import MetricsSet
+from hedra.reporting.metric import (
+    MetricsSet,
+    MetricType
+)
 
 
 try:
@@ -29,9 +32,9 @@ class SQLite:
         self.path = f'sqlite+aiosqlite:///{config.path}'
         self.events_table_name = config.events_table
         self.metrics_table_name = config.metrics_table
-        self.shared_metrics_table_name = 'stage_metrics'
-        self.errors_table_name = 'stage_errors'
-        self.custom_fields = config.custom_fields
+        self.shared_metrics_table_name = f'{config.metrics_table}_shared'
+        self.errors_table_name = f'{config.metrics_table}_errors'
+        self.custom_metrics_table_name = f'{config.metrics_table}_custom'
         self.metadata = sqlalchemy.MetaData()
 
         self.database = None
@@ -41,8 +44,27 @@ class SQLite:
         self._events_table = None
         self._metrics_table = None
         self._shared_metrics_table = None
-        self._custom_metrics_tables = {}
+        self._custom_metrics_table = None
         self._errors_table = None
+
+        self.metric_types_map = {
+            MetricType.COUNT: lambda field_name: sqlalchemy.Column(
+                field_name, 
+                sqlalchemy.BIGINT
+            ),
+            MetricType.DISTRIBUTION: lambda field_name: sqlalchemy.Column(
+                field_name, 
+                sqlalchemy.FLOAT
+            ),
+            MetricType.SAMPLE: lambda field_name: sqlalchemy.Column(
+                field_name, 
+                sqlalchemy.FLOAT
+            ),
+            MetricType.RATE: lambda field_name: sqlalchemy.Column(
+                field_name, 
+                sqlalchemy.FLOAT
+            ),
+        }
 
         self.session_uuid = str(uuid.uuid4())
         self.metadata_string: str = None
@@ -190,53 +212,55 @@ class SQLite:
 
         async with self._engine.begin() as connection:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics - Initiating transaction')
-            
-            for metrics_set in metrics_sets:
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
-                for custom_group_name, group in metrics_set.custom_metrics.items():
-                    custom_table_name = f'{custom_group_name}_metrics'
+            if self._custom_metrics_table is None:
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Custom Metrics table - {self.custom_metrics_table_name} - if not exists')
 
-                    if self._custom_metrics_tables.get(custom_table_name) is None:
-                        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Custom Metrics table - {custom_group_name} - if not exists')
+                custom_metrics_table = sqlalchemy.Table(
+                    self.custom_metrics_table_name,
+                    self.metadata,
+                    sqlalchemy.Column('id', sqlalchemy.INTEGER, primary_key=True),
+                    sqlalchemy.Column('name', sqlalchemy.TEXT),
+                    sqlalchemy.Column('stage', sqlalchemy.TEXT),
+                    sqlalchemy.Column('group', sqlalchemy.TEXT),
+                )
 
-                        custom_metrics_table = sqlalchemy.Table(
-                            custom_table_name,
-                            self.metadata,
-                            sqlalchemy.Column('id', sqlalchemy.INTEGER, primary_key=True),
-                            sqlalchemy.Column('name', sqlalchemy.TEXT),
-                            sqlalchemy.Column('stage', sqlalchemy.TEXT),
-                            sqlalchemy.Column('group', sqlalchemy.TEXT),
+                for metrics_set in metrics_sets:
+
+                    for custom_metric_name, custom_metric in metrics_set.custom_metrics.items():
+
+                        custom_metrics_table.append_column(
+                            self.metric_types_map.get(
+                                custom_metric.metric_type,
+                                lambda field_name: sqlalchemy.Column(
+                                    field_name, 
+                                    sqlalchemy.FLOAT
+                                )
+                            )(custom_metric_name)
                         )
 
-                        for field, value in group.items():
+                await connection.execute(CreateTable(custom_metrics_table, if_not_exists=True))
+                self._custom_metrics_table = custom_metrics_table
 
-                            if isinstance(value, (int, int16, int32, int64)):
-                                custom_metrics_table.append_column(
-                                    sqlalchemy.Column(field, sqlalchemy.INTEGER)
-                                )
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Custom Metrics table - {self.custom_metrics_table_name}')
 
-                            elif isinstance(value, (float, float32, float64)):
-                                custom_metrics_table.append_column(
-                                    sqlalchemy.Column(field, sqlalchemy.REAL)
-                                )
-
-                        await connection.execute(CreateTable(custom_metrics_table, if_not_exists=True))
-                        self._custom_metrics_tables[custom_table_name] = custom_metrics_table
-
-                        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Custom Metrics table - {custom_group_name}')
-
-                    await connection.execute(
-                        self._custom_metrics_tables[custom_table_name].insert(values={
-                            'name': metrics_set.name,
-                            'stage': metrics_set.stage,
-                            'group': custom_group_name,
-                            **group
-                        })
-                    )
+            for metrics_set in metrics_sets:
+                
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
+                    
+                await connection.execute(
+                    self._custom_metrics_table.insert(values={
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        'group': 'custom',
+                        **{
+                            custom_metric_name: custom_metric.metric_value for custom_metric_name, custom_metric in metrics_set.custom_metrics.items()
+                        }
+                    })
+                )
 
             await connection.commit()
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics - Transaction committed')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitte Cudstom Metrics - Transaction committed')
 
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
 

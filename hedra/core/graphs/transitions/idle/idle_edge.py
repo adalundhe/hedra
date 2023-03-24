@@ -2,7 +2,7 @@ from typing import List
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.idle.idle import Idle
-from hedra.core.graphs.simple_context import SimpleContext
+from hedra.core.hooks.types.base.simple_context import SimpleContext
 
 
 class IdleEdge(BaseEdge[Idle]):
@@ -28,6 +28,18 @@ class IdleEdge(BaseEdge[Idle]):
         return None, self.destination.stage_type
 
     def _update(self, destination: Stage):
+        for edge_name in self.history:
+
+            history = self.history[edge_name]
+
+            if self.next_history.get(edge_name) is None:
+                self.next_history[edge_name] = {}
+
+            self.next_history[edge_name].update({
+                key: value for key, value  in history.items() if key in self.provides
+            })
+
+
         self.next_history.update({
             (self.source.name, destination.name): {}
         })

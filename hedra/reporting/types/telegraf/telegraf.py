@@ -98,16 +98,17 @@ class Telegraf(StatsD):
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
-            for custom_group_name, group in metrics_set.custom_metrics.items():
-                self.connection.send_telegraf(
-                    f'{metrics_set.name}_{custom_group_name}',
-                    {
-                        'name': metrics_set.name,
-                        'stage': metrics_set.stage,
-                        'group': custom_group_name,
-                        **group
+            self.connection.send_telegraf(
+                f'{metrics_set.name}_custom',
+                {
+                    'name': metrics_set.name,
+                    'stage': metrics_set.stage,
+                    'group': 'custom',
+                    **{
+                        custom_metric_name: custom_metric.metric_value for custom_metric_name, custom_metric in metrics_set.custom_metrics.items()
                     }
-                )
+                }
+            )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to {self.statsd_type}')
 

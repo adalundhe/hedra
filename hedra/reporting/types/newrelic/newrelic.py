@@ -129,17 +129,17 @@ class NewRelic:
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
-            for custom_group_name, group in metrics_set.custom_metrics.items():
-                for field, value in group.items():
-                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metric - {metrics_set.name}:{custom_group_name}:{field}')
-                    await self._loop.run_in_executor(
-                        self._executor,
-                        functools.partial(
-                            self.client.record_custom_metric,
-                            f'{metrics_set.name}_{custom_group_name}_{field}',
-                            value
-                        )
+            for custom_metric_name, custom_metric in metrics_set.custom_metrics.items():
+
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metric - {metrics_set.name}:custom:{custom_metric_name}')
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self.client.record_custom_metric,
+                        f'{metrics_set.name}_custom_{custom_metric_name}',
+                        custom_metric.metric_value
                     )
+                )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to NewRelic')
 
@@ -159,11 +159,13 @@ class NewRelic:
                     ).lower()
                 )
 
+                error_message_metric_name = f'{metrics_set.name}_errors_{error_message}'
+
                 await self._loop.run_in_executor(
                     self._executor,
                     functools.partial(
                         self.client.record_custom_metric,
-                        f'{metrics_set.name}_errors_{error_message}',
+                        error_message_metric_name,
                         error.get('count')
                     )
                 )  

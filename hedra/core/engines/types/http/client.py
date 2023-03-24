@@ -74,7 +74,7 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
         self.pool.size -= decrease_capacity
         self.pool.connections = self.pool.connections[:self.pool.size]
         self.sem = Semaphore(self.pool.size)
-
+    
     async def prepare(self, action: HTTPAction) -> Coroutine[Any, Any, None]:
         try:
             if action.url.is_ssl:
@@ -274,6 +274,9 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
                 if action.hooks.after:
                     response = await self.execute_after(action, response)
                     action.setup()
+
+                if action.hooks.checks:
+                    response = await self.execute_checks(action, response)
 
                 if action.hooks.notify:
                     await asyncio.gather(*[

@@ -1,5 +1,5 @@
 import asyncio
-from typing import Generic, TypeVar, Union
+from typing import Generic, TypeVar
 from typing import Coroutine, List, Dict
 
 
@@ -21,13 +21,13 @@ class Hooks(Generic[A]):
 
     def __init__(
         self,
-        before: Coroutine = None,
-        after: Coroutine = None,
-        checks: List[Coroutine] = []
+        before: List[List[Coroutine]] = None,
+        after: List[List[Coroutine]] = None,
+        checks: List[Coroutine] = None
     ) -> None:
-        self.before: Coroutine = before
-        self.after: Coroutine = after
-        self.checks: List[Union[str, Coroutine]] = checks
+        self.before: List[List[Coroutine]] = before
+        self.after: List[List[Coroutine]] = after
+        self.checks: List[List[Coroutine]] = checks
         self.notify = False
         self.listen = False
         self.channel_events: List[asyncio.Event] = []

@@ -1,6 +1,7 @@
 import uuid
 from typing import Any, Dict, List, Union
 from hedra.reporting.tags import Tag
+from hedra.reporting.metric.custom_metric import CustomMetric
 from .metrics_group import MetricsGroup
 
 
@@ -40,7 +41,7 @@ class MetricsSet:
             'actions_per_second': metrics_data.get('actions_per_second')
         }
 
-        self.custom_metrics = metrics_data.get('custom')
+        self.custom_metrics: Dict[str, CustomMetric] = metrics_data.get('custom')
         self.errors: List[Dict[str, Union[str, int]]] = metrics_data.get('errors')
         self.tags = [
             Tag(tag_name, tag_value) for tag_name, tag_value in tags.items()

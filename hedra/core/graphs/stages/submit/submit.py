@@ -1,14 +1,9 @@
 from typing import Generic, TypeVar, List, Any, Dict
-from hedra.core.graphs.hooks.hook_types.condition import condition
-from hedra.core.graphs.hooks.hook_types.context import context
-from hedra.core.graphs.hooks.hook_types.event import event
-from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.hooks.hook_types.internal import Internal
-from hedra.core.graphs.hooks.registry.registry_types import (
-    EventHook,
-    ContextHook,
-    TransformHook
-)
+from hedra.core.hooks.types.condition.decorator import condition
+from hedra.core.hooks.types.context.decorator import context
+from hedra.core.hooks.types.event.decorator import event
+from hedra.core.hooks.types.base.hook_type import HookType
+from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting import Reporter
@@ -57,24 +52,16 @@ class Submit(Stage, Generic[T]):
     @context()
     async def collect_process_results_and_metrics(
         self,
+        analyze_stage_session_total: int = 0,
         analyze_stage_events: List[T]=[],
-        analyze_stage_summary_metrics: Dict[str, Any]={}
+        analyze_stage_summary_metrics: List[Any]=[]
 
     ):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Initializing results submission')
 
-        session_total = analyze_stage_summary_metrics.get('session_total', 0)
-        metrics = []
-
-        stage_summaries = analyze_stage_summary_metrics.get('stages', {})
-        for stage in stage_summaries.values():
-            metrics.extend(list(
-                stage.get('actions', {}).values()
-            ))
-
         return {
-            'submit_stage_session_total': session_total,
-            'submit_stage_metrics': metrics,
+            'submit_stage_session_total': analyze_stage_session_total,
+            'submit_stage_metrics': analyze_stage_summary_metrics,
             'submit_stage_events': analyze_stage_events
         }
 
@@ -179,6 +166,8 @@ class Submit(Stage, Generic[T]):
         await submit_stage_reporter.submit_errors(submit_stage_metrics)
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {submit_stage_reporter_name}:{submit_stage_reporter.reporter_id} - Submitting Error Metrics')
 
+        return {}
+
     @event('initialize_reporter')
     async def submit_custom_metrics(
         self,
@@ -189,13 +178,9 @@ class Submit(Stage, Generic[T]):
         await submit_stage_reporter.submit_custom(submit_stage_metrics)
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {submit_stage_reporter_name}:{submit_stage_reporter.reporter_id} - Submitting Custom Metrics')
 
-    @event(
-        'submit_processed_results',
-        'submit_stage_metrics',
-        'submit_main_metrics',
-        'submit_error_metrics',
-        'submit_custom_metrics'
-    )
+        return {}
+
+    @event('submit_custom_metrics')
     async def complete_submit_session(
         self,
         submit_stage_reporter: Reporter=None,
@@ -207,4 +192,5 @@ class Submit(Stage, Generic[T]):
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {submit_stage_reporter_name}:{submit_stage_reporter.reporter_id} - Completed Metrics submission')
         await self.logger.spinner.set_default_message(f'Successfully submitted the results for {submit_stage_session_total} actions via {submit_stage_reporter_name} reporter')
-        
+
+        return {}

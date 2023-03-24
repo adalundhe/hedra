@@ -1,11 +1,12 @@
 import re
 import uuid
 from typing import List
-
-from numpy import float32, float64, int16, int32, int64
 from hedra.logging import HedraLogger
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
-from hedra.reporting.metric import MetricsSet
+from hedra.reporting.metric import (
+    MetricsSet,
+    MetricType
+)
 
 
 try:
@@ -53,6 +54,13 @@ class StatsD:
             'distribution': lambda: NotImplementedError('StatsD does not support distributions.'),
             'timer': self.connection.timer
 
+        }
+
+        self.custom_types_map = {
+            MetricType.COUNT: 'count',
+            MetricType.DISTRIBUTION: 'gauge',
+            MetricType.RATE: 'gauge',
+            MetricType.SAMPLE: 'gauge'
         }
 
         self.session_uuid = str(uuid.uuid4())
@@ -138,23 +146,19 @@ class StatsD:
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
             
-            for custom_group_name, group in metrics_set.custom_metrics.items():
+            for custom_metric_name, custom_metric in metrics_set.custom_metrics.items():
 
-                for field, value in group.items():
-                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metric - {metrics_set.name}:{custom_group_name}:{field}')
-                    
-                    update_type = None
-                    if isinstance(value, (int, int16, int32, int64)):
-                        update_type = 'count'
+                metric_type = self.custom_types_map.get(
+                    custom_metric.metric_type,
+                    'gauge'
+                )
 
-                    elif isinstance(value, (float, float32, float64)):
-                        update_type = 'gauge'
+                update_function = self._update_map.get(metric_type)
+                update_function(
+                    f'{metrics_set.name}_{custom_metric_name}',
+                    custom_metric.metric_value
+                )
 
-                    update_function = self._update_map.get(update_type)
-                    update_function(
-                        f'{metrics_set.name}_{custom_group_name}_{field}',
-                        value
-                    )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to {self.statsd_type}')
 

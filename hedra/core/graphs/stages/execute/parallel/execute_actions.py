@@ -14,12 +14,13 @@ from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.registry import RequestTypes
 from hedra.core.engines.types.registry import registered_engines
-from hedra.core.graphs.hooks.registry.registrar import registrar
+from hedra.core.hooks.types.base.registrar import registrar
 from hedra.core.personas import get_persona
 from hedra.core.personas.persona_registry import registered_personas
-from hedra.core.graphs.events.event_graph import EventGraph
-from hedra.core.graphs.simple_context import SimpleContext
-from hedra.core.graphs.hooks.registry.registry_types import ActionHook, TaskHook
+from hedra.core.hooks.types.base.event_graph import EventGraph
+from hedra.core.hooks.types.base.simple_context import SimpleContext
+from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.base.import_tools import (
@@ -138,13 +139,6 @@ async def start_execution(
 
     await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Execution complete - Time (including addtional setup) took: {round(elapsed, 2)} seconds')
 
-    for result in results:
-        result.checks = [
-            [
-                event.event_name for event in layer
-            ] for layer in list(result.checks)
-        ]
-
     context = {}
 
     for stage in pipeline_stages.values():
@@ -238,6 +232,7 @@ def execute_actions(parallel_config: str):
         generated_hooks = {}
         for stage in discovered.values():
             stage: Stage = stage()
+            stage.context = SimpleContext()
             stage.graph_name = graph_name
             stage.graph_path = graph_path
             stage.graph_id = graph_id

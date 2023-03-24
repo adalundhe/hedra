@@ -1,14 +1,15 @@
 import importlib
 import ntpath
 import sys
+import asyncio
 import inspect
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List
 from hedra.logging import HedraLogger
-from hedra.core.graphs.events.event import Event, EventHook
-from hedra.core.graphs.hooks.registry.registrar import registrar
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
+from hedra.core.hooks.types.event.event import Event, EventHook
+from hedra.core.hooks.types.base.registrar import registrar
+from hedra.core.hooks.types.base.hook import Hook
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.common.plugin import Plugin
 from .stage import Stage
@@ -68,15 +69,16 @@ def set_stage_hooks(stage: Stage, generated_hooks: Dict[str, Hook]) -> Stage:
         hook_set: List[Hook] = registrar.all.get(method_name, [])
 
         for hook in hook_set:
-            hook._call = hook._call.__get__(stage, stage.__class__)
-            setattr(stage, hook.shortname, hook._call)
-
-            if inspect.ismethod(hook.call) is False:
-                hook.call = hook.call.__get__(stage, stage.__class__)
-                setattr(stage, hook.shortname, hook.call)
                 
 
             if generated_hooks.get(hook) is None:
+
+                hook._call = hook._call.__get__(stage, stage.__class__)
+                setattr(stage, hook.shortname, hook._call)
+
+                if inspect.ismethod(hook.call) is False:
+                    hook.call = hook.call.__get__(stage, stage.__class__)
+                    setattr(stage, hook.shortname, hook.call)
 
                 generated_hooks[hook] = 'created'
                 hook.stage = stage.name
@@ -90,13 +92,31 @@ def set_stage_hooks(stage: Stage, generated_hooks: Dict[str, Hook]) -> Stage:
             elif generated_hooks.get(hook) == 'created':
 
                 copied_hook = hook.copy()
+    
                 
+
+                stage_config: Dict[str, Any]  = stage.to_copy_dict()
+                copied_stage = type(stage)()
+
+                for copied_attribute_name, copied_attribute_value in stage_config.items():
+                    if inspect.ismethod(copied_attribute_value) is False:
+                        setattr(copied_stage, copied_attribute_name, copied_attribute_value)
+                        
                 copied_hook.stage = stage.name
-                copied_hook.stage_instance: Stage = stage
+                copied_hook.stage_instance: Stage = copied_stage
                 copied_hook.name = f'{stage.name}.{hook.shortname}'
                 copied_hook._call = method
 
                 copied_hook.name = f'{copied_hook.stage}.{copied_hook.shortname}'
-                stage.hooks[hook.hook_type].append(copied_hook)
+
+                copied_hook._call = copied_hook._call.__get__(stage, stage.__class__)
+                setattr(stage, copied_hook.shortname, copied_hook._call)
+
+                if inspect.ismethod(copied_hook.call) is False:
+                    copied_hook.call = copied_hook.call.__get__(stage, stage.__class__)
+                    setattr(stage, copied_hook.shortname, copied_hook.call)
+
+                if copied_hook not in stage.hooks[hook.hook_type]:
+                    stage.hooks[hook.hook_type].append(copied_hook)
 
     return stage

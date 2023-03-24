@@ -25,14 +25,15 @@ class Kafka:
 
         self.events_topic = config.events_topic
         self.metrics_topic = config.metrics_topic
-        self.custom_metrics_topics = {}
-        self.shared_metrics_topic = 'stage_metrics'
-        self.errors_topic = 'stage_errors'
+        self.custom_metrics_topic = f'{config.metrics_topic}_custom' 
+        self.shared_metrics_topic = f'{config.metrics_topic}_shared'
+        self.errors_topic = f'{config.metrics_topic}_errors'
 
         self.events_partition = config.events_partition
         self.metrics_partition = config.metrics_partition
-        self.shared_metrics_partition = 'stage_metrics'
-        self.errors_partition = 'stage_errors'
+        self.shared_metrics_partition = f'{config.metrics_partition}_shared'
+        self.errors_partition = f'{config.metrics_partition}_errors'
+        self.custom_metrics_partition = f'{config.metrics_partition}_custom'
 
         self.compression_type = config.compression_type
         self.timeout = config.timeout
@@ -152,35 +153,32 @@ class Kafka:
     
     async def submit_custom(self, metrics_sets: List[MetricsSet]):
 
+        batch = self._producer.create_batch()
+
         for metrics_set in metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Customm Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
-            for custom_group_name, group in metrics_set.custom_metrics.items():
-                custom_topic_name = f'{custom_group_name}_metrics'
+            for custom_metic_name, custom_metric in metrics_set.custom_metrics.items():
 
-                if self.custom_metrics_topics.get(custom_topic_name) is None:
-                    self.custom_metrics_topics[custom_topic_name] = self._producer.create_batch()
-                
-                self.custom_metrics_topics[custom_topic_name].append(
+                batch.append(
                     value=json.dumps({
                         'name': metrics_set.name,
                         'stage': metrics_set.stage,
-                        'group': custom_group_name,
-                        **group
+                        'group': 'custom',
+                        custom_metic_name: custom_metric.metric_value
                     }).encode('utf-8'),
                     timestamp=None,
-                    key=bytes(f'{metrics_set.name}_{custom_group_name}', 'utf')
+                    key=bytes(f'{metrics_set.name}_{custom_metic_name}', 'utf')
                 )
 
-        for topic_name, batch in self.custom_metrics_topics.items():
-            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Customm Metrics to Topic - {topic_name} - Partition - {topic_name}')
-            await self._producer.send_batch(
-                batch,
-                topic_name,
-                partition=topic_name
-            )
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Customm Metrics to Topic - {self.custom_metrics_topic} - Partition - {self.custom_metrics_partition}')
+        await self._producer.send_batch(
+            batch,
+            self.custom_metrics_topic,
+            partition=self.custom_metrics_partition
+        )
 
-            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Customm Metrics to Topic - {topic_name} - Partition - {topic_name}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Customm Metrics to Topic - {self.custom_metrics_topic} - Partition - {self.custom_metrics_partition}')
 
     async def submit_errors(self, metrics_sets: List[MetricsSet]):
 

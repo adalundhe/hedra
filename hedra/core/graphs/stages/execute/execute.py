@@ -2,7 +2,6 @@
 import dill
 import time
 import statistics
-import pickle
 from collections import defaultdict
 from typing import Generic, List, Union, Any, Dict
 from typing_extensions import TypeVarTuple, Unpack
@@ -15,19 +14,21 @@ from hedra.core.engines.types.playwright import (
 )
 from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.engines.types.registry import registered_engines
-from hedra.core.graphs.hooks.hook_types.condition import condition
-from hedra.core.graphs.hooks.hook_types.context import context
-from hedra.core.graphs.hooks.hook_types.event import event
-from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.hooks.hook_types.internal import Internal
-from hedra.core.graphs.hooks.registry.registry_types import (
-    ActionHook,
-    TaskHook
-)
+from hedra.core.hooks.types.condition.decorator import condition
+from hedra.core.hooks.types.context.decorator import context
+from hedra.core.hooks.types.event.decorator import event
+from hedra.core.hooks.types.base.hook_type import HookType
+from hedra.core.hooks.types.internal.decorator import Internal
+from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
 from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.core.personas.persona_registry import get_persona, registered_personas, DefaultPersona
+from hedra.core.personas.persona_registry import (
+    get_persona, 
+    registered_personas, 
+    DefaultPersona
+)
 from hedra.plugins.types.plugin_types import PluginType
 from .parallel import execute_actions
 
@@ -50,16 +51,12 @@ class Execute(Stage, Generic[Unpack[T]]):
         
         self.accepted_hook_types = [ 
             HookType.ACTION,
-            HookType.AFTER,
-            HookType.BEFORE, 
             HookType.CHANNEL, 
             HookType.CHECK,
             HookType.CONDITION,
             HookType.CONTEXT,
             HookType.EVENT,
-            HookType.SETUP, 
             HookType.TASK,
-            HookType.TEARDOWN,
             HookType.TRANSFORM
         ]
 

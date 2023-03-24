@@ -137,22 +137,23 @@ class AWSLambda:
 
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
-            for group_name, group in metrics_set.custom_metrics.items():
-                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - {group_name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Custom Metrics Set - custom:{metrics_set.metrics_set_id}')
 
-                await self._loop.run_in_executor(
-                    self._executor,
-                    functools.partial(
-                        self._client.invoke,
-                        FunctionName=self.metrics_lambda_name,
-                        Payload=json.dumps({
-                            'name': metrics_set.name,
-                            'stage': metrics_set.stage,
-                            'group': group_name,
-                            **group
-                        })
-                    )
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self._client.invoke,
+                    FunctionName=self.metrics_lambda_name,
+                    Payload=json.dumps({
+                        'name': metrics_set.name,
+                        'stage': metrics_set.stage,
+                        'group': 'custom',
+                        **{
+                            metric.metric_shortname: metric.metric_value for metric in metrics_set.custom_metrics.values()
+                        }
+                    })
                 )
+            )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Custom Metrics to Lambda - {self.metrics_lambda_name}')
 

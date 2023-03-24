@@ -1,5 +1,6 @@
 import uuid
-from typing import Any, Dict, Union
+from typing import Dict, Union
+from hedra.reporting.metric.custom_metric import CustomMetric
 
 
 class MetricsGroup:
@@ -63,22 +64,18 @@ class MetricsGroup:
         self.unique_fields = list(self.fields)
         self.unique_values = list(self.values)
 
-        self.custom_fields: Dict[str, Dict[str, Union[int, float, Any]]] = data.get('custom_metrics', {})
+        self.custom_fields: Dict[str, CustomMetric] = data.get('custom_metrics', {})
 
     @property
     def custom(self):
         return {
-            custom_metric_name: custom_metric.get(
-                'result'
-            ) for custom_metric_name, custom_metric in self.custom_fields.items()
+            custom_metric.metric_name: custom_metric.metric_value for custom_metric in self.custom_fields.values()
         }
 
     @property
     def custom_schemas(self):
         return {
-            custom_metric_name: custom_metric.get(
-                'field_type'
-            ) for custom_metric_name, custom_metric in self.custom_fields.items()
+            custom_metric.metric_name: custom_metric.metric_type for custom_metric in self.custom_fields.values()
         }
 
     @property

@@ -81,8 +81,10 @@ class ProgressText:
     async def stop_cli_tasks(self):
         self.run_cli_task = False
         self.run_timer_task = False
-        await self._cli_task
-        await self._timer_task
+
+        if self._cli_task and self._timer_task:
+            await self._cli_task
+            await self._timer_task
 
         self.cli_messages = []
 

@@ -105,15 +105,6 @@ class Graph:
         self.logger.hedra.sync.debug(f'{self.metadata_string} - Changed status to - {GraphStatus.ASSEMBLING.name} - from - {GraphStatus.INITIALIZING.name}')
         self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Changed status to - {GraphStatus.ASSEMBLING.name} - from - {GraphStatus.INITIALIZING.name}')
 
-        # If we havent specified a Validate stage for save aggregated results,
-        # append one.
-
-        if len(self.instances.get(StageTypes.VALIDATE)) < 1:
-            self.logger.hedra.sync.debug(f'{self.metadata_string} - Prepending {StageTypes.VALIDATE.name} stage')
-            self.logger.filesystem.sync['hedra.core'].debug(f'{self.metadata_string} - Prepending {StageTypes.VALIDATE.name} stage')
-
-            self._prepend_stage(StageTypes.VALIDATE)
-
         # A user will never specify an Idle stage. Instead, we prepend one to 
         # serve as the source node for a graphs, ensuring graphs have a 
         # valid starting point and preventing the user from forgetting things
@@ -169,25 +160,35 @@ class Graph:
 
         for transition_group in self._transitions:
 
+            is_idle_transition = False
+
+            transition_stage_types = [transition.edge.source.stage_type for transition in transition_group]
+            is_idle_transition = StageTypes.IDLE in transition_stage_types
+
             transition_group.sort_and_map_transitions()
 
             current_stages = ', '.join(
                 list(set([transition.from_stage.name for transition in transition_group]))
             )
 
+            self.logger.spinner.logger_enabled = True
+            if is_idle_transition:
+                self.logger.spinner.logger_enabled = False
+
             async with self.logger.spinner as status_spinner:
                 
-                await self.logger.spinner.append_message(f"Executing stages - {current_stages}")
+                if is_idle_transition is False:
+                    await self.logger.spinner.append_message(f"Executing stages - {current_stages}")
                 
-                for transition in transition_group:
-                    await status_spinner.system.debug(f'{self.metadata_string} - Executing stage Transtition - {transition.transition_id} -  from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
-                    await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing stage Transition - {transition.transition_id} - from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
-                    await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing stage - {transition.from_stage.name}:{transition.from_stage.stage_id}')
+                    for transition in transition_group:
+                        await status_spinner.system.debug(f'{self.metadata_string} - Executing stage Transtition - {transition.transition_id} -  from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
+                        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing stage Transition - {transition.transition_id} - from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
+                        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing stage - {transition.from_stage.name}:{transition.from_stage.stage_id}')
 
                 results = await asyncio.gather(*[
                     asyncio.create_task(transition.execute()) for transition in transition_group
                 ])
-
+                
                 for error, next_stage in results:
                     
                     if next_stage == StageTypes.ERROR:
@@ -206,23 +207,24 @@ class Graph:
                             error_transtiton.from_stage,
                             error_transtiton.to_stage
                         ) 
+
+                if self.status == GraphStatus.FAILED:
+                    status_spinner.finalize()
+                    await status_spinner.fail('Error')
+                    break
                 
                 for transition in transition_group:
                     await status_spinner.system.debug(f'{self.metadata_string} - Completed stage Transtition - {transition.transition_id} -  from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
 
 
-                completed_transitions_count = len(results)
-                await status_spinner.system.debug(f'{self.metadata_string} - Completed -  {completed_transitions_count} - transitions')
-                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Completed -  {completed_transitions_count} - transitions')
-                    
-                if self.status == GraphStatus.FAILED:
-                    status_spinner.finalize()
-                    await status_spinner.fail('Error')
-                    break
+                if is_idle_transition is False:
+                    completed_transitions_count = len(results)
+                    await status_spinner.system.debug(f'{self.metadata_string} - Completed -  {completed_transitions_count} - transitions')
+                    await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Completed -  {completed_transitions_count} - transitions')
 
-                status_spinner.group_finalize()
+                    status_spinner.group_finalize()
 
-                await status_spinner.ok('✔')
+                    await status_spinner.ok('✔')
 
                 results = None
             

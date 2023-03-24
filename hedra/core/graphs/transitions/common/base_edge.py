@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import Any, Generic, TypeVar, Dict, List, Union
 from hedra.core.graphs.stages.base.stage import Stage
-from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 
 
@@ -15,9 +14,11 @@ class BaseEdge(Generic[T]):
         self.provides = []
         
         self.from_stage_name: str = None
+        self.from_stage_names: List[str] = []
         self.stages_by_type: Dict[StageTypes, Dict[str, Stage]] = {}
         self.path_lengths: Dict[str, int] = {}
         self.history = {}
+        self.edge_data = {}
         self.next_history = {}
         self.visited = []
         self.valid_states = []
@@ -52,3 +53,10 @@ class BaseEdge(Generic[T]):
 
     def split(self) -> None:
         raise NotImplementedError('Err. - Please implement this method in the Edge class inheriting BaseEdge')
+
+    def merge(self) -> None:
+        raise NotImplementedError('Err. - Please implement this method in the Edge class inheriting BaseEdge')
+    
+    def setup(self) -> None:
+        pass
+        #raise NotImplementedError('Err. - Please implement this method in the Edge class inheriting BaseEdge')

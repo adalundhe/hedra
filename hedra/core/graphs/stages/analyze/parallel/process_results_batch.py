@@ -7,12 +7,12 @@ import json
 import threading
 import os
 import signal 
-from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
 from typing import Any, Dict, List
+from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.engines.types.common.base_result import BaseResult
-from hedra.core.graphs.events.event_graph import EventGraph
-from hedra.core.graphs.hooks.registry.registrar import registrar
+from hedra.core.hooks.types.base.event_graph import EventGraph
+from hedra.core.hooks.types.base.registrar import registrar
 from hedra.core.graphs.stages.base.import_tools import (
     import_stages,
     set_stage_hooks
@@ -82,14 +82,13 @@ async def process_batch(
             for custom_metric_hook in custom_metric_hook_set:
                 custom_metric_hooks.append(custom_metric_hook)
 
-        await asyncio.gather(*[
-            asyncio.create_task(events[stage_result.name].add(
+        for stage_result in results_batch:
+            events[stage_result.name].add(
                     stage,
                     stage_result,
                     stage_name
-                )) for stage_result in results_batch
-        ])
-        
+                )
+
         for events_stage_name, events_group in events.items():  
 
             await logger.filesystem.aio['hedra.reporting'].debug(
@@ -137,6 +136,7 @@ def process_results_batch(config: Dict[str, Any]):
 
     generated_hooks = {}
     for stage in discovered.values():
+        stage.context = SimpleContext()
         initialized_stage =  set_stage_hooks(
             stage(), 
             generated_hooks
@@ -152,6 +152,7 @@ def process_results_batch(config: Dict[str, Any]):
                 hooks_by_shortname[hook_type][hook.shortname] = hook
 
     setup_analyze_stage: Stage = initialized_stages.get(stage_name)
+    setup_analyze_stage.context = SimpleContext()
     setup_analyze_stage.context.update(source_stage_context)
 
     events_graph = EventGraph(hooks_by_type)

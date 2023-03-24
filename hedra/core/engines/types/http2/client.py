@@ -47,7 +47,12 @@ class MercuryHTTP2Client(BaseEngine[Union[A, HTTP2Action], Union[R, HTTP2Result]
         self.closed = False
         
         self.sem = Semaphore(value=concurrency)
-        self.pool: HTTP2Pool = HTTP2Pool(concurrency, self.timeouts, reset_connections=reset_connections)
+        self.pool: HTTP2Pool = HTTP2Pool(
+            concurrency, 
+            self.timeouts, 
+            reset_connections=reset_connections
+        )
+
         self.pool.create_pool()
         self.active = 0
         self.waiter = None
@@ -56,7 +61,12 @@ class MercuryHTTP2Client(BaseEngine[Union[A, HTTP2Action], Union[R, HTTP2Result]
     
     async def set_pool(self, concurrency: int):
         self.sem = asyncio.Semaphore(value=concurrency)
-        self.pool = HTTP2Pool(concurrency, reset_connections=self.pool.reset_connections)
+        self.pool = HTTP2Pool(
+            concurrency, 
+            self.timeouts,
+            reset_connections=self.pool.reset_connections
+        )
+
         self.pool.create_pool()
 
     def extend_pool(self, increased_capacity: int):

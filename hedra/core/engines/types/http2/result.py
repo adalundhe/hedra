@@ -48,7 +48,6 @@ class HTTP2Result(BaseResult):
             action.metadata.user,
             action.metadata.tags,
             RequestTypes.HTTP2,
-            action.hooks.checks,
             error
         )
 

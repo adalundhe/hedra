@@ -28,7 +28,6 @@ class PlaywrightResult(BaseResult):
             command.metadata.user,
             command.metadata.tags,
             RequestTypes.PLAYWRIGHT,
-            command.hooks.checks,
             error
         )
 

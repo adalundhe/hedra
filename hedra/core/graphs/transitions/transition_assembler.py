@@ -1,22 +1,22 @@
 import asyncio
 import networkx
-import inspect
 import threading
-import networkx
 import os
-import networkx
-import matplotlib.pyplot as plt
 from typing import List, Dict, Union, Any, Tuple, Coroutine
 from collections import defaultdict
-from hedra.core.graphs.events.event_graph import EventGraph
+from hedra.core.hooks.types.base.event_graph import EventGraph
 from hedra.core.graphs.stages.base.import_tools import set_stage_hooks
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.error import Error
 from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.core.graphs.hooks.registry.registrar import registrar
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook, HookType
+from hedra.core.hooks.types.base.registrar import registrar
+from hedra.core.hooks.types.base.hook import Hook, HookType
 from hedra.core.graphs.stages.base.parallel.batch_executor import BatchExecutor
-from hedra.core.graphs.transitions.exceptions.exceptions import IsolatedStageError
+from hedra.core.hooks.types.base.simple_context import SimpleContext
+from hedra.core.graphs.transitions.exceptions.exceptions import (
+    IsolatedStageError, 
+    InvalidTransitionError
+)
 from hedra.logging import HedraLogger
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.reporter.reporter_plugin import ReporterPlugin
@@ -25,11 +25,6 @@ from .transition_group import TransitionGroup
 from .transition import Transition
 from .common.transtition_metadata import TransitionMetadata
 from .common.base_edge import BaseEdge
-
-
-
-async def empty_call(*args):
-    return
 
 
 class TransitionAssembler:
@@ -84,9 +79,6 @@ class TransitionAssembler:
         stage_types_count = len(self.instances_by_type)
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Found - {stage_types_count} - unique stage types')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Found - {stage_types_count} - unique stage types')
-
-
-        print(self.graph_skipped_stages)   
 
         self.generated_stages: Dict[str, Stage] = {
             stage_name: stage() for stage_name, stage in stages.items() 
@@ -154,7 +146,6 @@ class TransitionAssembler:
             parallel_stages = []
 
             no_workers_stages = [
-                StageTypes.WAIT, 
                 StageTypes.IDLE
             ]
 
@@ -216,13 +207,6 @@ class TransitionAssembler:
                         neighbor_stage.stage_type
                     ))
 
-                    if transition_action.is_valid is False:
-                        invalid_transition_error, _ = self.loop.run_until_complete(
-                            transition_action(stage, neighbor_stage)
-                        )
-
-                        raise invalid_transition_error
-
                     self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Created transition from - {stage.name} - to - {neighbor_stage.name}')
                     self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Created transition from - {stage.name} - to - {neighbor_stage.name}')
 
@@ -232,6 +216,14 @@ class TransitionAssembler:
                         neighbor_stage
                     )
 
+
+                    if transition_action.is_valid is False:
+                        raise InvalidTransitionError(
+                            transition.from_stage,
+                            transition.to_stage
+                        )
+
+                   
                     transition.predecessors = list(graph.predecessors(stage.name))
                     transition.descendants = list(graph.successors(stage.name))
                     
@@ -265,6 +257,7 @@ class TransitionAssembler:
 
         idle_stages = self.instances_by_type.get(StageTypes.IDLE)
         for idle_stage in idle_stages:
+            idle_stage.context = SimpleContext()
             idle_stage.context.stages = {}
             idle_stage.context.visited = []
             idle_stage.context.results = {}

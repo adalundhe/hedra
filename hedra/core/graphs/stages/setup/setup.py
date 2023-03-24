@@ -1,30 +1,20 @@
 import asyncio
 import psutil
 import traceback
-import inspect
 from collections import defaultdict
 from typing_extensions import TypeVarTuple, Unpack
-from typing import Dict, Generic, List, Any, Union, Coroutine
-from hedra.core.graphs.hooks.hook_types.condition import condition
-from hedra.core.graphs.hooks.hook_types.context import context
-from hedra.core.graphs.hooks.hook_types.event import event
-from hedra.core.graphs.hooks.hook_types.transform import transform
-from hedra.core.graphs.hooks.registry.registry_types.hook import Hook
-from hedra.core.graphs.hooks.hook_types.hook_type import HookType
-from hedra.core.graphs.hooks.hook_types.internal import Internal
-from hedra.core.engines.client.client import Client, config_registry
+from typing import Dict, Generic, List, Any
+from hedra.core.hooks.types.condition.decorator import condition
+from hedra.core.hooks.types.context.decorator import context
+from hedra.core.hooks.types.event.decorator import event
+from hedra.core.hooks.types.transform.decorator import transform
+from hedra.core.hooks.types.base.hook import Hook
+from hedra.core.hooks.types.base.hook_type import HookType
+from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.engines.client.config import Config
-from hedra.core.engines.types.common.base_action import BaseAction
-from hedra.core.engines.types.task.task import Task
-from hedra.core.graphs.hooks.registry.registry_types import (
-    ActionHook,
-    AfterHook,
-    BeforeHook,
-    ChannelHook,
-    CheckHook,
-    SetupHook,
-    TaskHook
-)
+from hedra.core.engines.client.client import Client
+from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.personas.types import PersonaTypesMap
 from hedra.logging import HedraLogger
@@ -116,7 +106,6 @@ class Setup(Stage, Generic[Unpack[T]]):
             HookType.CONDITION,
             HookType.CONTEXT,
             HookType.EVENT, 
-            HookType.SETUP,
             HookType.TRANSFORM 
         ]
 

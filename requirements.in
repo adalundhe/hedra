@@ -18,3 +18,4 @@ tdigest
 GitPython
 aiologger
 yaspin
+pydantic
