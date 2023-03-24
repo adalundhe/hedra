@@ -68,8 +68,6 @@ class SubmitEdge(BaseEdge[Submit]):
 
         self.visited.append(self.source.name)
 
-        print(self.source.name, 'DONE!')
-
         return None, self.destination.stage_type
 
     def _update(self, destination: Stage):

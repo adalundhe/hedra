@@ -166,6 +166,8 @@ class Submit(Stage, Generic[T]):
         await submit_stage_reporter.submit_errors(submit_stage_metrics)
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {submit_stage_reporter_name}:{submit_stage_reporter.reporter_id} - Submitting Error Metrics')
 
+        return {}
+
     @event('initialize_reporter')
     async def submit_custom_metrics(
         self,
@@ -176,13 +178,9 @@ class Submit(Stage, Generic[T]):
         await submit_stage_reporter.submit_custom(submit_stage_metrics)
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {submit_stage_reporter_name}:{submit_stage_reporter.reporter_id} - Submitting Custom Metrics')
 
-    @event(
-        'submit_processed_results',
-        'submit_stage_metrics',
-        'submit_main_metrics',
-        'submit_error_metrics',
-        'submit_custom_metrics'
-    )
+        return {}
+
+    @event('submit_custom_metrics')
     async def complete_submit_session(
         self,
         submit_stage_reporter: Reporter=None,
@@ -194,4 +192,5 @@ class Submit(Stage, Generic[T]):
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {submit_stage_reporter_name}:{submit_stage_reporter.reporter_id} - Completed Metrics submission')
         await self.logger.spinner.set_default_message(f'Successfully submitted the results for {submit_stage_session_total} actions via {submit_stage_reporter_name} reporter')
-        
+
+        return {}

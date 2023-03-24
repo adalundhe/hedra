@@ -6,7 +6,6 @@ import uuid
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
-from hedra.reporting.metric.custom_metric import CustomMetric
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
 from .json_config import JSONConfig
@@ -18,7 +17,7 @@ class JSON:
     def __init__(self, config: JSONConfig) -> None:
         self.events_filepath = config.events_filepath
         self.metrics_filepath = config.metrics_filepath
-        self._executor = ThreadPoolExecutor(max_workers=1)
+        self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._loop = asyncio.get_event_loop()
 
         self.session_uuid = str(uuid.uuid4())
@@ -38,16 +37,29 @@ class JSON:
             event.record for event in events
         ]
 
-        with open(self.events_filepath, 'w') as events_file:
-            await self._loop.run_in_executor(
-                self._executor,
-                functools.partial(
-                    json.dump,
-                    event_records, 
-                    events_file, 
-                    indent=4
-                )
+        events_file = await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                open,
+                self.events_filepath,
+                'w'
             )
+        )
+
+        await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                json.dump,
+                event_records, 
+                events_file, 
+                indent=4
+            )
+        )
+
+        await self._loop.run_in_executor(
+            self._executor,
+            events_file.close
+        )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Events to file - {self.events_filepath}')
 
@@ -78,16 +90,29 @@ class JSON:
                 'groups': groups
             }
 
-        with open(self.metrics_filepath, 'w') as metrics_file:
-            await self._loop.run_in_executor(
-                self._executor,
-                functools.partial(
-                    json.dump,
-                    records, 
-                    metrics_file, 
-                    indent=4
-                )
+        metrics_file = await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                open,
+                self.metrics_filepath,
+                'w'
             )
+        )
+
+        await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                json.dump,
+                records, 
+                metrics_file, 
+                indent=4
+            )
+        )
+
+        await self._loop.run_in_executor(
+            self._executor,
+            metrics_file.close
+        )        
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Metrics to file - {self.metrics_filepath}')
 
