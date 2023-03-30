@@ -1,4 +1,3 @@
-from typing import List
 from hedra.core.engines.types.common.types import RequestTypes
 from .types import (
     GraphQLProcessedResult,
@@ -6,6 +5,7 @@ from .types import (
     GRPCProcessedResult,
     HTTPProcessedResult,
     HTTP2ProcessedResult,
+    HTTP3ProcessedResult,
     PlaywrightProcessedResult,
     TaskProcessedResult,
     UDPProcessedResult,
@@ -20,6 +20,7 @@ results_types = {
     RequestTypes.GRPC: GRPCProcessedResult,
     RequestTypes.HTTP: HTTPProcessedResult,
     RequestTypes.HTTP2: HTTP2ProcessedResult,
+    RequestTypes.HTTP3: HTTP3ProcessedResult,
     RequestTypes.PLAYWRIGHT: PlaywrightProcessedResult,
     RequestTypes.TASK: TaskProcessedResult,
     RequestTypes.UDP: UDPProcessedResult,

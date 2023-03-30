@@ -1,3 +1,4 @@
+from __future__ import annotations
 import binascii
 from typing import Dict, Union
 from hedra.core.engines.types.common.types import RequestTypes
@@ -29,7 +30,10 @@ class GRPCResult(HTTP2Result):
         return protobuf
 
     @classmethod
-    def from_dict(cls, results_dict: Dict[str, Union[int, float, str,]]):
+    def from_dict(
+        cls, 
+        results_dict: Dict[str, Union[int, float, str,]]
+    ) -> GRPCResult:
         
         action = GRPCAction(
             results_dict.get('name'),

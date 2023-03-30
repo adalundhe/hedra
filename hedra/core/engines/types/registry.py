@@ -3,6 +3,7 @@ from .graphql_http2 import MercuryGraphQLHTTP2Client
 from .grpc import MercuryGRPCClient
 from .http import MercuryHTTPClient
 from .http2 import MercuryHTTP2Client
+from .http3 import MercuryHTTP3Client
 from .playwright import MercuryPlaywrightClient
 from .task import MercuryTaskRunner
 from .udp import MercuryUDPClient
@@ -18,6 +19,11 @@ registered_engines = {
         reset_connections=reset_connections
     ),
     RequestTypes.HTTP2: lambda concurrency, timeouts, reset_connections: MercuryHTTP2Client(
+        concurrency=concurrency,
+        timeouts=timeouts,
+        reset_connections=reset_connections
+    ),
+    RequestTypes.HTTP3: lambda concurrency, timeouts, reset_connections: MercuryHTTP3Client(
         concurrency=concurrency,
         timeouts=timeouts,
         reset_connections=reset_connections

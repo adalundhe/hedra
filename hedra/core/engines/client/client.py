@@ -10,6 +10,7 @@ from .config import Config
 from .client_types import  (
     HTTPClient,
     HTTP2Client,
+    HTTP3Client,
     GRPCClient,
     GraphQLClient,
     GraphQLHTTP2Client,
@@ -49,6 +50,7 @@ class Client(Generic[Unpack[T]]):
         self._config: Config = None
         self._http = HTTPClient
         self._http2 = HTTP2Client
+        self._http3 = HTTP3Client
         self._grpc = GRPCClient
         self._graphql = GraphQLClient
         self._graphqlh2 = GraphQLHTTP2Client
@@ -120,6 +122,18 @@ class Client(Generic[Unpack[T]]):
         self._http2.next_name = self.next_name
         self._http2.intercept = self.intercept
         return self._http2
+
+    @property
+    def http3(self):
+        if self._http3.initialized is False:
+            self._http3 = self._http3(self._config)
+            self._http3.metadata_string = self.metadata_string
+            self._http3.actions = self.actions
+            self.clients[RequestTypes.HTTP3] = self._http3
+       
+        self._http3.next_name = self.next_name
+        self._http3.intercept = self.intercept
+        return self._http3
 
     @property
     def grpc(self):

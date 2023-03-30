@@ -3,6 +3,7 @@ from .graphql_http2_processed_result import GraphQLHTTP2ProcessedResult
 from .grpc_processed_result import GRPCProcessedResult
 from .http_processed_result import HTTPProcessedResult
 from .http2_processed_result import HTTP2ProcessedResult
+from .http3_processed_result import HTTP3ProcessedResult
 from .playwright_processed_result import PlaywrightProcessedResult
 from .task_processed_result import TaskProcessedResult
 from .udp_processed_result import UDPProcessedResult

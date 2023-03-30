@@ -1,9 +1,9 @@
 from typing import Dict, List, Union, Iterator
 from hedra.core.engines.client.config import Config
-from hedra.core.engines.types.http2 import(
-    MercuryHTTP2Client,
-    HTTP2Action,
-    HTTP2Result
+from hedra.core.engines.types.http3 import(
+    MercuryHTTP3Client,
+    HTTP3Action,
+    HTTP3Result
 )
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common import Timeouts
@@ -12,12 +12,12 @@ from hedra.logging import HedraLogger
 from .base_client import BaseClient
 
 
-class HTTP2Client(BaseClient[MercuryHTTP2Client, HTTP2Action, HTTP2Result]):
+class HTTP3Client(BaseClient[MercuryHTTP3Client, HTTP3Action, HTTP3Result]):
     
     def __init__(self, config: Config) -> None:
         super().__init__()
 
-        self.session = MercuryHTTP2Client(
+        self.session = MercuryHTTP3Client(
             concurrency=config.batch_size,
             timeouts=Timeouts(
                 connect_timeout=config.connect_timeout,
@@ -43,17 +43,19 @@ class HTTP2Client(BaseClient[MercuryHTTP2Client, HTTP2Action, HTTP2Result]):
         url: str, 
         headers: Dict[str, str] = {}, 
         user: str = None,
-        tags: List[Dict[str, str]] = []
+        tags: List[Dict[str, str]] = [],
+        redirects: int=3
     ):
 
-        request = HTTP2Action(
+        request = HTTP3Action(
             self.next_name,
             url,
             method='GET',
             headers=headers,
             data=None,
             user=user,
-            tags=tags
+            tags=tags,
+            redirects=redirects
         )
         
         return await self._execute_action(request)
@@ -64,17 +66,19 @@ class HTTP2Client(BaseClient[MercuryHTTP2Client, HTTP2Action, HTTP2Result]):
         headers: Dict[str, str] = {}, 
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
-        tags: List[Dict[str, str]] = []
+        tags: List[Dict[str, str]] = [],
+        redirects: int=3
     ):
 
-        request = HTTP2Action(
+        request = HTTP3Action(
             self.next_name,
             url,
             method='POST',
             headers=headers,
             data=data,
             user=user,
-            tags=tags
+            tags=tags,
+            redirects=redirects
         )
     
         return await self._execute_action(request)
@@ -89,7 +93,7 @@ class HTTP2Client(BaseClient[MercuryHTTP2Client, HTTP2Action, HTTP2Result]):
         tags: List[Dict[str, str]] = []
     ):
 
-        request = HTTP2Action(
+        request = HTTP3Action(
             self.next_name,
             url,
             method='PUT',
@@ -108,17 +112,19 @@ class HTTP2Client(BaseClient[MercuryHTTP2Client, HTTP2Action, HTTP2Result]):
         headers: Dict[str, str] = {}, 
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
-        tags: List[Dict[str, str]] = []
+        tags: List[Dict[str, str]] = [],
+        redirects: int=3
     ):
 
-        request = HTTP2Action(
+        request = HTTP3Action(
             self.next_name,
             url,
             method='PATCH',
             headers=headers,
             data=data,
             user=user,
-            tags=tags
+            tags=tags,
+            redirects=redirects
         )
 
         return await self._execute_action(request)
@@ -129,17 +135,19 @@ class HTTP2Client(BaseClient[MercuryHTTP2Client, HTTP2Action, HTTP2Result]):
         url: str, 
         headers: Dict[str, str] = {}, 
         user: str = None,
-        tags: List[Dict[str, str]] = []
+        tags: List[Dict[str, str]] = [],
+        redirects: int=3
     ):
 
-        request = HTTP2Action(
+        request = HTTP3Action(
             self.next_name,
             url,
             method='DELETE',
             headers=headers,
             data=None,
             user=user,
-            tags=tags
+            tags=tags,
+            redirects=redirects
         )
 
         return await self._execute_action(request)

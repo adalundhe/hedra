@@ -1,3 +1,4 @@
+from __future__ import annotations
 import json
 from typing import Dict, Union, Any
 from gzip import decompress as gzip_decompress
@@ -232,7 +233,10 @@ class HTTP2Result(BaseResult):
         }
 
     @classmethod
-    def from_dict(cls, results_dict: Dict[str, Union[int, float, str,]]):
+    def from_dict(
+        cls, 
+        results_dict: Dict[str, Union[int, float, str,]]
+    ) -> HTTP2Result:
         
         action = HTTP2Action(
             results_dict.get('name'),
