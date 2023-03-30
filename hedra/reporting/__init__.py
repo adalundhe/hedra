@@ -29,6 +29,9 @@ from .types import (
     TelegrafConfig,
     TelegrafStatsDConfig,
     TimescaleDBConfig,
+    XML,
+    XMLConfig
+    
 )
 
 from .reporter import (

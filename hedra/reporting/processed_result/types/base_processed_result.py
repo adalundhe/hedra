@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, List, Dict
+from typing import Any, List, Dict, Union
 from hedra.core.hooks.types.base.event import BaseEvent
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.reporting.tags import Tag
@@ -77,3 +77,9 @@ class BaseProcessedResult:
         return {
             tag.name: tag.value for tag in self.tags
         }
+    
+    def to_dict(self) -> Dict[str, Union[str, int, float]]:
+        raise NotImplementedError('Err. - Implement this method in a specific class inheriting from BaseProcessedResult')
+
+    def serialize(self) -> str:
+        raise NotImplementedError('Err. - Implement this method in a specific class inheriting from BaseProcessedResult')

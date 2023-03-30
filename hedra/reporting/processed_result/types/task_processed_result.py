@@ -1,5 +1,5 @@
-from typing import Any, Tuple, Dict
-from hedra.core.hooks.types.base.hook_type import HookType
+import json
+from typing import Any, Dict, Union
 from hedra.core.engines.types.task.result import TaskResult
 from .base_processed_result import BaseProcessedResult
 
@@ -27,3 +27,22 @@ class TaskProcessedResult(BaseProcessedResult):
         }
 
         self.data = result.data
+
+    def to_dict(self) -> Dict[str, Union[str, int, float]]:
+        return {
+            'name': self.name,
+            'stage': self.stage,
+            'shortname': self.shortname,
+            'checks': [check.__name__ for check in self.checks],
+            'error': str(self.error),
+            'time': self.time,
+            'type': self.type,
+            'source': self.source,
+            'data': self.data,
+            **self.timings
+        }
+    
+    def serialize(self) -> str:
+        return json.dumps(
+            self.to_dict()
+        )

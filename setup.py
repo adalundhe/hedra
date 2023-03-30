@@ -94,7 +94,8 @@ setup(
             'google-cloud-bigtable',
             'google-cloud-storage',
             'cryptography==38.0.4',
-            'aioquic'
+            'aioquic',
+            'dicttoxml',
         ],
         'all-engines': [
             'grpcio',
@@ -102,7 +103,7 @@ setup(
             'gql',
             'playwright',
             'cryptography==38.0.4',
-            'aioquic'
+            'aioquic',
 
         ],
         'all-reporters': [
@@ -127,6 +128,7 @@ setup(
             'google-cloud-bigquery',
             'google-cloud-bigtable',
             'google-cloud-storage',
+            'dicttoxml',
 
         ],
         'playwright': [
@@ -195,6 +197,9 @@ setup(
             'google-cloud-bigquery',
             'google-cloud-bigtable',
             'google-cloud-storage',
+        ],
+        'xml': [
+            'dicttoxml'
         ]
     },
     python_requires='>=3.8'

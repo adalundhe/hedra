@@ -1,6 +1,5 @@
 import json
-from typing import Any, Tuple, Dict
-from hedra.core.hooks.types.base.hook_type import HookType
+from typing import Any, Union, Dict
 from hedra.core.engines.types.udp import UDPResult
 from .base_processed_result import BaseProcessedResult
 
@@ -53,14 +52,13 @@ class UDPProcessedResult(BaseProcessedResult):
             'reading': result.complete - result.write_end
         }
 
-
-    def serialize(self):
+    def to_dict(self) -> Dict[str, Union[str, int, float]]:
 
         data = self.data
         if isinstance(data, (bytes, bytearray)):
             data = data.decode()
 
-        return json.dumps({
+        return {
             'name': self.name,
             'stage': self.stage,
             'shortname': self.shortname,
@@ -78,4 +76,14 @@ class UDPProcessedResult(BaseProcessedResult):
             'status': self.status,
             'headers': self.headers,
             'data': data
-        })
+        }
+
+    def serialize(self) -> str:
+
+        data = self.data
+        if isinstance(data, (bytes, bytearray)):
+            data = data.decode()
+
+        return json.dumps(
+            self.to_dict()
+        )

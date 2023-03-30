@@ -65,7 +65,9 @@ from .types import (
     TelegrafStatsD,
     TelegrafStatsDConfig,
     TimescaleDB,
-    TimescaleDBConfig
+    TimescaleDBConfig,
+    XML,
+    XMLConfig
 )
 
 ReporterType = TypeVar(
@@ -99,7 +101,8 @@ ReporterType = TypeVar(
     StatsDConfig,
     TelegrafConfig,
     TelegrafStatsDConfig,
-    TimescaleDBConfig
+    TimescaleDBConfig,
+    XMLConfig
 )
 
 class Reporter:
@@ -133,7 +136,8 @@ class Reporter:
             ReporterTypes.StatsD: lambda config: StatsD(config),
             ReporterTypes.Telegraf: lambda config: Telegraf(config),
             ReporterTypes.TelegrafStatsD: lambda config: TelegrafStatsD(config),
-            ReporterTypes.TimescaleDB: lambda config: TimescaleDB(config)
+            ReporterTypes.TimescaleDB: lambda config: TimescaleDB(config),
+            ReporterTypes.XML: lambda config: XML(config)
         }
 
     def __init__(self, reporter_config: Union[ReporterConfig, ReporterType]) -> None:

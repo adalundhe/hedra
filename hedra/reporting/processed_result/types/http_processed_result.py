@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Union
 from hedra.core.engines.types.http import HTTPResult
 from .base_processed_result import BaseProcessedResult
 
@@ -52,7 +52,7 @@ class HTTPProcessedResult(BaseProcessedResult):
             'reading': result.complete - result.write_end
         }
 
-    def serialize(self):
+    def to_dict(self) -> Dict[str, Union[str, int, float]]:
 
         data = self.data
         if isinstance(data, (bytes, bytearray)):
@@ -62,7 +62,7 @@ class HTTPProcessedResult(BaseProcessedResult):
         for key, value in self.headers.items():
             serializable_headers[key.decode()] = value.decode()
 
-        return json.dumps({
+        return {
             'name': self.name,
             'stage': self.stage,
             'shortname': self.shortname,
@@ -79,5 +79,20 @@ class HTTPProcessedResult(BaseProcessedResult):
             'hostname': self.hostname,
             'status': self.status,
             'headers': serializable_headers,
-            'data': data
-        })
+            'data': data,
+            **self.timings
+        }
+
+    def serialize(self) -> str:
+
+        data = self.data
+        if isinstance(data, (bytes, bytearray)):
+            data = data.decode()
+
+        serializable_headers = {}
+        for key, value in self.headers.items():
+            serializable_headers[key.decode()] = value.decode()
+
+        return json.dumps(
+            self.to_dict()
+        )
