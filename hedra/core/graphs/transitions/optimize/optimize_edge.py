@@ -1,9 +1,12 @@
 from __future__ import annotations
 import asyncio
 import inspect
+from collections import defaultdict
 from typing import Dict, List, Any, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.base.hook import Hook
+from hedra.core.hooks.types.base.registrar import registrar
 from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
@@ -164,8 +167,19 @@ class OptimizeEdge(BaseEdge[Optimize]):
         
         for copied_attribute_name, copied_attribute_value in optimize_stage_config.items():
             if inspect.ismethod(copied_attribute_value) is False:
-                setattr(optimize_stage_copy, copied_attribute_name, copied_attribute_value)
-        
+                setattr(
+                    optimize_stage_copy, 
+                    copied_attribute_name, 
+                    copied_attribute_value
+                )
+
+
+        user_hooks: Dict[str, Dict[str, Hook]] = defaultdict(dict)
+        for hooks in registrar.all.values():
+            for hook in hooks:
+                if hasattr(self.source, hook.shortname) and not hasattr(Execute, hook.shortname):
+                    user_hooks[hook.stage][hook.shortname] = hook._call
+
         optimize_stage_copy.dispatcher = self.source.dispatcher.copy()
 
         for event in optimize_stage_copy.dispatcher.events_by_name.values():
@@ -197,10 +211,18 @@ class OptimizeEdge(BaseEdge[Optimize]):
             event.source.stage_instance.context = optimize_stage_copy.context
             event.source.context = optimize_stage_copy.context
 
-            event.source._call = getattr(optimize_stage_copy, event.source.shortname)
-            
-            event.source._call = event.source._call.__get__(optimize_stage_copy, optimize_stage_copy.__class__)
-            setattr(optimize_stage_copy, event.source.shortname, event.source._call)
+            if event.source.shortname in user_hooks[optimize_stage_copy.name]:
+                hook_call = user_hooks[optimize_stage_copy.name].get(event.source.shortname)
+
+                hook_call = hook_call.__get__(optimize_stage_copy, optimize_stage_copy.__class__)
+                setattr(optimize_stage_copy, event.source.shortname, hook_call)
+
+                event.source._call = hook_call
+
+            else:            
+                event.source._call = getattr(optimize_stage_copy, event.source.shortname)
+                event.source._call = event.source._call.__get__(optimize_stage_copy, optimize_stage_copy.__class__)
+                setattr(optimize_stage_copy, event.source.shortname, event.source._call)
 
         self.source = optimize_stage_copy
 

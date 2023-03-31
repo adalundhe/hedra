@@ -8,6 +8,7 @@ from .common.transtition_metadata import TransitionMetadata
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from .common.complete_edge import CompleteEdge
 from .common.error_edge import ErrorEdge
+from .act.act_edge import ActEdge
 from .execute.execute_edge import ExecuteEdge
 from .idle.idle_edge import IdleEdge
 from .optimize.optimize_edge import OptimizeEdge
@@ -33,6 +34,7 @@ class Transition:
         self.destinations: List[str] = []
         self.transition_idx = 0
         edge_types = {
+            StageTypes.ACT: ActEdge,
             StageTypes.ANALYZE: AnalyzeEdge,
             StageTypes.COMPLETE: CompleteEdge,
             StageTypes.ERROR: ErrorEdge,

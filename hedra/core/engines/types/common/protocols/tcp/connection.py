@@ -26,6 +26,7 @@ class TCPConnection:
         self._writer = None
 
     async def create(self, hostname=None, socket_config=None, *, limit=_DEFAULT_LIMIT, ssl=None):
+        self.loop = asyncio.get_event_loop()
 
         family, type_, proto, _, address = socket_config
 
@@ -59,8 +60,7 @@ class TCPConnection:
     async def create_http2(self, hostname=None, socket_config=None, ssl: Optional[SSLContext] = None, ssl_timeout: int = SSL_HANDSHAKE_TIMEOUT):
         # this does the same as loop.open_connection(), but TLS upgrade is done
         # manually after connection be established.
-        if self.loop is None:
-            self.loop = asyncio.get_event_loop()
+        self.loop = asyncio.get_event_loop()
 
         family, type_, proto, _, address = socket_config
         

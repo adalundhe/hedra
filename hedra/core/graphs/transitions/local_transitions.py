@@ -6,6 +6,7 @@ local_transitions = {
 
         # State: Idle
         (StageTypes.IDLE, StageTypes.IDLE): TransitionMetadata(allow_multiple_edges=True, is_valid=True),
+        (StageTypes.IDLE, StageTypes.ACT): TransitionMetadata(allow_multiple_edges=True, is_valid=True),
         (StageTypes.IDLE, StageTypes.SETUP):  TransitionMetadata(allow_multiple_edges=True, is_valid=True),
         (StageTypes.IDLE, StageTypes.OPTIMIZE):  TransitionMetadata(allow_multiple_edges=True, is_valid=False),
         (StageTypes.IDLE, StageTypes.EXECUTE):   TransitionMetadata(allow_multiple_edges=True, is_valid=False),
@@ -16,6 +17,7 @@ local_transitions = {
 
         # State: Setup
         (StageTypes.SETUP, StageTypes.SETUP):  TransitionMetadata(allow_multiple_edges=False, is_valid=False),
+        (StageTypes.SETUP, StageTypes.ACT):  TransitionMetadata(allow_multiple_edges=False, is_valid=True),
         (StageTypes.SETUP, StageTypes.IDLE):  TransitionMetadata(allow_multiple_edges=False, is_valid=False),
         (StageTypes.SETUP, StageTypes.OPTIMIZE):  TransitionMetadata(allow_multiple_edges=False, is_valid=True),
         (StageTypes.SETUP, StageTypes.EXECUTE):  TransitionMetadata(allow_multiple_edges=False, is_valid=True),
@@ -26,6 +28,7 @@ local_transitions = {
 
         # State: Optimize
         (StageTypes.OPTIMIZE, StageTypes.OPTIMIZE): TransitionMetadata(allow_multiple_edges=False, is_valid=False),
+        (StageTypes.OPTIMIZE, StageTypes.ACT): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
         (StageTypes.OPTIMIZE, StageTypes.IDLE): TransitionMetadata(allow_multiple_edges=False, is_valid=False),
         (StageTypes.OPTIMIZE, StageTypes.SETUP): TransitionMetadata(allow_multiple_edges=False, is_valid=False),
         (StageTypes.OPTIMIZE, StageTypes.EXECUTE): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
@@ -34,8 +37,21 @@ local_transitions = {
         (StageTypes.OPTIMIZE, StageTypes.SUBMIT): TransitionMetadata(allow_multiple_edges=False, is_valid=False),
         (StageTypes.OPTIMIZE, StageTypes.ERROR): TransitionMetadata(allow_multiple_edges=False, is_valid=False),
 
+
+        # State: Act
+        (StageTypes.ACT, StageTypes.ACT): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
+        (StageTypes.ACT, StageTypes.OPTIMIZE): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
+        (StageTypes.ACT, StageTypes.IDLE): TransitionMetadata(allow_multiple_edges=False, is_valid=False),
+        (StageTypes.ACT, StageTypes.SETUP): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
+        (StageTypes.ACT, StageTypes.EXECUTE): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
+        (StageTypes.ACT, StageTypes.ANALYZE): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
+        (StageTypes.ACT, StageTypes.COMPLETE): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
+        (StageTypes.ACT, StageTypes.SUBMIT): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
+        (StageTypes.ACT, StageTypes.ERROR): TransitionMetadata(allow_multiple_edges=False, is_valid=False),
+
         # State: Execute
         (StageTypes.EXECUTE, StageTypes.EXECUTE): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
+        (StageTypes.EXECUTE, StageTypes.ACT): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
         (StageTypes.EXECUTE, StageTypes.IDLE): TransitionMetadata(allow_multiple_edges=False, is_valid=False),
         (StageTypes.EXECUTE, StageTypes.SETUP): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
         (StageTypes.EXECUTE, StageTypes.OPTIMIZE): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
@@ -46,6 +62,7 @@ local_transitions = {
 
         # State: Analyze
         (StageTypes.ANALYZE, StageTypes.ANALYZE): TransitionMetadata(allow_multiple_edges=False, is_valid=False),
+        (StageTypes.ANALYZE, StageTypes.ACT): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
         (StageTypes.ANALYZE, StageTypes.IDLE): TransitionMetadata(allow_multiple_edges=False, is_valid=False),
         (StageTypes.ANALYZE, StageTypes.SETUP): TransitionMetadata(allow_multiple_edges=False, is_valid=False),
         (StageTypes.ANALYZE, StageTypes.OPTIMIZE): TransitionMetadata(allow_multiple_edges=False, is_valid=False),
@@ -56,6 +73,7 @@ local_transitions = {
 
         # State: Submit
         (StageTypes.SUBMIT, StageTypes.SUBMIT): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
+        (StageTypes.SUBMIT, StageTypes.ACT): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
         (StageTypes.SUBMIT, StageTypes.IDLE): TransitionMetadata(allow_multiple_edges=False, is_valid=False),
         (StageTypes.SUBMIT, StageTypes.SETUP): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
         (StageTypes.SUBMIT, StageTypes.OPTIMIZE): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
@@ -66,6 +84,7 @@ local_transitions = {
 
         # State: Complete
         (StageTypes.COMPLETE, StageTypes.COMPLETE): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
+        (StageTypes.COMPLETE, StageTypes.ACT): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
         (StageTypes.COMPLETE, StageTypes.IDLE): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
         (StageTypes.COMPLETE, StageTypes.SETUP): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
         (StageTypes.COMPLETE, StageTypes.OPTIMIZE): TransitionMetadata(allow_multiple_edges=False, is_valid=True),
@@ -76,6 +95,7 @@ local_transitions = {
 
         # State: Error
         (StageTypes.ERROR, StageTypes.ERROR): TransitionMetadata(allow_multiple_edges=False, is_valid=False),
+        (StageTypes.ERROR, StageTypes.ACT): TransitionMetadata(allow_multiple_edges=False, is_valid=False),
         (StageTypes.ERROR, StageTypes.IDLE): TransitionMetadata(allow_multiple_edges=False, is_valid=False),
         (StageTypes.ERROR, StageTypes.SETUP): TransitionMetadata(allow_multiple_edges=False, is_valid=False),
         (StageTypes.ERROR, StageTypes.OPTIMIZE): TransitionMetadata(allow_multiple_edges=False, is_valid=False),

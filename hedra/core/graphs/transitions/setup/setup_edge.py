@@ -1,10 +1,13 @@
 from __future__ import annotations
 import asyncio
 import inspect
+from collections import defaultdict
 from typing import Dict, List, Any
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.hooks.types.base.event_types import EventType
+from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.hook_type import HookType
+from hedra.core.hooks.types.base.registrar import registrar
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.setup.setup import Setup
 from hedra.core.graphs.stages.execute import Execute
@@ -159,6 +162,12 @@ class SetupEdge(BaseEdge[Setup]):
             if inspect.ismethod(copied_attribute_value) is False:
                 setattr(setup_stage_copy, copied_attribute_name, copied_attribute_value)
 
+        user_hooks: Dict[str, Dict[str, Hook]] = defaultdict(dict)
+        for hooks in registrar.all.values():
+            for hook in hooks:
+                if hasattr(self.source, hook.shortname) and not hasattr(Execute, hook.shortname):
+                    user_hooks[hook.stage][hook.shortname] = hook._call
+
         setup_stage_copy.dispatcher = self.source.dispatcher.copy()
 
         edge_candidates = self._generate_edge_setup_candidates(edges)
@@ -186,10 +195,18 @@ class SetupEdge(BaseEdge[Setup]):
             event.source.stage_instance.context = setup_stage_copy.context
             event.source.context = setup_stage_copy.context
 
-            event.source._call = getattr(setup_stage_copy, event.source.shortname)
-            
-            event.source._call = event.source._call.__get__(setup_stage_copy, setup_stage_copy.__class__)
-            setattr(setup_stage_copy, event.source.shortname, event.source._call)
+            if event.source.shortname in user_hooks[setup_stage_copy.name]:
+                hook_call = user_hooks[setup_stage_copy.name].get(event.source.shortname)
+
+                hook_call = hook_call.__get__(setup_stage_copy, setup_stage_copy.__class__)
+                setattr(setup_stage_copy, event.source.shortname, hook_call)
+
+                event.source._call = hook_call
+
+            else:            
+                event.source._call = getattr(setup_stage_copy, event.source.shortname)
+                event.source._call = event.source._call.__get__(setup_stage_copy, setup_stage_copy.__class__)
+                setattr(setup_stage_copy, event.source.shortname, event.source._call)
           
         self.source = setup_stage_copy
 

@@ -10,7 +10,7 @@ from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.hooks.types.base.registrar import registrar
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
-from hedra.core.graphs.stages.execute.execute import Execute
+from hedra.core.graphs.stages.act.act import Act
 from hedra.core.graphs.stages.analyze.analyze import Analyze
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.stages.types.stage_states import StageStates
@@ -20,11 +20,11 @@ from hedra.core.graphs.stages.types.stage_types import StageTypes
 ExecuteHooks = List[Union[ActionHook , TaskHook]]
 
 
-class ExecuteEdge(BaseEdge[Execute]):
+class ActEdge(BaseEdge[Act]):
 
-    def __init__(self, source: Execute, destination: BaseEdge[Stage]) -> None:
+    def __init__(self, source: Act, destination: BaseEdge[Stage]) -> None:
         super(
-            ExecuteEdge,
+            ActEdge,
             self
         ).__init__(
             source,
@@ -32,6 +32,8 @@ class ExecuteEdge(BaseEdge[Execute]):
         )
 
         self.requires = [
+            'analyze_stage_custom_metrics_set',
+            'analyze_stage_summary_metrics',
             'setup_stage_ready_stages',
             'setup_stage_candidates',
             'execute_stage_setup_config',
@@ -41,6 +43,8 @@ class ExecuteEdge(BaseEdge[Execute]):
         ]
 
         self.provides = [
+            'analyze_stage_custom_metrics_set',
+            'analyze_stage_summary_metrics',
             'execute_stage_results',
             'execute_stage_setup_hooks',
             'execute_stage_setup_config',
@@ -59,9 +63,9 @@ class ExecuteEdge(BaseEdge[Execute]):
     async def transition(self):
 
         try:
-            self.source.state = StageStates.EXECUTING
+            self.source.state = StageStates.ACTING
 
-            execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
+            act_stages = self.stages_by_type.get(StageTypes.ACT)
             analyze_stages: Dict[str, Stage] = self.generate_analyze_candidates()
 
             if len(self.assigned_candidates) > 0:
@@ -85,7 +89,7 @@ class ExecuteEdge(BaseEdge[Execute]):
                 await self.source.run()
 
             for provided in self.provides:
-                self.edge_data[provided] = self.source.context[provided]
+                self.edge_data[provided] = self.source.context.get(provided)
             
             if self.destination.context is None:
                 self.destination.context = SimpleContext()
@@ -103,13 +107,13 @@ class ExecuteEdge(BaseEdge[Execute]):
 
             if self.destination.stage_type == StageTypes.SETUP:
     
-                execute_stages = list(self.stages_by_type.get(StageTypes.EXECUTE).values())
+                act_stages = list(self.stages_by_type.get(StageTypes.ACT).values())
 
-                for stage in execute_stages:
+                for stage in act_stages:
                     if stage.name not in self.visited and stage.state == StageStates.SETUP:
                         stage.state = StageStates.INITIALIZED
 
-            self.source.state = StageStates.EXECUTED
+            self.source.state = StageStates.ACTED
 
             self.visited.append(self.source.name)
 
@@ -139,30 +143,38 @@ class ExecuteEdge(BaseEdge[Execute]):
 
             next_results.update({
                 'execute_stage_results': {
-                    self.source.name: self.edge_data['execute_stage_results']
+                    self.source.name: self.edge_data.get('execute_stage_results')
                 },
-                'execute_stage_setup_config': self.edge_data['execute_stage_setup_config'],
-                'execute_stage_setup_hooks': self.edge_data['execute_stage_setup_hooks'],
-                'execute_stage_setup_by': self.edge_data['execute_stage_setup_by'],
-                'setup_stage_ready_stages': self.edge_data['setup_stage_ready_stages'],
-                'setup_stage_candidates': self.edge_data['setup_stage_candidates']
+                'execute_stage_setup_config': self.edge_data.get('execute_stage_setup_config'),
+                'execute_stage_setup_hooks': self.edge_data.get('execute_stage_setup_hooks'),
+                'execute_stage_setup_by': self.edge_data.get('execute_stage_setup_by'),
+                'setup_stage_ready_stages': self.edge_data.get('setup_stage_ready_stages'),
+                'setup_stage_candidates': self.edge_data.get('setup_stage_candidates'),
+                'analyze_stage_summary_metrics': self.edge_data.get(
+                    'analyze_stage_summary_metrics', 
+                    {}
+                ),
+                'analyze_stage_custom_metrics_set': self.edge_data.get(
+                    'analyze_stage_custom_metrics_set',
+                    {}
+                )
             })
 
             self.next_history.update({
                 (self.source.name, destination.name): next_results
             })
 
-    def split(self, edges: List[ExecuteEdge]) -> None:
+    def split(self, edges: List[ActEdge]) -> None:
 
         analyze_candidates = self.generate_analyze_candidates()
-        execute_stage_config: Dict[str, Any] = self.source.to_copy_dict()
+        analyze_stage_config: Dict[str, Any] = self.source.to_copy_dict()
 
-        execute_stage_copy: Execute = type(self.source.name, (Execute, ), self.source.__dict__)()
+        act_stage_copy: Act = type(self.source.name, (Act, ), self.source.__dict__)()
         
-        for copied_attribute_name, copied_attribute_value in execute_stage_config.items():
+        for copied_attribute_name, copied_attribute_value in analyze_stage_config.items():
             if inspect.ismethod(copied_attribute_value) is False:
                 setattr(
-                    execute_stage_copy, 
+                    act_stage_copy, 
                     copied_attribute_name, 
                     copied_attribute_value
                 )
@@ -170,13 +182,13 @@ class ExecuteEdge(BaseEdge[Execute]):
         user_hooks: Dict[str, Dict[str, Hook]] = defaultdict(dict)
         for hooks in registrar.all.values():
             for hook in hooks:
-                if hasattr(self.source, hook.shortname) and not hasattr(Execute, hook.shortname):
+                if hasattr(self.source, hook.shortname) and not hasattr(Act, hook.shortname):
                     user_hooks[hook.stage][hook.shortname] = hook._call
         
-        execute_stage_copy.dispatcher = self.source.dispatcher.copy()
+        act_stage_copy.dispatcher = self.source.dispatcher.copy()
 
-        for event in execute_stage_copy.dispatcher.events_by_name.values():
-            event.source.stage_instance = execute_stage_copy
+        for event in act_stage_copy.dispatcher.events_by_name.values():
+            event.source.stage_instance = act_stage_copy
 
         edge_candidates = self._generate_edge_analyze_candidates(edges)
 
@@ -194,31 +206,31 @@ class ExecuteEdge(BaseEdge[Execute]):
             elif candidate not in edge_candidates:
                 self.assigned_candidates.append(candidate)
 
-        execute_stage_copy.context = SimpleContext()
-        for event in execute_stage_copy.dispatcher.events_by_name.values():
-            event.source.stage_instance = execute_stage_copy 
-            event.source.stage_instance.context = execute_stage_copy.context
-            event.source.context = execute_stage_copy.context
+        act_stage_copy.context = SimpleContext()
+        for event in act_stage_copy.dispatcher.events_by_name.values():
+            event.source.stage_instance = act_stage_copy 
+            event.source.stage_instance.context = act_stage_copy.context
+            event.source.context = act_stage_copy.context
 
-            if event.source.shortname in user_hooks[execute_stage_copy.name]:
-                hook_call = user_hooks[execute_stage_copy.name].get(event.source.shortname)
+            if event.source.shortname in user_hooks[act_stage_copy.name]:
+                hook_call = user_hooks[act_stage_copy.name].get(event.source.shortname)
 
-                hook_call = hook_call.__get__(execute_stage_copy, execute_stage_copy.__class__)
-                setattr(execute_stage_copy, event.source.shortname, hook_call)
+                hook_call = hook_call.__get__(act_stage_copy, act_stage_copy.__class__)
+                setattr(act_stage_copy, event.source.shortname, hook_call)
 
                 event.source._call = hook_call
 
             else:            
-                event.source._call = getattr(execute_stage_copy, event.source.shortname)
-                event.source._call = event.source._call.__get__(execute_stage_copy, execute_stage_copy.__class__)
-                setattr(execute_stage_copy, event.source.shortname, event.source._call)
+                event.source._call = getattr(act_stage_copy, event.source.shortname)
+                event.source._call = event.source._call.__get__(act_stage_copy, act_stage_copy.__class__)
+                setattr(act_stage_copy, event.source.shortname, event.source._call)
  
-        self.source = execute_stage_copy
+        self.source = act_stage_copy
 
         if minimum_edge_idx < self.transition_idx:
             self.skip_stage = True
 
-    def _generate_edge_analyze_candidates(self, edges: List[ExecuteEdge]):
+    def _generate_edge_analyze_candidates(self, edges: List[ActEdge]):
 
         candidates = []
 
@@ -235,7 +247,7 @@ class ExecuteEdge(BaseEdge[Execute]):
     def generate_analyze_candidates(self) -> Dict[str, Stage]:
     
         submit_stages: Dict[str, Analyze] = self.stages_by_type.get(StageTypes.ANALYZE)
-        analyze_stages = self.stages_by_type.get(StageTypes.EXECUTE).items()
+        analyze_stages = self.stages_by_type.get(StageTypes.ACT).items()
         path_lengths: Dict[str, int] = self.path_lengths.get(self.source.name)
 
         all_paths = self.all_paths.get(self.source.name, [])
@@ -287,8 +299,8 @@ class ExecuteEdge(BaseEdge[Execute]):
         for from_stage_name in self.from_stage_names:
             previous_history = self.history[(from_stage_name, self.source.name)]
 
-            execute_config: Config = previous_history['execute_stage_setup_config']
-            setup_by = previous_history['execute_stage_setup_by']
+            execute_config: Config = previous_history.get('execute_stage_setup_config', Config())
+            setup_by = previous_history.get('execute_stage_setup_by')
 
             if execute_config.optimized:
                 execute_stage_setup_config = execute_config
@@ -300,23 +312,51 @@ class ExecuteEdge(BaseEdge[Execute]):
                 max_batch_size = execute_config.batch_size
                 execute_stage_setup_by = setup_by
 
-            execute_hooks: ExecuteHooks = previous_history['execute_stage_setup_hooks']
+            execute_hooks: ExecuteHooks = previous_history.get('execute_stage_setup_hooks', {})
             for setup_hook in execute_hooks:
                 execute_stage_setup_hooks[setup_hook.name] = setup_hook
 
-            ready_stages = previous_history['setup_stage_ready_stages']
+            ready_stages = previous_history.get('setup_stage_ready_stages', [])
 
             for ready_stage in ready_stages:
                 if ready_stage not in setup_stage_ready_stages:
                     setup_stage_ready_stages.append(ready_stage)
 
-            stage_candidates: List[Stage] = previous_history['setup_stage_candidates']
+            stage_candidates: List[Stage] = previous_history.get('setup_stage_candidates', [])
             for stage_candidate in stage_candidates:
                 if stage_candidate not in setup_stage_candidates:
                     setup_stage_candidates.append(stage_candidate)
-            
 
+        raw_results = {}
+        for from_stage_name in self.from_stage_names:
+            
+            stage_results = self.history[(
+                from_stage_name, 
+                self.source.name
+            )].get('execute_stage_results')
+
+            if stage_results:
+                raw_results.update(stage_results)
+
+        act_stages = self.stages_by_type.get(StageTypes.ACT)
+
+        results_to_calculate = {}
+        target_stages = {}
+        for stage_name in raw_results.keys():
+            stage = act_stages.get(stage_name)
+            all_paths = self.all_paths.get(stage_name)
+
+            in_path = self.source.name in all_paths
+
+            if in_path:
+                stage.state = StageStates.ANALYZING
+                results_to_calculate[stage_name] = raw_results.get(stage_name)
+                target_stages[stage_name] = stage
+        
         self.edge_data = {
+            'analyze_stage_raw_results': results_to_calculate,
+            'analyze_stage_target_stages': target_stages,
+            'analyze_stage_has_results': len(results_to_calculate) > 0,
             'execute_stage_setup_config': execute_stage_setup_config,
             'execute_stage_setup_hooks': execute_stage_setup_hooks,
             'execute_stage_setup_by': execute_stage_setup_by,
