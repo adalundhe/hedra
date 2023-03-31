@@ -251,23 +251,6 @@ class Graph:
             transition_group.edges_by_name = None
             transition_group.adjacency_list = None
 
-    async def check(self, graph_path: str):
-        
-        validation_stages = []
-
-        for transition_group in self._transitions:
-            for transtition in transition_group:
-
-                if transtition.from_stage.stage_type == StageTypes.VALIDATE: 
-                    validation_stages.append(transtition)
-
-        await asyncio.gather(*[
-            asyncio.create_task(transition.transition(
-                transition.from_stage, 
-                transition.to_stage
-            )) for transition in validation_stages
-        ])
-
     async def cleanup(self):
         pass
 

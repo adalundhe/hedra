@@ -1,6 +1,5 @@
 import uvloop
 import traceback
-uvloop.install()
 
 import os
 import click
@@ -14,14 +13,19 @@ from hedra.core.engines.types.graphql import GraphQLAction, MercuryGraphQLClient
 from hedra.core.engines.types.graphql_http2 import GraphQLHTTP2Action, MercuryGraphQLHTTP2Client
 from hedra.core.engines.types.http import HTTPAction, MercuryHTTPClient
 from hedra.core.engines.types.http2 import HTTP2Action, MercuryHTTP2Client
+from hedra.core.engines.types.http3 import HTTP3Action, MercuryHTTP3Client
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient
 from hedra.core.engines.types.udp import UDPAction, MercuryUDPClient
 from hedra.core.engines.types.websocket import WebsocketAction, MercuryWebsocketClient
+from hedra.versioning.flags.types.base.active import active_flags
+from hedra.versioning.flags.types.base.flag_type import FlagTypes
 from hedra.logging import (
     HedraLogger,
     LoggerTypes,
     logging_manager
 )
+
+uvloop.install()
 
 
 T = TypeVar(
@@ -29,6 +33,7 @@ T = TypeVar(
     MercuryGRPCClient,
     MercuryGraphQLHTTP2Client, 
     MercuryGraphQLClient, 
+    MercuryHTTP3Client,
     MercuryHTTP2Client, 
     MercuryHTTPClient,
     MercuryPlaywrightClient,
@@ -41,7 +46,23 @@ T = TypeVar(
 @click.option('--engine', default='http', type=str)
 @click.option('--timeout', default=60, type=int)
 @click.option('--log-level', default='info', type=str)
-def ping(uri: str, engine: str, timeout: int, log_level: str):
+@click.option(
+    '--enable-latest',
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help='Enable features marked as unstable.'
+)
+def ping(
+    uri: str, 
+    engine: str, 
+    timeout: int, 
+    log_level: str,
+    enable_latest: bool,
+):
+    
+    if enable_latest:
+        active_flags[FlagTypes.UNSTABLE_FEATURE] = True
 
     logging_manager.disable(
         LoggerTypes.HEDRA, 
@@ -58,6 +79,7 @@ def ping(uri: str, engine: str, timeout: int, log_level: str):
     engine_types_map = {
         'http': RequestTypes.HTTP,
         'http2': RequestTypes.HTTP2,
+        'http3': RequestTypes.HTTP3,
         'grpc': RequestTypes.GRPC,
         'graphql': RequestTypes.GRAPHQL,
         'graphql-http2': RequestTypes.GRAPHQL_HTTP2,
@@ -94,6 +116,10 @@ async def ping_target(uri: str, engine_type: RequestTypes, timeout: int, logger:
             uri
         ),
         RequestTypes.HTTP2: HTTP2Action(
+            action_name,
+            uri
+        ),
+        RequestTypes.HTTP3: HTTP3Action(
             action_name,
             uri
         ),
