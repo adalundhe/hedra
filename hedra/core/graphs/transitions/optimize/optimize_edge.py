@@ -50,55 +50,59 @@ class OptimizeEdge(BaseEdge[Optimize]):
 
     async def transition(self):
 
-        selected_optimization_candidates = self.generate_optimization_candidates()
+        try:
+            selected_optimization_candidates = self.generate_optimization_candidates()
 
-        if len(self.assigned_candidates) > 0:
-            selected_optimization_candidates = {
-                stage_name: stage for stage_name, stage in selected_optimization_candidates.items() if stage_name in self.assigned_candidates
-            }
+            if len(self.assigned_candidates) > 0:
+                selected_optimization_candidates = {
+                    stage_name: stage for stage_name, stage in selected_optimization_candidates.items() if stage_name in self.assigned_candidates
+                }
 
-        self.edge_data['optimize_stage_candidates'] = selected_optimization_candidates
-        
-        self.source.context.update(self.edge_data)
-        
-        for event in self.source.dispatcher.events_by_name.values():
-            event.source.stage_instance = self.source
-            event.context.update(self.edge_data)
+            self.edge_data['optimize_stage_candidates'] = selected_optimization_candidates
             
-            if event.source.context:
-                event.source.context.update(self.edge_data)
+            self.source.context.update(self.edge_data)
+            
+            for event in self.source.dispatcher.events_by_name.values():
+                event.source.stage_instance = self.source
+                event.context.update(self.edge_data)
+                
+                if event.source.context:
+                    event.source.context.update(self.edge_data)
 
-        if len(selected_optimization_candidates) > 0:
-            self.source.generation_optimization_candidates = len(selected_optimization_candidates)
+            if len(selected_optimization_candidates) > 0:
+                self.source.generation_optimization_candidates = len(selected_optimization_candidates)
 
-            if self.timeout and self.skip_stage is False:
-                await asyncio.wait_for(self.source.run(), timeout=self.timeout)
+                if self.timeout and self.skip_stage is False:
+                    await asyncio.wait_for(self.source.run(), timeout=self.timeout)
 
-            elif self.skip_stage is False:
-                await self.source.run()
+                elif self.skip_stage is False:
+                    await self.source.run()
 
-        for provided in self.provides:
-            self.edge_data[provided] = self.source.context[provided]
-
-        if self.destination.context is None:
-            self.destination.context = SimpleContext()
-        
-        self._update(self.destination)
-        if len(selected_optimization_candidates) > 0:
+            for provided in self.provides:
+                self.edge_data[provided] = self.source.context[provided]
 
             if self.destination.context is None:
                 self.destination.context = SimpleContext()
+            
+            self._update(self.destination)
+            if len(selected_optimization_candidates) > 0:
 
-            for optimization_candidate in selected_optimization_candidates.values():
+                if self.destination.context is None:
+                    self.destination.context = SimpleContext()
 
-                if optimization_candidate.context is None:
-                    optimization_candidate.context = SimpleContext()
+                for optimization_candidate in selected_optimization_candidates.values():
 
-                self._update(optimization_candidate)
+                    if optimization_candidate.context is None:
+                        optimization_candidate.context = SimpleContext()
 
-                optimization_candidate.state = StageStates.OPTIMIZED
+                    self._update(optimization_candidate)
 
-        self.visited.append(self.source.name)
+                    optimization_candidate.state = StageStates.OPTIMIZED
+
+            self.visited.append(self.source.name)
+
+        except Exception as edge_exception:
+            self.exception = edge_exception
 
         return None, self.destination.stage_type
 

@@ -38,35 +38,40 @@ class SubmitEdge(BaseEdge[Submit]):
         ]
 
     async def transition(self):
-        self.source.state = StageStates.SUBMITTING
         
-        self.source.context.update(self.edge_data)
-
-        for event in self.source.dispatcher.events_by_name.values():
-            event.source.stage_instance = self.source
-            event.context.update(self.edge_data)
+        try:
+            self.source.state = StageStates.SUBMITTING
             
-            if event.source.context:
-                event.source.context.update(self.edge_data)
+            self.source.context.update(self.edge_data)
 
-        if self.timeout and self.skip_stage is False:
-            await asyncio.wait_for(self.source.run(), timeout=self.timeout)
-        
-        elif self.skip_stage is False:
-            await self.source.run()
-        
-        for provided in self.provides:
-            self.edge_data[provided] = self.source.context[provided]
+            for event in self.source.dispatcher.events_by_name.values():
+                event.source.stage_instance = self.source
+                event.context.update(self.edge_data)
+                
+                if event.source.context:
+                    event.source.context.update(self.edge_data)
 
-        self._update(self.destination)
+            if self.timeout and self.skip_stage is False:
+                await asyncio.wait_for(self.source.run(), timeout=self.timeout)
+            
+            elif self.skip_stage is False:
+                await self.source.run()
+            
+            for provided in self.provides:
+                self.edge_data[provided] = self.source.context[provided]
 
-        self.source.state = StageStates.SUBMITTED
-        self.destination.state = StageStates.SUBMITTED
+            self._update(self.destination)
 
-        if self.destination.context is None:
-            self.destination.context = SimpleContext()
+            self.source.state = StageStates.SUBMITTED
+            self.destination.state = StageStates.SUBMITTED
 
-        self.visited.append(self.source.name)
+            if self.destination.context is None:
+                self.destination.context = SimpleContext()
+
+            self.visited.append(self.source.name)
+
+        except Exception as edge_exception:
+            self.exception = edge_exception
 
         return None, self.destination.stage_type
 

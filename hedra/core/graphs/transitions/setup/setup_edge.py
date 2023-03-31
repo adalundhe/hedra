@@ -41,57 +41,62 @@ class SetupEdge(BaseEdge[Setup]):
         self.assigned_candidates = []
 
     async def transition(self):
-        self.source.state = StageStates.SETTING_UP
+        
+        try:
+            self.source.state = StageStates.SETTING_UP
 
-        setup_candidates = self.get_setup_candidates()
+            setup_candidates = self.get_setup_candidates()
 
-        if len(self.assigned_candidates) > 0:
-            setup_candidates = {
-                stage_name: stage for stage_name, stage in setup_candidates.items() if stage_name in self.assigned_candidates
-            }
+            if len(self.assigned_candidates) > 0:
+                setup_candidates = {
+                    stage_name: stage for stage_name, stage in setup_candidates.items() if stage_name in self.assigned_candidates
+                }
 
-        self.source.generation_setup_candidates = len(setup_candidates)
+            self.source.generation_setup_candidates = len(setup_candidates)
 
-        for setup_candidate in setup_candidates.values():
-            setup_candidate.context = SimpleContext()
+            for setup_candidate in setup_candidates.values():
+                setup_candidate.context = SimpleContext()
 
-        self.edge_data['setup_stage_target_stages'] = setup_candidates
-        self.edge_data['setup_stage_target_config'] = self.source.config
+            self.edge_data['setup_stage_target_stages'] = setup_candidates
+            self.edge_data['setup_stage_target_config'] = self.source.config
 
-        self.source.context.update(self.edge_data)
-
-        for event in self.source.dispatcher.events_by_name.values():
-            event.source.stage_instance = self.source
             self.source.context.update(self.edge_data)
-            event.context.update(self.edge_data)
+
+            for event in self.source.dispatcher.events_by_name.values():
+                event.source.stage_instance = self.source
+                self.source.context.update(self.edge_data)
+                event.context.update(self.edge_data)
+                
+                if event.source.context:
+                    event.source.context.update(self.edge_data)
             
-            if event.source.context:
-                event.source.context.update(self.edge_data)
-        
-        if self.timeout and self.skip_stage is False:
-            await asyncio.wait_for(self.source.run(), timeout=self.timeout)
-        elif self.skip_stage is False:
-            await self.source.run()
+            if self.timeout and self.skip_stage is False:
+                await asyncio.wait_for(self.source.run(), timeout=self.timeout)
+            elif self.skip_stage is False:
+                await self.source.run()
 
-        for provided in self.provides:
-            self.edge_data[provided] = self.source.context[provided]
+            for provided in self.provides:
+                self.edge_data[provided] = self.source.context[provided]
 
-        self.edge_data['setup_stage_candidates'] = setup_candidates
+            self.edge_data['setup_stage_candidates'] = setup_candidates
 
-        self._update(self.destination)
+            self._update(self.destination)
 
-        if self.destination.context is None:
-            self.destination.context = SimpleContext()
+            if self.destination.context is None:
+                self.destination.context = SimpleContext()
 
-        for execute_stage in setup_candidates.values():
-            execute_stage.state = StageStates.SETUP
+            for execute_stage in setup_candidates.values():
+                execute_stage.state = StageStates.SETUP
 
-            if execute_stage.context is None:
-                execute_stage.context = SimpleContext()
+                if execute_stage.context is None:
+                    execute_stage.context = SimpleContext()
 
-            self._update(execute_stage)
-        
-        self.visited.append(self.source.name)
+                self._update(execute_stage)
+            
+            self.visited.append(self.source.name)
+
+        except Exception as edge_exception:
+            self.exception = edge_exception
 
         return None, self.destination.stage_type
 

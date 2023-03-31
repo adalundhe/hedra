@@ -46,6 +46,13 @@ def graph():
     default=3,
     help="Set the number of retries for connection validation."
 )
+@click.option(
+    '--enable-latest',
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help='Enable features marked as unstable.'
+)
 def run(
     path: str, 
     cpus: int, 
@@ -54,6 +61,7 @@ def run(
     log_directory: str,
     bypass_connection_validation: bool,
     connection_validation_retries: int,
+    enable_latest: bool,
 ):
     run_graph(
         path, 
@@ -63,6 +71,7 @@ def run(
         log_directory,
         bypass_connection_validation,
         connection_validation_retries,
+        enable_latest
     )
 
 
@@ -88,12 +97,12 @@ def check(path: str, log_level: str):
 @click.option(
     '--engine',
     default='http',
-    help='Engine to use in generated graph'
+    help='Engine to use in generated graph.'
 )
 @click.option(
     '--reporter',
     default='json',
-    help='Reporter to use in generated graph'
+    help='Reporter to use in generated graph.'
 )
 @click.option(
     '--log-level',
@@ -105,7 +114,7 @@ def create(
     stages: str, 
     engine: str,
     reporter: str,
-    log_level: str
+    log_level: str,
 ):
     create_graph(
         path, 

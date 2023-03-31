@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Generic, TypeVar, Dict, List, Union
+from typing import Any, Generic, TypeVar, Dict, List, Union, Optional
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 
@@ -29,6 +29,7 @@ class BaseEdge(Generic[T]):
         self.timeout = None
         self.folded = False
         self.transition_idx = 0
+        self.exception: Optional[Exception] = None
 
         self.edges_by_name: Dict[str, Stage] = {}
 

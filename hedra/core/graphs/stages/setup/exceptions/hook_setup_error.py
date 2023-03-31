@@ -8,6 +8,6 @@ class HookSetupError(Exception):
 
         hook_type = hook_type.name.lower()
         super().__init__(
-            f'Hook Error - @{hook_type} hook {hook.shortname} from stage {hook.stage}\nEncountered exception - {message} - while attempting to setup hook.'
+            f'Hook Error - @{hook_type} hook {hook.shortname} from stage {hook.stage}\n{message}'
         )
 

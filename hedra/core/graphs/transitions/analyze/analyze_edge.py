@@ -41,61 +41,66 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         self.assigned_candidates = []
     
     async def transition(self):
-        self.source.state = StageStates.ANALYZING
-        submit_candidates = self.generate_submit_candidates()
+        
+        try:
+            self.source.state = StageStates.ANALYZING
+            submit_candidates = self.generate_submit_candidates()
 
-        if len(self.assigned_candidates) > 0:
-            submit_candidates = {
-                stage_name: stage for stage_name, stage in submit_candidates.items() if stage_name in self.assigned_candidates
-            }
-        
-        self.source.context.update(self.edge_data)
-        
-        for event in self.source.dispatcher.events_by_name.values():
-            event.source.stage_instance = self.source
-            event.context.update(self.edge_data)
+            if len(self.assigned_candidates) > 0:
+                submit_candidates = {
+                    stage_name: stage for stage_name, stage in submit_candidates.items() if stage_name in self.assigned_candidates
+                }
             
-            if event.source.context:
-                event.source.context.update(self.edge_data)
-        
+            self.source.context.update(self.edge_data)
+            
+            for event in self.source.dispatcher.events_by_name.values():
+                event.source.stage_instance = self.source
+                event.context.update(self.edge_data)
+                
+                if event.source.context:
+                    event.source.context.update(self.edge_data)
+            
 
-        if self.edge_data['analyze_stage_has_results']:
+            if self.edge_data['analyze_stage_has_results']:
 
-            if self.timeout and self.skip_stage is False:
-                await asyncio.wait_for(self.source.run(), timeout=self.timeout)
+                if self.timeout and self.skip_stage is False:
+                    await asyncio.wait_for(self.source.run(), timeout=self.timeout)
 
-            elif self.skip_stage is False:
-                await self.source.run()
-        
-        for provided in self.provides:
-            self.edge_data[provided] = self.source.context[provided]
+                elif self.skip_stage is False:
+                    await self.source.run()
+            
+            for provided in self.provides:
+                self.edge_data[provided] = self.source.context[provided]
 
-        self.destination.state = StageStates.ANALYZED
+            self.destination.state = StageStates.ANALYZED
 
-        if self.destination.context is None:
-            self.destination.context = SimpleContext()
+            if self.destination.context is None:
+                self.destination.context = SimpleContext()
 
-        if self.edge_data['analyze_stage_has_results']:
+            if self.edge_data['analyze_stage_has_results']:
 
-            self._update(self.destination)
+                self._update(self.destination)
 
-            all_paths = []
-            for path_set in self.all_paths.get(self.source.name, []):
-                all_paths.extend(path_set)
- 
-            for stage in submit_candidates.values():
-                if stage.name in all_paths and stage.state == StageStates.INITIALIZED:
+                all_paths = []
+                for path_set in self.all_paths.get(self.source.name, []):
+                    all_paths.extend(path_set)
+    
+                for stage in submit_candidates.values():
+                    if stage.name in all_paths and stage.state == StageStates.INITIALIZED:
 
-                    if stage.context is None:
-                        stage.context = SimpleContext()
+                        if stage.context is None:
+                            stage.context = SimpleContext()
 
-                    self._update(stage)
+                        self._update(stage)
 
-                    stage.state = StageStates.ANALYZED
+                        stage.state = StageStates.ANALYZED
 
-        self.source.state = StageStates.ANALYZED
+            self.source.state = StageStates.ANALYZED
 
-        self.visited.append(self.source.name)
+            self.visited.append(self.source.name)
+
+        except Exception as edge_exception:
+            self.exception = edge_exception
 
         return None, self.destination.stage_type
 

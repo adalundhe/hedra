@@ -19,8 +19,8 @@ class ErrorEdge(BaseEdge[Error]):
         )
 
     async def transition(self):
-
-        await self.destination.run()
+       
+        await self.source.run()
 
         self.source.state = StageStates.ERRORED
 

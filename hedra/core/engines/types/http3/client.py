@@ -1,7 +1,6 @@
 import asyncio
 import time
 import uuid
-import traceback
 from collections import deque
 from typing import Dict, Any, Union, Coroutine, TypeVar
 from hedra.core.engines.types.common.base_engine import BaseEngine
@@ -15,6 +14,7 @@ from hedra.core.engines.types.common.protocols.udp.quic_protocol import (
     encode_frame
 )
 from hedra.logging import HedraLogger
+from hedra.versioning.flags.types.unstable.flag import unstable
 from .connection import HTTP3Connection
 from .action import HTTP3Action
 from .result import HTTP3Result
@@ -24,7 +24,7 @@ from .pool import Pool
 A = TypeVar('A')
 R = TypeVar('R')
 
-
+@unstable
 class MercuryHTTP3Client(BaseEngine[Union[A, HTTP3Action], Union[R, HTTP3Result]]):
 
     __slots__ = (
@@ -42,10 +42,7 @@ class MercuryHTTP3Client(BaseEngine[Union[A, HTTP3Action], Union[R, HTTP3Result]
     )
 
     def __init__(self, concurrency: int=10**3, timeouts: Timeouts = Timeouts(), reset_connections: bool=False) -> None:
-        super(
-            MercuryHTTP3Client,
-            self
-        ).__init__()
+        super().__init__()
 
         self.session_id = str(uuid.uuid4())
         self.timeouts = timeouts

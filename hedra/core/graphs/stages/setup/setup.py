@@ -62,7 +62,6 @@ class SetupCall:
                 self.exception = setup_exception
 
                 self.error_traceback = str(traceback.format_exc())
-                await self.logger.spinner.system.error(f'{self.metadata_string} - Encountered connection validation error - {str(setup_exception)} - {self.hook_name} Hook: {self.hook.name}:{self.hook.hook_id}')
                 await self.logger.filesystem.aio['hedra.core'].error(f'{self.metadata_string} - Encountered connection validation error - {str(setup_exception)} - {self.hook_name} Hook: {self.hook.name}:{self.hook.hook_id}')
 
                 if self.current_try >= self.retries:
@@ -306,14 +305,17 @@ class Setup(Stage, Generic[Unpack[T]]):
 
                 try:
                     if setup_call.exception:
-                        raise HookSetupError(hook, HookType.ACTION, str(setup_call.exception))
+                        raise HookSetupError(
+                            hook, 
+                            HookType.ACTION, 
+                            str(setup_call.exception)
+                        )
 
                     task.cancel()
                     if task.cancelled() is False:
                         await asyncio.wait_for(task, timeout=0.1)
 
                 except HookSetupError as hook_setup_exception:
-
                     if bypass_connection_validation:
 
                         action.hook_type = HookType.TASK

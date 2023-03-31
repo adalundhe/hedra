@@ -189,24 +189,27 @@ class Graph:
                     asyncio.create_task(transition.execute()) for transition in transition_group
                 ])
                 
-                for error, next_stage in results:
+                for transition in transition_group:
+                    error = transition.edge.exception
                     
-                    if next_stage == StageTypes.ERROR:
+                    if error:
+
+                        source_stage = transition.edge.source
 
                         self.status = GraphStatus.FAILED
 
                         await status_spinner.system.debug(f'{self.metadata_string} - Changed status to - {GraphStatus.FAILED.name} - from - {GraphStatus.RUNNING.name}')
                         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Changed status to - {GraphStatus.FAILED.name} - from - {GraphStatus.RUNNING.name}')
 
-                        await status_spinner.system.error(f'{self.metadata_string} - Encountered error executing stage - {error.from_stage.name}:{error.from_stage.stage_id}')
-                        await self.logger.filesystem.aio['hedra.core'].error(f'{self.metadata_string} - Encountered error executing stage - {error.from_stage.name}:{error.from_stage.stage_id}')
+                        await status_spinner.system.error(f'{self.metadata_string} - Encountered error executing stage - {source_stage.name}:{source_stage.stage_id}')
+                        await self.logger.filesystem.aio['hedra.core'].error(f'{self.metadata_string} - Encountered error executing stage - {source_stage.name}:{source_stage.stage_id}')
 
-                        error_transtiton = self.runner.create_error_transition(error)
+                        error_transtiton = self.runner.create_error_transition(
+                            source_stage,
+                            error
+                        )
 
-                        await error_transtiton.transition(
-                            error_transtiton.from_stage,
-                            error_transtiton.to_stage
-                        ) 
+                        await error_transtiton.execute() 
 
                 if self.status == GraphStatus.FAILED:
                     status_spinner.finalize()

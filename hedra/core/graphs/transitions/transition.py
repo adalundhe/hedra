@@ -71,9 +71,10 @@ class Transition:
         is_ignored_stage = self.to_stage.stage_type in skip_next_stages
         stage_skipped = self.edge.source.skip is True and self.edge.skip_stage is False
         invalid_transition = self.metadata.is_valid is False
+        has_exception = self.edge.exception is not None
 
         pass_to_next = (
-            is_ignored_stage or stage_skipped or invalid_transition
+            is_ignored_stage or stage_skipped or invalid_transition or has_exception
         ) is False
 
         if pass_to_next:

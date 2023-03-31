@@ -1,5 +1,4 @@
 import uvloop
-uvloop.install()
 import asyncio
 import os
 import inspect
@@ -7,19 +6,22 @@ import json
 import sys
 import importlib
 import ntpath
+import signal
 from pathlib import Path
 from typing import List
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs import Graph
+from hedra.core.graphs.status import GraphStatus
+from hedra.versioning.flags.types.base.active import active_flags
+from hedra.versioning.flags.types.base.flag_type import FlagTypes
 from hedra.logging import (
     HedraLogger,
     LoggerTypes,
     logging_manager
 )
-import signal
-import os
 
 
+uvloop.install()
 
 def run_graph(
     path: str, 
@@ -29,7 +31,11 @@ def run_graph(
     logfiles_directory: str,
     bypass_connection_validation: bool,
     connection_validation_retries: int,
+    enable_latest: bool,
 ):
+    
+    if enable_latest:
+        active_flags[FlagTypes.UNSTABLE_FEATURE] = True
 
     if logfiles_directory is None:
         logfiles_directory = os.getcwd()
@@ -182,8 +188,13 @@ def run_graph(
 
     except RuntimeError:
         pass
+    
+    if graph.status == GraphStatus.FAILED:
+        logger.filesystem.sync['hedra.core'].info(f'{graph.metadata_string} - Failed - {graph.logger.spinner.display.total_timer.elapsed_message}\n')
+        logger.console.sync.info(f'\nGraph - {graph_name.capitalize()} - failed. {graph.logger.spinner.display.total_timer.elapsed_message}\n')
 
-    logger.filesystem.sync['hedra.core'].info(f'{graph.metadata_string} - Completed - {graph.logger.spinner.display.total_timer.elapsed_message}\n')
-    logger.console.sync.info(f'\nGraph - {graph_name.capitalize()} - completed! {graph.logger.spinner.display.total_timer.elapsed_message}\n')
+    else:
+        logger.filesystem.sync['hedra.core'].info(f'{graph.metadata_string} - Completed - {graph.logger.spinner.display.total_timer.elapsed_message}\n')
+        logger.console.sync.info(f'\nGraph - {graph_name.capitalize()} - completed! {graph.logger.spinner.display.total_timer.elapsed_message}\n')
 
     os._exit(0)

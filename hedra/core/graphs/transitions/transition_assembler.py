@@ -314,12 +314,14 @@ class TransitionAssembler:
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')
     
-    def create_error_transition(self, error: Exception) -> Transition:
-
-        from_stage = error.from_stage
+    def create_error_transition(
+        self, 
+        source_stage: Stage,
+        error: Exception
+    ) -> Transition:
             
         error_transition = self.transition_types.get((
-            from_stage.stage_type,
+            source_stage.stage_type,
             StageTypes.ERROR
         ))
 
@@ -330,6 +332,6 @@ class TransitionAssembler:
 
         return Transition(
             error_transition,
-            from_stage,
+            error_stage,
             error_stage
         )

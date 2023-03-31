@@ -1,6 +1,4 @@
-import functools
 from collections import defaultdict
-from types import FunctionType
 from typing import Dict, List
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.channel.hook import ChannelHook
