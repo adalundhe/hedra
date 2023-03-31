@@ -26,6 +26,8 @@ class UDPConnection:
         self._writer = None
 
     async def create_udp(self, socket_config=None, *, limit=_DEFAULT_LIMIT, tls=None):
+        
+        self.loop = asyncio.get_event_loop()
 
         family, type_, _, _, address = socket_config
 
@@ -94,12 +96,12 @@ class UDPConnection:
             if not completed:
                 self.socket.close()
         # connect
-        loop = asyncio.get_event_loop()
-        _, protocol = await loop.create_datagram_endpoint(
+        self.loop = asyncio.get_event_loop()
+        _, protocol = await self.loop.create_datagram_endpoint(
             lambda: QuicProtocol(
                 connection, 
                 stream_handler=stream_handler,
-                loop=loop
+                loop=self.loop
             ),
             sock=self.socket,
         )

@@ -1,10 +1,13 @@
 from __future__  import annotations
+import inspect
 import asyncio
 from collections import defaultdict
 from typing import List, Dict, Any
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.submit.submit import Submit
+from hedra.core.hooks.types.base.hook import Hook
+from hedra.core.hooks.types.base.registrar import registrar
 from hedra.reporting.metric import MetricsSet
 from hedra.reporting.metric.custom_metric import CustomMetric
 from hedra.core.hooks.types.base.simple_context import SimpleContext
@@ -92,6 +95,49 @@ class SubmitEdge(BaseEdge[Submit]):
             })
 
     def split(self, edges: List[SubmitEdge]) -> None:
+
+        submit_stage_config: Dict[str, Any] = self.source.to_copy_dict()
+        submit_stage_copy: Submit = type(self.source.name, (Submit, ), self.source.__dict__)()
+        
+        for copied_attribute_name, copied_attribute_value in submit_stage_config.items():
+            if inspect.ismethod(copied_attribute_value) is False:
+                setattr(
+                    submit_stage_copy, 
+                    copied_attribute_name, 
+                    copied_attribute_value
+                )
+
+        user_hooks: Dict[str, Dict[str, Hook]] = defaultdict(dict)
+        for hooks in registrar.all.values():
+            for hook in hooks:
+                if hasattr(self.source, hook.shortname) and not hasattr(Submit, hook.shortname):
+                    user_hooks[hook.stage][hook.shortname] = hook._call
+        
+        submit_stage_copy.dispatcher = self.source.dispatcher.copy()
+
+        for event in submit_stage_copy.dispatcher.events_by_name.values():
+            event.source.stage_instance = submit_stage_copy
+
+        submit_stage_copy.context = SimpleContext()
+        for event in submit_stage_copy.dispatcher.events_by_name.values():
+            event.source.stage_instance = submit_stage_copy 
+            event.source.stage_instance.context = submit_stage_copy.context
+            event.source.context = submit_stage_copy.context
+
+            if event.source.shortname in user_hooks[submit_stage_copy.name]:
+                hook_call = user_hooks[submit_stage_copy.name].get(event.source.shortname)
+
+                hook_call = hook_call.__get__(submit_stage_copy, submit_stage_copy.__class__)
+                setattr(submit_stage_copy, event.source.shortname, hook_call)
+
+                event.source._call = hook_call
+
+            else:            
+                event.source._call = getattr(submit_stage_copy, event.source.shortname)
+                event.source._call = event.source._call.__get__(submit_stage_copy, submit_stage_copy.__class__)
+                setattr(submit_stage_copy, event.source.shortname, event.source._call)
+ 
+        self.source = submit_stage_copy
 
         transition_idxs = [edge.transition_idx for edge in edges]
         

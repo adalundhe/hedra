@@ -14,6 +14,7 @@ from .core.hooks import (
 )
 
 from .core.graphs.stages import (
+    Act,
     Analyze,
     Execute,
     Optimize,

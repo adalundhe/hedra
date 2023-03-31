@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import inspect
+from collections import defaultdict
 from typing import Dict, List, Any
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.registrar import registrar
@@ -142,13 +143,11 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             if inspect.ismethod(copied_attribute_value) is False:
                 setattr(analyze_stage_copy, copied_attribute_name, copied_attribute_value)
 
-        user_hooks: Dict[str, Hook] = {}
+        user_hooks: Dict[str, Dict[str, Hook]] = defaultdict(dict)
         for hooks in registrar.all.values():
             for hook in hooks:
                 if hasattr(self.source, hook.shortname) and not hasattr(Analyze, hook.shortname):
-                    user_hooks = {
-                        hook.shortname: hook._call
-                    }
+                    user_hooks[hook.stage][hook.shortname] = hook._call
 
         analyze_stage_copy.dispatcher = self.source.dispatcher.copy()
 
@@ -175,8 +174,8 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             event.source.stage_instance.context = analyze_stage_copy.context
             event.source.context = analyze_stage_copy.context
             
-            if event.source.shortname in user_hooks:
-                hook_call = user_hooks.get(event.source.shortname)
+            if event.source.shortname in user_hooks[analyze_stage_copy.name]:
+                hook_call = user_hooks[analyze_stage_copy.name].get(event.source.shortname)
 
                 hook_call = hook_call.__get__(analyze_stage_copy, analyze_stage_copy.__class__)
                 setattr(analyze_stage_copy, event.source.shortname, hook_call)

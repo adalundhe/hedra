@@ -2,6 +2,8 @@ from enum import Enum
 
 
 class StageStates(Enum):
+    ACTING='ACTING'
+    ACTED='ACTED'
     INITIALIZED='INITIALIZED'
     SETTING_UP='SETTING_UP'
     SETUP='SETUP'

@@ -66,6 +66,7 @@ class Generator:
         generator_item = self.generator_types.get(generator_type)
         generator_item_name = None
 
+
         if generator_item:
             generator_item_name = generator_item.__name__
 
@@ -74,7 +75,7 @@ class Generator:
                 self.global_imports[module.__name__] = module.__name__
 
             elif module_name != generator_item_name and module not in self.locals:
-
+                
                 module_path = self.known_module_paths.get(module_name, module.__module__)
                 minimum_viable_import_path = module_path.split('.')
 
