@@ -29,16 +29,8 @@ class FlagRegistry:
         self.module_paths[flag.__name__] = flag.__module__
 
         def wrap_feature(feature):
-
-            if inspect.isclass(feature):
-                feature_name = feature.__class__.__name__
-
-            elif inspect.isfunction(feature) or inspect.ismethod(feature):
-                feature_name = feature.__name__
-
-            else:
-                feature_name = feature_name.__class__.__name__
-
+            
+            feature_name = feature.__name__
 
             flagged_feature: Flag = self.flag_types[self.flag_type]
 
