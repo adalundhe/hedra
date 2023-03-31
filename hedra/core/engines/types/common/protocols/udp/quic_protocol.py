@@ -2,24 +2,6 @@ from __future__ import annotations
 import asyncio
 import pylsqpack
 import re
-from aioquic.quic.connection import QuicConnection, NetworkAddress
-from aioquic.quic.events import (
-    ConnectionTerminated,
-    ConnectionIdRetired,
-    ConnectionIdIssued,
-    HandshakeCompleted,
-    PingAcknowledged
-)
-from aioquic.h3.events import (
-    DatagramReceived,
-    DataReceived,
-    H3Event,
-    Headers,
-    HeadersReceived,
-    PushPromiseReceived,
-    WebTransportStreamDataReceived,
-)
-from aioquic.buffer import UINT_VAR_MAX_SIZE, Buffer, BufferReadError, encode_uint_var
 from enum import Enum, IntEnum
 from collections import deque
 from typing import (
@@ -36,19 +18,106 @@ from typing import (
     Union,
     Text,
 )
-from aioquic.quic.events import DatagramFrameReceived, QuicEvent, StreamDataReceived
-from aioquic.quic.connection import stream_is_unidirectional
 
-import aioquic
-from aioquic.h3.connection import ErrorCode
+
+def dummy_unit_encode(val: int):
+    return b''
+
+
+def dummy_stream_is_unidirectional(val: int):
+    return False
+    
+
+try:
+
+    from aioquic.quic.connection import QuicConnection, NetworkAddress
+    from aioquic.quic.events import (
+        ConnectionTerminated,
+        ConnectionIdRetired,
+        ConnectionIdIssued,
+        HandshakeCompleted,
+        PingAcknowledged
+    )
+    from aioquic.h3.events import (
+        DatagramReceived,
+        DataReceived,
+        H3Event,
+        Headers,
+        HeadersReceived,
+        PushPromiseReceived,
+        WebTransportStreamDataReceived,
+    )
+    from aioquic.buffer import (
+        UINT_VAR_MAX_SIZE,
+        Buffer, 
+        BufferReadError, 
+        encode_uint_var
+    )
+
+    from aioquic.quic.events import (
+        DatagramFrameReceived, 
+        QuicEvent, 
+        StreamDataReceived
+    )
+
+    from aioquic.quic.connection import stream_is_unidirectional
+
+except ImportError:
+    aioquic = object
+    QuicConnection = object
+    ConnectionTerminated = object
+    ConnectionIdRetired = object
+    ConnectionIdIssued = object
+    HandshakeCompleted = object
+    PingAcknowledged = object
+    DatagramReceived = object
+    DataReceived = object
+    H3Event = object
+    Headers = Any
+    HeadersReceived = object
+    PushPromiseReceived = object
+    WebTransportStreamDataReceived = object
+    NetworkAddress = Any
+    UINT_VAR_MAX_SIZE = 0 
+    Buffer = object
+    BufferReadError = object 
+    encode_uint_var = dummy_unit_encode
+    DatagramFrameReceived = object
+    QuicEvent = object
+    StreamDataReceived = object
+    stream_is_unidirectional = dummy_stream_is_unidirectional
+
 
 QuicConnectionIdHandler = Callable[[bytes], None]
 QuicStreamHandler = Callable[[asyncio.StreamReader, asyncio.StreamWriter], None]
 
 
-USER_AGENT = "aioquic/" + aioquic.__version__
+USER_AGENT = "hedra/client"
 RESERVED_SETTINGS = (0x0, 0x2, 0x3, 0x4, 0x5)
 UPPERCASE = re.compile(b"[A-Z]")
+
+
+class ErrorCode(IntEnum):
+    H3_NO_ERROR = 0x100
+    H3_GENERAL_PROTOCOL_ERROR = 0x101
+    H3_INTERNAL_ERROR = 0x102
+    H3_STREAM_CREATION_ERROR = 0x103
+    H3_CLOSED_CRITICAL_STREAM = 0x104
+    H3_FRAME_UNEXPECTED = 0x105
+    H3_FRAME_ERROR = 0x106
+    H3_EXCESSIVE_LOAD = 0x107
+    H3_ID_ERROR = 0x108
+    H3_SETTINGS_ERROR = 0x109
+    H3_MISSING_SETTINGS = 0x10A
+    H3_REQUEST_REJECTED = 0x10B
+    H3_REQUEST_CANCELLED = 0x10C
+    H3_REQUEST_INCOMPLETE = 0x10D
+    H3_MESSAGE_ERROR = 0x10E
+    H3_CONNECT_ERROR = 0x10F
+    H3_VERSION_FALLBACK = 0x110
+    QPACK_DECOMPRESSION_FAILED = 0x200
+    QPACK_ENCODER_STREAM_ERROR = 0x201
+    QPACK_DECODER_STREAM_ERROR = 0x202
 
 
 class Setting(IntEnum):

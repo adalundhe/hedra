@@ -47,7 +47,6 @@ setup(
         'attr',
         'networkx',
         'aiodns',
-        'h2',
         'click',
         'psutil',
         'fastapi',

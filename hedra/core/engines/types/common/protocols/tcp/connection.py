@@ -118,8 +118,6 @@ class TCPConnection:
         try:
             self.transport._ssl_protocol.pause_writing()
             self.transport.close()
-            while not self.transport._closed:
-                await asyncio.sleep(0)
 
         except Exception:
             pass

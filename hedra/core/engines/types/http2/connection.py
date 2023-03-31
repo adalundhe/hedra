@@ -1,11 +1,11 @@
 import asyncio
-import traceback
-import h2.settings
 from ssl import SSLContext
 from typing import Tuple, Optional, Union
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common.protocols.tcp import TCPConnection
+from hedra.core.engines.types.http2.streams.stream_settings import Settings
+from hedra.core.engines.types.http2.streams.stream_settings_codes import SettingCodes
 from .stream import Stream
 from .frames import FrameBuffer
 from .frames.types.base_frame import Frame
@@ -55,21 +55,21 @@ class HTTP2Connection:
         self.lock = asyncio.Lock()
         self.stream = Stream(self.stream_id, self.timeouts)
 
-        self.local_settings = h2.settings.Settings(
+        self.local_settings = Settings(
             client=True,
             initial_values={
-                h2.settings.SettingCodes.ENABLE_PUSH: 0,
-                h2.settings.SettingCodes.MAX_CONCURRENT_STREAMS: concurrency,
-                h2.settings.SettingCodes.MAX_HEADER_LIST_SIZE: 65535,
+                SettingCodes.ENABLE_PUSH: 0,
+                SettingCodes.MAX_CONCURRENT_STREAMS: concurrency,
+                SettingCodes.MAX_HEADER_LIST_SIZE: 65535,
             }
         )
-        self.remote_settings = h2.settings.Settings(
+        self.remote_settings = Settings(
             client=False
         )
 
         self.outbound_flow_control_window = self.remote_settings.initial_window_size
 
-        del self.local_settings[h2.settings.SettingCodes.ENABLE_CONNECT_PROTOCOL]
+        del self.local_settings[SettingCodes.ENABLE_CONNECT_PROTOCOL]
 
         self.local_settings_dict = {setting_name: setting_value for setting_name, setting_value in self.local_settings.items()}
         self.remote_settings_dict = {setting_name: setting_value for setting_name, setting_value in self.remote_settings.items()}

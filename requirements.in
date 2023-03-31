@@ -1,7 +1,6 @@
 attr
 networkx
 aiodns
-h2
 click
 pytz
 tzlocal

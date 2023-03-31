@@ -6,8 +6,6 @@ h2/frame_buffer
 A data structure that provides a way to iterate over a byte buffer in terms of
 frames.
 """
-import h2.errors
-import sys
 import struct
 from .types.attributes import (
     _STRUCT_HBBBL
