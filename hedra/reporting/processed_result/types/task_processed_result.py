@@ -8,7 +8,7 @@ class TaskProcessedResult(BaseProcessedResult):
 
     def __init__(
         self, 
-        stage: Any, 
+        stage: str, 
         result: TaskResult
     ) -> None:
         super(

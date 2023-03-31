@@ -7,7 +7,7 @@ class GRPCProcessedResult(HTTP2ProcessedResult):
 
     def __init__(
         self, 
-        stage: Any, 
+        stage: str, 
         result: GRPCResult
     ) -> None:
         super(

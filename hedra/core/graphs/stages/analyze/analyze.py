@@ -4,18 +4,20 @@ import statistics
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from typing import Union, List, Dict, Any, Tuple
-from hedra.plugins.types.plugin_types import PluginType
-from hedra.reporting.processed_result import ProcessedResultsGroup
-from hedra.reporting.metric import MetricsSet
-from hedra.reporting.metric.custom_metric import CustomMetric
+from hedra.core.engines.types.common.base_result import BaseResult
+from hedra.core.engines.types.common.results_set import ResultsSet
+from hedra.core.graphs.stages.base.stage import Stage
+from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.core.hooks.types.condition.decorator import condition
 from hedra.core.hooks.types.context.decorator import context
 from hedra.core.hooks.types.event.decorator import event  
-from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.event_types import EventType
-from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.reporting.processed_result import results_types
+from hedra.plugins.types.plugin_types import PluginType
+from hedra.reporting.metric import MetricsSet
+from hedra.reporting.metric.custom_metric import CustomMetric
+from hedra.reporting.processed_result import results_types, ProcessedResultsGroup
 from hedra.reporting.processed_result.types import (
     GraphQLProcessedResult,
     GraphQLHTTP2ProcessedResult,
@@ -28,7 +30,6 @@ from hedra.reporting.processed_result.types import (
     WebsocketProcessedResult,
 )
 
-from hedra.core.graphs.stages.base.stage import Stage
 from .parallel import process_results_batch
 
 dill.settings['byref'] = True
@@ -45,6 +46,8 @@ Events = Union[
     UDPProcessedResult,
     WebsocketProcessedResult
 ]
+
+StageConfig = Tuple[str, int, List[Dict[str, List[BaseResult]]]]
 
 RawResultsSet = Dict[str, ResultsSet]
 
@@ -103,6 +106,8 @@ class Analyze(Stage):
 
     @Internal()
     async def run(self):  
+        self.executor.batch_by_stages = True
+
         await self.setup_events()
         await self.dispatcher.dispatch_events(self.name)
 
@@ -249,84 +254,90 @@ class Analyze(Stage):
             'analyze_stage_configs': stage_configs,
             'analyze_stage_stages_count': stages_count
         }
+    
+    @condition('assign_stage_batches')
+    async def check_if_multiple_stages(
+        self,
+        analyze_stage_configs: List[Tuple[str, Any, int]]=[],
+    ):
+       return {
+           'multiple_stages_to_process': len(analyze_stage_configs) > 1
+       } 
 
-    @event('assign_stage_batches')
+    @event('check_if_multiple_stages')
     async def execute_batched_analysis(
         self,
         analyze_stage_stages_count: int=0,
         analyze_stage_elapsed_times: List[float]=[],
         analyze_stage_total_group_results: int=0,
-        analyze_stage_configs: List[Tuple[str, Any, int]]=[],
+        analyze_stage_configs: List[StageConfig]=[],
+        multiple_stages_to_process: bool=False
     ):
 
-        await self.logger.spinner.append_message(
-            f'Calculating results for - {analyze_stage_stages_count} - stages'
-        )
+        if multiple_stages_to_process:
+            await self.logger.spinner.append_message(
+                f'Calculating results for - {analyze_stage_stages_count} - stages'
+            )
 
-        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Processing results or - {analyze_stage_stages_count} - stages')
+            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Processing results or - {analyze_stage_stages_count} - stages')
+            
+            median_execution_time = round(statistics.median(analyze_stage_elapsed_times))
+            await self.logger.spinner.append_message(f'Calculating stats for - {analyze_stage_total_group_results} - actions executed over a median stage execution time of {median_execution_time} seconds')
+
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Calculating stats for - {analyze_stage_total_group_results} - actions over a median stage execution time of {median_execution_time} seconds')
+            stage_batch_results = await self.executor.execute_batches(
+                analyze_stage_configs,
+                process_results_batch
+            )
+
+            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Completed parital results aggregation for - {analyze_stage_stages_count} - stages')
+
+            return {
+                'analyze_stage_batch_results': stage_batch_results
+            }
         
-        median_execution_time = round(statistics.median(analyze_stage_elapsed_times))
-        await self.logger.spinner.append_message(f'Calculating stats for - {analyze_stage_total_group_results} - actions executed over a median stage execution time of {median_execution_time} seconds')
+        else:
 
-        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Calculating stats for - {analyze_stage_total_group_results} - actions over a median stage execution time of {median_execution_time} seconds')
+            events =  defaultdict(ProcessedResultsGroup)
+            stage_name, _, configs = analyze_stage_configs.pop()
+            config = configs.pop()
+            results_batch = config.get('analyze_stage_batched_results')
 
-        stage_batch_results = await self.executor.execute_batches(
-            analyze_stage_configs,
-            process_results_batch
-        )
-
-        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Completed parital results aggregation for - {analyze_stage_stages_count} - stages')
-
-        return {
-            'analyze_stage_batch_results': stage_batch_results
-        }
-
+            for stage_result in results_batch:
+                events[stage_result.name].add(
+                        stage_name,
+                        stage_result,
+                    )
+            
+            for events_group in events.values():
+                events_group.calculate_stats()
+                
+            return {
+                'analyze_stage_batch_results': [
+                    (
+                        stage_name,
+                        events
+                    )
+                ]
+            }
+        
     @event('execute_batched_analysis')
-    async def reduce_stage_contexts(
-        self,
-        analyze_stage_stages_count: int=0,
-        analyze_stage_batch_results: List[Tuple[str, List[Any]]]=[]
-    ):
-
-        self.logger.spinner.set_message_at(2, f'Converting aggregate results to metrics for - {analyze_stage_stages_count} - stages.')
-
-        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Starting stage results aggregation for {analyze_stage_stages_count} stages')
-        
-        stage_contexts = defaultdict(list)
-
-        for _, stage_results in analyze_stage_batch_results:
-
-            for group in stage_results:
-                pipeline_context = group.get('context', {})
-                for context_key, context_value in pipeline_context.items():
-                    stage_contexts[context_key].append(context_value)
-
-        return {
-            'analyze_stage_contexts': stage_contexts
-        }
-        
-    @event('reduce_stage_contexts')
     async def merge_events_groups(
         self,
-        analyze_stage_batch_results: List[Tuple[str, List[Any]]]=[]
+        analyze_stage_batch_results: List[Tuple[str, List[Any]]]=[],
+        multiple_stages_to_process: bool=False
     ):
 
         stage_events_set = {}
 
-        for stage_name, stage_results in analyze_stage_batch_results:
+        if multiple_stages_to_process:
+            for stage_name, stage_results in analyze_stage_batch_results:
+                stage_events_set[stage_name] = stage_results.pop()
 
+        else:
 
-            batch_results: List[Dict[str, Union[dict, ProcessedResultsGroup]]] = [
-                group.get('events') for group in stage_results
-            ]
-
-            stage_events =  defaultdict(ProcessedResultsGroup)
-
-            for events_groups in batch_results:
-                for event_group_name, events_group in events_groups.items():
-                    stage_events[event_group_name].merge(events_group)
-
-            stage_events_set[stage_name] = stage_events
+            for stage_name, stage_results in analyze_stage_batch_results:
+                stage_events_set[stage_name] = stage_results
 
         return {
             'analyze_stage_events_set': stage_events_set
@@ -370,7 +381,7 @@ class Analyze(Stage):
             for event_group_name, events_group in stage_events.items():  
 
                 custom_metrics = analyze_stage_custom_metrics_set.get(event_group_name, {})
-
+                
                 events_group.calculate_quantiles()
 
                 metric_data = {

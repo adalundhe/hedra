@@ -24,7 +24,7 @@ class HTTP2ProcessedResult(BaseProcessedResult):
 
     def __init__(
         self, 
-        stage: Any, 
+        stage: str, 
         result: HTTP2Result
     ) -> None:
         super(HTTP2ProcessedResult, self).__init__(

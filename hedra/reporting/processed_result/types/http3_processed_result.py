@@ -7,7 +7,7 @@ class HTTP3ProcessedResult(HTTPProcessedResult):
 
     def __init__(
         self, 
-        stage: Any, 
+        stage: str, 
         result: GraphQLResult
     ) -> None:
         super(HTTP3ProcessedResult, self).__init__(

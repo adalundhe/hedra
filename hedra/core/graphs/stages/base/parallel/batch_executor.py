@@ -27,6 +27,7 @@ class BatchExecutor:
         self.sem = BatchedSemaphore(max_workers)
         self.pool = ProcessPoolExecutor(max_workers=psutil.cpu_count(logical=False), mp_context=self.context)
         self.shutdown_task = None
+        self.batch_by_stages = False
 
     async def execute_batches(self, batched_stages: List[Tuple[int, List[Any]]], execution_task: FunctionType) -> List[Tuple[str, Any]]:
 
@@ -84,67 +85,77 @@ class BatchExecutor:
         # each core. The second will assign all four cores to the remaing
         # one stage.    
 
-        stages_count = len(stages)
-
-
-        self.batch_sets_count = math.ceil(stages_count/self.max_workers)
-        if self.batch_sets_count < 1:
-            self.batch_sets_count = 1
-        
-        self.more_stages_than_cpus = stages_count/self.max_workers > 1
-
-        if stages_count%self.max_workers > 0 and stages_count > self.max_workers:
-
-            batch_size = self.max_workers
-            workers_per_stage = int(self.max_workers/batch_size)
-            batched_stages = [
-                [
-                    workers_per_stage for _ in range(batch_size)
-                ] for _ in range(self.batch_sets_count - 1)
-            ]
-
-        else:
-            batch_size = int(stages_count/self.batch_sets_count)
-            workers_per_stage = int(self.max_workers/batch_size)
-            batched_stages = [
-                [
-                    workers_per_stage for _ in range(batch_size)
-                ] for _ in range(self.batch_sets_count)
-            ]
-
-        batches_count = len(batched_stages)
-
-        # If we have a remainder batch - i.e. more stages than cores.
-        last_batch = batched_stages[batches_count-1]
-
-        last_batch_size = stages_count%self.max_workers
-        if last_batch_size > 0 and self.more_stages_than_cpus:
-            last_batch_workers = int(self.max_workers/last_batch_size)
-            batched_stages.append([
-                last_batch_workers for _ in range(last_batch_size)
-            ])
-
-        last_batch = batched_stages[self.batch_sets_count-1]
-        last_batch_size = len(last_batch)
-        last_batch_remainder = self.max_workers%last_batch_size
-
-
-        if last_batch_remainder > 0:
-            for idx in range(last_batch_remainder):
-                last_batch[idx] += 1
-
-        stage_idx = 0
         batches = []
 
-        for batch in batched_stages:
-            for stage_idx, stage_workers_count in enumerate(batch):
+        if self.batch_by_stages is False:
 
-                stage_name, stage = stages[stage_idx]
+            stages_count = len(stages)
+            self.batch_sets_count = math.ceil(stages_count/self.max_workers)
+            if self.batch_sets_count < 1:
+                self.batch_sets_count = 1
+            
+            self.more_stages_than_cpus = stages_count/self.max_workers > 1
 
+            if stages_count%self.max_workers > 0 and stages_count > self.max_workers:
+
+                batch_size = self.max_workers
+                workers_per_stage = int(self.max_workers/batch_size)
+                batched_stages = [
+                    [
+                        workers_per_stage for _ in range(batch_size)
+                    ] for _ in range(self.batch_sets_count - 1)
+                ]
+
+            else:
+                batch_size = int(stages_count/self.batch_sets_count)
+                workers_per_stage = int(self.max_workers/batch_size)
+                batched_stages = [
+                    [
+                        workers_per_stage for _ in range(batch_size)
+                    ] for _ in range(self.batch_sets_count)
+                ]
+
+            batches_count = len(batched_stages)
+
+            # If we have a remainder batch - i.e. more stages than cores.
+            last_batch = batched_stages[batches_count-1]
+
+            last_batch_size = stages_count%self.max_workers
+            if last_batch_size > 0 and self.more_stages_than_cpus:
+                last_batch_workers = int(self.max_workers/last_batch_size)
+                batched_stages.append([
+                    last_batch_workers for _ in range(last_batch_size)
+                ])
+
+            last_batch = batched_stages[self.batch_sets_count-1]
+            last_batch_size = len(last_batch)
+            last_batch_remainder = self.max_workers%last_batch_size
+
+
+            if last_batch_remainder > 0:
+                for idx in range(last_batch_remainder):
+                    last_batch[idx] += 1
+
+            stage_idx = 0
+
+            for batch in batched_stages:
+                for stage_idx, stage_workers_count in enumerate(batch):
+
+                    stage_name, stage = stages[stage_idx]
+
+                    batches.append((
+                        stage_name,
+                        stage,
+                        stage_workers_count
+                    ))
+
+        else:
+
+            for stage_name, stage in stages:
                 batches.append((
                     stage_name,
                     stage,
-                    stage_workers_count
+                    1
                 ))
 
         return batches
