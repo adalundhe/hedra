@@ -148,7 +148,7 @@ class ProcessedResultsGroup:
             
             self.groups[group_name]['quantiles'] = quantiles
 
-    def merge(self, group: EventsGroup):
+    def merge(self, group: ProcessedResultsGroup):
         
         self.tags.update(group.tags)
 

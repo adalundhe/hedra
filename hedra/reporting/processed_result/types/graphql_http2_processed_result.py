@@ -1,10 +1,9 @@
-import json
-from typing import Dict, Any, Dict
-from hedra.core.hooks.types.base.hook_type import HookType
+from typing import Dict, Any, Union
+from .http2_processed_result import HTTP2ProcessedResult
 from hedra.core.engines.types.graphql_http2 import GraphQLHTTP2Result
 
 
-class GraphQLHTTP2ProcessedResult(GraphQLHTTP2Result):
+class GraphQLHTTP2ProcessedResult(HTTP2ProcessedResult):
 
     def __init__(
         self, 
@@ -15,3 +14,11 @@ class GraphQLHTTP2ProcessedResult(GraphQLHTTP2Result):
             stage,
             result
         )
+
+    def to_dict(self) -> Dict[str, Union[str, int, float]]:
+        graphql_result_dict = super().to_dict()
+
+        return {
+            **graphql_result_dict,
+            'query': self.query
+        }

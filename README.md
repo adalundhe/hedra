@@ -8,7 +8,7 @@
 
 | Package     | Hedra                                                           |
 | ----------- | -----------                                                     |
-| Version     | 0.7.3                                                           |
+| Version     | 0.7.4                                                           |
 | Web         | https://hedra.dev                                               |
 | Download    | https://pypi.org/project/hedra/                                 | 
 | Source      | https://github.com/scorbettUM/hedra                             |

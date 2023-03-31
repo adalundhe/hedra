@@ -1,3 +1,4 @@
+from __future__ import annotations
 import json
 from gzip import decompress as gzip_decompress
 from typing import List, Union, Dict
@@ -48,7 +49,7 @@ class HTTPResult(BaseResult):
         self.query = action.url.query
         self.hostname = action.url.hostname
 
-        self.headers = {}
+        self.headers: Dict[str, Union[str, int, float]] = {}
         self.body = bytearray()
         self.response_code = None
         self._version = None
@@ -178,7 +179,10 @@ class HTTPResult(BaseResult):
         }
 
     @classmethod
-    def from_dict(cls, results_dict: Dict[str, Union[int, float, str,]]):
+    def from_dict(
+        cls, 
+        results_dict: Dict[str, Union[int, float, str,]]
+    ) -> HTTPResult:
 
         action = HTTPAction(
             results_dict.get('name'),

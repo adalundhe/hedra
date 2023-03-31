@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Dict, Union
 from hedra.core.engines.types.graphql import GraphQLResult
 from .http_processed_result import HTTPProcessedResult
 
@@ -14,3 +14,13 @@ class GraphQLProcessedResult(HTTPProcessedResult):
             stage,
             result
         )
+
+        self.query = result.query
+
+    def to_dict(self) -> Dict[str, Union[str, int, float]]:
+        graphql_result_dict = super().to_dict()
+
+        return {
+            **graphql_result_dict,
+            'query': self.query
+        }

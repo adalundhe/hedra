@@ -57,59 +57,63 @@ class ExecuteEdge(BaseEdge[Execute]):
 
     async def transition(self):
 
-        self.source.state = StageStates.EXECUTING
+        try:
+            self.source.state = StageStates.EXECUTING
 
-        execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
-        analyze_stages: Dict[str, Stage] = self.generate_analyze_candidates()
+            execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
+            analyze_stages: Dict[str, Stage] = self.generate_analyze_candidates()
 
-        if len(self.assigned_candidates) > 0:
-            analyze_stages = {
-                stage_name: stage for stage_name, stage in analyze_stages.items() if stage_name in self.assigned_candidates
-            }
+            if len(self.assigned_candidates) > 0:
+                analyze_stages = {
+                    stage_name: stage for stage_name, stage in analyze_stages.items() if stage_name in self.assigned_candidates
+                }
 
-        self.source.context.update(self.edge_data)
-        
-        for event in self.source.dispatcher.events_by_name.values():
-            event.source.stage_instance = self.source
-            event.context.update(self.edge_data)
+            self.source.context.update(self.edge_data)
             
-            if event.source.context:
-                event.source.context.update(self.edge_data)
+            for event in self.source.dispatcher.events_by_name.values():
+                event.source.stage_instance = self.source
+                event.context.update(self.edge_data)
+                
+                if event.source.context:
+                    event.source.context.update(self.edge_data)
 
-        if self.timeout and self.skip_stage is False:
-            await asyncio.wait_for(self.source.run(), timeout=self.timeout)
+            if self.timeout and self.skip_stage is False:
+                await asyncio.wait_for(self.source.run(), timeout=self.timeout)
 
-        elif self.skip_stage is False:
-            await self.source.run()
+            elif self.skip_stage is False:
+                await self.source.run()
 
-        for provided in self.provides:
-            self.edge_data[provided] = self.source.context[provided]
-        
-        if self.destination.context is None:
-            self.destination.context = SimpleContext()
+            for provided in self.provides:
+                self.edge_data[provided] = self.source.context[provided]
+            
+            if self.destination.context is None:
+                self.destination.context = SimpleContext()
 
-        self._update(self.destination)
+            self._update(self.destination)
 
-        all_paths = self.all_paths.get(self.source.name, [])
+            all_paths = self.all_paths.get(self.source.name, [])
 
-        for stage in analyze_stages.values():
-            if stage.name in all_paths:
-                if stage.context is None:
-                    stage.context = SimpleContext()
+            for stage in analyze_stages.values():
+                if stage.name in all_paths:
+                    if stage.context is None:
+                        stage.context = SimpleContext()
 
-                self._update(stage)
+                    self._update(stage)
 
-        if self.destination.stage_type == StageTypes.SETUP:
-   
-            execute_stages = list(self.stages_by_type.get(StageTypes.EXECUTE).values())
+            if self.destination.stage_type == StageTypes.SETUP:
+    
+                execute_stages = list(self.stages_by_type.get(StageTypes.EXECUTE).values())
 
-            for stage in execute_stages:
-                if stage.name not in self.visited and stage.state == StageStates.SETUP:
-                    stage.state = StageStates.INITIALIZED
+                for stage in execute_stages:
+                    if stage.name not in self.visited and stage.state == StageStates.SETUP:
+                        stage.state = StageStates.INITIALIZED
 
-        self.source.state = StageStates.EXECUTED
+            self.source.state = StageStates.EXECUTED
 
-        self.visited.append(self.source.name)
+            self.visited.append(self.source.name)
+
+        except Exception as edge_exception:
+            self.exception = edge_exception
 
         return None, self.destination.stage_type
 

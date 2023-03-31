@@ -1,7 +1,4 @@
-import asyncio
-import traceback
 from typing import Dict, List, Union, Iterator
-from types import FunctionType
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.http2 import(
     MercuryHTTP2Client,

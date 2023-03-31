@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Dict, Union
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.http2.result import HTTP2Result
@@ -11,7 +12,10 @@ class GraphQLHTTP2Result(HTTP2Result):
         self.type = RequestTypes.GRAPHQL_HTTP2
 
     @classmethod
-    def from_dict(cls, results_dict: Dict[str, Union[int, float, str,]]):
+    def from_dict(
+        cls, 
+        results_dict: Dict[str, Union[int, float, str,]]
+    ) -> GraphQLHTTP2Result:
 
         action = GraphQLHTTP2Action(
             results_dict.get('name'),

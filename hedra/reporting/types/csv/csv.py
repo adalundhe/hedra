@@ -270,17 +270,11 @@ class CSV:
             'error_count'
         ]
 
-        filepath = Path(self.metrics_filepath)
-        base_filepath = filepath.parent
-        base_filename = filepath.stem
-
-        errors_filepath = f'{base_filepath}/{base_filename}_errors,csv'
-
         errors_file = await self._loop.run_in_executor(
             self._executor,
             functools.partial(
                 open,
-                errors_filepath,
+                self.errors_metrics_filepath,
                 'w'
             )
         )

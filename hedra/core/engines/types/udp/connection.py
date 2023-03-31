@@ -46,7 +46,11 @@ class UDPConnection:
     
         if self.connected is False or self.dns_address != dns_address or self.reset_connection:
             try:
-                reader, writer = await asyncio.wait_for(self._connection_factory.create(socket_config), timeout=timeout)
+                reader, writer = await asyncio.wait_for(
+                    self._connection_factory.create_udp(socket_config), 
+                    timeout=timeout
+                )
+                    
                 self.connected = True
 
                 self.reader = reader

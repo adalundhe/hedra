@@ -149,3 +149,8 @@ from .timescaledb import (
     TimescaleDB,
     TimescaleDBConfig
 )
+
+from .xml import (
+    XML,
+    XMLConfig
+)

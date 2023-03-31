@@ -1,5 +1,4 @@
-from typing import Any, Tuple, Dict
-from hedra.core.hooks.types.base.hook_type import HookType
+from typing import Any
 from hedra.core.engines.types.websocket import WebsocketResult
 from .http_processed_result import HTTPProcessedResult
 

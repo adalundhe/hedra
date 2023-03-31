@@ -5,11 +5,13 @@ class SocketTypes:
     DEFAULT=socket.AF_INET
     HTTP2=socket.AF_INET
     UDP=socket.AF_INET
+    HTTP3=socket.AF_INET6
     NONE=None
 
 class SocketProtocols:
     DEFAULT=socket.SOCK_STREAM
     HTTP2=socket.SOCK_STREAM
+    HTTP3=socket.SOCK_DGRAM
     UDP=socket.SOCK_DGRAM
     NONE=None
 
@@ -17,6 +19,7 @@ class SocketProtocols:
 class RequestTypes:
     HTTP='HTTP'
     HTTP2='HTTP2'
+    HTTP3='HTTP3'
     WEBSOCKET='WEBSOCKET'
     GRAPHQL='GRAPHQL'
     GRAPHQL_HTTP2="GRAPHQL_HTTP2"
@@ -33,6 +36,7 @@ class ProtocolMap:
         self.address_families = {
             RequestTypes.HTTP: SocketTypes.DEFAULT,
             RequestTypes.HTTP2: SocketTypes.HTTP2,
+            RequestTypes.HTTP3: SocketTypes.HTTP3,
             RequestTypes.WEBSOCKET: SocketTypes.DEFAULT,
             RequestTypes.GRAPHQL: SocketTypes.DEFAULT,
             RequestTypes.GRAPHQL_HTTP2: SocketTypes.HTTP2,
@@ -44,6 +48,7 @@ class ProtocolMap:
         self.protocols = {
             RequestTypes.HTTP: SocketProtocols.DEFAULT,
             RequestTypes.HTTP2: SocketProtocols.HTTP2,
+            RequestTypes.HTTP3: SocketProtocols.HTTP3,
             RequestTypes.WEBSOCKET: SocketProtocols.DEFAULT,
             RequestTypes.GRAPHQL: SocketProtocols.DEFAULT,
             RequestTypes.GRAPHQL_HTTP2: SocketTypes.HTTP2,

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Dict, Union
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.core.engines.types.common.types import RequestTypes
@@ -61,7 +62,10 @@ class PlaywrightResult(BaseResult):
         }
 
     @classmethod
-    def from_dict(cls, results_dict: Dict[str, Union[int, float, str,]]):
+    def from_dict(
+        cls, 
+        results_dict: Dict[str, Union[int, float, str,]]
+    ) -> PlaywrightResult:
 
         playwright_command = PlaywrightCommand(
             results_dict.get('name'),

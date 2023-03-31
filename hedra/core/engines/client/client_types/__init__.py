@@ -1,5 +1,6 @@
 from .http import HTTPClient
 from .http2 import HTTP2Client
+from .http3 import HTTP3Client
 from .grpc import GRPCClient
 from .graphql import GraphQLClient
 from .graphql_http2 import GraphQLHTTP2Client

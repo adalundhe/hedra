@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Union, Dict
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common.base_result import BaseResult
@@ -95,7 +96,10 @@ class UDPResult(BaseResult):
         }
 
     @classmethod
-    def from_dict(cls, results_dict: Dict[str, Union[int, float, str,]]):
+    def from_dict(
+        cls, 
+        results_dict: Dict[str, Union[int, float, str,]]
+    ) -> UDPResult:
 
         action = UDPAction(
             results_dict.get('name'),

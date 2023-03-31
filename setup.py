@@ -93,12 +93,17 @@ setup(
             'google-cloud-bigquery',
             'google-cloud-bigtable',
             'google-cloud-storage',
+            'cryptography==38.0.4',
+            'aioquic',
+            'dicttoxml',
         ],
         'all-engines': [
             'grpcio',
             'grpcio-tools',
             'gql',
-            'playwright'
+            'playwright',
+            'cryptography==38.0.4',
+            'aioquic',
 
         ],
         'all-reporters': [
@@ -123,6 +128,7 @@ setup(
             'google-cloud-bigquery',
             'google-cloud-bigtable',
             'google-cloud-storage',
+            'dicttoxml',
 
         ],
         'playwright': [
@@ -179,6 +185,10 @@ setup(
         'graphql': [
             'gql'
         ],
+        'http3': [
+            'cryptography==38.0.4',
+            'aioquic'
+        ],
         'snowflake': [
             'sqlalchemy',
             'snowflake-connector-python'
@@ -187,6 +197,9 @@ setup(
             'google-cloud-bigquery',
             'google-cloud-bigtable',
             'google-cloud-storage',
+        ],
+        'xml': [
+            'dicttoxml'
         ]
     },
     python_requires='>=3.8'

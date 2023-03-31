@@ -32,3 +32,4 @@ class ReporterTypes(Enum):
     Telegraf='telegraf'
     TelegrafStatsD='telegraf_statsd'
     TimescaleDB='timescaledb'
+    XML='xml'

@@ -53,4 +53,5 @@ from .reporting import (
     TelegrafConfig,
     TelegrafStatsDConfig,
     TimescaleDBConfig,
+    XMLConfig
 )

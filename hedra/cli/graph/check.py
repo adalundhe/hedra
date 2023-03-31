@@ -101,8 +101,6 @@ def check_graph(path: str, log_level: str):
 
     graph.assemble()
 
-    loop.run_until_complete(graph.check(path))
-
     logger['console'].sync.info('\nValidation complete!\n')
 
     os._exit(0)
