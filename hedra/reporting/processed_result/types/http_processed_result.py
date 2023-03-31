@@ -23,7 +23,7 @@ class HTTPProcessedResult(BaseProcessedResult):
 
     def __init__(
         self, 
-        stage: Any, 
+        stage: str, 
         result: HTTPResult
     ) -> None:
         super(HTTPProcessedResult, self).__init__(

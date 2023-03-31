@@ -25,7 +25,7 @@ class BaseProcessedResult:
 
     def __init__(
         self, 
-        stage: Any, 
+        stage_name: str, 
         result: BaseResult
     ) -> None:
 
@@ -39,7 +39,7 @@ class BaseProcessedResult:
         self.type = result.type
         self.source = result.source
         self.checks: List[List[BaseEvent]] = []
-        self.stage_name = stage.name
+        self.stage = stage_name
 
         self.time = self.timings.get('total', 0)
 
@@ -49,7 +49,6 @@ class BaseProcessedResult:
                 tag.get('value')
             ) for tag in result.tags
         ]
-        self.stage = None
 
 
     @property

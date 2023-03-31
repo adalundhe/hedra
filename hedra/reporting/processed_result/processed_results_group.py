@@ -2,7 +2,7 @@ from __future__ import annotations
 import uuid
 import numpy
 from collections import defaultdict
-from typing import Any, Dict, Union, Tuple
+from typing import Any, Dict, Union
 from hedra.reporting.stats import (
     Median,
     Mean,
@@ -57,16 +57,14 @@ class ProcessedResultsGroup:
 
     def add(
         self, 
-        stage: Any, 
+        stage_name: str,
         result: Any, 
-        stage_name: str
     ):
 
         processed_result: BaseProcessedResult = results_types.get(result.type, TaskProcessedResult)(
-            stage,
+            stage_name,
             result
         )
-        processed_result.stage = stage_name
 
         if self.source is None:
             self.source = processed_result.source
@@ -84,7 +82,7 @@ class ProcessedResultsGroup:
             if timing > 0:
                 self.timings[timing_group].append(timing)
 
-    def calculate_partial_group_stats(self):
+    def calculate_stats(self):
 
         self.total = self.succeeded + self.failed
 
@@ -147,69 +145,3 @@ class ProcessedResultsGroup:
             }
             
             self.groups[group_name]['quantiles'] = quantiles
-
-    def merge(self, group: ProcessedResultsGroup):
-        
-        self.tags.update(group.tags)
-
-        self.total += group.total
-        self.succeeded += group.succeeded
-        self.failed += group.failed
-
-        for error, error_count in group.errors.items():
-            self.errors[error] += error_count
-
-        for group_name in group.timings.keys():
-            self.timings[group_name].extend(group.timings[group_name])
-
-            merge_group_stats = group.groups.get(
-                group_name, 
-                {}
-            ).get(group_name)
-
-            stats_group = self.groups.get(
-                group_name,
-                {}
-            ).get(group_name)
-
-
-            update_median = group._streaming_median[group_name].get()
-            update_mean = group._streaming_mean[group_name].get()
-            update_variance = group._streaming_variance[group_name].get()
-            updated_stdev = group._streaming_stdev[group_name].get()
-
-            if self.groups.get(group_name) is None:
-                self.groups[group_name] = {
-                    group_name: {
-                        'median': update_median,
-                        'mean': update_mean,
-                        'variance': update_variance,
-                        'stdev': updated_stdev,
-                        'minimum': merge_group_stats['minimum'],
-                        'maximum': merge_group_stats['maximum']
-                    }
-                }
-
-            else:
-                
-                self._streaming_median[group_name].update(update_median)
-                self._streaming_mean[group_name].update(update_mean)
-                self._streaming_variance[group_name].update(update_variance)
-                self._streaming_stdev[group_name].update(updated_stdev)
-
-                self.groups[group_name] = {
-                    group_name: {
-                        'median': self._streaming_median[group_name].get(),
-                        'mean': self._streaming_mean[group_name].get(),
-                        'variance': self._streaming_variance[group_name].get(),
-                        'stdev': self._streaming_stdev[group_name].get(),
-                        'minimum': min([
-                            merge_group_stats['minimum'],
-                            stats_group['minimum']
-                        ]),
-                        'maximum': max([
-                            merge_group_stats['maximum'],
-                            stats_group['maximum']
-                        ])
-                    }
-                }

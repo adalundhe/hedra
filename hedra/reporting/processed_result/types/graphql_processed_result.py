@@ -4,10 +4,27 @@ from .http_processed_result import HTTPProcessedResult
 
 
 class GraphQLProcessedResult(HTTPProcessedResult):
+    
+    __slots__ = (
+        'event_id',
+        'action_id',
+        'url',
+        'ip_addr',
+        'method',
+        'path',
+        'params',
+        'hostname',
+        'status',
+        'headers',
+        'data',
+        'status',
+        'timings',
+        'query'
+    )
 
     def __init__(
         self, 
-        stage: Any, 
+        stage: str, 
         result: GraphQLResult
     ) -> None:
         super(GraphQLProcessedResult, self).__init__(

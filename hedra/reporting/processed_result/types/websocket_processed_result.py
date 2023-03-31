@@ -7,7 +7,7 @@ class WebsocketProcessedResult(HTTPProcessedResult):
 
     def __init__(
         self, 
-        stage: Any, 
+        stage: str, 
         result: WebsocketResult
     ) -> None:
         super(

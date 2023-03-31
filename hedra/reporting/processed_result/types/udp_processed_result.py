@@ -23,7 +23,7 @@ class UDPProcessedResult(BaseProcessedResult):
 
     def __init__(
         self, 
-        stage: Any, 
+        stage: str, 
         result: UDPResult
     ) -> None:
         super(UDPProcessedResult, self).__init__(

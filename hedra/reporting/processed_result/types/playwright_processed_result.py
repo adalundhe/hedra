@@ -21,7 +21,7 @@ class PlaywrightProcessedResult(BaseProcessedResult):
 
     def __init__(
         self, 
-        stage: Any, 
+        stage: str, 
         result: PlaywrightResult
     ) -> None:
         super(
