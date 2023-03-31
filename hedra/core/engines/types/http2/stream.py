@@ -1,10 +1,10 @@
 
-import h2.settings
 import struct
 from hedra.core.engines.types.common.encoder import Encoder
 from hedra.core.engines.types.common.protocols.shared.reader import Reader
 from hedra.core.engines.types.common.protocols.shared.writer import Writer
 from hedra.core.engines.types.common.timeouts import Timeouts
+from hedra.core.engines.types.http2.streams.stream_settings import Settings
 from hedra.core.engines.types.http2.windows.window_manager import WindowManager
 
 
@@ -60,7 +60,7 @@ class Stream:
         self._authority = None
         self.frame_buffer = None
         self.encoder: Encoder = None
-        self._remote_settings = h2.settings.Settings(
+        self._remote_settings = Settings(
             client=False
         )
         self._remote_settings_dict = {

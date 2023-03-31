@@ -1,5 +1,4 @@
 import json
-import h2.settings
 from typing import Dict, Iterator, Union, List, Any
 from urllib.parse import urlencode
 from hedra.core.engines.types.common.base_action import BaseAction
@@ -8,6 +7,7 @@ from hedra.core.engines.types.common.hooks import Hooks
 from hedra.core.engines.types.common import URL
 from hedra.core.engines.types.common.encoder import Encoder
 from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core.engines.types.http2.streams.stream_settings import Settings
 
 
 class HTTP2Action(BaseAction):
@@ -60,7 +60,7 @@ class HTTP2Action(BaseAction):
         self.is_stream = False
         self.ssl_context = None
         self.hpack_encoder = Encoder()
-        self._remote_settings = h2.settings.Settings(
+        self._remote_settings = Settings(
             client=False
         )
         

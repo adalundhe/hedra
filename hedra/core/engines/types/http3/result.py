@@ -2,11 +2,18 @@ from __future__ import annotations
 from typing import Union, Dict
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.http.result import HTTPResult
-from aioquic.h3.events import (
-    HeadersReceived,
-    DataReceived
-)
 from .action import HTTP3Action
+
+try:
+    from aioquic.h3.events import (
+        HeadersReceived,
+        DataReceived
+    )
+
+except ImportError:
+    HeadersReceived = object
+    DataReceived = object
+    
 
 class HTTP3Result(HTTPResult):
 

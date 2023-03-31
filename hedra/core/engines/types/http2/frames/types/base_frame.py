@@ -7,14 +7,12 @@ Defines framing logic for HTTP/2. Provides both classes to represent framed
 data and logic for aiding the connection when it comes to reading from the
 socket.
 """
-import h2.errors
 import sys
-import struct
 from typing import Any, Optional,  List, Iterable
 from hedra.core.engines.types.http2.stream import Stream
 from hedra.core.engines.types.http2.events.remote_settings_changed_event import RemoteSettingsChanged
 from hedra.core.engines.types.http2.events.settings_acknowledged_event import SettingsAcknowledged
-from hedra.core.engines.types.http2.streams.stream_settings import SettingCodes
+from hedra.core.engines.types.http2.streams.stream_settings_codes import SettingCodes
 from hedra.core.engines.types.http2.events.stream_reset import StreamReset
 from hedra.core.engines.types.http2.streams.stream_closed_by import StreamClosedBy
 from hedra.core.engines.types.http2.events.deferred_headers_event import DeferredHeaders
@@ -423,7 +421,7 @@ class Frame:
             self._data_to_send = b''
 
             new_event = ConnectionTerminated()
-            new_event.error_code = h2.errors._error_code_from_int(self.error_code)
+            new_event.error_code = ErrorCodes(self.error_code)
             new_event.last_stream_id = self.last_stream_id
             
             if self.additional_data:
@@ -458,7 +456,7 @@ class Frame:
             stream.closed_by = StreamClosedBy.RECV_RST_STREAM
             reset_event = StreamReset()
             reset_event.stream_id = stream.stream_id
-            reset_event[0].error_code = h2.errors._error_code_from_int(self.error_code)
+            reset_event[0].error_code = ErrorCodes(self.error_code)
 
             return [], [reset_event]
 

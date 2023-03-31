@@ -1,14 +1,22 @@
 import asyncio
 import socket
 from typing import Optional, Callable
-from aioquic.h3.connection import H3_ALPN
-from aioquic.quic.connection import QuicConnection
-from aioquic.quic.configuration import QuicConfiguration
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common.protocols.shared.reader import Reader
 from hedra.core.engines.types.common.protocols.shared.writer import Writer
 from .protocol import UDPProtocol
 from .quic_protocol import QuicProtocol
+
+try:
+    from aioquic.h3.connection import H3_ALPN
+    from aioquic.quic.connection import QuicConnection
+    from aioquic.quic.configuration import QuicConfiguration
+
+except ImportError:
+    H3_ALPN = []
+    QuicConnection = object
+    QuicConfiguration = object
+
 from hedra.core.engines.types.common.protocols.shared.constants import _DEFAULT_LIMIT
 
 
@@ -19,7 +27,7 @@ class UDPConnection:
 
     def __init__(self, factory_type: RequestTypes = RequestTypes.HTTP) -> None:
         self.loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
-        self.transport = None
+        self.transport: asyncio.DatagramTransport = None
         self.factory_type = factory_type
         self._connection = None
         self.socket: socket.socket = None
@@ -113,4 +121,12 @@ class UDPConnection:
         await protocol.wait_connected()
 
         return protocol
+    
+    async def close(self):
+
+        try:
+            self.transport.close()
+
+        except Exception:
+            pass
 

@@ -5,20 +5,18 @@ hpack/hpack
 
 Implements the HPACK header compression algorithm as detailed by the IETF.
 """
-import logging
 
-from hpack.table import HeaderTable, table_entry_size
-from hpack.exceptions import (
+from .hpack.table import HeaderTable, table_entry_size
+from .hpack.exceptions import (
     HPACKDecodingError, OversizedHeaderListError, InvalidTableSizeError
 )
-from hpack.huffman import HuffmanEncoder
-from hpack.huffman_constants import (
+from .hpack.huffman_encoder import HuffmanEncoder
+from .hpack.constants import (
     REQUEST_CODES, REQUEST_CODES_LENGTH
 )
-from hpack.huffman_table import decode_huffman
-from hpack.struct import HeaderTuple, NeverIndexedHeaderTuple
+from .hpack.huffman_table import decode_huffman
+from .hpack.structs import HeaderTuple, NeverIndexedHeaderTuple
 
-log = logging.getLogger(__name__)
 
 INDEX_NONE = b'\x00'
 INDEX_NEVER = b'\x10'
@@ -55,7 +53,6 @@ def encode_integer(integer, prefix_bits):
     This encodes an integer according to the wacky integer encoding rules
     defined in the HPACK spec.
     """
-    log.debug("Encoding %d with %d bits", integer, prefix_bits)
 
     if integer < 0:
         raise ValueError(
@@ -119,8 +116,6 @@ def decode_integer(data, prefix_bits):
         raise HPACKDecodingError(
             "Unable to decode HPACK integer representation from %r" % data
         )
-
-    log.debug("Decoded %d, consumed %d bytes", number, index)
 
     return number, index
 
@@ -248,20 +243,12 @@ class Encoder:
 
         header_block = b''.join(header_block)
 
-        log.debug("Encoded header block to %s", header_block)
-
         return header_block
 
     def add(self, to_add, sensitive, huffman=False):
         """
         This function takes a header key-value tuple and serializes it.
         """
-        log.debug(
-            "Adding %s to the header table, sensitive:%s, huffman:%s",
-            to_add,
-            sensitive,
-            huffman
-        )
 
         name, value = to_add
 
@@ -441,7 +428,6 @@ class Decoder:
         :raises HPACKDecodingError: If an error is encountered while decoding
                                     the header block.
         """
-        log.debug("Decoding %s", data)
 
         data_mem = bytearray(data)
         headers = []
@@ -540,7 +526,6 @@ class Decoder:
         """
         index, consumed = decode_integer(data, 7)
         header = HeaderTuple(*self.header_table.get_by_index(index))
-        log.debug("Decoded %s, consumed %d", header, consumed)
         return header, consumed
 
     def _decode_literal_no_index(self, data):
@@ -614,12 +599,5 @@ class Decoder:
         # If we've been asked to index this, add it to the header table.
         if should_index:
             self.header_table.add(name, value)
-
-        log.debug(
-            "Decoded %s, total consumed %d bytes, indexed %s",
-            header,
-            total_consumed,
-            should_index
-        )
 
         return header, total_consumed

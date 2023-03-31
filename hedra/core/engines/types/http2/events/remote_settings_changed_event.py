@@ -1,5 +1,5 @@
 from hedra.core.engines.types.http2.streams.changed_setting import ChangedSetting
-from hedra.core.engines.types.http2.streams.stream_settings import SettingCodes
+from hedra.core.engines.types.http2.streams.stream_settings_codes import SettingCodes
 from .base_event import BaseEvent
 
 

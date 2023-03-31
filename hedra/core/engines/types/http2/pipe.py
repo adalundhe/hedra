@@ -1,27 +1,20 @@
 import asyncio
-import traceback
-import h2.stream
-import h2.config
-import h2.connection
-import h2.events
-import h2.exceptions
-import h2.settings
-import h2.errors
-from hedra.core.engines.types.http2.stream import Stream
 from hedra.core.engines.types.common.encoder import Encoder
 from hedra.core.engines.types.common.decoder import Decoder
-from hedra.core.engines.types.http2.events.remote_settings_changed_event import RemoteSettingsChanged
-from hedra.core.engines.types.http2.events.settings_acknowledged_event import SettingsAcknowledged
-from hedra.core.engines.types.http2.streams.stream_settings import SettingCodes
-from hedra.core.engines.types.http2.events.stream_reset import StreamReset
-from hedra.core.engines.types.http2.streams.stream_closed_by import StreamClosedBy
-from hedra.core.engines.types.http2.events.deferred_headers_event import DeferredHeaders
-from hedra.core.engines.types.http2.events.connection_terminated_event import ConnectionTerminated
-from hedra.core.engines.types.http2.errors.exceptions import StreamClosedError
-from hedra.core.engines.types.http2.events.data_received_event import DataReceived
-from hedra.core.engines.types.http2.errors.exceptions import StreamError
+from hedra.core.engines.types.common.hpack.table import HeaderTable
+from hedra.core.engines.types.http2.config import H2Configuration
 from hedra.core.engines.types.http2.errors.types import ErrorCodes
+from hedra.core.engines.types.http2.errors.exceptions import StreamClosedError
+from hedra.core.engines.types.http2.errors.exceptions import StreamError
+from hedra.core.engines.types.http2.events.connection_terminated_event import ConnectionTerminated
+from hedra.core.engines.types.http2.events.data_received_event import DataReceived
+from hedra.core.engines.types.http2.events.deferred_headers_event import DeferredHeaders
+from hedra.core.engines.types.http2.events.stream_reset import StreamReset
 from hedra.core.engines.types.http2.events.window_updated_event import WindowUpdated
+from hedra.core.engines.types.http2.stream import Stream
+from hedra.core.engines.types.http2.streams.stream_closed_by import StreamClosedBy
+from hedra.core.engines.types.http2.streams.stream_settings import Settings
+from hedra.core.engines.types.http2.streams.stream_settings_codes import SettingCodes
 from .action import HTTP2Action
 from .result import HTTP2Result
 from .windows import WindowManager
@@ -49,37 +42,38 @@ class HTTP2Pipe:
         'remote_settings_dict'
     )
 
-    CONFIG = h2.config.H2Configuration(
+    CONFIG = H2Configuration(
         validate_inbound_headers=False,
     )
 
     def __init__(self, concurrency):
-        self._h2_state = h2.connection.H2Connection(config=self.CONFIG)
         self.connected = False
         self.concurrency = concurrency
         self._encoder = Encoder()
         self._decoder = Decoder()
+        self._decoder.header_table = HeaderTable()
+        self._decoder.max_allowed_table_size = self._decoder.header_table.maxsize
         self._init_sent = False
         self.stream_id = None
         self._data_to_send = b''
         self._headers_sent = False
         self.lock = asyncio.Lock()
 
-        self.local_settings = h2.settings.Settings(
+        self.local_settings = Settings(
             client=True,
             initial_values={
-                h2.settings.SettingCodes.ENABLE_PUSH: 0,
-                h2.settings.SettingCodes.MAX_CONCURRENT_STREAMS: concurrency,
-                h2.settings.SettingCodes.MAX_HEADER_LIST_SIZE: 65535,
+                SettingCodes.ENABLE_PUSH: 0,
+                SettingCodes.MAX_CONCURRENT_STREAMS: concurrency,
+                SettingCodes.MAX_HEADER_LIST_SIZE: 65535,
             }
         )
-        self.remote_settings = h2.settings.Settings(
+        self.remote_settings = Settings(
             client=False
         )
 
         self.outbound_flow_control_window = self.remote_settings.initial_window_size
 
-        del self.local_settings[h2.settings.SettingCodes.ENABLE_CONNECT_PROTOCOL]
+        del self.local_settings[SettingCodes.ENABLE_CONNECT_PROTOCOL]
 
         self._inbound_flow_control_window_manager = WindowManager(
             max_window_size=self.local_settings.initial_window_size
@@ -214,7 +208,7 @@ class HTTP2Pipe:
                         self._data_to_send = b''
 
                         new_event = ConnectionTerminated()
-                        new_event.error_code = h2.errors._error_code_from_int(frame.error_code)
+                        new_event.error_code = ErrorCodes(frame.error_code)
                         new_event.last_stream_id = frame.last_stream_id
                         
                         if frame.additional_data:
@@ -228,7 +222,7 @@ class HTTP2Pipe:
                         deferred_headers = DeferredHeaders(
                             stream.encoder,
                             frame,
-                            self._h2_state.config.header_encoding
+                            self.CONFIG.header_encoding
                         )
 
                         if deferred_headers.end_stream:
@@ -244,7 +238,7 @@ class HTTP2Pipe:
                         reset_event = StreamReset()
                         reset_event.stream_id = stream.stream_id
 
-                        reset_event.error_code = h2.errors._error_code_from_int(frame.error_code)
+                        reset_event.error_code = ErrorCodes(frame.error_code)
 
                         raise Exception(f'Connection - {stream.stream_id} err: {str(reset_event)}')
 

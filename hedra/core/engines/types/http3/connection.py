@@ -1,5 +1,4 @@
 from __future__ import annotations
-import traceback
 import asyncio
 from typing import Optional, Tuple
 from hedra.core.engines.types.common.protocols import UDPConnection
