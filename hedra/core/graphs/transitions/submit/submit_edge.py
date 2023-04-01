@@ -80,6 +80,15 @@ class SubmitEdge(BaseEdge[Submit]):
 
     def _update(self, destination: Stage):
 
+        for edge_name in self.history:
+
+            history = self.history[edge_name]
+
+            if self.next_history.get(edge_name) is None:
+                self.next_history[edge_name] = {}
+
+            self.next_history[edge_name].update(history)
+
         if self.skip_stage:
             self.next_history.update({
                 (self.source.name, destination.name): {

@@ -26,6 +26,7 @@ class Optimize(Stage):
     optimize_params={
         'batch_size': (0.5, 2)
     }
+    feed_forward=True
     
     def __init__(self) -> None:
         super().__init__()
@@ -47,6 +48,12 @@ class Optimize(Stage):
             HookType.TRANSFORM 
         ]
 
+        self.optimize_iterations = self.optimize_iterations
+        self.algorithm = self.algorithm
+        self.stage_time_limit = self.stage_time_limit
+        self.optimize_params = self.optimize_params
+        self.feed_forward = self.feed_forward
+
     @Internal()
     async def run(self):
 
@@ -56,7 +63,8 @@ class Optimize(Stage):
     @context()
     async def collect_optimization_stages(
         self,
-        optimize_stage_candidates: Dict[str, Execute]={}
+        optimize_stage_candidates: Dict[str, Execute]={},
+        optimize_stage_feed_forward: bool = True
     ):
         self.optimization_execution_time_start = time.monotonic()
 
@@ -91,6 +99,7 @@ class Optimize(Stage):
         batched_stages: BatchedOptimzationCandidates = list(self.executor.partion_stage_batches(optimize_stages))
 
         return {
+            'optimize_stage_feed_forward': optimize_stage_feed_forward,
             'optimize_stage_candidates': optimize_stage_candidates,
             'optimize_stage_stage_names': stage_names,
             'optimize_stage_stages_count': stages_count,
@@ -103,6 +112,7 @@ class Optimize(Stage):
         self,
         optimize_stage_stages_count: int=0,
         optimize_stage_batched_stages: BatchedOptimzationCandidates=[],
+        optimize_stage_feed_forward: bool = True
     ):
         batched_configs = []
 
@@ -128,7 +138,6 @@ class Optimize(Stage):
                     'graph_name': self.graph_name,
                     'graph_path': self.graph_path,
                     'graph_id': self.graph_id,
-                    'optimize_params': self.optimize_params,
                     'worker_idx': worker_idx,
                     'source_stage_context': {
                         context_key: context_value for context_key, context_value in serializable_context
@@ -142,6 +151,8 @@ class Optimize(Stage):
                     'execute_stage_batch_size': batch_size,
                     'execute_setup_stage_name': stage.context['execute_stage_setup_by'],
                     'execute_stage_plugins': execute_stage_plugins,
+                    'optimizer_params': self.optimize_params,
+                    'optimizer_feed_forward': optimize_stage_feed_forward,
                     'optimizer_iterations': self.optimize_iterations,
                     'optimizer_algorithm': self.algorithm,
                     'time_limit': self.time_limit

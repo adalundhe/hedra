@@ -32,6 +32,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         )
 
         self.requires = [
+            'optimize_stage_feed_forward',
             'execute_stage_setup_hooks',
             'execute_stage_setup_config',
             'execute_stage_setup_by',
@@ -49,7 +50,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         ]
 
         self.assigned_candidates = []
-        
+        self.edge_data = {}
 
     async def transition(self):
 
@@ -66,6 +67,8 @@ class OptimizeEdge(BaseEdge[Optimize]):
             self.source.context.update(self.edge_data)
             
             for event in self.source.dispatcher.events_by_name.values():
+                self.source.context.update(self.edge_data)
+
                 event.source.stage_instance = self.source
                 event.context.update(self.edge_data)
                 
@@ -119,11 +122,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
             if self.next_history.get(edge_name) is None:
                 self.next_history[edge_name] = {}
 
-            self.next_history[edge_name].update({
-                key: value for key, value  in history.items() if key in self.provides
-            })
-
-
+            self.next_history[edge_name].update(history)
 
         if self.next_history.get((self.source.name, destination.name)) is None:
             self.next_history[(self.source.name, destination.name)] = {}
@@ -159,6 +158,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
             
 
     def split(self, edges: List[OptimizeEdge]) -> None:
+
         optimze_candidates = self.generate_optimization_candidates()
 
         optimize_stage_config: Dict[str, Any] = self.source.to_copy_dict()
@@ -172,7 +172,6 @@ class OptimizeEdge(BaseEdge[Optimize]):
                     copied_attribute_name, 
                     copied_attribute_value
                 )
-
 
         user_hooks: Dict[str, Dict[str, Hook]] = defaultdict(dict)
         for hooks in registrar.all.values():
@@ -224,6 +223,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
                 event.source._call = event.source._call.__get__(optimize_stage_copy, optimize_stage_copy.__class__)
                 setattr(optimize_stage_copy, event.source.shortname, event.source._call)
 
+        
         self.source = optimize_stage_copy
 
     def _generate_edge_optimize_candidates(self, edges: List[OptimizeEdge]):
@@ -232,6 +232,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
 
         for edge in edges:
             if edge.transition_idx != self.transition_idx:
+                edge.setup()
                 optimize_candidates = edge.generate_optimization_candidates()
                 destination_path = edge.all_paths.get(edge.destination.name)
                 candidates.extend([
@@ -241,7 +242,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         return candidates
 
     def generate_optimization_candidates(self) -> Dict[str, Stage]:
-    
+        
         execute_stages: Dict[str, Execute] = self.stages_by_type.get(StageTypes.EXECUTE)
         optimize_stages = self.stages_by_type.get(StageTypes.OPTIMIZE).items()
         path_lengths: Dict[str, int] = self.path_lengths.get(self.source.name)
@@ -327,9 +328,9 @@ class OptimizeEdge(BaseEdge[Optimize]):
             for stage_candidate in stage_candidates:
                 if stage_candidate not in setup_stage_candidates:
                     setup_stage_candidates.append(stage_candidate)
-            
-
+        
         self.edge_data = {
+            'optimize_stage_feed_forward': self.source.feed_forward,
             'execute_stage_setup_config': execute_stage_setup_config,
             'execute_stage_setup_hooks': execute_stage_setup_hooks,
             'execute_stage_setup_by': execute_stage_setup_by,

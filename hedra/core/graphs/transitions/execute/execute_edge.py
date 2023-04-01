@@ -37,7 +37,8 @@ class ExecuteEdge(BaseEdge[Execute]):
             'execute_stage_setup_config',
             'execute_stage_setup_by',
             'execute_stage_setup_hooks',
-            'execute_stage_results'
+            'execute_stage_results',
+            'execute_stage_analyze_stages'
         ]
 
         self.provides = [
@@ -46,7 +47,8 @@ class ExecuteEdge(BaseEdge[Execute]):
             'execute_stage_setup_config',
             'execute_stage_setup_by',
             'setup_stage_ready_stages',
-            'execute_stage_skipped'
+            'execute_stage_skipped',
+            'execute_stage_analyze_stages'
         ]
 
         self.valid_states = [
@@ -127,9 +129,7 @@ class ExecuteEdge(BaseEdge[Execute]):
             if self.next_history.get(edge_name) is None:
                 self.next_history[edge_name] = {}
 
-            self.next_history[edge_name].update({
-                key: value for key, value  in history.items() if key in self.provides
-            })
+            self.next_history[edge_name].update(history)
 
         next_results = self.next_history.get((self.source.name, destination.name))
         if next_results is None:
@@ -138,6 +138,7 @@ class ExecuteEdge(BaseEdge[Execute]):
         if self.skip_stage is False:
 
             next_results.update({
+                'execute_stage_analyze_stages': self.assigned_candidates,
                 'execute_stage_results': {
                     self.source.name: self.edge_data['execute_stage_results']
                 },
@@ -221,9 +222,10 @@ class ExecuteEdge(BaseEdge[Execute]):
     def _generate_edge_analyze_candidates(self, edges: List[ExecuteEdge]):
 
         candidates = []
+        minimum_edge_idx = min([edge.transition_idx for edge in edges])
 
         for edge in edges:
-            if edge.transition_idx != self.transition_idx:
+            if edge.transition_idx != minimum_edge_idx:
                 analyze_candidates = edge.generate_analyze_candidates()
                 destination_path = edge.all_paths.get(edge.destination.name)
                 candidates.extend([

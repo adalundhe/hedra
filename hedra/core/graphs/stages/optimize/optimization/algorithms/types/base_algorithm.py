@@ -18,11 +18,18 @@ class BaseAlgorithm:
         self.stage_config: Config = config.get('stage_config')
         self.max_iter = config.get('iterations', 10)
         self.params = config.get('params', {})
+        self.feed_forward = config.get('feed_forward', True)
         self.time_limit = config.get('time_limit', 60)
         self.persona_total_time = self.stage_config.total_time
         self.batch = Batch(self.stage_config)
         self.current_params = {}
         self.session = None
+
+        if self.max_iter is None or self.max_iter <= 0:
+            self.max_iter = 10
+
+        if self.time_limit is None or self.time_limit <= 0:
+            self.time_limit = 60
 
         self.batch_time = self.time_limit/self.max_iter
 
@@ -42,26 +49,48 @@ class BaseAlgorithm:
             ]
 
         for param_name in optimize_params:
-            min_range, max_range = self.params.get(param_name)
+            min_range, max_range  = self.params.get(param_name)
+
+            if min_range is None or min_range <= 0:
+                
+                if self.feed_forward:
+                    min_range = 0.5
+
+                else:
+                    raise Exception(
+                        f'Err. - minimum range of optimization parameter {param_name} must be specified and greater than zero.'
+                    ) 
+
+            if max_range is None or max_range <= 0:
+                
+                if self.feed_forward:
+                    max_range = math.ceil(min_range) * 2
+
+                else:
+                    raise Exception(
+                        f'Err. - maximum range of optimization parameter {param_name} must be specified and greater than zero.'
+                    )
+                    
             param = self.param_values.get(param_name, {})
             value = param.get('value')
             params_type = param.get('type')
 
             self.param_names.append(param_name)
 
+            if self.feed_forward:
+                if params_type == ParamType.INTEGER:
+                    min_range = math.floor(min_range * value)
+                    max_range = math.ceil(max_range * value)
+
+                else:
+                    min_range = min_range * value
+                    max_range = max_range * value
+
             if max_range <= min_range:
                 raise Exception(
                     f'Err. - maximum value of optimization parameter {param_name} must be greater than minimum value.'
                 )
 
-            if params_type == ParamType.INTEGER:
-                min_range = math.floor(min_range * value)
-                max_range = math.ceil(max_range * value)
-
-            else:
-                min_range = min_range * value
-                max_range = max_range * value
-            
             self.bounds.append((
                 min_range,
                 max_range

@@ -1,5 +1,6 @@
 import json
 import dill
+import traceback
 import threading
 import os
 import signal
@@ -14,6 +15,7 @@ from hedra.core.hooks.types.base.event_graph import EventGraph
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.registry import registered_engines
 from hedra.core.personas.persona_registry import registered_personas
+from hedra.core.hooks.types.base.registrar import registrar
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
@@ -102,7 +104,6 @@ def optimize_stage(serialized_config: str):
     asyncio.set_event_loop(loop)
 
     try:
-
         hedra_config_filepath = os.path.join(
             os.getcwd(),
             '.hedra.json'
@@ -153,30 +154,40 @@ def optimize_stage(serialized_config: str):
         execute_stage_config: Config = optimization_config.get('execute_stage_config')
         execute_setup_stage_name: Config = optimization_config.get('execute_setup_stage_name')
         execute_stage_plugins: Dict[PluginType, List[str]] = optimization_config.get('execute_stage_plugins')
-        optimize_params: List[str] = optimization_config.get('optimize_params')
-        optimize_iterations: int = optimization_config.get('optimizer_iterations')
+        optimizer_params: List[str] = optimization_config.get('optimizer_params')
+        optimizer_iterations: int = optimization_config.get('optimizer_iterations')
         optimizer_algorithm: str = optimization_config.get('optimizer_algorithm')
+        optimizer_feed_forward: bool = optimization_config.get('optimizer_feed_forward')
         time_limit: int = optimization_config.get('time_limit')
         batch_size: int = optimization_config.get('execute_stage_batch_size')
 
         metadata_string = f'Graph - {graph_name}:{graph_id} - thread:{thread_id} - process:{process_id} - Stage: {source_stage_name}:{source_stage_id} - '
         discovered: Dict[str, Stage] = import_stages(graph_path)
-        
-        initialized_stages: Dict[str, Stage] = {}
+        plugins_by_type = import_plugins(graph_path)
+
+        initialized_stages = {}
         hooks_by_type = defaultdict(dict)
         hooks_by_name = {}
         hooks_by_shortname = defaultdict(dict)
 
-        generated_stages = {}
-        for stage in discovered.values():
-            stage.context = SimpleContext()
-            
-            initialized_stage =  set_stage_hooks(
-                stage(),
-                generated_stages
-            )
+        execute_stage_config.batch_size = batch_size
 
-            initialized_stages[initialized_stage.name] = initialized_stage
+        generated_hooks = {}
+        for stage in discovered.values():
+            stage: Stage = stage()
+            stage.context = SimpleContext()
+            stage.graph_name = graph_name
+            stage.graph_path = graph_path
+            stage.graph_id = graph_id
+
+            for hook_shortname, hook in registrar.reserved[stage.name].items():
+                hook._call = hook._call.__get__(stage, stage.__class__)
+                setattr(stage, hook_shortname, hook._call)
+
+            initialized_stage = set_stage_hooks(
+                stage, 
+                generated_hooks
+            )
 
             for hook_type in initialized_stage.hooks:
 
@@ -185,19 +196,13 @@ def optimize_stage(serialized_config: str):
                     hooks_by_name[hook.name] = hook
                     hooks_by_shortname[hook_type][hook.shortname] = hook
 
+            initialized_stages[initialized_stage.name] = initialized_stage
+
         execute_stage: Stage = initialized_stages.get(execute_stage_name)
         execute_stage.context.update(source_stage_context)
 
-        events_graph = EventGraph(hooks_by_type)
-        events_graph.hooks_by_name = hooks_by_name
-        events_graph.hooks_by_shortname = hooks_by_shortname
-        events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
-
-        for stage in initialized_stages.values():
-            stage.dispatcher.assemble_action_and_task_subgraphs()
-
-        execute_stage_config.batch_size = batch_size
-        plugins_by_type = import_plugins(graph_path)
+        setup_stage: Setup = initialized_stages.get(execute_setup_stage_name)
+        setup_stage.context.update(source_stage_context)
 
         stage_persona_plugins: List[str] = execute_stage_plugins[PluginType.PERSONA]
         persona_plugins: Dict[str, PersonaPlugin] = plugins_by_type[PluginType.PERSONA]
@@ -217,8 +222,19 @@ def optimize_stage(serialized_config: str):
 
         for plugin_name, plugin in plugins_by_type[PluginType.OPTIMIZER].items():
             registered_algorithms[plugin_name] = plugin
-        
-        
+
+        for hook_type in setup_stage.hooks:
+            for hook in setup_stage.hooks[hook_type]:
+                hooks_by_type[hook_type][hook.name] = hook
+
+        events_graph = EventGraph(hooks_by_type)
+        events_graph.hooks_by_name = hooks_by_name
+        events_graph.hooks_by_shortname = hooks_by_shortname
+        events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
+
+        for stage in initialized_stages.values():
+            stage.dispatcher.assemble_action_and_task_subgraphs()
+
         setup_stage: Setup = initialized_stages.get(execute_setup_stage_name)
 
         setup_execute_stage: Execute = loop.run_until_complete(setup_action_channels_and_playwright(
@@ -240,11 +256,12 @@ def optimize_stage(serialized_config: str):
             'graph_id': graph_id,
             'source_stage_name': source_stage_name,
             'source_stage_id': source_stage_id,
-            'params': optimize_params,
+            'params': optimizer_params,
             'stage_name': execute_stage_name,
             'stage_config': execute_stage_config,
             'stage_hooks': setup_execute_stage.hooks,
-            'iterations': optimize_iterations,
+            'feed_forward': optimizer_feed_forward,
+            'iterations': optimizer_iterations,
             'algorithm': optimizer_algorithm,
             'time_limit': time_limit
         })
@@ -312,7 +329,6 @@ def optimize_stage(serialized_config: str):
         })
 
     except BrokenPipeError:
-
         try:
             optimizer._event_loop.close()
             loop.close()

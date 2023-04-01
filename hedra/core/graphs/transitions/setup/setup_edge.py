@@ -112,9 +112,7 @@ class SetupEdge(BaseEdge[Setup]):
             if self.next_history.get(edge_name) is None:
                 self.next_history[edge_name] = {}
 
-            self.next_history[edge_name].update({
-                key: value for key, value  in history.items() if key in self.provides
-            })
+            self.next_history[edge_name].update(history)
 
 
         if self.next_history.get((self.source.name, destination.name)) is None:
