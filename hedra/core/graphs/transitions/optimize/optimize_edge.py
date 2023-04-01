@@ -249,30 +249,16 @@ class OptimizeEdge(BaseEdge[Optimize]):
 
         all_paths = self.all_paths.get(self.source.name, [])
 
-        optimize_stages_in_path = {}
-        for stage_name, stage in optimize_stages:
-            if stage_name in all_paths and stage_name != self.source.name and stage_name not in self.visited:
-                optimize_stages_in_path[stage_name] = self.all_paths.get(stage_name)
-
         optimization_candidates: Dict[str, Stage] = {}
 
         for stage_name, stage in execute_stages.items():
             if stage_name in all_paths:
-                if len(optimize_stages_in_path) > 0:
-                    for path in optimize_stages_in_path.values():
-                        if stage_name not in path:
-                            stage.state = StageStates.OPTIMIZING
-                            stage.context['execute_stage_setup_config'] = self.edge_data['execute_stage_setup_config']
-                            stage.context['execute_stage_setup_by'] = self.edge_data['execute_stage_setup_by']
-                            optimization_candidates[stage_name] = stage
-
-                else:
-                    stage.context['execute_stage_setup_config'] = self.edge_data['execute_stage_setup_config']
-                    stage.context['execute_stage_setup_by'] = self.edge_data['execute_stage_setup_by']
-                    optimization_candidates[stage_name] = stage
+                stage.context['execute_stage_setup_config'] = self.edge_data['execute_stage_setup_config']
+                stage.context['execute_stage_setup_by'] = self.edge_data['execute_stage_setup_by']
+                optimization_candidates[stage_name] = stage
 
         selected_optimization_candidates: Dict[str, Stage] = {}
-        following_opimize_stage_distances = [
+        following_optimize_stage_distances = [
             path_length for stage_name, path_length in path_lengths.items() if stage_name in optimize_stages
         ]
 
@@ -281,10 +267,10 @@ class OptimizeEdge(BaseEdge[Optimize]):
 
             if stage_name in optimization_candidates:
 
-                if len(following_opimize_stage_distances) > 0 and stage_distance < min(following_opimize_stage_distances):
+                if len(following_optimize_stage_distances) > 0 and stage_distance <= min(following_optimize_stage_distances):
                     selected_optimization_candidates[stage_name] = optimization_candidates.get(stage_name)
 
-                elif len(following_opimize_stage_distances) == 0:
+                elif len(following_optimize_stage_distances) == 0:
                     selected_optimization_candidates[stage_name] = optimization_candidates.get(stage_name)
 
         return selected_optimization_candidates

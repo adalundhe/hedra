@@ -124,11 +124,10 @@ class Transition:
 
             for neighbor in neighbors:
                 required_keys = self.edges_by_name[neighbor].requires
-                self.edges_by_name[neighbor].from_stage_name = source_name
 
                 if source_name not in self.edges_by_name[neighbor].from_stage_names:
                     self.edges_by_name[neighbor].from_stage_names.append(source_name)
-
+                    
                 neighbor_edge_source = self.edges_by_name[neighbor].source.name
 
                 previous_edge = (source_name, neighbor_edge_source)

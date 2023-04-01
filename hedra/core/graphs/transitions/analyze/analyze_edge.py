@@ -210,32 +210,19 @@ class AnalyzeEdge(BaseEdge[Analyze]):
     def generate_submit_candidates(self) -> Dict[str, Stage]:
     
         submit_stages: Dict[str, Submit] = self.stages_by_type.get(StageTypes.SUBMIT)
-        analyze_stages = self.stages_by_type.get(StageTypes.ANALYZE).items()
         path_lengths: Dict[str, int] = self.path_lengths.get(self.source.name)
 
         all_paths = self.all_paths.get(self.source.name, [])
-
-        analyze_stages_in_path = {}
-        for stage_name, stage in analyze_stages:
-            if stage_name in all_paths and stage_name != self.source.name and stage_name not in self.visited:
-                analyze_stages_in_path[stage_name] = self.all_paths.get(stage_name)
 
         submit_candidates: Dict[str, Stage] = {}
 
         for stage_name, stage in submit_stages.items():
             if stage_name in all_paths:
-                if len(analyze_stages_in_path) > 0:
-                    for path in analyze_stages_in_path.values():
-                        if stage_name not in path:
-                            stage.state = StageStates.ANALYZING
-                            submit_candidates[stage_name] = stage
-
-                else:
-                    submit_candidates[stage_name] = stage
+                submit_candidates[stage_name] = stage
 
         selected_submit_candidates: Dict[str, Stage] = {}
-        following_opimize_stage_distances = [
-            path_length for stage_name, path_length in path_lengths.items() if stage_name in analyze_stages
+        following_submit_stage_distances = [
+            path_length for stage_name, path_length in path_lengths.items() if stage_name in submit_stages
         ]
 
         for stage_name in path_lengths.keys():
@@ -243,10 +230,10 @@ class AnalyzeEdge(BaseEdge[Analyze]):
 
             if stage_name in submit_candidates:
 
-                if len(following_opimize_stage_distances) > 0 and stage_distance < min(following_opimize_stage_distances):
+                if len(following_submit_stage_distances) > 0 and stage_distance <= min(following_submit_stage_distances):
                     selected_submit_candidates[stage_name] = submit_candidates.get(stage_name)
 
-                elif len(following_opimize_stage_distances) == 0:
+                elif len(following_submit_stage_distances) == 0:
                     selected_submit_candidates[stage_name] = submit_candidates.get(stage_name)
 
         return selected_submit_candidates
@@ -254,15 +241,17 @@ class AnalyzeEdge(BaseEdge[Analyze]):
     def setup(self) -> None:
 
         raw_results = {}
-        for from_stage_name in self.from_stage_names:
-            
-            stage_results = self.history[(
-                from_stage_name, 
-                self.source.name
-            )].get('execute_stage_results')
+        for source_stage, destination_stage in self.history:
 
-            if stage_results:
-                raw_results.update(stage_results)
+            stage_results = {}
+            if destination_stage == self.source.name:
+
+                stage_results = self.history[(
+                    source_stage, 
+                    self.source.name
+                )].get('execute_stage_results')
+
+            raw_results.update(stage_results)
 
         execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
 
