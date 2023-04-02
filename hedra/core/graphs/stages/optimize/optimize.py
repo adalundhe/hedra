@@ -1,7 +1,6 @@
 import asyncio
 import dill
 import time
-import pickle
 from collections import defaultdict
 from typing import Dict, List, Tuple, Any, Union
 from hedra.core.engines.client.config import Config
@@ -17,14 +16,14 @@ from .parallel import optimize_stage
 
 
 BatchedOptimzationCandidates = List[Tuple[str, Execute, int]] 
-
+OptimizeParameterPair = Tuple[Union[int, float], Union[int, float]]
 
 class Optimize(Stage):
     stage_type=StageTypes.OPTIMIZE
     optimize_iterations=0
     algorithm='shg'
     stage_time_limit='1m'
-    optimize_params={
+    optimize_params: Dict[str, OptimizeParameterPair]={
         'batch_size': (0.5, 2)
     }
     feed_forward=True
