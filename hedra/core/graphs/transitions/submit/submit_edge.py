@@ -160,33 +160,37 @@ class SubmitEdge(BaseEdge[Submit]):
         custom_metrics = {}
         session_totals: Dict[str, int] = {}
 
-        for from_stage_name in self.from_stage_names:
-            previous_history = self.history[(from_stage_name, self.source.name)]
-        
-            analyze_stage_summary_metrics: MetricsSetGroup = previous_history['analyze_stage_summary_metrics']
-            analyze_stage_events: List[BaseProcessedResult] = previous_history.get(
-                'analyze_stage_events',
-                []
-            )
+        for source_stage, destination_stage in self.history:
+            if destination_stage == self.source.name:
 
-            events.extend(analyze_stage_events)
+                previous_history = self.history[(source_stage, self.source.name)]
+            
+                analyze_stage_summary_metrics: MetricsSetGroup = previous_history.get(
+                    'analyze_stage_summary_metrics'
+                )
+                analyze_stage_events: List[BaseProcessedResult] = previous_history.get(
+                    'analyze_stage_events',
+                    []
+                )
 
-            stage_totals: Dict[str, int] = analyze_stage_summary_metrics.get(
-                'stage_totals', 
-                {}
-            )
+                events.extend(analyze_stage_events)
 
-            for stage_name, stage_total in stage_totals.items():
+                stage_totals: Dict[str, int] = analyze_stage_summary_metrics.get(
+                    'stage_totals', 
+                    {}
+                )
 
-                if session_totals.get(stage_name) is None:   
-                    session_totals[stage_name] = stage_total
+                for stage_name, stage_total in stage_totals.items():
+
+                    if session_totals.get(stage_name) is None:   
+                        session_totals[stage_name] = stage_total
 
 
-            stage_summaries = analyze_stage_summary_metrics.get('stages', {})
-            for stage in stage_summaries.values():
-                metrics.extend(list(
-                    stage.get('actions', {}).values()
-                ))
+                stage_summaries = analyze_stage_summary_metrics.get('stages', {})
+                for stage in stage_summaries.values():
+                    metrics.extend(list(
+                        stage.get('actions', {}).values()
+                    ))
 
         self.edge_data['analyze_stage_events'] = events
         self.edge_data['analyze_stage_summary_metrics'] = metrics

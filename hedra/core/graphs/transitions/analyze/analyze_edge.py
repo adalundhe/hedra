@@ -235,21 +235,19 @@ class AnalyzeEdge(BaseEdge[Analyze]):
 
                 elif len(following_submit_stage_distances) == 0:
                     selected_submit_candidates[stage_name] = submit_candidates.get(stage_name)
-
+        
         return selected_submit_candidates
 
     def setup(self) -> None:
 
         raw_results = {}
         for source_stage, destination_stage in self.history:
-
             stage_results = {}
             if destination_stage == self.source.name:
-
                 stage_results = self.history[(
                     source_stage, 
                     self.source.name
-                )].get('execute_stage_results')
+                )].get('execute_stage_results', {})
 
             raw_results.update(stage_results)
 

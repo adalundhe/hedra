@@ -69,10 +69,9 @@ def set_stage_hooks(stage: Stage, generated_hooks: Dict[str, Hook]) -> Stage:
         hook_set: List[Hook] = registrar.all.get(method_name, [])
 
         for hook in hook_set:
-                
 
             if generated_hooks.get(hook) is None:
-
+                hook = hook.copy()
                 hook._call = hook._call.__get__(stage, stage.__class__)
                 setattr(stage, hook.shortname, hook._call)
 
@@ -92,8 +91,6 @@ def set_stage_hooks(stage: Stage, generated_hooks: Dict[str, Hook]) -> Stage:
             elif generated_hooks.get(hook) == 'created':
 
                 copied_hook = hook.copy()
-    
-                
 
                 stage_config: Dict[str, Any]  = stage.to_copy_dict()
                 copied_stage = type(stage)()

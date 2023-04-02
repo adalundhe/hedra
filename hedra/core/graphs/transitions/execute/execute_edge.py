@@ -32,6 +32,7 @@ class ExecuteEdge(BaseEdge[Execute]):
         )
 
         self.requires = [
+            'setup_stage_configs',
             'setup_stage_ready_stages',
             'setup_stage_candidates',
             'execute_stage_setup_config',
@@ -41,6 +42,7 @@ class ExecuteEdge(BaseEdge[Execute]):
         ]
 
         self.provides = [
+            'setup_stage_configs',
             'execute_stage_results',
             'execute_stage_setup_hooks',
             'execute_stage_setup_config',
@@ -275,7 +277,11 @@ class ExecuteEdge(BaseEdge[Execute]):
             if destination_stage == self.source.name:
                 previous_history = self.history[(source_stage, self.source.name)]
 
-                execute_config: Config = previous_history['execute_stage_setup_config']
+                setup_stage_configs: Dict[str, Config] = previous_history['setup_stage_configs']
+                execute_config: Config = setup_stage_configs.get(
+                    self.source.name
+                )
+
                 setup_by = previous_history['execute_stage_setup_by']
 
                 if execute_config.optimized:

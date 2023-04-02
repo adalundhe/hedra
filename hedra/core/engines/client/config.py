@@ -11,8 +11,6 @@ class Config:
             if config_option_value is None:
                 del kwargs[config_option_name]
     
-        
-
         self.total_time_string = kwargs.get('total_time', '1m')
         parsed_time = TimeParser(self.total_time_string)
 

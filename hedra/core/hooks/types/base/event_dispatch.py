@@ -218,39 +218,39 @@ class EventDispatcher:
 
     async def _execute_batch(self, initial_event: BaseEvent):
         for layer in initial_event.execution_path:
-                layer_events = [
-                    self.events_by_name.get(event_name) for event_name in layer
+            layer_events = [
+                self.events_by_name.get(event_name) for event_name in layer
+            ]
+
+            results: List[Dict[str, Any]] = await asyncio.gather(*[
+                asyncio.create_task(
+                    asyncio.wait_for(
+                        event.call(**event.next_args),
+                        timeout=self.timeout
+                    ) if self.timeout else event.call()
+                ) for event in layer_events
+            ])
+
+            result_events: List[Tuple[BaseEvent, Any]] = []
+            for result in results:
+                for event_name, result in result.items():
+                    event = self.events_by_name.get(event_name)
+                    result_events.append((event, result))
+
+            for event, result in result_events:
+                next_events = [
+                    event.events.get(event_name) for event_name in  event.next_map if event.events.get(event_name) is not None
                 ]
 
-                results: List[Dict[str, Any]] = await asyncio.gather(*[
-                    asyncio.create_task(
-                        asyncio.wait_for(
-                            event.call(**event.next_args),
-                            timeout=self.timeout
-                        ) if self.timeout else event.call()
-                    ) for event in layer_events
-                ])
+                event.context.update(event.next_args[event.event_name])
+                event.source.stage_instance.context.update(event.next_args[event.event_name])
+            
 
-                result_events: List[Tuple[BaseEvent, Any]] = []
-                for result in results:
-                    for event_name, result in result.items():
-                        event = self.events_by_name.get(event_name)
-                        result_events.append((event, result))
+                for next_event in next_events:
+                    next_event.context.update(event.context)
 
-                for event, result in result_events:
-                    next_events = [
-                        event.events.get(event_name) for event_name in  event.next_map if event.events.get(event_name) is not None
-                    ]
+                    next_event.next_args[next_event.event_name].update(result)
+                    event.context.update(next_event.next_args[next_event.event_name])
+                    event.source.stage_instance.context.update(next_event.next_args[next_event.event_name])
 
-                    event.context.update(event.next_args[event.event_name])
-                    event.source.stage_instance.context.update(event.next_args[event.event_name])
-                
-
-                    for next_event in next_events:
-                        next_event.context.update(event.context)
-
-                        next_event.next_args[next_event.event_name].update(result)
-                        event.context.update(next_event.next_args[next_event.event_name])
-                        event.source.stage_instance.context.update(next_event.next_args[next_event.event_name])
-
-                
+            

@@ -48,13 +48,16 @@ async def setup_action_channels_and_playwright(
     metadata_string: str,
     persona_config: Config
 ) -> Execute:
-
     setup_stage.context = SimpleContext()
     setup_stage.generation_setup_candidates = 1
     setup_stage.context['setup_stage_target_config'] = persona_config
     setup_stage.context['setup_stage_target_stages'] = {
         execute_stage.name: execute_stage
     }
+
+    for event in setup_stage.dispatcher.events_by_name.values():
+        event.source.stage_instance = setup_stage
+        event.context.update(setup_stage.context)
 
     await setup_stage.run_internal()
     
@@ -223,13 +226,7 @@ def optimize_stage(serialized_config: str):
         for plugin_name, plugin in plugins_by_type[PluginType.OPTIMIZER].items():
             registered_algorithms[plugin_name] = plugin
 
-        for hook_type in setup_stage.hooks:
-            for hook in setup_stage.hooks[hook_type]:
-                hooks_by_type[hook_type][hook.name] = hook
-
         events_graph = EventGraph(hooks_by_type)
-        events_graph.hooks_by_name = hooks_by_name
-        events_graph.hooks_by_shortname = hooks_by_shortname
         events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
 
         for stage in initialized_stages.values():

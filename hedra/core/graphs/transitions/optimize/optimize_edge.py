@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import inspect
+import traceback
 from collections import defaultdict
 from typing import Dict, List, Any, Union
 from hedra.core.engines.client.config import Config
@@ -32,6 +33,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         )
 
         self.requires = [
+            'setup_stage_configs',
             'optimize_stage_feed_forward',
             'execute_stage_setup_hooks',
             'execute_stage_setup_config',
@@ -42,6 +44,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         ]
 
         self.provides = [
+            'setup_stage_configs',
             'optimize_stage_optimized_params',
             'optimize_stage_optimized_configs',
             'optimize_stage_optimized_hooks',
@@ -108,6 +111,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
             self.visited.append(self.source.name)
 
         except Exception as edge_exception:
+            print(traceback.format_exc())
             self.exception = edge_exception
 
         return None, self.destination.stage_type
@@ -124,38 +128,24 @@ class OptimizeEdge(BaseEdge[Optimize]):
 
             self.next_history[edge_name].update(history)
 
-        if self.next_history.get((self.source.name, destination.name)) is None:
-            self.next_history[(self.source.name, destination.name)] = {}
+        if self.skip_stage is False:
 
-        if self.skip_stage:
-
-            stage_setup_by: str = self.edge_data['execute_stage_setup_by'].get(destination.name)
-
-            self.next_history[(self.source.name, destination.name)].update({
-                'optimize_stage_optimized_params': {},
-                'setup_stage_candidates': [],
-                'setup_stage_ready_stages': self.edge_data['setup_stage_ready_stages'],
-                'execute_stage_setup_config': None,
-                'execute_stage_setup_hooks': None,
-                'execute_stage_setup_by': stage_setup_by 
-            })
-
-        else:
+            if self.next_history.get((self.source.name, destination.name)) is None:
+                self.next_history[(self.source.name, destination.name)] = {}
 
             optimized_config: Stage = self.edge_data['optimize_stage_optimized_configs'].get(destination.name)
             optimzied_hooks: Stage = self.edge_data['optimize_stage_optimized_hooks'].get(destination.name)
             stage_setup_by: str = self.edge_data['execute_stage_setup_by'].get(destination.name)
 
             self.next_history[(self.source.name, destination.name)].update({
+                'setup_stage_configs': self.edge_data['optimize_stage_optimized_configs'],
                 'optimize_stage_optimized_params': self.edge_data['optimize_stage_optimized_params'],
                 'setup_stage_candidates': list(self.edge_data['optimize_stage_candidates'].keys()),
                 'setup_stage_ready_stages': self.edge_data['setup_stage_ready_stages'],
                 'execute_stage_setup_config': optimized_config,
                 'execute_stage_setup_hooks': optimzied_hooks,
                 'execute_stage_setup_by': stage_setup_by 
-            })
-
-            
+            }) 
 
     def split(self, edges: List[OptimizeEdge]) -> None:
 
@@ -223,8 +213,11 @@ class OptimizeEdge(BaseEdge[Optimize]):
                 event.source._call = event.source._call.__get__(optimize_stage_copy, optimize_stage_copy.__class__)
                 setattr(optimize_stage_copy, event.source.shortname, event.source._call)
 
-        
         self.source = optimize_stage_copy
+
+        if minimum_edge_idx < self.transition_idx:
+            self.skip_stage = True
+
 
     def _generate_edge_optimize_candidates(self, edges: List[OptimizeEdge]):
 
@@ -283,39 +276,49 @@ class OptimizeEdge(BaseEdge[Optimize]):
         execute_stage_setup_by: str = None
         setup_stage_ready_stages: List[Stage] = []
         setup_stage_candidates: List[Stage] = []
+        setup_stage_configs: Dict[str, Config] = {}
 
-        for from_stage_name in self.from_stage_names:
-            previous_history = self.history[(from_stage_name, self.source.name)]
+        for source_stage, destination_stage in self.history:
+            
+            if destination_stage == self.source.name:
+                previous_history = self.history[(source_stage, self.source.name)]
+                setup_stage_configs.update(
+                    previous_history.get(
+                        'setup_stage_configs',
+                        {}
+                    )
+                )
 
-            execute_config: Config = previous_history['execute_stage_setup_config']
-            setup_by = previous_history['execute_stage_setup_by']
+                execute_config: Config = previous_history['execute_stage_setup_config']
+                setup_by = previous_history['execute_stage_setup_by']
 
-            if execute_config.optimized:
-                execute_stage_setup_config = execute_config
-                max_batch_size = execute_config.batch_size
-                execute_stage_setup_by = setup_by
+                if execute_config.optimized:
+                    execute_stage_setup_config = execute_config
+                    max_batch_size = execute_config.batch_size
+                    execute_stage_setup_by = setup_by
 
-            elif execute_config.batch_size > max_batch_size:
-                execute_stage_setup_config = execute_config
-                max_batch_size = execute_config.batch_size
-                execute_stage_setup_by = setup_by
+                elif execute_config.batch_size > max_batch_size:
+                    execute_stage_setup_config = execute_config
+                    max_batch_size = execute_config.batch_size
+                    execute_stage_setup_by = setup_by
 
-            execute_hooks: ExecuteHooks = previous_history['execute_stage_setup_hooks']
-            for setup_hook in execute_hooks:
-                execute_stage_setup_hooks[setup_hook.name] = setup_hook
+                execute_hooks: ExecuteHooks = previous_history['execute_stage_setup_hooks']
+                for setup_hook in execute_hooks:
+                    execute_stage_setup_hooks[setup_hook.name] = setup_hook
 
-            ready_stages = previous_history['setup_stage_ready_stages']
+                ready_stages = previous_history['setup_stage_ready_stages']
 
-            for ready_stage in ready_stages:
-                if ready_stage not in setup_stage_ready_stages:
-                    setup_stage_ready_stages.append(ready_stage)
+                for ready_stage in ready_stages:
+                    if ready_stage not in setup_stage_ready_stages:
+                        setup_stage_ready_stages.append(ready_stage)
 
-            stage_candidates: List[Stage] = previous_history['setup_stage_candidates']
-            for stage_candidate in stage_candidates:
-                if stage_candidate not in setup_stage_candidates:
-                    setup_stage_candidates.append(stage_candidate)
+                stage_candidates: List[Stage] = previous_history['setup_stage_candidates']
+                for stage_candidate in stage_candidates:
+                    if stage_candidate not in setup_stage_candidates:
+                        setup_stage_candidates.append(stage_candidate)
         
         self.edge_data = {
+            'setup_stage_configs': setup_stage_configs,
             'optimize_stage_feed_forward': self.source.feed_forward,
             'execute_stage_setup_config': execute_stage_setup_config,
             'execute_stage_setup_hooks': execute_stage_setup_hooks,

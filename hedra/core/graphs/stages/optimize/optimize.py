@@ -4,14 +4,15 @@ import time
 import pickle
 from collections import defaultdict
 from typing import Dict, List, Tuple, Any, Union
-from hedra.core.hooks.types.base.hook_type import HookType
-from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.core.hooks.types.context.decorator import context
-from hedra.core.hooks.types.event.decorator import event
-from hedra.core.hooks.types.internal.decorator import Internal
+from hedra.core.engines.client.config import Config
 from hedra.core.engines.client.time_parser import TimeParser
 from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.base.stage import Stage
+from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.core.hooks.types.base.hook_type import HookType
+from hedra.core.hooks.types.context.decorator import context
+from hedra.core.hooks.types.event.decorator import event
+from hedra.core.hooks.types.internal.decorator import Internal
 from .parallel import optimize_stage
 
 
@@ -63,6 +64,7 @@ class Optimize(Stage):
     @context()
     async def collect_optimization_stages(
         self,
+        setup_stage_configs: Dict[str, Config] = {},
         optimize_stage_candidates: Dict[str, Execute]={},
         optimize_stage_feed_forward: bool = True
     ):
@@ -99,6 +101,7 @@ class Optimize(Stage):
         batched_stages: BatchedOptimzationCandidates = list(self.executor.partion_stage_batches(optimize_stages))
 
         return {
+            'setup_stage_configs': setup_stage_configs,
             'optimize_stage_feed_forward': optimize_stage_feed_forward,
             'optimize_stage_candidates': optimize_stage_candidates,
             'optimize_stage_stage_names': stage_names,
@@ -110,6 +113,7 @@ class Optimize(Stage):
     @event('collect_optimization_stages')
     async def create_optimization_configs(
         self,
+        setup_stage_configs: Dict[str, Config] = {},
         optimize_stage_stages_count: int=0,
         optimize_stage_batched_stages: BatchedOptimzationCandidates=[],
         optimize_stage_feed_forward: bool = True
@@ -134,6 +138,7 @@ class Optimize(Stage):
                 for plugin in stage.plugins.values():
                     execute_stage_plugins[plugin.type].append(plugin.name)
 
+                selected_stage_config = setup_stage_configs.get(stage.name)
                 configs.append({
                     'graph_name': self.graph_name,
                     'graph_path': self.graph_path,
@@ -147,8 +152,8 @@ class Optimize(Stage):
                     'execute_stage_name': stage_name,
                     'execute_stage_generation_count': assigned_workers_count,
                     'execute_stage_id': stage.execution_stage_id,
-                    'execute_stage_config': stage.context['execute_stage_setup_config'],
-                    'execute_stage_batch_size': batch_size,
+                    'execute_stage_config': selected_stage_config,
+                    'execute_stage_batch_size': selected_stage_config.batch_size,
                     'execute_setup_stage_name': stage.context['execute_stage_setup_by'],
                     'execute_stage_plugins': execute_stage_plugins,
                     'optimizer_params': self.optimize_params,

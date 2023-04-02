@@ -1,9 +1,11 @@
 import asyncio
 import psutil
 import traceback
+import math
 from collections import defaultdict
 from typing_extensions import TypeVarTuple, Unpack
-from typing import Dict, Generic, List, Any
+from typing import Dict, Generic, List, Any, Optional
+from hedra.core.experiments.experiment import Experiment
 from hedra.core.hooks.types.condition.decorator import condition
 from hedra.core.hooks.types.context.decorator import context
 from hedra.core.hooks.types.event.decorator import event
@@ -74,6 +76,7 @@ class SetupCall:
 
 
 class Setup(Stage, Generic[Unpack[T]]):
+    experiment: Optional[Experiment] = None
     stage_type=StageTypes.SETUP
     log_level='info'
     persona_type='default'
@@ -138,7 +141,10 @@ class Setup(Stage, Generic[Unpack[T]]):
             self.stage_id
         )
         self.client._config = self.config
-
+    
+        self.experiment = self.experiment
+        if self.experiment:
+            self.experiment.source_batch_size = self.batch_size
 
         self.source_internal_events = [
             'collect_target_stages'
@@ -172,8 +178,8 @@ class Setup(Stage, Generic[Unpack[T]]):
                 initial_event for initial_event in self.dispatcher.initial_events[stage] if initial_event.source.shortname in self.source_internal_events
             ]
 
-        await self.dispatcher.dispatch_events(self.name)
         self.dispatcher.initial_events = initial_events
+        await self.dispatcher.dispatch_events(self.name)
     
     @context()
     async def collect_target_stages(
@@ -181,12 +187,14 @@ class Setup(Stage, Generic[Unpack[T]]):
         setup_stage_target_stages: Dict[str, Stage]={},
         setup_stage_target_config: Config=None
     ):
+  
         bypass_connection_validation = self.core_config.get('bypass_connection_validation', False)
         connection_validation_retries = self.core_config.get('connection_validation_retries', 3)
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting setup')
         
         return {
+            'setup_stage_target_stages_count': len(setup_stage_target_stages),
             'setup_stage_target_config': setup_stage_target_config,
             'setup_stage_target_stages': setup_stage_target_stages,
             'bypass_connection_validation': bypass_connection_validation,
@@ -199,8 +207,9 @@ class Setup(Stage, Generic[Unpack[T]]):
         setup_stage_target_stages: Dict[str, Stage]={},
         setup_stage_target_config: Config=None
     ):
-
         execute_stage_names = ', '.join(list(setup_stage_target_stages.keys()))
+
+        setup_stage_configs = {}
 
         await self.logger.spinner.append_message(f'Setting up - {execute_stage_names}')
 
@@ -233,10 +242,13 @@ class Setup(Stage, Generic[Unpack[T]]):
 
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Engine plugin - {plugin.name} - for Execute stage - {execute_stage_name}')
 
-            execute_stage.client._config = setup_stage_target_config
+            config_copy = setup_stage_target_config.copy()
+
+            setup_stage_configs[execute_stage_name] = config_copy
             setup_stage_target_stages[execute_stage_name] = execute_stage
 
         return  {
+            'setup_stage_configs': setup_stage_configs,
             'setup_stage_target_stages': setup_stage_target_stages
         }
 
@@ -267,6 +279,7 @@ class Setup(Stage, Generic[Unpack[T]]):
     @transform('check_actions_setup_needed')
     async def setup_action(
         self,
+        setup_stage_configs: Dict[str, Config] = {},
         setup_stage_actions: ActionHook=None,
         setup_stage_has_actions: bool = False,
         bypass_connection_validation: bool=False,
@@ -274,10 +287,21 @@ class Setup(Stage, Generic[Unpack[T]]):
         setup_stage_target_config: Config=None
     ):
             if setup_stage_has_actions:
+
                 hook = setup_stage_actions
                 hook.stage_instance.client.next_name = hook.name
                 hook.stage_instance.client.intercept = True
-                hook.stage_instance.client._config = setup_stage_target_config
+
+                config_copy = setup_stage_configs.get(
+                    hook.stage
+                )
+
+                if self.experiment and self.experiment.is_variant(hook.stage):
+                    config_copy.batch_size = self.experiment.get_variant_batch_size(
+                        hook.stage
+                    )
+
+                hook.stage_instance.client._config = config_copy
 
                 execute_stage_name = hook.stage_instance.name
 
@@ -287,8 +311,12 @@ class Setup(Stage, Generic[Unpack[T]]):
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Preparing Action hook - {hook.name}:{hook.hook_id} - for suspension - Execute stage - {execute_stage_name}')
 
                 hook.stage_instance.client.actions.set_waiter(hook.stage_instance.name)
-
-                setup_call = SetupCall(hook, setup_stage_target_config, retries=connection_validation_retries)
+                
+                setup_call = SetupCall(
+                    hook, 
+                    config_copy, 
+                    retries=connection_validation_retries
+                )
 
                 setup_call.metadata_string = self.metadata_string
                 setup_call.action_store = hook.stage_instance.client.actions
@@ -441,6 +469,7 @@ class Setup(Stage, Generic[Unpack[T]]):
     @context('setup_task')
     async def apply_channels(
         self,
+        setup_stage_configs: Dict[str, Config] = {},
         setup_stage_target_stages: Dict[str, Stage]=[],
         setup_stage_actions: List[ActionHook]=[],
         setup_stage_tasks: List[TaskHook]=[],
@@ -481,12 +510,14 @@ class Setup(Stage, Generic[Unpack[T]]):
 
             tasks_generated_count = len(execute_stage.hooks[HookType.TASK])
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Generated - {tasks_generated_count} - Tasks for Execute stage - {execute_stage.name}')
-    
+
         return {
+            'setup_stage_configs': setup_stage_configs,
             'execute_stage_setup_by': self.name,
             'execute_stage_setup_hooks': execute_stage_setup_hooks,
             'execute_stage_setup_config': setup_stage_target_config,
-            'setup_stage_ready_stages': setup_stage_target_stages
+            'setup_stage_ready_stages': setup_stage_target_stages,
+            'setup_stage_target_stages': setup_stage_target_stages
         }
 
     @event('apply_channels')

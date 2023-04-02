@@ -32,16 +32,22 @@ class SetupEdge(BaseEdge[Setup]):
             StageStates.VALIDATED
         ]
 
-        self.requires = []
+        self.requires = [
+            'execute_stage_results'
+        ]
+
         self.provides = [
             'execute_stage_setup_hooks',
             'execute_stage_setup_config',
             'execute_stage_setup_by',
             'setup_stage_ready_stages',
             'setup_stage_candidates',
+            'setup_stage_configs',
+            'execute_stage_results'
         ]
 
         self.assigned_candidates = []
+        self.assigned_optimize_candidates = []
 
     async def transition(self):
         
@@ -49,10 +55,16 @@ class SetupEdge(BaseEdge[Setup]):
             self.source.state = StageStates.SETTING_UP
 
             setup_candidates = self.get_setup_candidates()
+            optimize_candidates = self.get_optimize_candidates()
 
             if len(self.assigned_candidates) > 0:
                 setup_candidates = {
                     stage_name: stage for stage_name, stage in setup_candidates.items() if stage_name in self.assigned_candidates
+                }
+
+            if len(self.assigned_optimize_candidates) > 0:
+                optimize_candidates = {
+                    stage_name: stage for stage_name, stage in optimize_candidates.items() if stage_name in self.assigned_optimize_candidates
                 }
 
             self.source.generation_setup_candidates = len(setup_candidates)
@@ -95,6 +107,15 @@ class SetupEdge(BaseEdge[Setup]):
                     execute_stage.context = SimpleContext()
 
                 self._update(execute_stage)
+
+            
+            for optimize_stage in optimize_candidates.values():
+                optimize_stage.state = StageStates.SETUP
+
+                if optimize_stage.context is None:
+                    optimize_stage.context = SimpleContext()
+
+                self._update(optimize_stage)
             
             self.visited.append(self.source.name)
 
@@ -120,6 +141,7 @@ class SetupEdge(BaseEdge[Setup]):
 
         if self.skip_stage:
             self.next_history[(self.source.name, destination.name)].update({
+                'setup_stage_configs': {},
                 'execute_stage_setup_hooks': [],
                 'setup_stage_ready_stages': {},
                 'setup_stage_candidates': [],
@@ -128,7 +150,7 @@ class SetupEdge(BaseEdge[Setup]):
             })
 
         else:
-
+            setup_stage_configs = self.edge_data.get('setup_stage_configs', {})
             ready_stages = self.edge_data.get('setup_stage_ready_stages', {})
             setup_candidates = self.edge_data.get('setup_stage_candidates', {})
             setup_config = self.edge_data.get('execute_stage_setup_config')
@@ -141,6 +163,7 @@ class SetupEdge(BaseEdge[Setup]):
             self.stages_by_type[StageTypes.EXECUTE].update(ready_stages)
 
             self.next_history[(self.source.name, destination.name)].update({
+                'setup_stage_configs': setup_stage_configs,
                 'execute_stage_setup_hooks': execute_stage_setup_hooks,
                 'setup_stage_ready_stages': ready_stages,
                 'setup_stage_candidates': list(setup_candidates.keys()),
@@ -151,6 +174,7 @@ class SetupEdge(BaseEdge[Setup]):
 
     def split(self, edges: List[SetupEdge]) -> None:
         setup_candidates = self.get_setup_candidates()
+        optimize_candidates = self.get_optimize_candidates()
 
         setup_stage_config: Dict[str, Any] = self.source.to_copy_dict()
 
@@ -169,6 +193,7 @@ class SetupEdge(BaseEdge[Setup]):
         setup_stage_copy.dispatcher = self.source.dispatcher.copy()
 
         edge_candidates = self._generate_edge_setup_candidates(edges)
+        optimize_edge_candidates = self._generate_edge_optimize_candidates(edges)
 
         destination_path = self.all_paths.get(self.destination.name)
 
@@ -178,6 +203,10 @@ class SetupEdge(BaseEdge[Setup]):
             candidate_name for candidate_name in setup_candidates if candidate_name in destination_path
         ]
 
+        assigned_optimize_candidates = [
+            candidate_name for candidate_name in optimize_candidates if candidate_name in destination_path
+        ]
+
         for candidate in assigned_candidates:
 
             if candidate in edge_candidates and self.transition_idx == minimum_edge_idx:
@@ -185,6 +214,14 @@ class SetupEdge(BaseEdge[Setup]):
 
             elif candidate not in edge_candidates:
                 self.assigned_candidates.append(candidate)
+
+        for candidate in assigned_optimize_candidates:
+
+            if candidate in optimize_edge_candidates and self.transition_idx == minimum_edge_idx:
+                self.assigned_optimize_candidates.append(candidate)
+
+            elif candidate not in optimize_edge_candidates:
+                self.assigned_optimize_candidates.append(candidate)
 
         setup_stage_copy.context = SimpleContext()
         for event in setup_stage_copy.dispatcher.events_by_name.values():
@@ -221,22 +258,36 @@ class SetupEdge(BaseEdge[Setup]):
                 ])
 
         return candidates
+    
+    def _generate_edge_optimize_candidates(self, edges: List[SetupEdge]):
+
+        candidates = []
+
+        for edge in edges:
+            if edge.transition_idx != self.transition_idx:
+                optimize_candidates = edge.get_optimize_candidates()
+                destination_path = edge.all_paths.get(edge.destination.name)
+                candidates.extend([
+                    candidate_name for candidate_name in optimize_candidates if candidate_name in destination_path
+                ])
+
+        return candidates
 
     def get_setup_candidates(self) -> Dict[str, Execute]:
-        execute_stages = [(stage_name, stage) for stage_name, stage in self.stages_by_type.get(StageTypes.EXECUTE).items()]
+        execute_stages: Dict[str, Execute] = self.stages_by_type.get(StageTypes.EXECUTE)
+        setup_stages: Dict[str, Setup] = self.stages_by_type.get(StageTypes.SETUP)
+        path_lengths: Dict[str, int] = self.path_lengths.get(self.source.name)
 
         all_paths = self.all_paths.get(self.source.name, [])
 
-        path_lengths: Dict[str, int] = self.path_lengths.get(self.source.name)
+        execute_candidates: Dict[str, Stage] = {}
 
-        execute_stages: Dict[str, Execute] = {
-            stage_name: stage for stage_name, stage in execute_stages if stage_name in all_paths and stage_name not in self.visited
-        }
+        for stage_name, stage in execute_stages.items():
+            if stage_name in all_paths:
+                execute_candidates[stage_name] = stage    
 
-        setup_candidates: Dict[str, Execute] = {}
+        selected_execute_candidates: Dict[str, Execute] = {}
         
-        setup_stages: Dict[str, Setup] = self.stages_by_type.get(StageTypes.SETUP)
-        execute_stages: Dict[str, Execute] = self.stages_by_type.get(StageTypes.EXECUTE)
         following_setup_stage_distances = [
             path_length for stage_name, path_length in path_lengths.items() if stage_name in setup_stages
         ]
@@ -244,24 +295,51 @@ class SetupEdge(BaseEdge[Setup]):
         for stage_name in path_lengths.keys():
             stage_distance = path_lengths.get(stage_name)
 
-            if stage_name in execute_stages:
+            if stage_name in execute_candidates:
 
-                if len(following_setup_stage_distances) > 0 and stage_distance < min(following_setup_stage_distances):
-                    setup_candidates[stage_name] = execute_stages.get(stage_name)
+                if len(following_setup_stage_distances) > 0 and stage_distance <= min(following_setup_stage_distances):
+                    selected_execute_candidates[stage_name] = execute_candidates.get(stage_name)
 
                 elif len(following_setup_stage_distances) == 0:
-                    setup_candidates[stage_name] = execute_stages.get(stage_name)
+                    selected_execute_candidates[stage_name] = execute_candidates.get(stage_name)
 
-        setup_candidates = {
-            stage_name: stage for stage_name, stage in setup_candidates.items()
-        }
-
-        for candidate in setup_candidates.values():
+        for candidate in selected_execute_candidates.values():
             actions = [event for event in candidate.dispatcher.actions_and_tasks.values() if event.event_type == EventType.ACTION]
             tasks = [event for event in candidate.dispatcher.actions_and_tasks.values() if event.event_type == EventType.TASK]
 
             candidate.hooks[HookType.ACTION] = actions
             candidate.hooks[HookType.TASK] = tasks
 
+        return selected_execute_candidates
+    
+    def get_optimize_candidates(self) -> Dict[str, Execute]:
+        optimize_stages: Dict[str, Execute] = self.stages_by_type.get(StageTypes.OPTIMIZE, {})
+        setup_stages: Dict[str, Setup] = self.stages_by_type.get(StageTypes.SETUP)
+        path_lengths: Dict[str, int] = self.path_lengths.get(self.source.name)
 
-        return setup_candidates
+        all_paths = self.all_paths.get(self.source.name, [])
+
+        optimize_candidates: Dict[str, Stage] = {}
+
+        for stage_name, stage in optimize_stages.items():
+            if stage_name in all_paths:
+                optimize_candidates[stage_name] = stage    
+
+        selected_optimize_candidates: Dict[str, Execute] = {}
+        
+        following_setup_stage_distances = [
+            path_length for stage_name, path_length in path_lengths.items() if stage_name in setup_stages or stage_name in optimize_stages
+        ]
+
+        for stage_name in path_lengths.keys():
+            stage_distance = path_lengths.get(stage_name)
+
+            if stage_name in optimize_candidates:
+
+                if len(following_setup_stage_distances) > 0 and stage_distance <= min(following_setup_stage_distances):
+                    selected_optimize_candidates[stage_name] = optimize_candidates.get(stage_name)
+
+                elif len(following_setup_stage_distances) == 0:
+                    selected_optimize_candidates[stage_name] = optimize_candidates.get(stage_name)
+
+        return selected_optimize_candidates
