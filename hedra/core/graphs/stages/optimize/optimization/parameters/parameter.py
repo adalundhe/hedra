@@ -28,4 +28,9 @@ class Parameter:
             maximum_range=maximum
         )
 
-        assert self.maximum > self.minimum, f"Err. - maximum parameter rage value for optimization parameter {self.parameter_name} must be greater than minimum parameter range value."
+        assert self.maximum > self.minimum, f"Err. - maximum parameter range value for optimization parameter {self.parameter_name} must be greater than minimum parameter range value."
+
+        if self.feed_forward:
+            assert self.minimum >= 0.1, f'Err. - Range multiplier for feed-forward optimization parameter {self.parameter_name} cannot exceed minimum of 0.1.'
+            assert self.maximum <= 10, f'Err. - Range multiplier for feed-forward optimization parameter {self.parameter_name} cannot exceed maximum of 10.'
+            
