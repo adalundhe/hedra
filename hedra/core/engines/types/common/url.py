@@ -1,6 +1,3 @@
-from re import S
-import traceback
-from typing import Dict
 import aiodns
 import socket
 from ipaddress import ip_address, IPv4Address
