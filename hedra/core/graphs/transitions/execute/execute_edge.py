@@ -154,7 +154,6 @@ class ExecuteEdge(BaseEdge[Execute]):
 
     def split(self, edges: List[ExecuteEdge]) -> None:
 
-        analyze_candidates = self.generate_analyze_candidates()
         execute_stage_config: Dict[str, Any] = self.source.to_copy_dict()
 
         execute_stage_copy: Execute = type(self.source.name, (Execute, ), self.source.__dict__)()
@@ -178,21 +177,7 @@ class ExecuteEdge(BaseEdge[Execute]):
         for event in execute_stage_copy.dispatcher.events_by_name.values():
             event.source.stage_instance = execute_stage_copy
 
-        edge_candidates = self._generate_edge_analyze_candidates(edges)
-
         minimum_edge_idx = min([edge.transition_idx for edge in edges])
-
-        assigned_candidates = [
-            candidate_name for candidate_name in analyze_candidates
-        ]
-
-        for candidate in assigned_candidates:
-
-            if candidate in edge_candidates and self.transition_idx == minimum_edge_idx:
-                self.assigned_candidates.append(candidate)
-
-            elif candidate not in edge_candidates:
-                self.assigned_candidates.append(candidate)
 
         execute_stage_copy.context = SimpleContext()
         for event in execute_stage_copy.dispatcher.events_by_name.values():
@@ -217,21 +202,6 @@ class ExecuteEdge(BaseEdge[Execute]):
 
         if minimum_edge_idx < self.transition_idx:
             self.skip_stage = True
-
-    def _generate_edge_analyze_candidates(self, edges: List[ExecuteEdge]):
-
-        candidates = []
-        minimum_edge_idx = min([edge.transition_idx for edge in edges])
-
-        for edge in edges:
-            if edge.transition_idx != minimum_edge_idx:
-                analyze_candidates = edge.generate_analyze_candidates()
-                destination_path = edge.all_paths.get(edge.destination.name)
-                candidates.extend([
-                    candidate_name for candidate_name in analyze_candidates if candidate_name in destination_path
-                ])
-
-        return candidates
 
     def generate_analyze_candidates(self) -> Dict[str, Stage]:
     

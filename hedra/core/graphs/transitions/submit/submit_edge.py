@@ -192,6 +192,11 @@ class SubmitEdge(BaseEdge[Submit]):
                         stage.get('actions', {}).values()
                     ))
 
+                analyze_stage_custom_metrics_set: CustomMetricSet = previous_history['analyze_stage_custom_metrics_set']
+                
+                for custom_metrics_set in analyze_stage_custom_metrics_set.values():
+                    custom_metrics.update(custom_metrics_set)
+
         self.edge_data['analyze_stage_events'] = events
         self.edge_data['analyze_stage_summary_metrics'] = metrics
         self.edge_data['analyze_stage_session_total'] = sum(session_totals.values())
@@ -199,15 +204,6 @@ class SubmitEdge(BaseEdge[Submit]):
         metrics_set_counts = defaultdict(lambda: 0)
         for metrics_set in metrics:
             metrics_set_counts[metrics_set.name] += 1
-
-        custom_metrics: Dict[str, CustomMetric] = {}
-        for from_stage in self.from_stage_names:
-            previous_history = self.history[(from_stage, self.source.name)]
-            analyze_stage_custom_metrics_set: CustomMetricSet = previous_history['analyze_stage_custom_metrics_set']
-            
-            for custom_metrics_set in analyze_stage_custom_metrics_set.values():
-                custom_metrics.update(custom_metrics_set)
-
     
         for metric_set in metrics:
             set_count = metrics_set_counts.get(metric_set.name)
