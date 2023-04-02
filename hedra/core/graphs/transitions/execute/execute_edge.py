@@ -170,7 +170,7 @@ class ExecuteEdge(BaseEdge[Execute]):
         for hooks in registrar.all.values():
             for hook in hooks:
                 if hasattr(self.source, hook.shortname) and not hasattr(Execute, hook.shortname):
-                    user_hooks[hook.stage][hook.shortname] = hook._call
+                    user_hooks[self.source.name][hook.shortname] = hook._call
         
         execute_stage_copy.dispatcher = self.source.dispatcher.copy()
 

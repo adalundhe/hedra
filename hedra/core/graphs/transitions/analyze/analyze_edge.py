@@ -142,16 +142,18 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         for hooks in registrar.all.values():
             for hook in hooks:
                 if hasattr(self.source, hook.shortname) and not hasattr(Analyze, hook.shortname):
-                    user_hooks[hook.stage][hook.shortname] = hook._call
+                    user_hooks[self.source.name][hook.shortname] = hook._call
 
         analyze_stage_copy.dispatcher = self.source.dispatcher.copy()
+
+        for event in analyze_stage_copy.dispatcher.events_by_name.values():
+            event.source.stage_instance = analyze_stage_copy
 
         minimum_edge_idx = min([edge.transition_idx for edge in edges])
 
         analyze_stage_copy.context = SimpleContext()
         for event in analyze_stage_copy.dispatcher.events_by_name.values():
             event.context = analyze_stage_copy.context 
-            event.source.stage_instance = analyze_stage_copy
             event.source.stage_instance.context = analyze_stage_copy.context
             event.source.context = analyze_stage_copy.context
             
