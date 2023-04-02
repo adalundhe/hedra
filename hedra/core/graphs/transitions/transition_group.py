@@ -38,9 +38,7 @@ class TransitionGroup:
         self.transition_idx += 1
     
     def sort_and_map_transitions(self):
-
         for transition in self.transitions:
-
             transition.edges = [
                 group_transition.edge for group_transition in self.transitions
             ]
@@ -52,11 +50,13 @@ class TransitionGroup:
 
 
             if len(destinations)> 1:
+                transition.edge.setup()
                 transition.edge.split([transition.edge for transition in destinations])
 
                 transition.destinations = [
                     destination_transition.edge.destination.name for destination_transition in destinations
                 ]
+            
 
             
 

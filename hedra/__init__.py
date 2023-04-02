@@ -13,6 +13,12 @@ from .core.hooks import (
     transform,
 )
 
+from hedra.core.graphs.stages.optimize.optimization.parameters import Parameter
+from hedra.core.experiments import (
+    Experiment,
+    Variant
+)
+
 from .core.graphs.stages import (
     Act,
     Analyze,

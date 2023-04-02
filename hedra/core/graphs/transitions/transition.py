@@ -124,21 +124,10 @@ class Transition:
 
             for neighbor in neighbors:
                 required_keys = self.edges_by_name[neighbor].requires
-                self.edges_by_name[neighbor].from_stage_name = source_name
 
                 if source_name not in self.edges_by_name[neighbor].from_stage_names:
                     self.edges_by_name[neighbor].from_stage_names.append(source_name)
-
-                neighbor_edge_source = self.edges_by_name[neighbor].source.name
-
-                previous_edge = (source_name, neighbor_edge_source)
-
-                for history in transition_source_histories.values():
-                    self.edges_by_name[neighbor].history.update({
-                            previous_edge: {
-                                key: value for key, value in history.items() if key in required_keys
-                            }
-                        })
+                    
 
                 for edge_name in self.edge.next_history:
                     source_history: HistoryUpdate = self.edge.next_history[edge_name]
@@ -148,6 +137,19 @@ class Transition:
                             key: value for key, value in source_history.items() if key in required_keys
                         }
                     })
+
+                neighbor_edge_source = self.edges_by_name[neighbor].source.name
+
+                previous_edge = (source_name, neighbor_edge_source)
+
+                for history in transition_source_histories.values():
+                    if self.edges_by_name[neighbor].history.get(previous_edge) is None and len(history) > 0:
+                        self.edges_by_name[neighbor].history.update({
+                                previous_edge: {
+                                    key: value for key, value in history.items() if key in required_keys
+                                }
+                            })
+
 
         self.edge.edge_data = {}
 

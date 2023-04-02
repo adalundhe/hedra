@@ -6,6 +6,7 @@ from hedra.core.personas.batching.param_type import ParamType
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.personas.batching.batch import Batch
+from hedra.core.graphs.stages.optimize.optimization.parameters.parameter import Parameter
 from typing import Dict, List, Tuple, Union
 
 
@@ -17,12 +18,25 @@ class BaseAlgorithm:
     ) -> None:
         self.stage_config: Config = config.get('stage_config')
         self.max_iter = config.get('iterations', 10)
-        self.params = config.get('params', {})
+
+        parameters: List[Parameter] = config.get('params', [])
+        algorithm_parameters: Dict[str, Parameter] = {}
+
+        for parameter in parameters:
+            algorithm_parameters[parameter.parameter_name] = parameter
+
+        self.params: Dict[str, Parameter] = algorithm_parameters
         self.time_limit = config.get('time_limit', 60)
         self.persona_total_time = self.stage_config.total_time
         self.batch = Batch(self.stage_config)
         self.current_params = {}
         self.session = None
+
+        if self.max_iter is None or self.max_iter <= 0:
+            self.max_iter = 10
+
+        if self.time_limit is None or self.time_limit <= 0:
+            self.time_limit = 60
 
         self.batch_time = self.time_limit/self.max_iter
 
@@ -42,26 +56,26 @@ class BaseAlgorithm:
             ]
 
         for param_name in optimize_params:
-            min_range, max_range = self.params.get(param_name)
+            parameter = self.params.get(param_name)
+                    
             param = self.param_values.get(param_name, {})
             value = param.get('value')
             params_type = param.get('type')
 
+            min_range = parameter.minimum
+            max_range = parameter.maximum
+
             self.param_names.append(param_name)
 
-            if max_range <= min_range:
-                raise Exception(
-                    f'Err. - maximum value of optimization parameter {param_name} must be greater than minimum value.'
-                )
+            if parameter.feed_forward:
+                if params_type == ParamType.INTEGER:
+                    min_range = math.floor(min_range * value)
+                    max_range = math.ceil(max_range * value)
 
-            if params_type == ParamType.INTEGER:
-                min_range = math.floor(min_range * value)
-                max_range = math.ceil(max_range * value)
+                else:
+                    min_range = min_range * value
+                    max_range = max_range * value
 
-            else:
-                min_range = min_range * value
-                max_range = max_range * value
-            
             self.bounds.append((
                 min_range,
                 max_range

@@ -83,7 +83,7 @@ async def start_execution(
     
     persona = get_persona(persona_config)
     persona.workers = workers
-
+    
     await setup_stage.run_internal()
 
     stages: Dict[str, Stage] =  setup_stage.context['setup_stage_ready_stages']
@@ -246,6 +246,7 @@ def execute_actions(parallel_config: str):
             for hook_type in initialized_stage.hooks:
 
                 for hook in initialized_stage.hooks[hook_type]:
+                    hook.stage_instance = initialized_stage
                     hooks_by_type[hook_type][hook.name] = hook
                     hooks_by_name[hook.name] = hook
                     hooks_by_shortname[hook_type][hook.shortname] = hook
@@ -257,7 +258,6 @@ def execute_actions(parallel_config: str):
 
         setup_stage: Setup = initialized_stages.get(source_setup_stage_name)
         setup_stage.context.update(source_stage_context)
-
 
         if partition_method == PartitionMethod.BATCHES and source_stage_config.optimized is False:
             if workers == worker_id:
@@ -283,19 +283,15 @@ def execute_actions(parallel_config: str):
             plugin.name = plugin_name
             registered_engines[plugin_name] = lambda config: plugin(config)
 
-        for hook_type in setup_stage.hooks:
-            for hook in setup_stage.hooks[hook_type]:
-                hooks_by_type[hook_type][hook.name] = hook
-
         events_graph = EventGraph(hooks_by_type)
-        events_graph.hooks_by_name = hooks_by_name
-        events_graph.hooks_by_shortname = hooks_by_shortname
         events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
 
         for stage in initialized_stages.values():
             stage.dispatcher.assemble_action_and_task_subgraphs()
 
-        setup_stage.context = SimpleContext()
+        if setup_stage.context is None:
+            setup_stage.context = SimpleContext()
+
         setup_stage.config = source_stage_config
         setup_stage.generation_setup_candidates = 1
         setup_stage.context['setup_stage_target_config'] = source_stage_config

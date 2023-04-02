@@ -1,31 +1,36 @@
 import asyncio
 import dill
 import time
-import pickle
 from collections import defaultdict
 from typing import Dict, List, Tuple, Any, Union
-from hedra.core.hooks.types.base.hook_type import HookType
-from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.core.hooks.types.context.decorator import context
-from hedra.core.hooks.types.event.decorator import event
-from hedra.core.hooks.types.internal.decorator import Internal
+from hedra.core.engines.client.config import Config
 from hedra.core.engines.client.time_parser import TimeParser
 from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.base.stage import Stage
+from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.core.hooks.types.base.hook_type import HookType
+from hedra.core.hooks.types.context.decorator import context
+from hedra.core.hooks.types.event.decorator import event
+from hedra.core.hooks.types.internal.decorator import Internal
+from .optimization.parameters import Parameter
 from .parallel import optimize_stage
 
 
 BatchedOptimzationCandidates = List[Tuple[str, Execute, int]] 
-
+OptimizeParameterPair = Tuple[Union[int, float], Union[int, float]]
 
 class Optimize(Stage):
     stage_type=StageTypes.OPTIMIZE
     optimize_iterations=0
     algorithm='shg'
     stage_time_limit='1m'
-    optimize_params={
-        'batch_size': (0.5, 2)
-    }
+    optimize_params: List[Parameter]=[
+        Parameter(
+            'batch_size',
+            minimum=0.5,
+            maximum=2
+        )
+    ]
     
     def __init__(self) -> None:
         super().__init__()
@@ -47,6 +52,11 @@ class Optimize(Stage):
             HookType.TRANSFORM 
         ]
 
+        self.optimize_iterations = self.optimize_iterations
+        self.algorithm = self.algorithm
+        self.stage_time_limit = self.stage_time_limit
+        self.optimize_params = self.optimize_params
+
     @Internal()
     async def run(self):
 
@@ -56,7 +66,8 @@ class Optimize(Stage):
     @context()
     async def collect_optimization_stages(
         self,
-        optimize_stage_candidates: Dict[str, Execute]={}
+        setup_stage_configs: Dict[str, Config] = {},
+        optimize_stage_candidates: Dict[str, Execute]={},
     ):
         self.optimization_execution_time_start = time.monotonic()
 
@@ -91,6 +102,7 @@ class Optimize(Stage):
         batched_stages: BatchedOptimzationCandidates = list(self.executor.partion_stage_batches(optimize_stages))
 
         return {
+            'setup_stage_configs': setup_stage_configs,
             'optimize_stage_candidates': optimize_stage_candidates,
             'optimize_stage_stage_names': stage_names,
             'optimize_stage_stages_count': stages_count,
@@ -101,6 +113,7 @@ class Optimize(Stage):
     @event('collect_optimization_stages')
     async def create_optimization_configs(
         self,
+        setup_stage_configs: Dict[str, Config] = {},
         optimize_stage_stages_count: int=0,
         optimize_stage_batched_stages: BatchedOptimzationCandidates=[],
     ):
@@ -113,9 +126,9 @@ class Optimize(Stage):
         for stage_name, stage, assigned_workers_count in optimize_stage_batched_stages:
 
             configs = []
-            stage_config = stage.context['execute_stage_setup_config'] 
+            selected_stage_config = setup_stage_configs.get(stage.name) 
 
-            batch_size = int(stage_config.batch_size/assigned_workers_count)
+            batch_size = int(selected_stage_config.batch_size/assigned_workers_count)
 
             for worker_idx in range(assigned_workers_count):
 
@@ -128,7 +141,6 @@ class Optimize(Stage):
                     'graph_name': self.graph_name,
                     'graph_path': self.graph_path,
                     'graph_id': self.graph_id,
-                    'optimize_params': self.optimize_params,
                     'worker_idx': worker_idx,
                     'source_stage_context': {
                         context_key: context_value for context_key, context_value in serializable_context
@@ -138,10 +150,11 @@ class Optimize(Stage):
                     'execute_stage_name': stage_name,
                     'execute_stage_generation_count': assigned_workers_count,
                     'execute_stage_id': stage.execution_stage_id,
-                    'execute_stage_config': stage.context['execute_stage_setup_config'],
+                    'execute_stage_config': selected_stage_config,
                     'execute_stage_batch_size': batch_size,
                     'execute_setup_stage_name': stage.context['execute_stage_setup_by'],
                     'execute_stage_plugins': execute_stage_plugins,
+                    'optimizer_params': self.optimize_params,
                     'optimizer_iterations': self.optimize_iterations,
                     'optimizer_algorithm': self.algorithm,
                     'time_limit': self.time_limit

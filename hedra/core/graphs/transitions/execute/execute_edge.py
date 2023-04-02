@@ -32,6 +32,7 @@ class ExecuteEdge(BaseEdge[Execute]):
         )
 
         self.requires = [
+            'setup_stage_configs',
             'setup_stage_ready_stages',
             'setup_stage_candidates',
             'execute_stage_setup_config',
@@ -41,12 +42,13 @@ class ExecuteEdge(BaseEdge[Execute]):
         ]
 
         self.provides = [
+            'setup_stage_configs',
             'execute_stage_results',
             'execute_stage_setup_hooks',
             'execute_stage_setup_config',
             'execute_stage_setup_by',
             'setup_stage_ready_stages',
-            'execute_stage_skipped'
+            'execute_stage_skipped',
         ]
 
         self.valid_states = [
@@ -127,9 +129,7 @@ class ExecuteEdge(BaseEdge[Execute]):
             if self.next_history.get(edge_name) is None:
                 self.next_history[edge_name] = {}
 
-            self.next_history[edge_name].update({
-                key: value for key, value  in history.items() if key in self.provides
-            })
+            self.next_history[edge_name].update(history)
 
         next_results = self.next_history.get((self.source.name, destination.name))
         if next_results is None:
@@ -154,7 +154,6 @@ class ExecuteEdge(BaseEdge[Execute]):
 
     def split(self, edges: List[ExecuteEdge]) -> None:
 
-        analyze_candidates = self.generate_analyze_candidates()
         execute_stage_config: Dict[str, Any] = self.source.to_copy_dict()
 
         execute_stage_copy: Execute = type(self.source.name, (Execute, ), self.source.__dict__)()
@@ -171,28 +170,14 @@ class ExecuteEdge(BaseEdge[Execute]):
         for hooks in registrar.all.values():
             for hook in hooks:
                 if hasattr(self.source, hook.shortname) and not hasattr(Execute, hook.shortname):
-                    user_hooks[hook.stage][hook.shortname] = hook._call
+                    user_hooks[self.source.name][hook.shortname] = hook._call
         
         execute_stage_copy.dispatcher = self.source.dispatcher.copy()
 
         for event in execute_stage_copy.dispatcher.events_by_name.values():
             event.source.stage_instance = execute_stage_copy
 
-        edge_candidates = self._generate_edge_analyze_candidates(edges)
-
         minimum_edge_idx = min([edge.transition_idx for edge in edges])
-
-        assigned_candidates = [
-            candidate_name for candidate_name in analyze_candidates
-        ]
-
-        for candidate in assigned_candidates:
-
-            if candidate in edge_candidates and self.transition_idx == minimum_edge_idx:
-                self.assigned_candidates.append(candidate)
-
-            elif candidate not in edge_candidates:
-                self.assigned_candidates.append(candidate)
 
         execute_stage_copy.context = SimpleContext()
         for event in execute_stage_copy.dispatcher.events_by_name.values():
@@ -218,65 +203,38 @@ class ExecuteEdge(BaseEdge[Execute]):
         if minimum_edge_idx < self.transition_idx:
             self.skip_stage = True
 
-    def _generate_edge_analyze_candidates(self, edges: List[ExecuteEdge]):
-
-        candidates = []
-
-        for edge in edges:
-            if edge.transition_idx != self.transition_idx:
-                analyze_candidates = edge.generate_analyze_candidates()
-                destination_path = edge.all_paths.get(edge.destination.name)
-                candidates.extend([
-                    candidate_name for candidate_name in analyze_candidates if candidate_name in destination_path
-                ])
-
-        return candidates
-
     def generate_analyze_candidates(self) -> Dict[str, Stage]:
     
-        submit_stages: Dict[str, Analyze] = self.stages_by_type.get(StageTypes.ANALYZE)
-        analyze_stages = self.stages_by_type.get(StageTypes.EXECUTE).items()
+        analyze_stages: Dict[str, Analyze] = self.stages_by_type.get(StageTypes.ANALYZE)
         path_lengths: Dict[str, int] = self.path_lengths.get(self.source.name)
 
         all_paths = self.all_paths.get(self.source.name, [])
 
-        analyze_stages_in_path = {}
-        for stage_name, stage in analyze_stages:
-            if stage_name in all_paths and stage_name != self.source.name and stage_name not in self.visited:
-                analyze_stages_in_path[stage_name] = self.all_paths.get(stage_name)
+        analyze_candidates: Dict[str, Stage] = {}
 
-        submit_candidates: Dict[str, Stage] = {}
-
-        for stage_name, stage in submit_stages.items():
+        for stage_name, stage in analyze_stages.items():
             if stage_name in all_paths:
-                if len(analyze_stages_in_path) > 0:
-                    for path in analyze_stages_in_path.values():
-                        if stage_name not in path:
-                            submit_candidates[stage_name] = stage
+                analyze_candidates[stage_name] = stage
 
-                else:
-                    submit_candidates[stage_name] = stage
-
-        selected_submit_candidates: Dict[str, Stage] = {}
-        following_opimize_stage_distances = [
+        selected_analyze_candidates: Dict[str, Stage] = {}
+        following_analyze_stage_distances = [
             path_length for stage_name, path_length in path_lengths.items() if stage_name in analyze_stages
         ]
 
         for stage_name in path_lengths.keys():
             stage_distance = path_lengths.get(stage_name)
 
-            if stage_name in submit_candidates:
+            if stage_name in analyze_candidates:
 
-                if len(following_opimize_stage_distances) > 0 and stage_distance < min(following_opimize_stage_distances):
-                    selected_submit_candidates[stage_name] = submit_candidates.get(stage_name)
+                if len(following_analyze_stage_distances) > 0 and stage_distance <= min(following_analyze_stage_distances):
+                    selected_analyze_candidates[stage_name] = analyze_candidates.get(stage_name)
 
-                elif len(following_opimize_stage_distances) == 0:
-                    selected_submit_candidates[stage_name] = submit_candidates.get(stage_name)
+                elif len(following_analyze_stage_distances) == 0:
+                    selected_analyze_candidates[stage_name] = analyze_candidates.get(stage_name)
 
-        return selected_submit_candidates
+        return selected_analyze_candidates
     
     def setup(self) -> None:
-
         max_batch_size = 0
         execute_stage_setup_config: Config = None
         execute_stage_setup_hooks: Dict[str, ExecuteHooks] = {}
@@ -284,36 +242,43 @@ class ExecuteEdge(BaseEdge[Execute]):
         setup_stage_ready_stages: List[Stage] = []
         setup_stage_candidates: List[Stage] = []
 
-        for from_stage_name in self.from_stage_names:
-            previous_history = self.history[(from_stage_name, self.source.name)]
+        for source_stage, destination_stage in self.history:
 
-            execute_config: Config = previous_history['execute_stage_setup_config']
-            setup_by = previous_history['execute_stage_setup_by']
+            if destination_stage == self.source.name:
+                previous_history = self.history[(source_stage, self.source.name)]
 
-            if execute_config.optimized:
-                execute_stage_setup_config = execute_config
-                max_batch_size = execute_config.batch_size
-                execute_stage_setup_by = setup_by
+                setup_stage_configs: Dict[str, Config] = previous_history['setup_stage_configs']
 
-            elif execute_config.batch_size > max_batch_size:
-                execute_stage_setup_config = execute_config
-                max_batch_size = execute_config.batch_size
-                execute_stage_setup_by = setup_by
+                execute_config: Config = setup_stage_configs.get(
+                    self.source.name
+                )
 
-            execute_hooks: ExecuteHooks = previous_history['execute_stage_setup_hooks']
-            for setup_hook in execute_hooks:
-                execute_stage_setup_hooks[setup_hook.name] = setup_hook
+                setup_by = previous_history['execute_stage_setup_by']
 
-            ready_stages = previous_history['setup_stage_ready_stages']
+                if execute_config.optimized:
+                    execute_stage_setup_config = execute_config
+                    max_batch_size = execute_config.batch_size
+                    execute_stage_setup_by = setup_by
 
-            for ready_stage in ready_stages:
-                if ready_stage not in setup_stage_ready_stages:
-                    setup_stage_ready_stages.append(ready_stage)
+                elif execute_config.batch_size > max_batch_size:
+                    execute_stage_setup_config = execute_config
+                    max_batch_size = execute_config.batch_size
+                    execute_stage_setup_by = setup_by
 
-            stage_candidates: List[Stage] = previous_history['setup_stage_candidates']
-            for stage_candidate in stage_candidates:
-                if stage_candidate not in setup_stage_candidates:
-                    setup_stage_candidates.append(stage_candidate)
+                execute_hooks: ExecuteHooks = previous_history['execute_stage_setup_hooks']
+                for setup_hook in execute_hooks:
+                    execute_stage_setup_hooks[setup_hook.name] = setup_hook
+
+                ready_stages = previous_history['setup_stage_ready_stages']
+
+                for ready_stage in ready_stages:
+                    if ready_stage not in setup_stage_ready_stages:
+                        setup_stage_ready_stages.append(ready_stage)
+
+                stage_candidates: List[Stage] = previous_history['setup_stage_candidates']
+                for stage_candidate in stage_candidates:
+                    if stage_candidate not in setup_stage_candidates:
+                        setup_stage_candidates.append(stage_candidate)
             
 
         self.edge_data = {

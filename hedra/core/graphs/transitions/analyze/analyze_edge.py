@@ -30,7 +30,6 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             'execute_stage_results'
         ]
         self.provides = [
-            'analyze_stage_custom_metrics_set',
             'analyze_stage_summary_metrics'
         ]
 
@@ -47,11 +46,6 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         try:
             self.source.state = StageStates.ANALYZING
             submit_candidates = self.generate_submit_candidates()
-
-            if len(self.assigned_candidates) > 0:
-                submit_candidates = {
-                    stage_name: stage for stage_name, stage in submit_candidates.items() if stage_name in self.assigned_candidates
-                }
             
             self.source.context.update(self.edge_data)
             
@@ -102,7 +96,6 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             self.visited.append(self.source.name)
 
         except Exception as edge_exception:
-            print(traceback.format_exc())
             self.exception = edge_exception
 
         return None, self.destination.stage_type
@@ -126,16 +119,11 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                     'analyze_stage_summary_metrics': self.edge_data.get(
                         'analyze_stage_summary_metrics', 
                         {}
-                    ),
-                    'analyze_stage_custom_metrics_set': self.edge_data.get(
-                        'analyze_stage_custom_metrics_set',
-                        {}
                     )
                 }
             })
 
     def split(self, edges: List[AnalyzeEdge]) -> None:
-        submit_candidates = self.generate_submit_candidates()
 
         analyze_stage_config: Dict[str, Any] = self.source.to_copy_dict()
 
@@ -149,30 +137,18 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         for hooks in registrar.all.values():
             for hook in hooks:
                 if hasattr(self.source, hook.shortname) and not hasattr(Analyze, hook.shortname):
-                    user_hooks[hook.stage][hook.shortname] = hook._call
+                    user_hooks[self.source.name][hook.shortname] = hook._call
 
         analyze_stage_copy.dispatcher = self.source.dispatcher.copy()
 
-        edge_candidates = self._generate_edge_submit_candidates(edges)
+        for event in analyze_stage_copy.dispatcher.events_by_name.values():
+            event.source.stage_instance = analyze_stage_copy
 
         minimum_edge_idx = min([edge.transition_idx for edge in edges])
-
-        assigned_candidates = [
-            candidate_name for candidate_name in submit_candidates if candidate_name
-        ]
-
-        for candidate in assigned_candidates:
-
-            if candidate in edge_candidates and self.transition_idx == minimum_edge_idx:
-                self.assigned_candidates.append(candidate)
-
-            elif candidate not in edge_candidates:
-                self.assigned_candidates.append(candidate)
 
         analyze_stage_copy.context = SimpleContext()
         for event in analyze_stage_copy.dispatcher.events_by_name.values():
             event.context = analyze_stage_copy.context 
-            event.source.stage_instance = analyze_stage_copy
             event.source.stage_instance.context = analyze_stage_copy.context
             event.source.context = analyze_stage_copy.context
             
@@ -194,49 +170,22 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         if minimum_edge_idx < self.transition_idx:
             self.skip_stage = True
 
-    def _generate_edge_submit_candidates(self, edges: List[AnalyzeEdge]):
-
-        candidates = []
-
-        for edge in edges:
-            if edge.transition_idx != self.transition_idx:
-                analyze_candidates = edge.generate_submit_candidates()
-                destination_path = edge.all_paths.get(edge.destination.name)
-                candidates.extend([
-                    candidate_name for candidate_name in analyze_candidates if candidate_name in destination_path
-                ])
-
-        return candidates
-
     def generate_submit_candidates(self) -> Dict[str, Stage]:
     
         submit_stages: Dict[str, Submit] = self.stages_by_type.get(StageTypes.SUBMIT)
-        analyze_stages = self.stages_by_type.get(StageTypes.ANALYZE).items()
         path_lengths: Dict[str, int] = self.path_lengths.get(self.source.name)
 
         all_paths = self.all_paths.get(self.source.name, [])
-
-        analyze_stages_in_path = {}
-        for stage_name, stage in analyze_stages:
-            if stage_name in all_paths and stage_name != self.source.name and stage_name not in self.visited:
-                analyze_stages_in_path[stage_name] = self.all_paths.get(stage_name)
 
         submit_candidates: Dict[str, Stage] = {}
 
         for stage_name, stage in submit_stages.items():
             if stage_name in all_paths:
-                if len(analyze_stages_in_path) > 0:
-                    for path in analyze_stages_in_path.values():
-                        if stage_name not in path:
-                            stage.state = StageStates.ANALYZING
-                            submit_candidates[stage_name] = stage
-
-                else:
-                    submit_candidates[stage_name] = stage
+                submit_candidates[stage_name] = stage
 
         selected_submit_candidates: Dict[str, Stage] = {}
-        following_opimize_stage_distances = [
-            path_length for stage_name, path_length in path_lengths.items() if stage_name in analyze_stages
+        following_submit_stage_distances = [
+            path_length for stage_name, path_length in path_lengths.items() if stage_name in submit_stages
         ]
 
         for stage_name in path_lengths.keys():
@@ -244,26 +193,26 @@ class AnalyzeEdge(BaseEdge[Analyze]):
 
             if stage_name in submit_candidates:
 
-                if len(following_opimize_stage_distances) > 0 and stage_distance < min(following_opimize_stage_distances):
+                if len(following_submit_stage_distances) > 0 and stage_distance <= min(following_submit_stage_distances):
                     selected_submit_candidates[stage_name] = submit_candidates.get(stage_name)
 
-                elif len(following_opimize_stage_distances) == 0:
+                elif len(following_submit_stage_distances) == 0:
                     selected_submit_candidates[stage_name] = submit_candidates.get(stage_name)
-
+        
         return selected_submit_candidates
 
     def setup(self) -> None:
 
         raw_results = {}
-        for from_stage_name in self.from_stage_names:
-            
-            stage_results = self.history[(
-                from_stage_name, 
-                self.source.name
-            )].get('execute_stage_results')
+        for source_stage, destination_stage in self.history:
+            stage_results = {}
+            if destination_stage == self.source.name:
+                stage_results = self.history[(
+                    source_stage, 
+                    self.source.name
+                )].get('execute_stage_results', {})
 
-            if stage_results:
-                raw_results.update(stage_results)
+            raw_results.update(stage_results)
 
         execute_stages = self.stages_by_type.get(StageTypes.EXECUTE)
 

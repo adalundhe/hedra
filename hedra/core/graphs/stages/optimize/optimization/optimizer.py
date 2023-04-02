@@ -69,7 +69,6 @@ class Optimizer:
         self.current_params = {}
         self.start = 0
         self.elapsed = 00
-        
 
     def optimize(self):
 
@@ -82,7 +81,6 @@ class Optimizer:
         self.logger.filesystem.sync['hedra.optimize'].info(f'{self.metadata_string} - Optimization config: Max Iter - {self.algorithm.max_iter}')
 
         self.start = time.time()
-        
         results = self.algorithm.optimize(self._run_optimize)
 
         optimized_params = {}
@@ -171,7 +169,7 @@ class Optimizer:
             
             return elapsed/completed_count
 
-        return 0
+        return float('inf')
 
     def _run_optimize(self, xargs):
 

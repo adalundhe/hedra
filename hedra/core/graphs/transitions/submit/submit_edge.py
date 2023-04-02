@@ -32,7 +32,6 @@ class SubmitEdge(BaseEdge[Submit]):
         
         self.requires = [
             'analyze_stage_session_total',
-            'analyze_stage_custom_metrics_set',
             'analyze_stage_events',
             'analyze_stage_summary_metrics'
         ]
@@ -80,14 +79,16 @@ class SubmitEdge(BaseEdge[Submit]):
 
     def _update(self, destination: Stage):
 
-        if self.skip_stage:
-            self.next_history.update({
-                (self.source.name, destination.name): {
-                    'analyze_stage_summary_metrics': {}
-                }
-            })
+        for edge_name in self.history:
 
-        else:
+            history = self.history[edge_name]
+
+            if self.next_history.get(edge_name) is None:
+                self.next_history[edge_name] = {}
+
+            self.next_history[edge_name].update(history)
+
+        if self.skip_stage is False:
             self.next_history.update({
                 (self.source.name, destination.name): {
                     'analyze_stage_summary_metrics': self.edge_data['analyze_stage_summary_metrics'] 
@@ -111,7 +112,7 @@ class SubmitEdge(BaseEdge[Submit]):
         for hooks in registrar.all.values():
             for hook in hooks:
                 if hasattr(self.source, hook.shortname) and not hasattr(Submit, hook.shortname):
-                    user_hooks[hook.stage][hook.shortname] = hook._call
+                    user_hooks[self.source.name][hook.shortname] = hook._call
         
         submit_stage_copy.dispatcher = self.source.dispatcher.copy()
 
@@ -148,60 +149,43 @@ class SubmitEdge(BaseEdge[Submit]):
         
         events: List[BaseProcessedResult] = []
         metrics: List[MetricsSet] = []
-        custom_metrics = {}
         session_totals: Dict[str, int] = {}
 
-        for from_stage_name in self.from_stage_names:
-            previous_history = self.history[(from_stage_name, self.source.name)]
-        
-            analyze_stage_summary_metrics: MetricsSetGroup = previous_history['analyze_stage_summary_metrics']
-            analyze_stage_events: List[BaseProcessedResult] = previous_history.get(
-                'analyze_stage_events',
-                []
-            )
+        for source_stage, destination_stage in self.history:
+            if destination_stage == self.source.name:
 
-            events.extend(analyze_stage_events)
+                previous_history = self.history[(source_stage, self.source.name)]
+            
+                analyze_stage_summary_metrics: MetricsSetGroup = previous_history.get(
+                    'analyze_stage_summary_metrics'
+                )
+                analyze_stage_events: List[BaseProcessedResult] = previous_history.get(
+                    'analyze_stage_events',
+                    []
+                )
 
-            stage_totals: Dict[str, int] = analyze_stage_summary_metrics.get(
-                'stage_totals', 
-                {}
-            )
+                events.extend(analyze_stage_events)
 
-            for stage_name, stage_total in stage_totals.items():
+                stage_totals: Dict[str, int] = analyze_stage_summary_metrics.get(
+                    'stage_totals', 
+                    {}
+                )
 
-                if session_totals.get(stage_name) is None:   
-                    session_totals[stage_name] = stage_total
+                for stage_name, stage_total in stage_totals.items():
+
+                    if session_totals.get(stage_name) is None:   
+                        session_totals[stage_name] = stage_total
 
 
-            stage_summaries = analyze_stage_summary_metrics.get('stages', {})
-            for stage in stage_summaries.values():
-                metrics.extend(list(
-                    stage.get('actions', {}).values()
-                ))
+                stage_summaries = analyze_stage_summary_metrics.get('stages', {})
+                for stage in stage_summaries.values():
+                    metrics.extend(list(
+                        stage.get('actions', {}).values()
+                    ))
 
         self.edge_data['analyze_stage_events'] = events
         self.edge_data['analyze_stage_summary_metrics'] = metrics
         self.edge_data['analyze_stage_session_total'] = sum(session_totals.values())
-
-        metrics_set_counts = defaultdict(lambda: 0)
-        for metrics_set in metrics:
-            metrics_set_counts[metrics_set.name] += 1
-
-        custom_metrics: Dict[str, CustomMetric] = {}
-        for from_stage in self.from_stage_names:
-            previous_history = self.history[(from_stage, self.source.name)]
-            analyze_stage_custom_metrics_set: CustomMetricSet = previous_history['analyze_stage_custom_metrics_set']
-            
-            for custom_metrics_set in analyze_stage_custom_metrics_set.values():
-                custom_metrics.update(custom_metrics_set)
-
-    
-        for metric_set in metrics:
-            set_count = metrics_set_counts.get(metric_set.name)
-
-            if set_count > 1:
-                # If two of the same set exist we merge their custom metrics.
-                metric_set.custom_metrics = custom_metrics
 
 
 
