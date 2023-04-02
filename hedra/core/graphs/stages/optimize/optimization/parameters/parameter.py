@@ -10,7 +10,7 @@ class Parameter:
             parameter_name: str,
             minimum: Union[int, float]=None,
             maximum: Union[int, float]=None,
-            feed_forward: bool=True
+            feed_forward: bool=False
         ) -> None:
         self.parameter_name = parameter_name
         self.feed_forward = feed_forward
