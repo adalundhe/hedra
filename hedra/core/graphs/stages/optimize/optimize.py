@@ -127,9 +127,9 @@ class Optimize(Stage):
         for stage_name, stage, assigned_workers_count in optimize_stage_batched_stages:
 
             configs = []
-            stage_config = stage.context['execute_stage_setup_config'] 
+            selected_stage_config = setup_stage_configs.get(stage.name) 
 
-            batch_size = int(stage_config.batch_size/assigned_workers_count)
+            batch_size = int(selected_stage_config.batch_size/assigned_workers_count)
 
             for worker_idx in range(assigned_workers_count):
 
@@ -138,7 +138,6 @@ class Optimize(Stage):
                 for plugin in stage.plugins.values():
                     execute_stage_plugins[plugin.type].append(plugin.name)
 
-                selected_stage_config = setup_stage_configs.get(stage.name)
                 configs.append({
                     'graph_name': self.graph_name,
                     'graph_path': self.graph_path,
@@ -153,7 +152,7 @@ class Optimize(Stage):
                     'execute_stage_generation_count': assigned_workers_count,
                     'execute_stage_id': stage.execution_stage_id,
                     'execute_stage_config': selected_stage_config,
-                    'execute_stage_batch_size': selected_stage_config.batch_size,
+                    'execute_stage_batch_size': batch_size,
                     'execute_setup_stage_name': stage.context['execute_stage_setup_by'],
                     'execute_stage_plugins': execute_stage_plugins,
                     'optimizer_params': self.optimize_params,

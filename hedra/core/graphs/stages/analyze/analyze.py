@@ -436,7 +436,6 @@ class Analyze(Stage):
     @context('generate_metrics_sets')
     async def generate_summary(
         self,
-        analyze_stage_custom_metrics_set: CustoMetricsSet={},
         analyze_stage_stages_count: int=0,
         analyze_stage_total_group_results: int=0,
         analyze_stage_processed_results: ProcessedResultsSet={},
@@ -463,7 +462,6 @@ class Analyze(Stage):
         await self.logger.spinner.set_default_message(f'Completed results analysis for {analyze_stage_total_group_results} actions and {analyze_stage_stages_count} stages over {self.analysis_execution_time} seconds')
 
         return {
-            'analyze_stage_custom_metrics_set': analyze_stage_custom_metrics_set,
             'analyze_stage_summary_metrics': summaries
         }
 

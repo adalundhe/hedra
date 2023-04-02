@@ -32,7 +32,6 @@ class SubmitEdge(BaseEdge[Submit]):
         
         self.requires = [
             'analyze_stage_session_total',
-            'analyze_stage_custom_metrics_set',
             'analyze_stage_events',
             'analyze_stage_summary_metrics'
         ]
@@ -89,14 +88,7 @@ class SubmitEdge(BaseEdge[Submit]):
 
             self.next_history[edge_name].update(history)
 
-        if self.skip_stage:
-            self.next_history.update({
-                (self.source.name, destination.name): {
-                    'analyze_stage_summary_metrics': {}
-                }
-            })
-
-        else:
+        if self.skip_stage is False:
             self.next_history.update({
                 (self.source.name, destination.name): {
                     'analyze_stage_summary_metrics': self.edge_data['analyze_stage_summary_metrics'] 
@@ -157,7 +149,6 @@ class SubmitEdge(BaseEdge[Submit]):
         
         events: List[BaseProcessedResult] = []
         metrics: List[MetricsSet] = []
-        custom_metrics = {}
         session_totals: Dict[str, int] = {}
 
         for source_stage, destination_stage in self.history:
@@ -192,25 +183,9 @@ class SubmitEdge(BaseEdge[Submit]):
                         stage.get('actions', {}).values()
                     ))
 
-                analyze_stage_custom_metrics_set: CustomMetricSet = previous_history['analyze_stage_custom_metrics_set']
-                
-                for custom_metrics_set in analyze_stage_custom_metrics_set.values():
-                    custom_metrics.update(custom_metrics_set)
-
         self.edge_data['analyze_stage_events'] = events
         self.edge_data['analyze_stage_summary_metrics'] = metrics
         self.edge_data['analyze_stage_session_total'] = sum(session_totals.values())
-
-        metrics_set_counts = defaultdict(lambda: 0)
-        for metrics_set in metrics:
-            metrics_set_counts[metrics_set.name] += 1
-    
-        for metric_set in metrics:
-            set_count = metrics_set_counts.get(metric_set.name)
-
-            if set_count > 1:
-                # If two of the same set exist we merge their custom metrics.
-                metric_set.custom_metrics = custom_metrics
 
 
 

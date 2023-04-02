@@ -33,7 +33,6 @@ class ActEdge(BaseEdge[Act]):
 
         self.requires = [
             'setup_stage_configs',
-            'analyze_stage_custom_metrics_set',
             'analyze_stage_summary_metrics',
             'setup_stage_ready_stages',
             'setup_stage_candidates',
@@ -45,7 +44,6 @@ class ActEdge(BaseEdge[Act]):
 
         self.provides = [
             'setup_stage_configs',
-            'analyze_stage_custom_metrics_set',
             'analyze_stage_summary_metrics',
             'execute_stage_results',
             'execute_stage_setup_hooks',

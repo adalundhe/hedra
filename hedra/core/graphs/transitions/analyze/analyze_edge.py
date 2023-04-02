@@ -30,7 +30,6 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             'execute_stage_results'
         ]
         self.provides = [
-            'analyze_stage_custom_metrics_set',
             'analyze_stage_summary_metrics'
         ]
 
@@ -119,10 +118,6 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                 (self.source.name, destination.name): {
                     'analyze_stage_summary_metrics': self.edge_data.get(
                         'analyze_stage_summary_metrics', 
-                        {}
-                    ),
-                    'analyze_stage_custom_metrics_set': self.edge_data.get(
-                        'analyze_stage_custom_metrics_set',
                         {}
                     )
                 }
