@@ -34,7 +34,6 @@ class OptimizeEdge(BaseEdge[Optimize]):
 
         self.requires = [
             'setup_stage_configs',
-            'optimize_stage_feed_forward',
             'execute_stage_setup_hooks',
             'execute_stage_setup_config',
             'execute_stage_setup_by',
@@ -278,7 +277,6 @@ class OptimizeEdge(BaseEdge[Optimize]):
         
         self.edge_data = {
             'setup_stage_configs': setup_stage_configs,
-            'optimize_stage_feed_forward': self.source.feed_forward,
             'execute_stage_setup_config': execute_stage_setup_config,
             'execute_stage_setup_hooks': execute_stage_setup_hooks,
             'execute_stage_setup_by': execute_stage_setup_by,

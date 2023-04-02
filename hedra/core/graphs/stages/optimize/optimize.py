@@ -12,6 +12,7 @@ from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.context.decorator import context
 from hedra.core.hooks.types.event.decorator import event
 from hedra.core.hooks.types.internal.decorator import Internal
+from .optimization.parameters import Parameter
 from .parallel import optimize_stage
 
 
@@ -23,10 +24,13 @@ class Optimize(Stage):
     optimize_iterations=0
     algorithm='shg'
     stage_time_limit='1m'
-    optimize_params: Dict[str, OptimizeParameterPair]={
-        'batch_size': (0.5, 2)
-    }
-    feed_forward=True
+    optimize_params: List[Parameter]=[
+        Parameter(
+            'batch_size',
+            minimum=0.5,
+            maximum=2
+        )
+    ]
     
     def __init__(self) -> None:
         super().__init__()
@@ -52,7 +56,6 @@ class Optimize(Stage):
         self.algorithm = self.algorithm
         self.stage_time_limit = self.stage_time_limit
         self.optimize_params = self.optimize_params
-        self.feed_forward = self.feed_forward
 
     @Internal()
     async def run(self):
@@ -65,7 +68,6 @@ class Optimize(Stage):
         self,
         setup_stage_configs: Dict[str, Config] = {},
         optimize_stage_candidates: Dict[str, Execute]={},
-        optimize_stage_feed_forward: bool = True
     ):
         self.optimization_execution_time_start = time.monotonic()
 
@@ -101,7 +103,6 @@ class Optimize(Stage):
 
         return {
             'setup_stage_configs': setup_stage_configs,
-            'optimize_stage_feed_forward': optimize_stage_feed_forward,
             'optimize_stage_candidates': optimize_stage_candidates,
             'optimize_stage_stage_names': stage_names,
             'optimize_stage_stages_count': stages_count,
@@ -115,7 +116,6 @@ class Optimize(Stage):
         setup_stage_configs: Dict[str, Config] = {},
         optimize_stage_stages_count: int=0,
         optimize_stage_batched_stages: BatchedOptimzationCandidates=[],
-        optimize_stage_feed_forward: bool = True
     ):
         batched_configs = []
 
@@ -155,7 +155,6 @@ class Optimize(Stage):
                     'execute_setup_stage_name': stage.context['execute_stage_setup_by'],
                     'execute_stage_plugins': execute_stage_plugins,
                     'optimizer_params': self.optimize_params,
-                    'optimizer_feed_forward': optimize_stage_feed_forward,
                     'optimizer_iterations': self.optimize_iterations,
                     'optimizer_algorithm': self.algorithm,
                     'time_limit': self.time_limit
