@@ -278,6 +278,7 @@ class ExecuteEdge(BaseEdge[Execute]):
                 previous_history = self.history[(source_stage, self.source.name)]
 
                 setup_stage_configs: Dict[str, Config] = previous_history['setup_stage_configs']
+
                 execute_config: Config = setup_stage_configs.get(
                     self.source.name
                 )

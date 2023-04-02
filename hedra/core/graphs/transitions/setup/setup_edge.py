@@ -57,16 +57,6 @@ class SetupEdge(BaseEdge[Setup]):
             setup_candidates = self.get_setup_candidates()
             optimize_candidates = self.get_optimize_candidates()
 
-            if len(self.assigned_candidates) > 0:
-                setup_candidates = {
-                    stage_name: stage for stage_name, stage in setup_candidates.items() if stage_name in self.assigned_candidates
-                }
-
-            if len(self.assigned_optimize_candidates) > 0:
-                optimize_candidates = {
-                    stage_name: stage for stage_name, stage in optimize_candidates.items() if stage_name in self.assigned_optimize_candidates
-                }
-
             self.source.generation_setup_candidates = len(setup_candidates)
 
             for setup_candidate in setup_candidates.values():
@@ -139,17 +129,7 @@ class SetupEdge(BaseEdge[Setup]):
         if self.next_history.get((self.source.name, destination.name)) is None:
             self.next_history[(self.source.name, destination.name)] = {}
 
-        if self.skip_stage:
-            self.next_history[(self.source.name, destination.name)].update({
-                'setup_stage_configs': {},
-                'execute_stage_setup_hooks': [],
-                'setup_stage_ready_stages': {},
-                'setup_stage_candidates': [],
-                'execute_stage_setup_config': None,
-                'execute_stage_setup_by': self.source.name   
-            })
-
-        else:
+        if self.skip_stage is False:
             setup_stage_configs = self.edge_data.get('setup_stage_configs', {})
             ready_stages = self.edge_data.get('setup_stage_ready_stages', {})
             setup_candidates = self.edge_data.get('setup_stage_candidates', {})
@@ -173,8 +153,6 @@ class SetupEdge(BaseEdge[Setup]):
             
 
     def split(self, edges: List[SetupEdge]) -> None:
-        setup_candidates = self.get_setup_candidates()
-        optimize_candidates = self.get_optimize_candidates()
 
         setup_stage_config: Dict[str, Any] = self.source.to_copy_dict()
 
@@ -192,36 +170,7 @@ class SetupEdge(BaseEdge[Setup]):
 
         setup_stage_copy.dispatcher = self.source.dispatcher.copy()
 
-        edge_candidates = self._generate_edge_setup_candidates(edges)
-        optimize_edge_candidates = self._generate_edge_optimize_candidates(edges)
-
-        destination_path = self.all_paths.get(self.destination.name)
-
         minimum_edge_idx = min([edge.transition_idx for edge in edges])
-
-        assigned_candidates = [
-            candidate_name for candidate_name in setup_candidates if candidate_name in destination_path
-        ]
-
-        assigned_optimize_candidates = [
-            candidate_name for candidate_name in optimize_candidates if candidate_name in destination_path
-        ]
-
-        for candidate in assigned_candidates:
-
-            if candidate in edge_candidates and self.transition_idx == minimum_edge_idx:
-                self.assigned_candidates.append(candidate)
-
-            elif candidate not in edge_candidates:
-                self.assigned_candidates.append(candidate)
-
-        for candidate in assigned_optimize_candidates:
-
-            if candidate in optimize_edge_candidates and self.transition_idx == minimum_edge_idx:
-                self.assigned_optimize_candidates.append(candidate)
-
-            elif candidate not in optimize_edge_candidates:
-                self.assigned_optimize_candidates.append(candidate)
 
         setup_stage_copy.context = SimpleContext()
         for event in setup_stage_copy.dispatcher.events_by_name.values():
@@ -245,33 +194,8 @@ class SetupEdge(BaseEdge[Setup]):
           
         self.source = setup_stage_copy
 
-    def _generate_edge_setup_candidates(self, edges: List[SetupEdge]):
-
-        candidates = []
-
-        for edge in edges:
-            if edge.transition_idx != self.transition_idx:
-                setup_candidates = edge.get_setup_candidates()
-                destination_path = edge.all_paths.get(edge.destination.name)
-                candidates.extend([
-                    candidate_name for candidate_name in setup_candidates if candidate_name in destination_path
-                ])
-
-        return candidates
-    
-    def _generate_edge_optimize_candidates(self, edges: List[SetupEdge]):
-
-        candidates = []
-
-        for edge in edges:
-            if edge.transition_idx != self.transition_idx:
-                optimize_candidates = edge.get_optimize_candidates()
-                destination_path = edge.all_paths.get(edge.destination.name)
-                candidates.extend([
-                    candidate_name for candidate_name in optimize_candidates if candidate_name in destination_path
-                ])
-
-        return candidates
+        if minimum_edge_idx < self.transition_idx:
+            self.skip_stage = True
 
     def get_setup_candidates(self) -> Dict[str, Execute]:
         execute_stages: Dict[str, Execute] = self.stages_by_type.get(StageTypes.EXECUTE)

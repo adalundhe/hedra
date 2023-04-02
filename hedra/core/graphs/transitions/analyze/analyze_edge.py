@@ -47,11 +47,6 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         try:
             self.source.state = StageStates.ANALYZING
             submit_candidates = self.generate_submit_candidates()
-
-            if len(self.assigned_candidates) > 0:
-                submit_candidates = {
-                    stage_name: stage for stage_name, stage in submit_candidates.items() if stage_name in self.assigned_candidates
-                }
             
             self.source.context.update(self.edge_data)
             
@@ -134,7 +129,6 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             })
 
     def split(self, edges: List[AnalyzeEdge]) -> None:
-        submit_candidates = self.generate_submit_candidates()
 
         analyze_stage_config: Dict[str, Any] = self.source.to_copy_dict()
 
@@ -152,21 +146,7 @@ class AnalyzeEdge(BaseEdge[Analyze]):
 
         analyze_stage_copy.dispatcher = self.source.dispatcher.copy()
 
-        edge_candidates = self._generate_edge_submit_candidates(edges)
-
         minimum_edge_idx = min([edge.transition_idx for edge in edges])
-
-        assigned_candidates = [
-            candidate_name for candidate_name in submit_candidates if candidate_name
-        ]
-
-        for candidate in assigned_candidates:
-
-            if candidate in edge_candidates and self.transition_idx == minimum_edge_idx:
-                self.assigned_candidates.append(candidate)
-
-            elif candidate not in edge_candidates:
-                self.assigned_candidates.append(candidate)
 
         analyze_stage_copy.context = SimpleContext()
         for event in analyze_stage_copy.dispatcher.events_by_name.values():
@@ -192,20 +172,6 @@ class AnalyzeEdge(BaseEdge[Analyze]):
 
         if minimum_edge_idx < self.transition_idx:
             self.skip_stage = True
-
-    def _generate_edge_submit_candidates(self, edges: List[AnalyzeEdge]):
-
-        candidates = []
-
-        for edge in edges:
-            if edge.transition_idx != self.transition_idx:
-                analyze_candidates = edge.generate_submit_candidates()
-                destination_path = edge.all_paths.get(edge.destination.name)
-                candidates.extend([
-                    candidate_name for candidate_name in analyze_candidates if candidate_name in destination_path
-                ])
-
-        return candidates
 
     def generate_submit_candidates(self) -> Dict[str, Stage]:
     

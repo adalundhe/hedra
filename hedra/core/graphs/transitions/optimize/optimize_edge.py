@@ -60,11 +60,6 @@ class OptimizeEdge(BaseEdge[Optimize]):
         try:
             selected_optimization_candidates = self.generate_optimization_candidates()
 
-            if len(self.assigned_candidates) > 0:
-                selected_optimization_candidates = {
-                    stage_name: stage for stage_name, stage in selected_optimization_candidates.items() if stage_name in self.assigned_candidates
-                }
-
             self.edge_data['optimize_stage_candidates'] = selected_optimization_candidates
             
             self.source.context.update(self.edge_data)
@@ -111,7 +106,6 @@ class OptimizeEdge(BaseEdge[Optimize]):
             self.visited.append(self.source.name)
 
         except Exception as edge_exception:
-            print(traceback.format_exc())
             self.exception = edge_exception
 
         return None, self.destination.stage_type
@@ -149,8 +143,6 @@ class OptimizeEdge(BaseEdge[Optimize]):
 
     def split(self, edges: List[OptimizeEdge]) -> None:
 
-        optimze_candidates = self.generate_optimization_candidates()
-
         optimize_stage_config: Dict[str, Any] = self.source.to_copy_dict()
 
         optimize_stage_copy: Optimize = type(self.source.name, (Optimize, ), self.source.__dict__)()
@@ -174,24 +166,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         for event in optimize_stage_copy.dispatcher.events_by_name.values():
             event.source.stage_instance = optimize_stage_copy
 
-        edge_candidates = self._generate_edge_optimize_candidates(edges)
-
-        destination_path = self.all_paths.get(self.destination.name)
-
         minimum_edge_idx = min([edge.transition_idx for edge in edges])
-
-        assigned_candidates = [
-            candidate_name for candidate_name in optimze_candidates if candidate_name in destination_path
-        ]
-
-        for candidate in assigned_candidates:
-
-            if candidate in edge_candidates and self.transition_idx == minimum_edge_idx:
-                self.assigned_candidates.append(candidate)
-
-            elif candidate not in edge_candidates:
-                self.assigned_candidates.append(candidate)
-
         
         optimize_stage_copy.context = SimpleContext()
         for event in optimize_stage_copy.dispatcher.events_by_name.values():
@@ -217,22 +192,6 @@ class OptimizeEdge(BaseEdge[Optimize]):
 
         if minimum_edge_idx < self.transition_idx:
             self.skip_stage = True
-
-
-    def _generate_edge_optimize_candidates(self, edges: List[OptimizeEdge]):
-
-        candidates = []
-
-        for edge in edges:
-            if edge.transition_idx != self.transition_idx:
-                edge.setup()
-                optimize_candidates = edge.generate_optimization_candidates()
-                destination_path = edge.all_paths.get(edge.destination.name)
-                candidates.extend([
-                    candidate_name for candidate_name in optimize_candidates if candidate_name in destination_path
-                ])
-
-        return candidates
 
     def generate_optimization_candidates(self) -> Dict[str, Stage]:
         
