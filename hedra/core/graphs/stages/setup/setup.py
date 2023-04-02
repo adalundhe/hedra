@@ -285,7 +285,7 @@ class Setup(Stage, Generic[Unpack[T]]):
         connection_validation_retries: int=3,
         setup_stage_target_config: Config=None
     ):
-            if setup_stage_has_actions:
+            if setup_stage_has_actions and isinstance(setup_stage_actions, ActionHook):
 
                 hook = setup_stage_actions
                 hook.stage_instance.client.next_name = hook.name
@@ -417,7 +417,7 @@ class Setup(Stage, Generic[Unpack[T]]):
         setup_stage_has_tasks: bool=False,
         setup_stage_target_config: Config=None
     ):
-        if setup_stage_has_tasks:
+        if setup_stage_has_tasks and isinstance(setup_stage_tasks, TaskHook):
             hook = setup_stage_tasks
             execute_stage: Stage = hook.stage_instance
             execute_stage.client.next_name = hook.name
