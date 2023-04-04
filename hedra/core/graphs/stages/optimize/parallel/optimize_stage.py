@@ -50,6 +50,7 @@ async def setup_action_channels_and_playwright(
 ) -> Execute:
     setup_stage.context = SimpleContext()
     setup_stage.generation_setup_candidates = 1
+    setup_stage.context['setup_stage_is_primary_thread'] = False
     setup_stage.context['setup_stage_target_config'] = persona_config
     setup_stage.context['setup_stage_target_stages'] = {
         execute_stage.name: execute_stage

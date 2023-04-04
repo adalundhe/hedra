@@ -5,6 +5,7 @@ import time
 import signal
 import dill
 import pickle
+import traceback
 from collections import defaultdict
 from typing import Dict, Any, List, Union
 from hedra.core.engines.client.config import Config
@@ -79,12 +80,12 @@ async def start_execution(
     logger.filesystem.create_filelogger('hedra.core.log')
 
     start = time.monotonic()
-
-    
-    persona = get_persona(persona_config)
-    persona.workers = workers
     
     await setup_stage.run_internal()
+
+    persona = get_persona(persona_config)
+
+    persona.workers = workers
 
     stages: Dict[str, Stage] =  setup_stage.context['setup_stage_ready_stages']
 
@@ -294,11 +295,12 @@ def execute_actions(parallel_config: str):
 
         setup_stage.config = source_stage_config
         setup_stage.generation_setup_candidates = 1
+        setup_stage.config = source_stage_config
+        setup_stage.context['setup_stage_is_primary_thread'] = False
         setup_stage.context['setup_stage_target_config'] = source_stage_config
         setup_stage.context['setup_stage_target_stages'] = {
             execute_stage.name: execute_stage
         }
-  
 
         result = loop.run_until_complete(
             start_execution(
@@ -317,7 +319,7 @@ def execute_actions(parallel_config: str):
             loop.close()
         except RuntimeError:
             pass
-
+        
         return {}
 
     except Exception as e:
