@@ -74,8 +74,14 @@ class CSV:
         original_filepath = Path(self.events_filepath)
         while file_exists:
             filepath = Path(self.events_filepath)
-            if filepath.stem[-1].isnumeric():
-                copy_index = int(filepath.stem[-1]) + 1
+            result = self.pattern.search(filepath.stem)
+            match: str = None
+            if result:
+                match = result.group(0)
+
+            if match and match[1:].isnumeric():
+                existing_copy_index = match[1:]
+                copy_index = int(existing_copy_index) + 1
 
             directory = original_filepath.parent
             filename = original_filepath.stem

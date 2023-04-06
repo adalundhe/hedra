@@ -6,6 +6,7 @@ import psutil
 import uuid
 import os
 import signal
+import re
 from pathlib import Path
 from typing import List, TextIO
 from concurrent.futures import ThreadPoolExecutor
@@ -30,7 +31,7 @@ def handle_loop_stop(
         loop.stop()
     except Exception:
         pass
-    
+
 
 class JSON:
 
@@ -47,6 +48,7 @@ class JSON:
 
         self.events_file: TextIO = None
         self.write_mode = 'w'
+        self.pattern = re.compile("_[0-9]+")
 
     async def connect(self):
         self._loop = asyncio._get_running_loop()
@@ -63,8 +65,14 @@ class JSON:
         original_filepath = Path(self.events_filepath)
         while file_exists:
             filepath = Path(self.events_filepath)
-            if filepath.stem[-1].isnumeric():
-                copy_index = int(filepath.stem[-1]) + 1
+            result = self.pattern.search(filepath.stem)
+            match: str = None
+            if result:
+                match = result.group(0)
+
+            if match and match[1:].isnumeric():
+                existing_copy_index = match[1:]
+                copy_index = int(existing_copy_index) + 1
 
             directory = original_filepath.parent
             filename = original_filepath.stem

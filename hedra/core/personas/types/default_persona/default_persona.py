@@ -33,8 +33,8 @@ async def cancel_pending(pend: Task):
             return pend
 
         pend.cancel()
-        if not pend.cancelled():
-            await pend
+        # if not pend.cancelled():
+        #     await pend
 
         return pend
     
@@ -170,9 +170,9 @@ class DefaultPersona:
         if self._stream:
 
             for reporter in self.stream_reporters:
-                await reporter.connect()
                 reporter.logger.filesystem.aio['hedra.reporting'].logger_enabled = False
                 reporter.selected_reporter.logger.filesystem.aio['hedra.reporting'].logger_enabled = False
+                await reporter.connect()
 
             await self.start_stream()
 

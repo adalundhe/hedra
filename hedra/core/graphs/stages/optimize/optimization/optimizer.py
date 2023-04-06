@@ -159,6 +159,9 @@ class Optimizer:
             except Exception:
                 pass
 
+            except ConnectionResetError:
+                pass
+
             elapsed = persona.end - persona.start
 
             await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - took - {round(elapsed, 2)} - seconds')
@@ -184,6 +187,8 @@ class Optimizer:
                     except asyncio.CancelledError:
                         pass
                     except asyncio.InvalidStateError:
+                        pass
+                    except ConnectionResetError:
                         pass
 
             await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Inverted APS score- {elapsed/completed_count}')
