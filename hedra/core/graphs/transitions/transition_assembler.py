@@ -235,7 +235,6 @@ class TransitionAssembler:
                             transition.to_stage
                         )
 
-                   
                     transition.predecessors = list(graph.predecessors(stage.name))
                     transition.descendants = list(graph.successors(stage.name))
                     
@@ -308,6 +307,11 @@ class TransitionAssembler:
                         execute_stage.context['execute_stage_stream_configs'] = [
                             streaming_submit_stage.config
                         ]
+
+                    else:
+                        execute_stage.context['execute_stage_stream_configs'].append(
+                            streaming_submit_stage.config
+                        )
 
 
         for stage_type in StageTypes:

@@ -14,9 +14,16 @@ from hedra.reporting.processed_result.types.base_processed_result import BasePro
 from hedra.reporting.metric import MetricsSet
 from .json_config import JSONConfig
 
+
 has_connector = True
 
-def handle_loop_stop(signame, executor: ThreadPoolExecutor, loop: asyncio.AbstractEventLoop, events_file: TextIO): 
+
+def handle_loop_stop(
+    signame, 
+    executor: ThreadPoolExecutor, 
+    loop: asyncio.AbstractEventLoop, 
+    events_file: TextIO
+): 
     try:
         events_file.close()
         executor.shutdown() 
@@ -56,7 +63,7 @@ class JSON:
             filepath = Path(self.events_filepath)
             copy_index = 1
             if filepath.stem[-1].isnumeric():
-                copy_index = int(filepath.stem[-1])
+                copy_index = int(filepath.stem[-1]) + 1
 
             directory = filepath.parent
             filename = filepath.stem
