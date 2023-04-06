@@ -5,6 +5,7 @@ import uuid
 import os
 import functools
 import signal
+import datetime
 from typing import List, TextIO
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -62,6 +63,19 @@ class CSV:
     async def connect(self):
         self._loop = asyncio._get_running_loop()
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping connect')
+        
+        original_filepath = Path(self.events_filepath)
+        
+        directory = original_filepath.parent
+        filename = original_filepath.stem
+
+        events_file_timestamp = datetime.datetime.now().strftime('%Y-%m-%dT-%H:%M:%S.z')
+
+        self.events_filepath = os.path.join(
+            directory,
+            f'{filename}_{events_file_timestamp}.csv'
+        )
+
         file_exists = await self._loop.run_in_executor(
             self._executor,
             functools.partial(   
@@ -70,8 +84,7 @@ class CSV:
             )
         )
         
-        copy_index = 1
-        original_filepath = Path(self.events_filepath)
+        copy_index = None
         while file_exists:
             filepath = Path(self.events_filepath)
             result = self.pattern.search(filepath.stem)
@@ -83,13 +96,8 @@ class CSV:
                 existing_copy_index = match[1:]
                 copy_index = int(existing_copy_index) + 1
 
-            directory = original_filepath.parent
-            filename = original_filepath.stem
-
-            self.events_filepath = os.path.join(
-                directory,
-                f'{filename}_{copy_index}.csv'
-            )
+            else:
+                copy_index = 1
 
             file_exists = await self._loop.run_in_executor(
                 self._executor,
@@ -97,6 +105,12 @@ class CSV:
                     os.path.exists,
                     self.events_filepath
                 )
+            )
+
+        if copy_index:
+            self.events_filepath = os.path.join(
+                directory,
+                f'{filename}_copy{copy_index}_{events_file_timestamp}.csv'
             )
 
         self.events_file = await self._loop.run_in_executor(

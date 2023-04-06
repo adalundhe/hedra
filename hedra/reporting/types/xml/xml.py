@@ -7,6 +7,7 @@ import psutil
 import signal
 import os
 import re
+import datetime
 from pathlib import Path
 from typing import List, TextIO
 from concurrent.futures import ThreadPoolExecutor
@@ -63,6 +64,19 @@ class XML:
     async def connect(self):
         self._loop = asyncio._get_running_loop()
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping connect')
+        
+        original_filepath = Path(self.events_filepath)
+        
+        directory = original_filepath.parent
+        filename = original_filepath.stem
+
+        events_file_timestamp = datetime.datetime.now().strftime('%Y-%m-%dT-%H:%M:%S.z')
+
+        self.events_filepath = os.path.join(
+            directory,
+            f'{filename}_{events_file_timestamp}.xml'
+        )
+        
         file_exists = await self._loop.run_in_executor(
             self._executor,
             functools.partial(   
@@ -71,7 +85,7 @@ class XML:
             )
         )
         
-        copy_index = 1
+        copy_index = None
         original_filepath = Path(self.events_filepath)
         while file_exists:
             filepath = Path(self.events_filepath)
@@ -84,12 +98,12 @@ class XML:
                 existing_copy_index = match[1:]
                 copy_index = int(existing_copy_index) + 1
 
-            directory = original_filepath.parent
-            filename = original_filepath.stem
+            else:
+                copy_index = 1
 
             self.events_filepath = os.path.join(
                 directory,
-                f'{filename}_{copy_index}.xml'
+                f'{filename}_copy{copy_index}_{events_file_timestamp}.json'
             )
 
             file_exists = await self._loop.run_in_executor(
@@ -98,6 +112,17 @@ class XML:
                     os.path.exists,
                     self.events_filepath
                 )
+            )
+
+        directory = original_filepath.parent
+        filename = original_filepath.stem
+
+        events_file_timestamp = datetime.datetime.now().strftime('%Y-%m-%dT-%H:%M:%S.z')
+
+        if copy_index:
+            self.events_filepath = os.path.join(
+                directory,
+                f'{filename}_copy{copy_index}_{events_file_timestamp}.xml'
             )
 
         self.events_file = await self._loop.run_in_executor(
