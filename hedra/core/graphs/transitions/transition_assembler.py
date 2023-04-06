@@ -301,7 +301,7 @@ class TransitionAssembler:
                     execute_stage.name, 
                     streaming_submit_stage.name
                 )
-
+                
                 if has_path:
                     if execute_stage.context['execute_stage_stream_configs'] is None:
                         execute_stage.context['execute_stage_stream_configs'] = [

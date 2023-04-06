@@ -143,7 +143,7 @@ class DefaultPersona:
         for hook in self._hooks:
             if self.stage_name is None:
                 self.stage_name = hook.stage
-
+        
         for reporter_config in self.stream_reporter_configs:
             self.stream_reporters.append(
                 Reporter(reporter_config)

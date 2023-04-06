@@ -70,18 +70,27 @@ class CSV:
             )
         )
         
-        if file_exists:
+        copy_index = 1
+        original_filepath = Path(self.events_filepath)
+        while file_exists:
             filepath = Path(self.events_filepath)
-            copy_index = 1
             if filepath.stem[-1].isnumeric():
                 copy_index = int(filepath.stem[-1]) + 1
 
-            directory = filepath.parent
-            filename = filepath.stem
+            directory = original_filepath.parent
+            filename = original_filepath.stem
 
             self.events_filepath = os.path.join(
                 directory,
                 f'{filename}_{copy_index}.csv'
+            )
+
+            file_exists = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(   
+                    os.path.exists,
+                    self.events_filepath
+                )
             )
 
         self.events_file = await self._loop.run_in_executor(

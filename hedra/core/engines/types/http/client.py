@@ -137,9 +137,10 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
         self.active += 1
  
         async with self.sem:
-            connection = self.pool.connections.pop()
             
             try:
+                
+                connection = self.pool.connections.pop()
                 
                 if action.hooks.listen:
                     event = asyncio.Event()

@@ -15,6 +15,7 @@ from hedra.core.graphs.stages.analyze.analyze import Analyze
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.reporting.reporter import ReporterConfig
 
 
 ExecuteHooks = List[Union[ActionHook , TaskHook]]
@@ -39,7 +40,7 @@ class ExecuteEdge(BaseEdge[Execute]):
             'execute_stage_setup_by',
             'execute_stage_setup_hooks',
             'execute_stage_results',
-            'execute_stage_streamed_analytics'
+            'execute_stage_streamed_analytics',
         ]
 
         self.provides = [
@@ -59,6 +60,7 @@ class ExecuteEdge(BaseEdge[Execute]):
         ]
 
         self.assigned_candidates = []
+        self.execute_stage_stream_configs: List[ReporterConfig] = []
 
     async def transition(self):
 
@@ -287,9 +289,15 @@ class ExecuteEdge(BaseEdge[Execute]):
                 execute_stage_streamed_analytics.extend(
                     previous_history.get('execute_stage_streamed_analytics', [])
                 )
-            
 
+        stream_configs = self.source.context.get('execute_stage_stream_configs')
+        if stream_configs:
+            self.execute_stage_stream_configs.extend([
+                config for config in stream_configs if config not in self.execute_stage_stream_configs
+            ])
+            
         self.edge_data = {
+            'execute_stage_stream_configs': self.execute_stage_stream_configs, 
             'execute_stage_streamed_analytics': execute_stage_streamed_analytics,
             'execute_stage_setup_config': execute_stage_setup_config,
             'execute_stage_setup_hooks': execute_stage_setup_hooks,

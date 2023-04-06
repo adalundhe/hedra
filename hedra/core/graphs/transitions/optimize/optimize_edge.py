@@ -92,9 +92,6 @@ class OptimizeEdge(BaseEdge[Optimize]):
             self._update(self.destination)
             if len(selected_optimization_candidates) > 0:
 
-                if self.destination.context is None:
-                    self.destination.context = SimpleContext()
-
                 for optimization_candidate in selected_optimization_candidates.values():
 
                     if optimization_candidate.context is None:
@@ -170,6 +167,8 @@ class OptimizeEdge(BaseEdge[Optimize]):
         minimum_edge_idx = min([edge.transition_idx for edge in edges])
         
         optimize_stage_copy.context = SimpleContext()
+        optimize_stage_copy.context.update(self.source.context)
+
         for event in optimize_stage_copy.dispatcher.events_by_name.values():
             event.source.stage_instance = optimize_stage_copy 
             event.source.stage_instance = optimize_stage_copy
