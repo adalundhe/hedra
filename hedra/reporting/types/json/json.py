@@ -1,9 +1,13 @@
+from __future__ import annotations
 import asyncio
 import functools
 import json
 import psutil
 import uuid
-from typing import List
+import os
+import signal
+from pathlib import Path
+from typing import List, TextIO
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
@@ -12,53 +16,108 @@ from .json_config import JSONConfig
 
 has_connector = True
 
+def handle_loop_stop(signame, executor: ThreadPoolExecutor, loop: asyncio.AbstractEventLoop, events_file: TextIO): 
+    try:
+        events_file.close()
+        executor.shutdown() 
+        loop.stop()
+    except Exception:
+        pass
+    
+
 class JSON:
 
     def __init__(self, config: JSONConfig) -> None:
         self.events_filepath = config.events_filepath
         self.metrics_filepath = config.metrics_filepath
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
-        self._loop = asyncio.get_event_loop()
+        self._loop: asyncio.AbstractEventLoop = None
 
         self.session_uuid = str(uuid.uuid4())
         self.metadata_string: str = None
         self.logger = HedraLogger()
         self.logger.initialize()
 
+        self.events_file: TextIO = None
+        self.write_mode = 'w'
 
     async def connect(self):
+        self._loop = asyncio._get_running_loop()
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping connect')
+        file_exists = await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(   
+                os.path.exists,
+                self.events_filepath
+            )
+        )
+        
+        if file_exists:
+            filepath = Path(self.events_filepath)
+            copy_index = 1
+            if filepath.stem[-1].isnumeric():
+                copy_index = int(filepath.stem[-1])
+
+            directory = filepath.parent
+            filename = filepath.stem
+
+            self.events_filepath = os.path.join(
+                directory,
+                f'{filename}_{copy_index}.json'
+            )
+
+        self.events_file = await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                open,
+                self.events_filepath,
+                self.write_mode
+            )
+        )
+
+        for signame in ('SIGINT', 'SIGTERM'):
+            self._loop.add_signal_handler(
+                getattr(signal, signame),
+                lambda signame=signame: handle_loop_stop(
+                    signame,
+                    self._executor,
+                    self._loop,
+                    self.events_file
+                )
+            )
 
     async def submit_events(self, events: List[BaseProcessedResult]):
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Events to file - {self.events_filepath}')
 
-        event_records = [
-            event.record for event in events
-        ]
+        event_records = {
+            event.event_id: event.record for event in events
+        }
 
-        events_file = await self._loop.run_in_executor(
-            self._executor,
-            functools.partial(
-                open,
-                self.events_filepath,
-                'w'
-            )
-        )
+        if self.write_mode == 'a+':
+            try:
+                existing_data = await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        json.load,
+                        self.events_file
+                    )
+                )
+            
+            except Exception:
+                existing_data = {}
+
+            event_records.update(existing_data)
+
 
         await self._loop.run_in_executor(
             self._executor,
             functools.partial(
                 json.dump,
                 event_records, 
-                events_file, 
+                self.events_file, 
                 indent=4
             )
-        )
-
-        await self._loop.run_in_executor(
-            self._executor,
-            events_file.close
         )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Events to file - {self.events_filepath}')
@@ -123,5 +182,11 @@ class JSON:
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping Error Metrics')
 
     async def close(self):
+        await self._loop.run_in_executor(
+            self._executor,
+            self.events_file.close
+        )
+        
         self._executor.shutdown()
+
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')

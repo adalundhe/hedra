@@ -39,18 +39,19 @@ class ActEdge(BaseEdge[Act]):
             'execute_stage_setup_config',
             'execute_stage_setup_by',
             'execute_stage_setup_hooks',
-            'execute_stage_results'
+            'execute_stage_results',
+            'execute_stage_streamed_analytics'
         ]
 
         self.provides = [
             'setup_stage_configs',
             'analyze_stage_summary_metrics',
-            'execute_stage_results',
             'execute_stage_setup_hooks',
             'execute_stage_setup_config',
             'execute_stage_setup_by',
             'setup_stage_ready_stages',
-            'execute_stage_skipped'
+            'execute_stage_results',
+            'execute_stage_streamed_analytics'
         ]
 
         self.valid_states = [

@@ -62,6 +62,8 @@ class TransitionAssembler:
         self.all_hooks = []
         self.edges_by_name: Dict[Tuple[str, str], BaseEdge] = {}
         self.adjacency_list: Dict[str, List[Transition]] = defaultdict(list)
+        self.execute_stages: List[Stage] = []
+        self.streaming_submit_stages: List[Stage] = []
 
         self._graph_metadata_log_string = f'Graph - {self.graph_name}:{self.graph_id} - thread:{self._thread_id} - process:{self._process_id} - '
 
@@ -216,6 +218,16 @@ class TransitionAssembler:
                         neighbor_stage
                     )
 
+                    if stage.stage_type == StageTypes.EXECUTE:
+                        self.execute_stages.append(
+                            stage
+                        )
+
+                    if stage.stage_type == StageTypes.SUBMIT and stage.stream:
+                        self.streaming_submit_stages.append(
+                            stage
+                        )
+
 
                     if transition_action.is_valid is False:
                         raise InvalidTransitionError(
@@ -277,6 +289,26 @@ class TransitionAssembler:
                 stages_by_type[stage_type][stage.name] = stage
 
         all_paths = {}
+        
+        for execute_stage in self.execute_stages:
+
+            if execute_stage.context is None:
+                execute_stage.context = SimpleContext()
+
+            for streaming_submit_stage in self.streaming_submit_stages:
+
+                has_path = networkx.has_path(
+                    graph, 
+                    execute_stage.name, 
+                    streaming_submit_stage.name
+                )
+
+                if has_path:
+                    if execute_stage.context['execute_stage_stream_configs'] is None:
+                        execute_stage.context['execute_stage_stream_configs'] = [
+                            streaming_submit_stage.config
+                        ]
+
 
         for stage_type in StageTypes:
 

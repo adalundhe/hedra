@@ -3,54 +3,26 @@ import time
 import asyncio
 import uuid
 import psutil
-from asyncio import Task
 from hedra.core.engines.client.config import Config
-from hedra.core.personas.types.default_persona.default_persona import DefaultPersona
+from hedra.core.personas.types.default_persona.default_persona import DefaultPersona, cancel_pending
 from hedra.core.personas.types.types import PersonaTypes
-from .completed_counter import CompletedCounter
-
-
-async def cancel_pending(pend: Task):
-    try:
-        if pend.done():
-            pend.exception()
-
-            return pend
-
-        pend.cancel()
-        if not pend.cancelled():
-            await pend
-
-        return pend
-    
-    except asyncio.CancelledError as cancelled_error:
-        return cancelled_error
-
-    except asyncio.TimeoutError as timeout_error:
-        return timeout_error
-
-    except asyncio.InvalidStateError as invalid_state:
-        return invalid_state
+from hedra.core.personas.streaming.stream import Stream
 
 
 class ConstantArrivalPersona(DefaultPersona):
 
-    __slots__ = (
-        'completed_counter'
-    )
-
     def __init__(self, config: Config):
-        super(ConstantArrivalPersona, self).__init__(config)
+        super().__init__(config)
 
         self.persona_id = str(uuid.uuid4())
 
-        self.completed_counter = CompletedCounter()
+        self.stream = Stream()
         self.type = PersonaTypes.CONSTANT_ARRIVAL
-            
-    async def execute(self):
 
+    async def execute(self):
+        hooks = self._hooks
         hook_names = ', '.join([
-            hook.name for hook in self._hooks
+            hook.name for hook in hooks
         ])
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing {self.actions_count} Hooks: {hook_names}')
@@ -58,50 +30,67 @@ class ConstantArrivalPersona(DefaultPersona):
         total_time = self.total_time
 
         await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Executing for a total of - {total_time} - seconds')
+        loop = asyncio.get_running_loop()
 
-        await self.start_updates()
+        if self._stream:
 
-        self.start = time.monotonic()
-        completed, pending = await asyncio.wait([
-            asyncio.ensure_future(
-                self.completed_counter.execute_action(
-                    self._hooks[action_idx]
-                )
-            ) async for action_idx in self.generator(total_time)
-        ], timeout=1)
+            for reporter in self.stream_reporters:
+                await reporter.connect()
+                reporter.logger.filesystem.aio['hedra.reporting'].logger_enabled = False
+                reporter.selected_reporter.logger.filesystem.aio['hedra.reporting'].logger_enabled = False
 
-        self.end = time.monotonic()
+            await self.start_stream()
+
+            self.start = time.monotonic()
+            completed, pending = await asyncio.wait([
+                loop.create_task(
+                    self.stream.execute_action(
+                        hooks[action_idx]
+                    )
+                ) async for action_idx in self.generator(total_time)
+            ], timeout=self.graceful_stop)
+
+            self.end = time.monotonic()
+
+            self.execution_metrics = await self.stop_stream()
+
+            for reporter in self.stream_reporters:
+                await reporter.close()
+
+        else:
+
+            self.start = time.monotonic()
+            completed, pending = await asyncio.wait([
+                loop.create_task(
+                    self.stream.execute_action(
+                        hooks[action_idx]
+                    )
+                ) async for action_idx in self.generator(total_time)
+            ], timeout=self.graceful_stop)
+
+            self.end = time.monotonic()
+
         self.pending_actions = len(pending)
-
         await self.logger.filesystem.aio['hedra.core'].debug(
             f'{self.metadata_string} - Execution completed with - {self.pending_actions} - actions left pending'
         )
 
         results = await asyncio.gather(*completed)
-        
-        await self.stop_updates()
 
         cleanup_start = time.monotonic()
 
-        try:
-            await asyncio.gather(*[
-                asyncio.create_task(
-                    cancel_pending(pend)
-                ) for pend in pending
-            ])
-
-        except asyncio.CancelledError:
-            pass
-
-        except asyncio.TimeoutError:
-            pass
+        await asyncio.gather(*[
+            asyncio.create_task(
+                cancel_pending(pend)
+            ) for pend in pending
+        ])
 
         cleanup_elapsed = time.monotonic() - cleanup_start
         await self.logger.filesystem.aio['hedra.core'].info(
             f'{self.metadata_string} - Cleanup completed - Resolved {self.pending_actions} pending actions in {round(cleanup_elapsed, 2)} seconds'
         )
 
-        for hook in self._hooks:
+        for hook in hooks:
 
             session_closed_start = time.monotonic()
 
@@ -111,7 +100,7 @@ class ConstantArrivalPersona(DefaultPersona):
             session_closed_elapsed = time.monotonic() - session_closed_start
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Closed session - {hook.session.session_id} - for Hook - {hook.name}:{hook.hook_id}. Took: {round(session_closed_elapsed, 2)} seconds')
-  
+        
         self.total_actions = len(set(results))
         self.total_elapsed = self.end - self.start
         self.optimized_params = None
@@ -125,7 +114,7 @@ class ConstantArrivalPersona(DefaultPersona):
         idx = 0
         action_idx = 0
         max_pool_size = math.ceil(self.batch.size * (psutil.cpu_count(logical=False) * 2)/self.workers)
-        self.completed_counter.last_batch_size = self.batch.size
+        self.stream.last_batch_size = self.batch.size
 
         start = time.time()
         while elapsed < total_time:
@@ -137,29 +126,29 @@ class ConstantArrivalPersona(DefaultPersona):
 
             if idx%self._hooks[action_idx].session.pool.size == 0:
 
-                if self.completed_counter.completed_count  > 0:
+                if self.stream.completed_count  > 0:
 
-                    if self.completed_counter.completed_count < self.batch.size:
-                        increase_percentage = (self.batch.size - self.completed_counter.completed_count)/self.batch.size
-                        increase_amount = math.ceil(increase_percentage * self.completed_counter.last_batch_size)
+                    if self.stream.completed_count < self.batch.size:
+                        increase_percentage = (self.batch.size - self.stream.completed_count)/self.batch.size
+                        increase_amount = math.ceil(increase_percentage * self.stream.last_batch_size)
 
-                        self.completed_counter.last_completed = self.completed_counter.completed_count
-                        self.completed_counter.last_batch_size = self.completed_counter.last_batch_size + increase_amount
+                        self.stream.last_completed = self.stream.completed_count
+                        self.stream.last_batch_size = self.stream.last_batch_size + increase_amount
 
                         self._hooks[action_idx].session.extend_pool(increase_amount)
                         await asyncio.sleep(0)
 
-                    elif self.completed_counter.completed_count > self.batch.size:
-                        decrease_percentage = (self.completed_counter.completed_count - self.batch.size)/self.completed_counter.completed_count
-                        decrease_amount = math.ceil(decrease_percentage * self.completed_counter.last_batch_size)
+                    elif self.stream.completed_count > self.batch.size:
+                        decrease_percentage = (self.stream.completed_count - self.batch.size)/self.stream.completed_count
+                        decrease_amount = math.ceil(decrease_percentage * self.stream.last_batch_size)
 
-                        self.completed_counter.last_completed = self.completed_counter.completed_count
-                        self.completed_counter.last_batch_size = self.completed_counter.last_batch_size - decrease_amount
+                        self.stream.last_completed = self.stream.completed_count
+                        self.stream.last_batch_size = self.stream.last_batch_size - decrease_amount
 
                         self._hooks[action_idx].session.shrink_pool(decrease_amount)
                         await asyncio.sleep(0)
             
-                    self.completed_counter.completed_count = 0
+                    self.stream.completed_count = 0
 
                 await asyncio.sleep(self.batch.interval)
 

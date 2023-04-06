@@ -1,6 +1,9 @@
+from __future__ import annotations
 import uuid
 import threading
 import os
+import asyncio
+import signal
 from typing import Any, List, TypeVar, Union
 from hedra.logging import HedraLogger
 from hedra.plugins.types.reporter.reporter_config import ReporterConfig
@@ -104,6 +107,7 @@ ReporterType = TypeVar(
     TimescaleDBConfig,
     XMLConfig
 )
+
 
 class Reporter:
     reporters = {

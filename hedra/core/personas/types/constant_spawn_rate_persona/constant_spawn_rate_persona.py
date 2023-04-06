@@ -10,6 +10,41 @@ from hedra.core.personas.types.types import PersonaTypes
 
 
 class ConstantSpawnPersona(DefaultPersona):
+    __slots__ = (
+        'metadata_string',
+        'persona_id',
+        'logger',
+        'type',
+        'workers',
+        'actions',
+        '_hooks',
+        'batch',
+        '_stream',
+        'total_time',
+        'duration',
+        'total_actions',
+        'total_elapsed',
+        'start',
+        'end',
+        'completed_actions',
+        'pending_actions',
+        'completed_time',
+        'run_timer',
+        'actions_count',
+        'graceful_stop',
+        'is_timed',
+        '_stream_thread',
+        '_loop',
+        'current_action_idx',
+        'optimized_params',
+        '_executor',
+        'stream',
+        'execution_metrics',
+        'stream_reporter_configs',
+        'stream_reporters',
+        'stage_name',
+        'action_interval'
+    )    
 
     def __init__(self, config: Config):
         super(ConstantSpawnPersona, self).__init__(config)

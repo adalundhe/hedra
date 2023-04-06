@@ -2,12 +2,12 @@ import asyncio
 import math
 import multiprocessing
 import psutil
-import functools
+from multiprocessing import current_process, active_children
 from types import FunctionType
+from concurrent.futures.process import BrokenProcessPool
 from concurrent.futures import ProcessPoolExecutor
-from multiprocessing.pool import Pool
-from typing import Any, Coroutine, Dict, List, Tuple, Union
-from hedra.core.engines.types.common.base_result import BaseResult
+from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
+from typing import Any, List, Tuple
 from .synchronization import BatchedSemaphore
 
 
@@ -28,6 +28,7 @@ class BatchExecutor:
         self.pool = ProcessPoolExecutor(max_workers=psutil.cpu_count(logical=False), mp_context=self.context)
         self.shutdown_task = None
         self.batch_by_stages = False
+
 
     async def execute_batches(self, batched_stages: List[Tuple[int, List[Any]]], execution_task: FunctionType) -> List[Tuple[str, Any]]:
 
@@ -67,16 +68,19 @@ class BatchExecutor:
         configs: List[Any]
     ):
 
-        results = await asyncio.gather(*[
-            self.loop.run_in_executor(
-                self.pool,
-                execution_task,
-                config
-                
-            ) for config in configs
-        ])
+        try:
+            return await asyncio.gather(*[
+                self.loop.run_in_executor(
+                    self.pool,
+                    execution_task,
+                    config
+                    
+                ) for config in configs
+            ])
         
-        return results
+        except BrokenProcessPool:
+            raise ProcessKilledError()
+
 
     def partion_stage_batches(self, stages: List[Any], ) -> List[Tuple[str, Any, int]]:
 
@@ -162,3 +166,7 @@ class BatchExecutor:
 
     async def shutdown(self):
         self.pool.shutdown()
+
+        child_processes = active_children()
+        for child in child_processes:
+            child.kill()

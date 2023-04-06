@@ -32,7 +32,7 @@ class BaseProcessedResult:
         self.event_id = str(uuid.uuid4())
         self.action_id = result.action_id
 
-        self.name = None
+        self.name = result.name
         self.shortname = result.name
         self.error = result.error
         self.timings = {}
@@ -62,6 +62,7 @@ class BaseProcessedResult:
     @property
     def record(self):
         return {
+            'id': self.event_id,
             'name': self.name,
             'stage': self.stage,
             'time': self.time,

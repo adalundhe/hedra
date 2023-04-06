@@ -15,6 +15,7 @@ T = TypeVar('T')
 
 class Submit(Stage, Generic[T]):
     stage_type=StageTypes.SUBMIT
+    stream: bool = False
     config: T= None
     
     def __init__(self) -> None:
@@ -42,6 +43,9 @@ class Submit(Stage, Generic[T]):
             'submit_custom_metrics',
             'complete_submit_session'
         ]
+
+        self.stream = self.stream
+        self.config = self.config
 
     @Internal()
     async def run(self):
@@ -123,7 +127,7 @@ class Submit(Stage, Generic[T]):
         submit_stage_session_total: int=0
     ):
 
-        if submit_stage_has_events:
+        if submit_stage_has_events and self.stream is False:
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {submit_stage_reporter_name}:{submit_stage_reporter.reporter_id} - Submitting - {submit_stage_session_total} - Events')
             await submit_stage_reporter.submit_events(submit_stage_events)

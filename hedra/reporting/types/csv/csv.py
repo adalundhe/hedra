@@ -2,6 +2,7 @@ import asyncio
 import csv
 import psutil
 import uuid
+import os
 import functools
 from typing import List
 from pathlib import Path
@@ -48,17 +49,29 @@ class CSV:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Events to file - {self.events_filepath}')
         
+        file_exists = await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(   
+                os.path.exists,
+                self.events_filepath
+            )
+        )
+        
+        write_mode = 'w'
+        if file_exists:
+            write_mode = 'a+'
+
         events_file = await self._loop.run_in_executor(
             self._executor,
             functools.partial(
                 open,
                 self.events_filepath,
-                'w'
+                write_mode
             )
         )        
 
         for event in events:
-            if self._events_csv_writer is None:
+            if self._events_csv_writer is None or write_mode == 'w':
                 self._events_csv_writer = csv.DictWriter(events_file, fieldnames=event.fields)
                 
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Writing headers to file - {self.metrics_filepath} - {", ".join(event.fields)}')

@@ -5,7 +5,6 @@ import time
 import signal
 import dill
 import pickle
-import traceback
 from collections import defaultdict
 from typing import Dict, Any, List, Union
 from hedra.core.engines.client.config import Config
@@ -21,6 +20,7 @@ from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
 from hedra.core.graphs.stages.base.stage import Stage
+from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
 from hedra.core.graphs.stages.base.import_tools import (
     import_stages, 
     import_plugins, 
@@ -36,6 +36,7 @@ from hedra.logging import (
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
+from hedra.reporting.reporter import ReporterConfig
 
 
 async def start_execution(
@@ -43,7 +44,8 @@ async def start_execution(
     persona_config: Config,
     setup_stage: Setup,
     workers: int,
-    source_stage_name: str
+    source_stage_name: str,
+    source_stage_stream_configs: List[ReporterConfig]
 ):
 
     hedra_config_filepath = os.path.join(
@@ -83,14 +85,14 @@ async def start_execution(
     
     await setup_stage.run_internal()
 
-    persona = get_persona(persona_config)
-
-    persona.workers = workers
-
     stages: Dict[str, Stage] =  setup_stage.context['setup_stage_ready_stages']
 
     setup_execute_stage: Stage = stages.get(source_stage_name)
     setup_execute_stage.logger = logger
+
+    persona = get_persona(persona_config)
+    persona.stream_reporter_configs = source_stage_stream_configs
+    persona.workers = workers
 
     actions_and_tasks: List[Union[ActionHook, TaskHook]] = setup_stage.context['execute_stage_setup_hooks'].get(source_stage_name)
 
@@ -158,9 +160,13 @@ async def start_execution(
 
         context.update({
             context_key: context_value for context_key, context_value in serializable_context
-        })   
+        }) 
+
+    for idx, result in enumerate(results):
+        results[idx] = dill.dumps(result)  
 
     results_dict =  {
+        'streamed_analytics': persona.streamed_analytics,
         'results': results,
         'total_results': len(results),
         'total_elapsed': persona.total_elapsed,
@@ -187,10 +193,10 @@ def execute_actions(parallel_config: str):
             loop.close()
 
         except BrokenPipeError:
-            os._exit(1)
-                
+            pass
+
         except RuntimeError:
-            os._exit(1)
+            pass
 
     for signame in ('SIGINT', 'SIGTERM'):
         loop.add_signal_handler(
@@ -210,6 +216,8 @@ def execute_actions(parallel_config: str):
         source_stage_config: Config = parallel_config.get('source_stage_config')
         source_stage_id = parallel_config.get('source_stage_id')
         source_setup_stage_name = parallel_config.get('source_setup_stage_name')
+        source_stage_stream_configs = parallel_config.get('source_stage_stream_configs')
+
         thread_id = threading.current_thread().ident
         process_id = os.getpid()
 
@@ -230,7 +238,10 @@ def execute_actions(parallel_config: str):
         generated_hooks = {}
         for stage in discovered.values():
             stage: Stage = stage()
-            stage.context = SimpleContext()
+
+            if stage.context is None:
+                stage.context = SimpleContext()
+                
             stage.graph_name = graph_name
             stage.graph_path = graph_path
             stage.graph_id = graph_id
@@ -308,19 +319,20 @@ def execute_actions(parallel_config: str):
                 source_stage_config,
                 setup_stage,
                 workers,
-                source_stage_name
+                source_stage_name,
+                source_stage_stream_configs
             )
         )
+
+        loop.close()
 
         return result
 
     except BrokenPipeError:
-        try:
-            loop.close()
-        except RuntimeError:
-            pass
-        
-        return {}
+        raise ProcessKilledError()
+    
+    except RuntimeError:
+        raise ProcessKilledError()
 
     except Exception as e:
         raise e

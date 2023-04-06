@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import inspect
+import traceback
 from collections import defaultdict
 from typing import Dict, List, Any
 from hedra.core.hooks.types.base.hook import Hook
@@ -26,9 +27,11 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         )
 
         self.requires = [
+            'execute_stage_streamed_analytics',
             'execute_stage_results'
         ]
         self.provides = [
+            'execute_stage_streamed_analytics',
             'analyze_stage_summary_metrics'
         ]
 
@@ -228,7 +231,8 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                 results_to_calculate[stage_name] = raw_results.get(stage_name)
                 target_stages[stage_name] = stage
         
-        
-        self.edge_data['analyze_stage_raw_results'] = results_to_calculate
-        self.edge_data['analyze_stage_target_stages'] = target_stages
-        self.edge_data['analyze_stage_has_results'] = len(results_to_calculate) > 0
+        self.edge_data = {
+            'analyze_stage_raw_results': results_to_calculate,
+            'analyze_stage_target_stages': target_stages,
+            'analyze_stage_has_results': len(results_to_calculate) > 0
+        }

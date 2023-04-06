@@ -7,6 +7,7 @@ import sys
 import importlib
 import ntpath
 import signal
+from multiprocessing import current_process, active_children
 from pathlib import Path
 from typing import List
 from hedra.core.graphs.stages.base.stage import Stage
@@ -147,30 +148,26 @@ def run_graph(
     def handle_loop_stop(signame):
         try:
 
-            loop.stop()
-            executors_shutdown: List[asyncio.Future] = []
-            for transition_group in graph._transitions:
-                for transition in transition_group:
-                    if transition.edge.source.executor:
-                        executors_shutdown.append(
-                            asyncio.ensure_future(
-                                transition.edge.source.executor.shutdown()
-                            )
-                        )
+            child_processes = active_children()
+            for child in child_processes:
+                child.kill()
+                
+            process = current_process()
+            if process:
+                try:
+                    process.kill()
+                
+                except Exception:
+                    pass
 
-            for executor_shutdown in executors_shutdown:
-                if not executor_shutdown.done():
-                    executor_shutdown.set_result(None)
-
-                executor_shutdown.result()
-
-            loop.close()
-        except BrokenPipeError:   
-            logger.console.sync.critical('\n\nAborted.\n')    
-            os._exit(1)
+        except BrokenPipeError:
+            logger.console.sync.critical('\n\nAborted.\n')   
 
         except RuntimeError:
             logger.console.sync.critical('\n\nAborted.\n')
+
+        if len(child_processes) < 1:
+            logger.console.sync.critical('\n\nAborted.\n')   
             os._exit(1)
 
     graph.assemble()
@@ -189,12 +186,33 @@ def run_graph(
     except RuntimeError:
         pass
     
+    exit_code = 0
+
     if graph.status == GraphStatus.FAILED:
         logger.filesystem.sync['hedra.core'].info(f'{graph.metadata_string} - Failed - {graph.logger.spinner.display.total_timer.elapsed_message}\n')
         logger.console.sync.info(f'\nGraph - {graph_name.capitalize()} - failed. {graph.logger.spinner.display.total_timer.elapsed_message}\n')
+        exit_code = 1
+
+    elif graph.status == GraphStatus.CANCELLED:
+        logger.console.sync.critical('\nAborted.\n') 
+        exit_code = 1  
 
     else:
         logger.filesystem.sync['hedra.core'].info(f'{graph.metadata_string} - Completed - {graph.logger.spinner.display.total_timer.elapsed_message}\n')
         logger.console.sync.info(f'\nGraph - {graph_name.capitalize()} - completed! {graph.logger.spinner.display.total_timer.elapsed_message}\n')
 
-    os._exit(0)
+    
+    if graph.status == GraphStatus.FAILED or graph.status == GraphStatus.COMPLETE:
+        child_processes = active_children()
+        for child in child_processes:
+            child.kill()
+            
+        process = current_process()
+        if process:
+            try:
+                process.kill()
+            
+            except Exception:
+                pass
+
+    os._exit(exit_code)

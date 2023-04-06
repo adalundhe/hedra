@@ -33,10 +33,12 @@ class SetupEdge(BaseEdge[Setup]):
         ]
 
         self.requires = [
+            'execute_stage_streamed_analytics',
             'execute_stage_results'
         ]
 
         self.provides = [
+            'execute_stage_streamed_analytics',
             'execute_stage_setup_hooks',
             'execute_stage_setup_config',
             'execute_stage_setup_by',
@@ -60,7 +62,13 @@ class SetupEdge(BaseEdge[Setup]):
             self.source.generation_setup_candidates = len(setup_candidates)
 
             for setup_candidate in setup_candidates.values():
-                setup_candidate.context = SimpleContext()
+                if setup_candidate.context is None:
+                    setup_candidate.context = SimpleContext()
+
+            
+            for optimize_candidate in optimize_candidates.values():
+                if optimize_candidate.context is None:
+                    optimize_candidate.context = SimpleContext()
 
             self.edge_data['setup_stage_target_stages'] = setup_candidates
             self.edge_data['setup_stage_target_config'] = self.source.config

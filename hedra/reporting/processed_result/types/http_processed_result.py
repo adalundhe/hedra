@@ -40,7 +40,6 @@ class HTTPProcessedResult(BaseProcessedResult):
         self.status = result.status
         self.headers: Dict[bytes, bytes] = result.headers
         self.data = result.data
-        self.name = f'{self.method}_{self.shortname}'
 
         self.time = result.complete - result.start
 

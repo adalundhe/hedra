@@ -1,7 +1,6 @@
 from __future__ import annotations
 import asyncio
 import inspect
-import traceback
 from collections import defaultdict
 from typing import Dict, List, Any, Union
 from hedra.core.engines.client.config import Config
@@ -16,6 +15,7 @@ from hedra.core.graphs.stages.optimize.optimize import Optimize
 from hedra.core.graphs.stages.execute.execute import Execute
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 
 
 ExecuteHooks = List[Union[ActionHook , TaskHook]]
@@ -33,6 +33,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         )
 
         self.requires = [
+            'execute_stage_streamed_analytics',
             'setup_stage_configs',
             'execute_stage_setup_hooks',
             'execute_stage_setup_config',
@@ -43,6 +44,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         ]
 
         self.provides = [
+            'execute_stage_streamed_analytics',
             'setup_stage_configs',
             'optimize_stage_optimized_params',
             'optimize_stage_optimized_configs',
@@ -235,11 +237,12 @@ class OptimizeEdge(BaseEdge[Optimize]):
         setup_stage_ready_stages: List[Stage] = []
         setup_stage_candidates: List[Stage] = []
         setup_stage_configs: Dict[str, Config] = {}
+        execute_stage_streamed_analytics: List[StreamAnalytics] = []
 
         for source_stage, destination_stage in self.history:
             
             if destination_stage == self.source.name:
-                previous_history = self.history[(source_stage, self.source.name)]
+                previous_history: Dict[str, Any] = self.history[(source_stage, self.source.name)]
                 setup_stage_configs.update(
                     previous_history.get(
                         'setup_stage_configs',
@@ -274,8 +277,16 @@ class OptimizeEdge(BaseEdge[Optimize]):
                 for stage_candidate in stage_candidates:
                     if stage_candidate not in setup_stage_candidates:
                         setup_stage_candidates.append(stage_candidate)
+
+                execute_stage_streamed_analytics.extend(
+                    previous_history.get(
+                        'execute_stage_streamed_analytics',
+                        []
+                    )
+                )
         
         self.edge_data = {
+            'execute_stage_streamed_analytics': execute_stage_streamed_analytics,
             'setup_stage_configs': setup_stage_configs,
             'execute_stage_setup_config': execute_stage_setup_config,
             'execute_stage_setup_hooks': execute_stage_setup_hooks,

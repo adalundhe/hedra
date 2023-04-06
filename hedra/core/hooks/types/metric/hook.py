@@ -1,5 +1,9 @@
 import asyncio
+import dill
+import functools
+import signal
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Awaitable, Any, Optional, Dict, List
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.hook_type import HookType
@@ -9,7 +13,18 @@ from hedra.reporting.metric.custom_metric import CustomMetric
 
 
 RawResultsSet = Dict[str, ResultsSet]
+def handle_loop_stop(
+        signame, 
+        executor: ThreadPoolExecutor
+    ):
+    try:
+        executor.shutdown()
 
+    except BrokenPipeError:
+        pass
+
+    except RuntimeError:
+        pass
 
 class MetricHook(Hook):
 
@@ -33,19 +48,33 @@ class MetricHook(Hook):
         self.metric_type = metric_type
         self.group = group
         self.order = order
+        self.executor = ThreadPoolExecutor(max_workers=1)
+        self.loop: asyncio.AbstractEventLoop = None
 
     async def call(self, **kwargs):
 
         results: RawResultsSet = self.context['analyze_stage_raw_results']
+        self.loop = asyncio.get_running_loop()
+        for signame in ('SIGINT', 'SIGTERM'):
+            self.loop.add_signal_handler(
+                getattr(signal, signame),
+                lambda signame=signame: handle_loop_stop(
+                    signame,
+                    self.executor
+                )
+            )
 
-        stage_results: Dict[str, List[BaseResult]] = defaultdict(list)
+
         args_by_hook = {}
 
         if 'results' in self.params:
-            for results_set in results.values():
-                for result in results_set.results:
-                    stage_results[result.name].append(result)
-
+            stage_results = await self.loop.run_in_executor(
+                self.executor,
+                functools.partial(
+                    self._generate_deserialized_results,
+                    results
+                )
+            )
             
             for result_set_name, results_set in stage_results.items():
                 args_by_hook[result_set_name] =  {
@@ -66,6 +95,8 @@ class MetricHook(Hook):
 
         for custom_metric in custom_metric_results:
             metric_results.update(custom_metric)
+
+        self.executor.shutdown()
 
         return {
             **kwargs,
@@ -121,8 +152,16 @@ class MetricHook(Hook):
             metric_fullname: custom_metric 
         }
 
+    def _generate_deserialized_results(self, results: RawResultsSet) -> Dict[str, List[BaseResult]]:
+        stage_results: Dict[str, List[BaseResult]] = defaultdict(list)
 
-        
+        for results_set in results.values():
+            for result in results_set.results:
+                stage_result: BaseResult = dill.loads(result)
+                stage_results[stage_result.name].append(stage_result)
+
+        return stage_results
+
 
     def copy(self):
         metric_hook = MetricHook(

@@ -6,7 +6,6 @@ import math
 from typing import Dict, List, Union
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
-from hedra.tools.helpers import awaitable
 from asyncio import Task
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.personas.batching.batch import Batch
@@ -14,6 +13,16 @@ from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.types.types import PersonaTypes
+from hedra.core.personas.streaming import (
+    Stream,
+    StreamAnalytics
+)
+from hedra.reporting.processed_result.results import results_types
+from hedra.reporting.reporter import (
+    Reporter,
+    ReporterConfig
+)
+
 
 
 async def cancel_pending(pend: Task):
@@ -50,7 +59,7 @@ class DefaultPersona:
         'actions',
         '_hooks',
         'batch',
-        '_live_updates',
+        '_stream',
         'total_time',
         'duration',
         'total_actions',
@@ -64,11 +73,18 @@ class DefaultPersona:
         'actions_count',
         'graceful_stop',
         'is_timed',
-        'timer_thread',
-        'loop',
+        '_stream_thread',
+        '_loop',
         'current_action_idx',
         'optimized_params',
-        'thread_pool'
+        '_executor',
+        'stream',
+        'streamed_analytics',
+        'stream_reporter_configs',
+        'stream_reporters',
+        'stage_name',
+        'optimization_active',
+        'pending'
     )    
 
     def __init__(self, config: Config):
@@ -84,9 +100,10 @@ class DefaultPersona:
         self.actions = []
         self._hooks: List[Union[ActionHook, TaskHook]] = {}
         self.batch = Batch(config)
-        self.thread_pool = ThreadPoolExecutor(self.workers)
+        self._loop: asyncio.AbstractEventLoop = None
 
-        self._live_updates = False
+        self._stream = False
+        self.optimization_active = False
         self.total_time = config.total_time
         self.duration = 0
         self.total_actions = 0
@@ -99,12 +116,17 @@ class DefaultPersona:
         self.run_timer = False
         self.actions_count = 0
         self.graceful_stop = config.graceful_stop
+        self.stream: Stream = None 
 
         self.is_timed = True
-        self.timer_thread = None
+        self._stream_thread = None
 
         self.current_action_idx = 0
         self.optimized_params = None
+        self.streamed_analytics = []
+        self.stream_reporter_configs: List[ReporterConfig] = []
+        self.stream_reporters: List[Reporter] = []
+        self.stage_name: str = None
 
     def setup(self, hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]], metadata_string: str):
         self._setup(hooks, metadata_string)
@@ -117,7 +139,20 @@ class DefaultPersona:
             *hooks.get(HookType.ACTION),
             *hooks.get(HookType.TASK, [])
         ])
-                
+
+        for hook in self._hooks:
+            if self.stage_name is None:
+                self.stage_name = hook.stage
+
+        for reporter_config in self.stream_reporter_configs:
+            self.stream_reporters.append(
+                Reporter(reporter_config)
+            )
+
+        self._stream = len(self.stream_reporters) > 0 and self.optimization_active is False
+
+        if self._stream:
+            self.stream = Stream()
             
     async def execute(self):
         hooks = self._hooks
@@ -132,18 +167,43 @@ class DefaultPersona:
         await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Executing for a total of - {total_time} - seconds')
         loop = asyncio.get_running_loop()
 
-        await self.start_updates()
+        if self._stream:
 
-        self.start = time.monotonic()
-        completed, pending = await asyncio.wait([
-            loop.create_task(
-                hooks[action_idx].session.execute_prepared_request(
-                    hooks[action_idx].action
-                )
-            ) async for action_idx in self.generator(total_time)
-        ], timeout=self.graceful_stop)
+            for reporter in self.stream_reporters:
+                await reporter.connect()
+                reporter.logger.filesystem.aio['hedra.reporting'].logger_enabled = False
+                reporter.selected_reporter.logger.filesystem.aio['hedra.reporting'].logger_enabled = False
 
-        self.end = time.monotonic()
+            await self.start_stream()
+
+            self.start = time.monotonic()
+            completed, pending = await asyncio.wait([
+                loop.create_task(
+                    self.stream.execute_action(
+                        hooks[action_idx]
+                    )
+                ) async for action_idx in self.generator(total_time)
+            ], timeout=self.graceful_stop)
+
+            self.end = time.monotonic()
+
+            self.streamed_analytics = await self.stop_stream()
+
+            for reporter in self.stream_reporters:
+                await reporter.close()
+
+        else:
+
+            self.start = time.monotonic()
+            completed, pending = await asyncio.wait([
+                loop.create_task(
+                    hooks[action_idx].session.execute_prepared_request(
+                        hooks[action_idx].action
+                    )
+                ) async for action_idx in self.generator(total_time)
+            ], timeout=self.graceful_stop)
+
+            self.end = time.monotonic()
 
         self.pending_actions = len(pending)
         await self.logger.filesystem.aio['hedra.core'].debug(
@@ -151,8 +211,6 @@ class DefaultPersona:
         )
 
         results = await asyncio.gather(*completed)
-        
-        await self.stop_updates()
 
         cleanup_start = time.monotonic()
 
@@ -209,40 +267,63 @@ class DefaultPersona:
             
             action_idx = (action_idx+1)%self.actions_count
 
-    async def start_updates(self):
-        if self._live_updates:
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Live Updates enabled')
-            self.timer_thread = asyncio.create_task(self._run_timer_in_background())
-    
-    async def stop_updates(self):
-        if self._live_updates:
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Live Updates stopped')
-            self.run_timer = False
-            await self.timer_thread
+    async def start_stream(self):
+        self._loop = asyncio.get_event_loop()
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Live Updates enabled')
+        self._stream_thread = asyncio.create_task(
+            self._run_stream()
+        )
 
-    def run_updates_in_background(self):
-        loop = asyncio.new_event_loop()
-        loop.run_until_complete(self._run_timer_in_background())
+    async def stop_stream(self) -> StreamAnalytics:
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Live Updates stopped')
+        self.run_timer = False
+        return await self._stream_thread
 
-    async def _run_timer_in_background(self):
-        start = time.time()
+    async def _run_stream(self) -> StreamAnalytics:
         self.run_timer = True
 
-        while self.run_timer:
-            completed_actions = 0
+        stream_analytics = StreamAnalytics()
+        
+        start = time.time()
+        batch_start = time.time()
+        stream_submission_tasks = []
+        collection_stop_time = self.total_time - 1
+
+        while self.completed_time < collection_stop_time and self.run_timer:
             self.completed_time = time.time() - start
-
-            for deferred_batch in self.batch.deferred:
-                completed_actions += await awaitable(len, deferred_batch)
-
-
-            self.completed_actions = completed_actions
             await asyncio.sleep(1)
 
-        completed_actions = 0
-        for deferred_batch in self.batch.deferred:
-            completed_actions += await awaitable(len, deferred_batch)
+            batch_elapsed = time.time() - batch_start
 
-        self.completed_actions = completed_actions
+            stream_analytics.add(
+                self.stream,
+                batch_elapsed
+            )
+
+            processed_results = [
+                results_types.get(
+                    result.type
+                )(
+                    self.stage_name,
+                    result
+                ) for result in self.stream.completed
+            ]
+
+            for reporter in self.stream_reporters:
+                stream_submission_tasks.append(
+                    asyncio.create_task(
+                        reporter.submit_events(processed_results)
+                    )
+                )
+
+            batch_start = time.time()
+            self.stream.completed = []
+
+        self.stream.completed = []
+
+        await asyncio.gather(*stream_submission_tasks)
+        
         self.completed_time = time.time() - start
+
+        return stream_analytics
         

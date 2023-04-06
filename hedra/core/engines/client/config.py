@@ -1,5 +1,6 @@
 import psutil
 from typing import List
+from pydantic import BaseModel
 from .time_parser import TimeParser
 
 

@@ -3,10 +3,12 @@ import time
 import threading
 import os
 import signal 
+import dill
 from collections import defaultdict
 from typing import Any, Dict, List
-from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.logging import HedraLogger
+from hedra.core.engines.types.common.base_result import BaseResult
+from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
 from hedra.reporting.processed_result.processed_results_group import ProcessedResultsGroup
 
 
@@ -37,8 +39,12 @@ def process_results_batch(config: Dict[str, Any]):
     def handle_loop_stop(signame):
         try:
             loop.close()
+
+        except BrokenPipeError:
+            pass
+
         except RuntimeError:
-            os._exit(1)
+            pass
 
     for signame in ('SIGINT', 'SIGTERM'):
         loop.add_signal_handler(
@@ -59,7 +65,8 @@ def process_results_batch(config: Dict[str, Any]):
 
         start = time.monotonic()
 
-        for stage_result in results_batch:
+        for result in results_batch:
+            stage_result: BaseResult = dill.loads(result)
             events[stage_result.name].add(
                     stage_name,
                     stage_result,
@@ -80,13 +87,10 @@ def process_results_batch(config: Dict[str, Any]):
         return events
 
     except BrokenPipeError:
-
-        try:
-            loop.close()
-        except RuntimeError:
-            pass
-
-        return b''
+        raise ProcessKilledError()
+    
+    except RuntimeError:
+        raise ProcessKilledError()
 
     except Exception as e:
         raise e
