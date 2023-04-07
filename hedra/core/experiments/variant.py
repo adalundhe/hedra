@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from hedra.versioning.flags.types.unstable.flag import unstable
 from .distribution import Distribution
 
@@ -11,11 +11,13 @@ class Variant:
         stage_name: str,
         weight: Optional[float] = None,
         distribution: str=None,
-        distribution_intervals: int=10
+        distribution_intervals: int=10,
+        optimize_from: List[str]=[]
     ) -> None:
         self.stage_name = stage_name
         self.weight = weight
         self.distribution: Optional[Distribution] = None
+        self.optimize_from: List[str] = optimize_from
         
         if distribution:
             self.distribution = Distribution(
