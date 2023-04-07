@@ -21,6 +21,7 @@ from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.task.hook import TaskHook
+from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -30,6 +31,7 @@ from hedra.core.personas.persona_registry import (
     DefaultPersona
 )
 from hedra.plugins.types.plugin_types import PluginType
+from hedra.reporting.reporter import ReporterConfig
 from .parallel import execute_actions
 
 
@@ -90,6 +92,7 @@ class Execute(Stage, Generic[Unpack[T]]):
     @context()
     async def get_stage_config(
         self,
+        execute_stage_stream_configs: List[ReporterConfig] = [],
         execute_stage_setup_config: Config=None,
         execute_stage_setup_by: str=None,
         execute_stage_setup_hooks: List[Union[ActionHook , TaskHook]] = []
@@ -97,7 +100,8 @@ class Execute(Stage, Generic[Unpack[T]]):
         self.context.ignore_serialization_filters = [
             'execute_stage_setup_hooks',
             'setup_stage_ready_stages',
-            'execute_stage_results'
+            'execute_stage_results',
+            'execute_stage_streamed_analytics'
         ]
         persona_type_name = execute_stage_setup_config.persona_type.capitalize()
 
@@ -105,6 +109,7 @@ class Execute(Stage, Generic[Unpack[T]]):
         await self.logger.spinner.append_message(f'Stage {self.name} executing - {execute_stage_setup_config.batch_size} - VUs over {self.workers} threads for {execute_stage_setup_config.total_time_string} using - {persona_type_name} - persona')
 
         return {
+            'execute_stage_stream_configs': execute_stage_stream_configs,
             'execute_stage_setup_hooks': execute_stage_setup_hooks,
             'execute_stage_setup_by': execute_stage_setup_by,
             'execute_stage_setup_config': execute_stage_setup_config
@@ -143,7 +148,8 @@ class Execute(Stage, Generic[Unpack[T]]):
         execute_stage_has_multiple_workers: bool = False,
         execute_stage_setup_config: Config=None,
         execute_stage_plugins: Dict[str, List[Any]]={},
-        execute_stage_setup_by: str=None
+        execute_stage_setup_by: str=None,
+        execute_stage_stream_configs: List[ReporterConfig] = []
     ):
         if execute_stage_has_multiple_workers:
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting execution for - {self.workers} workers')
@@ -165,6 +171,7 @@ class Execute(Stage, Generic[Unpack[T]]):
                         'source_stage_id': self.stage_id,
                         'source_stage_plugins': execute_stage_plugins,
                         'source_stage_config': execute_stage_setup_config,
+                        'source_stage_stream_configs': execute_stage_stream_configs,
                         'partition_method': PartitionMethod.BATCHES,
                         'workers': self.workers,
                         'worker_id': idx + 1
@@ -186,13 +193,19 @@ class Execute(Stage, Generic[Unpack[T]]):
         execute_stage_results: List[List[Any]]=[]
     ):
         if execute_stage_has_multiple_workers:
+            execute_stage_streamed_analytics = []
             aggregate_results = []
             elapsed_times = []
             stage_contexts = defaultdict(list)
 
             for result_set in execute_stage_results:
+
                 aggregate_results.extend(result_set.get('results'))
                 elapsed_times.append(result_set.get('total_elapsed'))
+                
+                streamed_analytics = result_set.get('streamed_analytics')
+                if streamed_analytics:
+                    execute_stage_streamed_analytics.append(streamed_analytics)
 
                 pipeline_context: Dict[str, Any] = result_set.get('context', {})
                 for context_key, context_value in pipeline_context.items():
@@ -208,7 +221,9 @@ class Execute(Stage, Generic[Unpack[T]]):
 
             return {
                 stage_name: stage_contexts,
+                'execute_stage_streamed_analytics': execute_stage_streamed_analytics,
                 'execute_stage_results':  ResultsSet({
+                    'stage': self.name,
                     'stage_results': aggregate_results,
                     'total_results': total_results,
                     'total_elapsed': total_elapsed
@@ -292,7 +307,11 @@ class Execute(Stage, Generic[Unpack[T]]):
             await self.logger.spinner.set_default_message(f'Stage - {self.name} completed {total_results} actions at {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
 
             return {
+                'execute_stage_streamed_analytics': [
+                    results.get('streamed_analytics')
+                ],
                 'execute_stage_results': ResultsSet({
+                    'stage': self.name,
                     'stage_results': results,
                     'total_results': total_results,
                     'total_elapsed': total_elapsed
@@ -301,5 +320,5 @@ class Execute(Stage, Generic[Unpack[T]]):
 
     @event('aggregate_multiple_worker_results', 'setup_single_worker_job')
     async def complete(self):
-        await self.executor.shutdown()
+        self.executor.shutdown()
         return {}

@@ -1,6 +1,9 @@
 import dill
 import time
 import statistics
+import asyncio
+import signal
+import functools
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from typing import Union, List, Dict, Any, Tuple
@@ -62,6 +65,28 @@ CustoMetricsSet = Dict[str, Dict[str, Dict[str, Union[int, float, Any]]]]
 EventsSet = Dict[str, Dict[str, ProcessedResultsGroup]]
 
 
+def handle_loop_stop(
+    signame,
+    loop: asyncio.AbstractEventLoop,
+    executor: ThreadPoolExecutor
+):
+    try:
+        executor.shutdown()
+        loop.close()
+
+    except BrokenPipeError:
+        pass
+
+    except RuntimeError:
+        pass
+
+
+def deserialize_results(results: List[bytes]) -> List[BaseResult]:
+    return [
+        dill.loads(result) for result in results
+    ]
+
+
 class Analyze(Stage):
     stage_type=StageTypes.ANALYZE
     is_parallel = False
@@ -83,8 +108,8 @@ class Analyze(Stage):
         self.allow_parallel = True
         self.analysis_execution_time = 0
         self.analysis_execution_time_start = 0
-        self._executor = ThreadPoolExecutor(max_workers=1)
-
+        self._executor = ThreadPoolExecutor(max_workers=self.workers)
+        self._loop: asyncio.AbstractEventLoop = None
         self.source_internal_events = [
             'initialize_raw_results'
         ]
@@ -129,32 +154,77 @@ class Analyze(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Generated custom Event - {plugin.event.type} - for Reporter plugin - {plugin_name}')
 
-        all_results = list(analyze_stage_raw_results.items())
-
         self.context.ignore_serialization_filters = [
             'analyze_stage_all_results',
             'analyze_stage_raw_results',
-            'analyze_stage_target_stages'
+            'analyze_stage_target_stages',
+            'analyze_stage_deserialized_results'
         ]
+
+        all_results = list(analyze_stage_raw_results.items())
+
+        total_group_results = 0
+        for stage_results in analyze_stage_raw_results.values():
+            total_group_results += stage_results.total_results
         
         return {
             'analyze_stage_raw_results': analyze_stage_raw_results,
-            'analyze_stage_all_results': all_results
+            'analyze_stage_all_results': all_results,
+            'analyze_stage_stages_count': len(analyze_stage_raw_results),
+            'analyze_stage_total_group_results': total_group_results,
         }
-
+    
     @event('initialize_results_analysis')
+    async def add_shutdown_handler(self):
+        self._loop = asyncio.get_running_loop()
+
+        for signame in ('SIGINT', 'SIGTERM'):
+            self._loop.add_signal_handler(
+                getattr(signal, signame),
+                lambda signame=signame: handle_loop_stop(
+                    signame,
+                    self._loop,
+                    self.executor
+                )
+            )
+
+    @event('add_shutdown_handler')
+    async def generate_deserialized_results(
+        self,
+        analyze_stage_raw_results: RawResultsSet={}
+    ):
+        deserialized_results = dict(analyze_stage_raw_results)
+        for results_set_name, results_set in analyze_stage_raw_results.items():
+            
+            results_set_copy = results_set.copy()
+            results_set_copy.results = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    deserialize_results,
+                    results_set.results
+                )
+            )
+
+            deserialized_results[results_set_name] = results_set_copy
+
+
+        return {
+            'analyze_stage_raw_results': analyze_stage_raw_results,
+            'analyze_stage_deserialized_results': deserialized_results
+        }    
+
+
+    @event('generate_deserialized_results')
     async def partition_results_batches(
         self,
         analyze_stage_raw_results: RawResultsSet={},
         analyze_stage_all_results: List[RawResultsPairs]=[]
     ):
         batches = self.executor.partion_stage_batches(analyze_stage_all_results)
-        total_group_results = 0
 
         elapsed_times = []
         for stage_name, _, _ in batches:
             stage_results: ResultsSet = analyze_stage_raw_results.get(stage_name)
-            total_group_results += stage_results.total_results
             elapsed_times.append(
                 stage_results.total_elapsed
             )
@@ -163,7 +233,6 @@ class Analyze(Stage):
 
         return {
             'analyze_stage_batches': batches,
-            'analyze_stage_total_group_results': total_group_results,
             'analyze_stage_elapsed_times': elapsed_times
         }
     
@@ -248,11 +317,8 @@ class Analyze(Stage):
 
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Assigned {assigned_workers_count} to process results from stage - {stage_name}')
 
-        stages_count = len(stage_configs)
-
         return {
             'analyze_stage_configs': stage_configs,
-            'analyze_stage_stages_count': stages_count
         }
     
     @condition('assign_stage_batches')
@@ -271,7 +337,8 @@ class Analyze(Stage):
         analyze_stage_elapsed_times: List[float]=[],
         analyze_stage_total_group_results: int=0,
         analyze_stage_configs: List[StageConfig]=[],
-        multiple_stages_to_process: bool=False
+        multiple_stages_to_process: bool=False,
+        analyze_stage_deserialized_results: RawResultsSet = {}
     ):
 
         if multiple_stages_to_process:
@@ -297,28 +364,28 @@ class Analyze(Stage):
             }
         
         else:
-
-            events =  defaultdict(ProcessedResultsGroup)
-            stage_name, _, configs = analyze_stage_configs.pop()
-            config = configs.pop()
-            results_batch = config.get('analyze_stage_batched_results')
-
-            for stage_result in results_batch:
-                events[stage_result.name].add(
-                        stage_name,
-                        stage_result,
-                    )
             
-            for events_group in events.values():
-                events_group.calculate_stats()
+
+            batch_results = []
+            events =  defaultdict(ProcessedResultsGroup)
+
+            for results_set in analyze_stage_deserialized_results.values():
+
+                for stage_result in results_set.results:
+                    events[stage_result.name].add(
+                            results_set.stage,
+                            stage_result,
+                        )
+                    
+                batch_results.append(
+                    (results_set.stage, events)
+                )
                 
+                for events_group in events.values():
+                    events_group.calculate_stats()
+                    
             return {
-                'analyze_stage_batch_results': [
-                    (
-                        stage_name,
-                        events
-                    )
-                ]
+                'analyze_stage_batch_results': batch_results
             }
         
     @event('execute_batched_analysis')
@@ -438,7 +505,7 @@ class Analyze(Stage):
         self,
         analyze_stage_stages_count: int=0,
         analyze_stage_total_group_results: int=0,
-        analyze_stage_processed_results: ProcessedResultsSet={},
+        analyze_stage_processed_results: ProcessedResultsSet=[],
         analyze_stage_contexts: Dict[str, Any]={}
     ):
 
@@ -467,5 +534,5 @@ class Analyze(Stage):
 
     @event('generate_summary')
     async def complete(self):
-        await self.executor.shutdown()
+        self.executor.shutdown()
         return {}

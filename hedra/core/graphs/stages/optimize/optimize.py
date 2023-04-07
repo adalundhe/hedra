@@ -6,6 +6,7 @@ from typing import Dict, List, Tuple, Any, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.client.time_parser import TimeParser
 from hedra.core.graphs.stages.execute import Execute
+from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.hooks.types.base.hook_type import HookType
@@ -77,7 +78,8 @@ class Optimize(Stage):
             'optimize_stage_candidates',
             'setup_stage_ready_stages',
             'execute_stage_setup_hooks',
-            'execute_stage_results'
+            'execute_stage_results',
+            'execute_stage_streamed_analytics'
         ]
 
         stage_names = ', '.join(list(optimize_stage_candidates.keys()))
@@ -211,6 +213,7 @@ class Optimize(Stage):
     ):
         optimized_batch_sizes = []
         for optimization_result in optimize_stage_results:
+
             optimized_config = optimization_result.get('config')
             optimized_batch_sizes.append(
                 optimized_config.batch_size
@@ -310,5 +313,5 @@ class Optimize(Stage):
 
     @event('complete_optimization')
     async def complete(self):
-        await self.executor.shutdown()
+        self.executor.shutdown()
 

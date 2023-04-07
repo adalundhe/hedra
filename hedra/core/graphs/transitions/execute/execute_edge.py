@@ -15,6 +15,7 @@ from hedra.core.graphs.stages.analyze.analyze import Analyze
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.reporting.reporter import ReporterConfig
 
 
 ExecuteHooks = List[Union[ActionHook , TaskHook]]
@@ -38,7 +39,8 @@ class ExecuteEdge(BaseEdge[Execute]):
             'execute_stage_setup_config',
             'execute_stage_setup_by',
             'execute_stage_setup_hooks',
-            'execute_stage_results'
+            'execute_stage_results',
+            'execute_stage_streamed_analytics',
         ]
 
         self.provides = [
@@ -49,6 +51,7 @@ class ExecuteEdge(BaseEdge[Execute]):
             'execute_stage_setup_by',
             'setup_stage_ready_stages',
             'execute_stage_skipped',
+            'execute_stage_streamed_analytics'
         ]
 
         self.valid_states = [
@@ -57,6 +60,7 @@ class ExecuteEdge(BaseEdge[Execute]):
         ]
 
         self.assigned_candidates = []
+        self.execute_stage_stream_configs: List[ReporterConfig] = []
 
     async def transition(self):
 
@@ -97,7 +101,7 @@ class ExecuteEdge(BaseEdge[Execute]):
             all_paths = self.all_paths.get(self.source.name, [])
 
             for stage in analyze_stages.values():
-                if stage.name in all_paths:
+                if stage.name in all_paths and stage.name != self.destination.name:
                     if stage.context is None:
                         stage.context = SimpleContext()
 
@@ -141,6 +145,7 @@ class ExecuteEdge(BaseEdge[Execute]):
                 'execute_stage_results': {
                     self.source.name: self.edge_data['execute_stage_results']
                 },
+                'execute_stage_streamed_analytics': self.edge_data['execute_stage_streamed_analytics'],
                 'execute_stage_setup_config': self.edge_data['execute_stage_setup_config'],
                 'execute_stage_setup_hooks': self.edge_data['execute_stage_setup_hooks'],
                 'execute_stage_setup_by': self.edge_data['execute_stage_setup_by'],
@@ -241,6 +246,7 @@ class ExecuteEdge(BaseEdge[Execute]):
         execute_stage_setup_by: str = None
         setup_stage_ready_stages: List[Stage] = []
         setup_stage_candidates: List[Stage] = []
+        execute_stage_streamed_analytics = []
 
         for source_stage, destination_stage in self.history:
 
@@ -279,9 +285,20 @@ class ExecuteEdge(BaseEdge[Execute]):
                 for stage_candidate in stage_candidates:
                     if stage_candidate not in setup_stage_candidates:
                         setup_stage_candidates.append(stage_candidate)
-            
 
+                execute_stage_streamed_analytics.extend(
+                    previous_history.get('execute_stage_streamed_analytics', [])
+                )
+
+        stream_configs = self.source.context.get('execute_stage_stream_configs')
+        if stream_configs:
+            self.execute_stage_stream_configs.extend([
+                config for config in stream_configs if config not in self.execute_stage_stream_configs
+            ])
+            
         self.edge_data = {
+            'execute_stage_stream_configs': self.execute_stage_stream_configs, 
+            'execute_stage_streamed_analytics': execute_stage_streamed_analytics,
             'execute_stage_setup_config': execute_stage_setup_config,
             'execute_stage_setup_hooks': execute_stage_setup_hooks,
             'execute_stage_setup_by': execute_stage_setup_by,

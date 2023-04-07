@@ -1,5 +1,6 @@
 import psutil
 from typing import List
+from pydantic import BaseModel
 from .time_parser import TimeParser
 
 
@@ -42,6 +43,7 @@ class Config:
         self.color_scheme = kwargs.get('color_scheme')
         self.group_size = kwargs.get('group_size')
         self.playwright_options = kwargs.get('playwright_options', {})
+        self.distribution: List[float] = None
 
     def copy(self):
         return Config(**{
@@ -68,5 +70,6 @@ class Config:
             'permissions': self.permissions,
             'color_scheme': self.color_scheme,
             'group_size': self.group_size,
-            'playwright_options': self.playwright_options
+            'playwright_options': self.playwright_options,
+            'distribution': self.distribution
         })

@@ -63,8 +63,7 @@ class Optimizer:
         self._current_iter = 0
         self.optimized_results = {}
         self._max_aps = 0
-        self._event_loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self._event_loop) 
+        self._event_loop: asyncio.AbstractEventLoop = None
 
         self.current_params = {}
         self.start = 0
@@ -113,6 +112,8 @@ class Optimizer:
             'optimization_max_aps': self._max_aps
         }
 
+        self._event_loop.close()
+
         return self.optimized_results
 
     async def _optimize(self, xargs: List[Union[int, float]]):
@@ -120,6 +121,7 @@ class Optimizer:
         if self._current_iter < self.algorithm.max_iter and self.elapsed < self._optimization_time_limit:
 
             persona = get_persona(self.stage_config)
+            persona.optimization_active = True
             persona.setup(self.stage_hooks, self.metadata_string)
 
             for idx, param in enumerate(xargs):
@@ -157,6 +159,9 @@ class Optimizer:
             except Exception:
                 pass
 
+            except ConnectionResetError:
+                pass
+
             elapsed = persona.end - persona.start
 
             await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - took - {round(elapsed, 2)} - seconds')
@@ -164,7 +169,28 @@ class Optimizer:
             if completed_count < 1:
                 completed_count = 1
 
-            await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - actions per second - {round(completed_count/elapsed)}')
+            if elapsed < 1:
+                elapsed = float('inf')
+
+            # This section necessary for low-bandwidth connections
+            # where the condensed runtime of optimize runs can
+            # result
+            all_tasks = asyncio.all_tasks()
+            running_task = asyncio.current_task()
+            for task in all_tasks:
+                if task != running_task and task.cancelled() is False:
+                    try:
+                        task.cancel()
+                        if task.cancelled() is False:
+                            await task
+                    
+                    except asyncio.CancelledError:
+                        pass
+                    except asyncio.InvalidStateError:
+                        pass
+                    except ConnectionResetError:
+                        pass
+
             await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Inverted APS score- {elapsed/completed_count}')
             
             return elapsed/completed_count

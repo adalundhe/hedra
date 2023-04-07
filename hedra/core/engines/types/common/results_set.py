@@ -24,7 +24,7 @@ class ResultsSet:
         execution_results: Dict[str, Union[int, float, List[ResultsBatch]]]
     ) -> None:
 
-        
+        self.stage: str = execution_results.get('stage')
         self.total_elapsed: float = execution_results.get('total_elapsed', 0)
         self.total_results: int = execution_results.get('total_results', 0)
 
@@ -71,3 +71,12 @@ class ResultsSet:
             grouped_results[result.name].append(result)
 
         return grouped_results
+    
+    def copy(self):
+        return ResultsSet({
+            'stage': self.stage,
+            'total_elapsed': self.total_elapsed,
+            'total_results': self.total_results,
+            'stage_results': list(self.results),
+            'serialized_results': list(self.serialized_results)
+        })

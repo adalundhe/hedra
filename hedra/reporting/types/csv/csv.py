@@ -2,8 +2,11 @@ import asyncio
 import csv
 import psutil
 import uuid
+import os
 import functools
-from typing import List
+import signal
+import time
+from typing import List, TextIO
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
@@ -13,13 +16,26 @@ from .csv_config import CSVConfig
 has_connector = True
 
 
+def handle_loop_stop(
+    signame, 
+    executor: ThreadPoolExecutor, 
+    loop: asyncio.AbstractEventLoop, 
+    events_file: TextIO
+): 
+    try:
+        events_file.close()
+        executor.shutdown() 
+        loop.stop()
+    except Exception:
+        pass
+    
+
 class CSV:
 
     def __init__(self, config: CSVConfig) -> None:
         self.events_filepath = config.events_filepath
         self.metrics_filepath = Path(config.metrics_filepath).absolute()
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
-        self._loop = asyncio.get_event_loop()
 
         self.session_uuid = str(uuid.uuid4())
         self.metadata_string: str = None
@@ -31,6 +47,9 @@ class CSV:
         self._stage_metrics_csv_writer = None
         self._errors_csv_writer = None
         self._custom_metrics_csv_writer = None
+        self._loop: asyncio.AbstractEventLoop = None
+        self.events_file: TextIO = None 
+        self.write_mode = 'w'
 
 
         filepath = Path(config.metrics_filepath)
@@ -42,24 +61,49 @@ class CSV:
         self.errors_metrics_filepath = f'{base_filepath}/{base_filename}_errors.csv'
 
     async def connect(self):
+        self._loop = asyncio._get_running_loop()
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping connect')
-
-    async def submit_events(self, events: List[BaseProcessedResult]):
-
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Events to file - {self.events_filepath}')
         
-        events_file = await self._loop.run_in_executor(
+        original_filepath = Path(self.events_filepath)
+        
+        directory = original_filepath.parent
+        filename = original_filepath.stem
+
+        events_file_timestamp = time.time()
+
+        self.events_filepath = os.path.join(
+            directory,
+            f'{filename}_{events_file_timestamp}.csv'
+        )
+
+        self.events_file = await self._loop.run_in_executor(
             self._executor,
             functools.partial(
                 open,
                 self.events_filepath,
-                'w'
+                self.write_mode
             )
-        )        
+        )
+
+        for signame in ('SIGINT', 'SIGTERM'):
+            self._loop.add_signal_handler(
+                getattr(signal, signame),
+                lambda signame=signame: handle_loop_stop(
+                    signame,
+                    self._executor,
+                    self._loop,
+                    self.events_file
+                )
+            )
+
+    async def submit_events(self, events: List[BaseProcessedResult]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Events to file - {self.events_filepath}')
+          
 
         for event in events:
-            if self._events_csv_writer is None:
-                self._events_csv_writer = csv.DictWriter(events_file, fieldnames=event.fields)
+            if self._events_csv_writer is None or self.write_mode == 'w':
+                self._events_csv_writer = csv.DictWriter(self.events_file, fieldnames=event.fields)
                 
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Writing headers to file - {self.metrics_filepath} - {", ".join(event.fields)}')
 
@@ -75,11 +119,6 @@ class CSV:
                 self._events_csv_writer.writerow,
                 event.record
             )
-
-        await self._loop.run_in_executor(
-            self._executor,
-            events_file.close
-        )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Events to file - {self.events_filepath}')
 
@@ -314,6 +353,13 @@ class CSV:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Error Metrics to file - {self.metrics_filepath}')
                 
     async def close(self):
+        
+        await self._loop.run_in_executor(
+            self._executor,
+            self.events_file.close
+        )
+
+
         self._executor.shutdown()
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')
 

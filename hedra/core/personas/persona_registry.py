@@ -1,3 +1,4 @@
+from .types.approximate_distribution import ApproximateDistributionPersona
 from .types.default_persona import DefaultPersona
 from .types.batched_persona import BatchedPersona
 from .types.sequenced_persona import SequencedPersona
@@ -12,6 +13,7 @@ from hedra.core.engines.client.config import Config
 
 
 registered_personas = {
+    PersonaTypes.APPROXIMATE_DISTRIBUTION: lambda config: ApproximateDistributionPersona(config),
     PersonaTypes.DEFAULT: lambda config: DefaultPersona(config),
     PersonaTypes.BATCHED: lambda config: BatchedPersona(config),
     PersonaTypes.RAMPED: lambda config: RampedPersona(config),

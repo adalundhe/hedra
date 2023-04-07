@@ -184,7 +184,8 @@ class Setup(Stage, Generic[Unpack[T]]):
     async def collect_target_stages(
         self,
         setup_stage_target_stages: Dict[str, Stage]={},
-        setup_stage_target_config: Config=None
+        setup_stage_target_config: Config=None,
+        setup_stage_is_primary_thread: bool = True
     ):
   
         bypass_connection_validation = self.core_config.get('bypass_connection_validation', False)
@@ -197,14 +198,16 @@ class Setup(Stage, Generic[Unpack[T]]):
             'setup_stage_target_config': setup_stage_target_config,
             'setup_stage_target_stages': setup_stage_target_stages,
             'bypass_connection_validation': bypass_connection_validation,
-            'connection_validation_retries': connection_validation_retries
+            'connection_validation_retries': connection_validation_retries,
+            'setup_stage_is_primary_thread': setup_stage_is_primary_thread
         }
 
     @event('collect_target_stages')
     async def configure_target_stages(
         self, 
         setup_stage_target_stages: Dict[str, Stage]={},
-        setup_stage_target_config: Config=None
+        setup_stage_target_config: Config=None,
+        setup_stage_is_primary_thread: bool=True
     ):
         execute_stage_names = ', '.join(list(setup_stage_target_stages.keys()))
 
@@ -213,6 +216,9 @@ class Setup(Stage, Generic[Unpack[T]]):
         await self.logger.spinner.append_message(f'Setting up - {execute_stage_names}')
 
         execute_stage_id = 1
+
+        if setup_stage_is_primary_thread and self.experiment:
+            self.experiment.assign_weights()
         
         for execute_stage_name, execute_stage in setup_stage_target_stages.items():
 
@@ -242,6 +248,21 @@ class Setup(Stage, Generic[Unpack[T]]):
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Engine plugin - {plugin.name} - for Execute stage - {execute_stage_name}')
 
             config_copy = setup_stage_target_config.copy()
+
+            if self.experiment and self.experiment.is_variant(execute_stage_name) and setup_stage_is_primary_thread:
+                config_copy.batch_size = self.experiment.get_variant_batch_size(
+                    execute_stage_name
+                )
+
+                distribution = self.experiment.calculate_distribution(
+                    execute_stage_name,
+                    config_copy.batch_size
+                )
+
+                if distribution is not None:
+                    config_copy.distribution = distribution
+                    config_copy.persona_type = self.persona_types['approx-dist']
+
 
             setup_stage_configs[execute_stage_name] = config_copy
             setup_stage_target_stages[execute_stage_name] = execute_stage
@@ -294,11 +315,6 @@ class Setup(Stage, Generic[Unpack[T]]):
                 config_copy = setup_stage_configs.get(
                     hook.stage
                 )
-
-                if self.experiment and self.experiment.is_variant(hook.stage):
-                    config_copy.batch_size = self.experiment.get_variant_batch_size(
-                        hook.stage
-                    )
 
                 hook.stage_instance.client._config = config_copy
 

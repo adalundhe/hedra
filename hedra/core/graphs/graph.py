@@ -6,6 +6,7 @@ import threading
 import os
 import time
 from typing import Dict, List, Any
+from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.transitions.transition_group import TransitionGroup
@@ -191,6 +192,10 @@ class Graph:
                 
                 for transition in transition_group:
                     error = transition.edge.exception
+
+                    if isinstance(error, ProcessKilledError):
+                        self.status = GraphStatus.CANCELLED
+                        return
                     
                     if error:
 

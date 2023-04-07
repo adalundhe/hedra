@@ -54,7 +54,8 @@ class Transition:
 
         self.edge.setup()
 
-        self.edge.source.context = SimpleContext()
+        if self.edge.source.context is None:
+            self.edge.source.context = SimpleContext()
         
         result = await self.edge.transition()
 

@@ -2,12 +2,13 @@ from enum import Enum
 
 
 class PersonaTypes:
+    APPROXIMATE_DISTRIBUTION='APPROXIMATE-DISTRIBUTION'
     BATCHED='BATCHED'
     DEFAULT='DEFAULT'
     RAMPED='RAMPED'
-    RAMPED_INTERVAL='RAMPED_INTERVAL'
-    CONSTANT_ARRIVAL='CONSTANT_ARRIVAL'
-    CONSTANT_SPAWN='CONSTANT_SPAWN'
+    RAMPED_INTERVAL='RAMPED-INTERVAL'
+    CONSTANT_ARRIVAL='CONSTANT-ARRIVAL'
+    CONSTANT_SPAWN='CONSTANT-SPAWN'
     SEQUENCE='SEQUENCE'
     WEIGHTED='WEIGHTED'
     NO_WAIT='NO-WAIT'
@@ -17,6 +18,7 @@ class PersonaTypesMap:
 
     def __init__(self) -> None:
         self.types = {
+            'approx-dist': PersonaTypes.APPROXIMATE_DISTRIBUTION,
             'batched': PersonaTypes.BATCHED,
             'default': PersonaTypes.DEFAULT,
             'ramped': PersonaTypes.RAMPED,

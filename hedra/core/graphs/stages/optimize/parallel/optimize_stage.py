@@ -1,7 +1,7 @@
 import json
 import dill
-import traceback
 import threading
+import traceback
 import os
 import signal
 import pickle
@@ -24,6 +24,7 @@ from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.engines.types.registry import RequestTypes
+from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
 from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.base.import_tools import (
     import_stages, 
@@ -50,6 +51,7 @@ async def setup_action_channels_and_playwright(
 ) -> Execute:
     setup_stage.context = SimpleContext()
     setup_stage.generation_setup_candidates = 1
+    setup_stage.context['setup_stage_is_primary_thread'] = False
     setup_stage.context['setup_stage_target_config'] = persona_config
     setup_stage.context['setup_stage_target_stages'] = {
         execute_stage.name: execute_stage
@@ -102,9 +104,16 @@ async def setup_action_channels_and_playwright(
 def optimize_stage(serialized_config: str):
     import asyncio
     import uvloop
+    import warnings
+    warnings.simplefilter("ignore")
+
     uvloop.install()
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    try:
+        loop = asyncio.get_event_loop()
+    except Exception:
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
 
     try:
         hedra_config_filepath = os.path.join(
@@ -263,15 +272,21 @@ def optimize_stage(serialized_config: str):
             'time_limit': time_limit
         })
 
+        optimizer._event_loop = loop
+
         def handle_loop_stop(signame):
             try:
                 optimizer._event_loop.stop()
                 optimizer._event_loop.close()
 
             except BrokenPipeError:
+                pid = os.getpid()
+                os.kill(pid, signal.SIGKILL)
                 os._exit(1)
                 
             except RuntimeError:
+                pid = os.getpid()
+                os.kill(pid, signal.SIGKILL)
                 os._exit(1)
 
         for signame in ('SIGINT', 'SIGTERM'):
@@ -318,6 +333,8 @@ def optimize_stage(serialized_config: str):
                 context_key: context_value for context_key, context_value in serializable_context
             })
         
+        loop.close()
+        
         return dill.dumps({
             'stage': execute_stage.name,
             'config': execute_stage_config,
@@ -326,13 +343,10 @@ def optimize_stage(serialized_config: str):
         })
 
     except BrokenPipeError:
-        try:
-            optimizer._event_loop.close()
-            loop.close()
-        except RuntimeError:
-            pass
-
-        return {}
+        raise ProcessKilledError()
+    
+    except RuntimeError:
+        raise ProcessKilledError()
     
     except Exception as e:
         raise e
