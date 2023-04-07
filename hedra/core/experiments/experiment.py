@@ -33,7 +33,7 @@ class Experiment:
                 total_weight -= participant.weight
 
             elif self.random:
-                weight  = round(random.uniform(0.1, total_weight), 2)
+                weight  = round(random.uniform(0.1, 0.9), 2)
 
                 if participant_idx < self.participants_count - 1:
                     participant.weight = weight
