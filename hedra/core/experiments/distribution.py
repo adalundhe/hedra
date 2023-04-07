@@ -20,7 +20,11 @@ class Distribution:
 
         self._distribution_map = DistributionMap()
         self._distributions: Dict[str, Callable[..., List[float]]] = {
-            DistributionTypes.BETA: lambda size: numpy.random.beta(1, 1, size=size),
+            DistributionTypes.BETA: lambda size: numpy.random.beta(
+                1, 
+                1, 
+                size=size
+            ),
             DistributionTypes.BINOMIAL: lambda size: numpy.random.binomial(
                 size, 
                 [random.uniform(0.1, 1) for _ in range(size)]
@@ -38,9 +42,19 @@ class Distribution:
                 size/2,
                 size
             )/size,
-            DistributionTypes.F_DISTRIBUTION: lambda size: numpy.random.f(1, 100, size=size),
-            DistributionTypes.GAMMA: lambda size: numpy.random.gamma(1, size=size),
-            DistributionTypes.GEOMETRIC: lambda size: numpy.random.geometric(p=1/size, size=size)/size,
+            DistributionTypes.F_DISTRIBUTION: lambda size: numpy.random.f(
+                1, 
+                100, 
+                size=size
+            ),
+            DistributionTypes.GAMMA: lambda size: numpy.random.gamma(
+                1, 
+                size=size
+            ),
+            DistributionTypes.GEOMETRIC: lambda size: numpy.random.geometric(
+                p=1/size, 
+                size=size
+            )/size,
             DistributionTypes.GUMBEL: lambda size: numpy.random.gumbel(
                 size/2,
                 size/2,

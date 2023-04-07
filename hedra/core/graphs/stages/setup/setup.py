@@ -194,6 +194,7 @@ class Setup(Stage, Generic[Unpack[T]]):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting setup')
         
         return {
+            'setup_stage_experiment_distributions': {},
             'setup_stage_target_stages_count': len(setup_stage_target_stages),
             'setup_stage_target_config': setup_stage_target_config,
             'setup_stage_target_stages': setup_stage_target_stages,
@@ -207,7 +208,8 @@ class Setup(Stage, Generic[Unpack[T]]):
         self, 
         setup_stage_target_stages: Dict[str, Stage]={},
         setup_stage_target_config: Config=None,
-        setup_stage_is_primary_thread: bool=True
+        setup_stage_is_primary_thread: bool=True,
+        setup_stage_experiment_distributions: Dict[str, List[float]]={},
     ):
         execute_stage_names = ', '.join(list(setup_stage_target_stages.keys()))
 
@@ -262,6 +264,8 @@ class Setup(Stage, Generic[Unpack[T]]):
                 if distribution is not None:
                     config_copy.distribution = distribution
                     config_copy.persona_type = self.persona_types['approx-dist']
+
+                    setup_stage_experiment_distributions[execute_stage_name] = distribution
 
 
             setup_stage_configs[execute_stage_name] = config_copy
@@ -488,7 +492,8 @@ class Setup(Stage, Generic[Unpack[T]]):
         setup_stage_target_stages: Dict[str, Stage]=[],
         setup_stage_actions: List[ActionHook]=[],
         setup_stage_tasks: List[TaskHook]=[],
-        setup_stage_target_config: Config=None
+        setup_stage_target_config: Config=None,
+        setup_stage_experiment_distributions: Dict[str, List[float]]={}
     ):
         actions_by_stage = defaultdict(list)
         tasks_by_stage = defaultdict(list)
@@ -527,6 +532,7 @@ class Setup(Stage, Generic[Unpack[T]]):
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Generated - {tasks_generated_count} - Tasks for Execute stage - {execute_stage.name}')
 
         return {
+            'setup_stage_experiment_distributions': setup_stage_experiment_distributions,
             'setup_stage_configs': setup_stage_configs,
             'execute_stage_setup_by': self.name,
             'execute_stage_setup_hooks': execute_stage_setup_hooks,

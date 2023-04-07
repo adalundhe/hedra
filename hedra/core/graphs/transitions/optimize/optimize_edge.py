@@ -33,6 +33,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         )
 
         self.requires = [
+            'setup_stage_experiment_distributions',
             'execute_stage_streamed_analytics',
             'setup_stage_configs',
             'execute_stage_setup_hooks',
@@ -44,6 +45,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         ]
 
         self.provides = [
+            'setup_stage_experiment_distributions',
             'execute_stage_streamed_analytics',
             'setup_stage_configs',
             'optimize_stage_optimized_params',
@@ -237,6 +239,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         setup_stage_candidates: List[Stage] = []
         setup_stage_configs: Dict[str, Config] = {}
         execute_stage_streamed_analytics: List[StreamAnalytics] = []
+        setup_stage_experiment_distributions: Dict[str, List[float]] = {}
 
         for source_stage, destination_stage in self.history:
             
@@ -283,8 +286,16 @@ class OptimizeEdge(BaseEdge[Optimize]):
                         []
                     )
                 )
+
+                setup_stage_experiment_distributions.update(
+                    previous_history.get(
+                        'setup_stage_experiment_distributions',
+                        {}
+                    )
+                )
         
         self.edge_data = {
+            'setup_stage_experiment_distributions': setup_stage_experiment_distributions,
             'execute_stage_streamed_analytics': execute_stage_streamed_analytics,
             'setup_stage_configs': setup_stage_configs,
             'execute_stage_setup_config': execute_stage_setup_config,
