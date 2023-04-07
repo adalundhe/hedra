@@ -5,7 +5,7 @@ import uuid
 import os
 import functools
 import signal
-import datetime
+import time
 from typing import List, TextIO
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -69,49 +69,12 @@ class CSV:
         directory = original_filepath.parent
         filename = original_filepath.stem
 
-        events_file_timestamp = datetime.datetime.now().strftime('%Y-%m-%dT-%H:%M:%S.z')
+        events_file_timestamp = time.time()
 
         self.events_filepath = os.path.join(
             directory,
             f'{filename}_{events_file_timestamp}.csv'
         )
-
-        file_exists = await self._loop.run_in_executor(
-            self._executor,
-            functools.partial(   
-                os.path.exists,
-                self.events_filepath
-            )
-        )
-        
-        copy_index = None
-        while file_exists:
-            filepath = Path(self.events_filepath)
-            result = self.pattern.search(filepath.stem)
-            match: str = None
-            if result:
-                match = result.group(0)
-
-            if match and match[1:].isnumeric():
-                existing_copy_index = match[1:]
-                copy_index = int(existing_copy_index) + 1
-
-            else:
-                copy_index = 1
-
-            file_exists = await self._loop.run_in_executor(
-                self._executor,
-                functools.partial(   
-                    os.path.exists,
-                    self.events_filepath
-                )
-            )
-
-        if copy_index:
-            self.events_filepath = os.path.join(
-                directory,
-                f'{filename}_copy{copy_index}_{events_file_timestamp}.csv'
-            )
 
         self.events_file = await self._loop.run_in_executor(
             self._executor,

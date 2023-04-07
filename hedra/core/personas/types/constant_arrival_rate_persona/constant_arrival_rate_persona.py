@@ -107,6 +107,7 @@ class ConstantArrivalPersona(DefaultPersona):
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed execution')
 
+        print('DONE!')
         return results
 
     async def generator(self, total_time):

@@ -2,6 +2,7 @@ import asyncio
 import dill
 import functools
 import signal
+import psutil
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Awaitable, Any, Optional, Dict, List
@@ -48,7 +49,7 @@ class MetricHook(Hook):
         self.metric_type = metric_type
         self.group = group
         self.order = order
-        self.executor = ThreadPoolExecutor(max_workers=1)
+        self.executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=True))
         self.loop: asyncio.AbstractEventLoop = None
 
     async def call(self, **kwargs):

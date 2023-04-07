@@ -1,6 +1,7 @@
 import asyncio
 import time
 import uuid
+import traceback
 from typing import Dict, Any, Union, Coroutine, TypeVar
 from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
@@ -175,8 +176,16 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
 
                 response.write_end = time.monotonic()
 
-                response.response_code = await connection.reader.readline_fast()
-                headers = await connection.read_headers()
+                response.response_code = await asyncio.wait_for(
+                    connection.reader.readline_fast(),
+                    timeout=self.timeouts.socket_read_timeout
+                )
+
+                headers = await asyncio.wait_for(
+                    connection.read_headers(),
+                    timeout=self.timeouts.socket_read_timeout
+                )
+
                 status = response.status
             
                 if status >= 300 and status < 400:
@@ -223,8 +232,15 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
 
                         response.write_end = time.monotonic()
 
-                        response.response_code = await connection.reader.readline_fast()
-                        headers = await connection.read_headers()
+                        response.response_code = await asyncio.wait_for(
+                            connection.reader.readline_fast(),
+                            timeout=self.timeouts.socket_read_timeout
+                        )
+
+                        headers = await asyncio.wait_for(
+                            connection.read_headers(),
+                            timeout=self.timeouts.socket_read_timeout
+                        )
 
                         status = response.status
 
@@ -242,7 +258,10 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
                 # is, and we ain't playing that game.
                 body = bytearray()
                 if content_length:
-                    body = await connection.readexactly(int(content_length))
+                    body = await asyncio.wait_for(
+                        connection.readexactly(int(content_length)),
+                        timeout=self.timeouts.socket_read_timeout
+                    )
 
                 elif transfer_encoding:
                     
@@ -255,11 +274,19 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
                         if not chunk_size:
                             # read last CRLF
                             body.extend(
-                                await connection.readuntil()
+                                await asyncio.wait_for(
+                                    connection.readuntil(),
+                                    timeout=self.timeouts.socket_read_timeout
+                                )
                             )
+                            
                             break
                         
-                        chunk = await connection.readexactly(chunk_size + 2)
+                        chunk = await asyncio.wait_for(
+                            connection.readexactly(chunk_size + 2),
+                            timeout=self.timeouts.socket_read_timeout
+                        )
+
                         body.extend(
                             chunk[:-2]
                         )

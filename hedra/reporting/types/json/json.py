@@ -7,7 +7,7 @@ import uuid
 import os
 import signal
 import re
-import datetime
+import time
 from pathlib import Path
 from typing import List, TextIO
 from concurrent.futures import ThreadPoolExecutor
@@ -60,59 +60,11 @@ class JSON:
         directory = original_filepath.parent
         filename = original_filepath.stem
 
-        events_file_timestamp = datetime.datetime.now().strftime('%Y-%m-%dT-%H:%M:%S.z')
-
+        events_file_timestamp =time.time()
         self.events_filepath = os.path.join(
             directory,
             f'{filename}_{events_file_timestamp}.json'
         )
-        
-        file_exists = await self._loop.run_in_executor(
-            self._executor,
-            functools.partial(   
-                os.path.exists,
-                self.events_filepath
-            )
-        )
-        
-        copy_index = None
-        original_filepath = Path(self.events_filepath)
-        while file_exists:
-            filepath = Path(self.events_filepath)
-            result = self.pattern.search(filepath.stem)
-            match: str = None
-            if result:
-                match = result.group(0)
-
-            if match and match[1:].isnumeric():
-                existing_copy_index = match[1:]
-                copy_index = int(existing_copy_index) + 1
-
-            else:
-                copy_index = 1
-
-            self.events_filepath = os.path.join(
-                directory,
-                f'{filename}_copy{copy_index}_{events_file_timestamp}.json'
-            )
-
-            file_exists = await self._loop.run_in_executor(
-                self._executor,
-                functools.partial(   
-                    os.path.exists,
-                    self.events_filepath
-                )
-            )
-
-        directory = original_filepath.parent
-        filename = original_filepath.stem
-        events_file_timestamp = datetime.datetime.now().strftime('%Y-%m-%dT-%H:%M:%S.z')
-
-        if copy_index:
-            self.events_filepath = os.path.join(
-                directory,
-                f'{filename}_copy{copy_index}_{events_file_timestamp}.json'
-            )
 
         self.events_file = await self._loop.run_in_executor(
             self._executor,

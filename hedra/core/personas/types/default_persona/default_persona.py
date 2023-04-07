@@ -322,7 +322,7 @@ class DefaultPersona:
         self.stream.completed = []
 
         await asyncio.gather(*stream_submission_tasks)
-        
+   
         self.completed_time = time.time() - start
 
         return stream_analytics
