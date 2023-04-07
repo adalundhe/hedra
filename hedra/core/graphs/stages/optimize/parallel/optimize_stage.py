@@ -32,6 +32,7 @@ from hedra.core.graphs.stages.base.import_tools import (
     set_stage_hooks
 )
 from hedra.core.graphs.stages.optimize.optimization.algorithms import registered_algorithms
+from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from hedra.logging import (
     HedraLogger,
     LoggerTypes,
@@ -159,13 +160,19 @@ def optimize_stage(serialized_config: str):
         graph_name: str = optimization_config.get('graph_name')
         graph_path: str= optimization_config.get('graph_path')
         graph_id: str = optimization_config.get('graph_id')
+        
         source_stage_name: str = optimization_config.get('source_stage_name')
         source_stage_id: str = optimization_config.get('source_stage_id')
         source_stage_context: Dict[str, Any] = optimization_config.get('source_stage_context')
+
+        setup_stage_experiment_distributions: Dict[str, List[float]] = optimization_config.get('setup_stage_experiment_distributions')
+        
         execute_stage_name: str = optimization_config.get('execute_stage_name')
         execute_stage_config: Config = optimization_config.get('execute_stage_config')
         execute_setup_stage_name: Config = optimization_config.get('execute_setup_stage_name')
         execute_stage_plugins: Dict[PluginType, List[str]] = optimization_config.get('execute_stage_plugins')
+        execute_stage_streamed_analytics: Dict[str, List[StreamAnalytics]] = optimization_config.get('execute_stage_streamed_analytics')
+        
         optimizer_params: List[str] = optimization_config.get('optimizer_params')
         optimizer_iterations: int = optimization_config.get('optimizer_iterations')
         optimizer_algorithm: str = optimization_config.get('optimizer_algorithm')
@@ -269,7 +276,9 @@ def optimize_stage(serialized_config: str):
             'feed_forward': optimizer_feed_forward,
             'iterations': optimizer_iterations,
             'algorithm': optimizer_algorithm,
-            'time_limit': time_limit
+            'time_limit': time_limit,
+            'distributions': setup_stage_experiment_distributions,
+            'stream_analytics': execute_stage_streamed_analytics
         })
 
         optimizer._event_loop = loop

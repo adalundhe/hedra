@@ -33,8 +33,9 @@ async def cancel_pending(pend: Task):
             return pend
 
         pend.cancel()
-        # if not pend.cancelled():
-        #     await pend
+        await asyncio.sleep(0)
+        if not pend.cancelled():
+            await pend
 
         return pend
     

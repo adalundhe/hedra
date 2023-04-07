@@ -15,6 +15,7 @@ from hedra.core.graphs.stages.analyze.analyze import Analyze
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 
 
 ExecuteHooks = List[Union[ActionHook , TaskHook]]
@@ -32,26 +33,28 @@ class ActEdge(BaseEdge[Act]):
         )
 
         self.requires = [
-            'setup_stage_configs',
             'analyze_stage_summary_metrics',
-            'setup_stage_ready_stages',
-            'setup_stage_candidates',
             'execute_stage_setup_config',
             'execute_stage_setup_by',
             'execute_stage_setup_hooks',
             'execute_stage_results',
-            'execute_stage_streamed_analytics'
+            'execute_stage_streamed_analytics',
+            'setup_stage_configs',
+            'setup_stage_experiment_distributions',
+            'setup_stage_ready_stages',
+            'setup_stage_candidates',
         ]
 
         self.provides = [
-            'setup_stage_configs',
             'analyze_stage_summary_metrics',
             'execute_stage_setup_hooks',
             'execute_stage_setup_config',
             'execute_stage_setup_by',
-            'setup_stage_ready_stages',
             'execute_stage_results',
-            'execute_stage_streamed_analytics'
+            'execute_stage_streamed_analytics',
+            'setup_stage_configs',
+            'setup_stage_ready_stages',
+            'setup_stage_experiment_distributions',
         ]
 
         self.valid_states = [
@@ -257,47 +260,61 @@ class ActEdge(BaseEdge[Act]):
         execute_stage_setup_config: Config = None
         execute_stage_setup_hooks: Dict[str, ExecuteHooks] = {}
         execute_stage_setup_by: str = None
+        execute_stage_streamed_analytics: Dict[str, List[StreamAnalytics]]= defaultdict(list)
         setup_stage_ready_stages: List[Stage] = []
         setup_stage_candidates: List[Stage] = []
         setup_stage_configs: Dict[str, Config] = {}
+        setup_stage_experiment_distributions: Dict[str, List[float]] = {}
 
-        for from_stage_name in self.from_stage_names:
-            previous_history = self.history[(from_stage_name, self.source.name)]
-
-            execute_config: Config = previous_history.get('execute_stage_setup_config', Config())
-            setup_stage_configs.update(
-                    previous_history.get(
-                        'setup_stage_configs',
-                        {}
-                    )
-                )
+        for source_stage, destination_stage in self.history:
             
-            setup_by = previous_history.get('execute_stage_setup_by')
+            previous_history: Dict[str, Any]  = self.history[(source_stage, destination_stage)]
 
-            if execute_config.optimized:
-                execute_stage_setup_config = execute_config
-                max_batch_size = execute_config.batch_size
-                execute_stage_setup_by = setup_by
+            if destination_stage == self.source.name:
+                execute_config: Config = previous_history.get('execute_stage_setup_config', Config())
+                setup_stage_configs.update(
+                        previous_history.get(
+                            'setup_stage_configs',
+                            {}
+                        )
+                    )
+                
+                setup_by = previous_history.get('execute_stage_setup_by')
 
-            elif execute_config.batch_size > max_batch_size:
-                execute_stage_setup_config = execute_config
-                max_batch_size = execute_config.batch_size
-                execute_stage_setup_by = setup_by
+                if execute_config.optimized:
+                    execute_stage_setup_config = execute_config
+                    max_batch_size = execute_config.batch_size
+                    execute_stage_setup_by = setup_by
 
-            execute_hooks: ExecuteHooks = previous_history.get('execute_stage_setup_hooks', {})
-            for setup_hook in execute_hooks:
-                execute_stage_setup_hooks[setup_hook.name] = setup_hook
+                elif execute_config.batch_size > max_batch_size:
+                    execute_stage_setup_config = execute_config
+                    max_batch_size = execute_config.batch_size
+                    execute_stage_setup_by = setup_by
 
-            ready_stages = previous_history.get('setup_stage_ready_stages', [])
+                execute_hooks: ExecuteHooks = previous_history.get('execute_stage_setup_hooks', {})
+                for setup_hook in execute_hooks:
+                    execute_stage_setup_hooks[setup_hook.name] = setup_hook
 
-            for ready_stage in ready_stages:
-                if ready_stage not in setup_stage_ready_stages:
-                    setup_stage_ready_stages.append(ready_stage)
+                ready_stages = previous_history.get('setup_stage_ready_stages', [])
 
-            stage_candidates: List[Stage] = previous_history.get('setup_stage_candidates', [])
-            for stage_candidate in stage_candidates:
-                if stage_candidate not in setup_stage_candidates:
-                    setup_stage_candidates.append(stage_candidate)
+                for ready_stage in ready_stages:
+                    if ready_stage not in setup_stage_ready_stages:
+                        setup_stage_ready_stages.append(ready_stage)
+
+                stage_candidates: List[Stage] = previous_history.get('setup_stage_candidates', [])
+                for stage_candidate in stage_candidates:
+                    if stage_candidate not in setup_stage_candidates:
+                        setup_stage_candidates.append(stage_candidate)
+
+                stage_distributions = previous_history.get('setup_stage_experiment_distributions')
+
+                if stage_distributions:
+                    setup_stage_experiment_distributions.update(stage_distributions)
+            
+            streamed_analytics = previous_history.get('execute_stage_streamed_analytics')
+
+            if streamed_analytics:
+                execute_stage_streamed_analytics[source_stage].extend(streamed_analytics)
 
         raw_results = {}
         for from_stage_name in self.from_stage_names:
