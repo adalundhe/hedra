@@ -1,3 +1,4 @@
+from typing import Union
 from scipy.stats import betaprime
 from .base import BaseDistribution
 
@@ -7,19 +8,19 @@ class BetaPrimeDistribution(BaseDistribution):
     def __init__(
         self, 
         size: int,
-        alpha_value: int=3,
+        alpha_value: int=5,
         beta_value: int=6,
-        scale: float=0.5
+        center: Union[int, float]=0.5,
+        randomness: Union[int, float]=0.25
     ):
-        center = int(size/2)
-
         super().__init__(
-            size,
-            center,
-            scale,
-            betaprime(
+            size=size,
+            center=center,
+            randomness=randomness,
+            frozen_distribution=betaprime(
                 alpha_value,
                 beta_value, 
-                scale=scale
+                loc=center,
+                scale=randomness
             )
         )

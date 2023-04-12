@@ -1,3 +1,4 @@
+from typing import Union
 from scipy.stats import fisk
 from .base import BaseDistribution
 
@@ -6,20 +7,18 @@ class FiskDistribution(BaseDistribution):
 
     def __init__(
         self,
-        size: int
+        size: int,
+        alpha: Union[int, float]=2,
+        center: Union[int, float]=0.5,
+        randomness: Union[int, float]=0.25
     ):
-        center = int(size * 0.1)
-        scale_factor = int(size * 0.4)
         super().__init__(
-            size,
-            center,
-            center,
-            fisk(
-                center,
+            size=size,
+            center=center,
+            randomness=randomness,
+            frozen_distribution=fisk(
+                alpha,
                 loc=center,
-                scale_factor=scale_factor
+                scale=randomness
             )
         )
-
-    def generate(self):
-        return super().generate()/self.size

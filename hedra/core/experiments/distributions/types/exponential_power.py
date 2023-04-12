@@ -8,15 +8,15 @@ class ExponentialPowerDistribution(BaseDistribution):
     def __init__(
         self,
         size: int,
-        center: float = 0.1,
-        scale: Union[int, float]=2
+        center: Union[int, float]=0.5,
+        randomness: Union[int, float]=0.25
     ):
         super().__init__(
-            size,
-            center,
-            scale,
-            exponpow(
-                scale,
-                center
+            size=size,
+            center=center,
+            randomness=randomness,
+            frozen_distribution=exponpow(
+                loc=center,
+                scale=randomness
             )
         )

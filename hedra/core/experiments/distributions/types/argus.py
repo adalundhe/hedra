@@ -1,20 +1,24 @@
+from typing import Union
 from scipy.stats import argus
 from .base import BaseDistribution
 
 
 class ArgusDistribution(BaseDistribution):
 
-    def __init__(self, size: int):
-        center = int(size/2)
-        scale_factor = size * 0.4
+    def __init__(
+        self, 
+        size: int,
+        center: Union[int, float]=0.5,
+        randomness: Union[int, float]=0.25
+    ):
 
         super().__init__(
-            size,
-            center,
-            scale_factor,
-            argus(
+            size=size,
+            center=center,
+            randomness=randomness,
+            frozen_distribution=argus(
                 1,
-                loc=center,
-                scale=scale_factor
+            center=center,
+            randomness=randomness,
             )
         )

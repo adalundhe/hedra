@@ -1,3 +1,4 @@
+from typing import Union
 from scipy.stats import f
 from .base import BaseDistribution
 
@@ -6,21 +7,20 @@ class FDistribution(BaseDistribution):
 
     def __init__(
         self,
-        size: int
+        size: int,
+        distribution_function_number: Union[int, float]=10,
+        distribution_function_density: Union[int, float]=6,
+        center: Union[int, float]=0.5,
+        randomness: Union[int, float]=0.25
     ):
-        center = int(size * 0.1)
-        scale_factor = int(size * 0.1)
         super().__init__(
-            size,
-            center,
-            center,
-            f(
-                1,
-                size,
+            size=size,
+            center=center,
+            randomness=randomness,
+            frozen_distribution=f(
+                distribution_function_number,
+                distribution_function_density,
                 loc=center,
-                scale_factor=scale_factor
+                scale=randomness
             )
         )
-
-    def generate(self):
-        return super().generate()/self.size
