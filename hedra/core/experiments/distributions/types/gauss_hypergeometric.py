@@ -4,7 +4,7 @@ from scipy.stats import gausshyper
 from .base import BaseDistribution
 
 
-class GaussDistribution(BaseDistribution):
+class GaussHypergeometricDistribution(BaseDistribution):
 
     def __init__(
         self,

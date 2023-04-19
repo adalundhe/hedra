@@ -27,7 +27,7 @@ class BaseDistribution:
         self._upper_bound = 0.9
 
     def generate_distribution(self, batch_size: int) -> List[float]:
-        distribution_size, step_size = self.get_distribution_and_step_size()
+        distribution_size, step_size = self._get_distribution_and_step_size()
 
         distribution_sample = self._frozen_distribution.rvs(
             distribution_size
@@ -36,19 +36,19 @@ class BaseDistribution:
             size=distribution_size
         )
 
-        generated_walk = self.generate_random_walk(distribution_sample)
-        scaled_walk = self.smooth_generated_walk(
+        generated_walk = self._generate_random_walk(distribution_sample)
+        scaled_walk = self._smooth_generated_walk(
             generated_walk,
             step_size
         ) * batch_size
 
-        return self.apply_averaging(
+        return self._apply_averaging(
             scaled_walk,
             step_size
         )
         
     
-    def get_distribution_and_step_size(self) -> Tuple[int, int]:
+    def _get_distribution_and_step_size(self) -> Tuple[int, int]:
         if self.size <= 10:
             distribution_size = self.size**3
             step_size = self.size**2
@@ -72,7 +72,7 @@ class BaseDistribution:
 
         return distribution_size, step_size
     
-    def generate_random_walk(self, distribution_sample: List[float]) -> List[float]:
+    def _generate_random_walk(self, distribution_sample: List[float]) -> List[float]:
         current_step_value = 0.5
         result = []
         for sample_value in distribution_sample:
@@ -88,7 +88,7 @@ class BaseDistribution:
 
         return numpy.array(result)
     
-    def smooth_generated_walk(
+    def _smooth_generated_walk(
         self, 
         generated_walk: List[float], 
         smoothing_window_size: int
@@ -100,7 +100,7 @@ class BaseDistribution:
             )/smoothing_window_size
         )[(smoothing_window_size-1):]
     
-    def apply_averaging(
+    def _apply_averaging(
         self, 
         scaled_walk: List[float],
         step_size: int

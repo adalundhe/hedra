@@ -1,22 +1,22 @@
 from typing import Union
-from scipy.stats import genlogistic
+from scipy.stats import gennorm
 from .base import BaseDistribution
 
 
-class GeneralizedLogisticDistribution(BaseDistribution):
+class GeneralizedNormalDistribution(BaseDistribution):
 
     def __init__(
         self,
         size: int,
-        a_value: float=0.5,
+        a_value: float=1,
         center: Union[int, float]=0.5,
-        randomness: Union[int, float]=0.25
+        randomness: Union[int, float]=0.5
     ):
         super().__init__(
             size=size,
             center=center,
             randomness=randomness,
-            frozen_distribution=genlogistic(
+            frozen_distribution=gennorm(
                 a_value,
                 loc=center,
                 scale=randomness

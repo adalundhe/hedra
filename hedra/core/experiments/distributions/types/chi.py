@@ -3,7 +3,7 @@ from scipy.stats import chi
 from .base import BaseDistribution
 
 
-class ChiSquaredDistribution(BaseDistribution):
+class ChiDistribution(BaseDistribution):
 
     def __init__(
         self,
