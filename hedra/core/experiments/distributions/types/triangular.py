@@ -3,7 +3,7 @@ from scipy.stats import triang
 from .base import BaseDistribution
 
 
-class TrapezoidDistribution(BaseDistribution):
+class TriangularDistribution(BaseDistribution):
 
     def __init__(
         self,
