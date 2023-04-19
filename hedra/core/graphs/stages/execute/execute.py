@@ -30,6 +30,7 @@ from hedra.core.personas.persona_registry import (
     registered_personas, 
     DefaultPersona
 )
+from hedra.logging import logging_manager
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.reporter import ReporterConfig
 from .parallel import execute_actions
@@ -164,6 +165,8 @@ class Execute(Stage, Generic[Unpack[T]]):
                         'graph_path': self.graph_path,
                         'graph_id': self.graph_id,
                         'source_stage_name': self.name,
+                        'logfiles_directory': logging_manager.logfiles_directory,
+                        'log_level': logging_manager.log_level_name,
                         'source_stage_context': {
                             context_key: context_value for context_key, context_value in serializable_context
                         },

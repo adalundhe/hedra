@@ -9,7 +9,6 @@ import ntpath
 import signal
 from multiprocessing import current_process, active_children
 from pathlib import Path
-from typing import List
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs import Graph
 from hedra.core.graphs.status import GraphStatus
@@ -20,7 +19,6 @@ from hedra.logging import (
     LoggerTypes,
     logging_manager
 )
-
 
 uvloop.install()
 
@@ -176,7 +174,7 @@ def run_graph(
             getattr(signal, signame),
             lambda signame=signame: handle_loop_stop(signame)
         )
-
+    
     try:
         loop.run_until_complete(graph.run())
         

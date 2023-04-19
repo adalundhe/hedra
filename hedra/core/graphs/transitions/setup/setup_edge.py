@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import inspect
+import traceback
 from collections import defaultdict
 from typing import Dict, List, Any
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge

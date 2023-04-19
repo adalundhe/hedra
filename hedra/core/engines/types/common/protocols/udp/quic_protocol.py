@@ -1,6 +1,5 @@
 from __future__ import annotations
 import asyncio
-import pylsqpack
 import re
 from enum import Enum, IntEnum
 from collections import deque
@@ -30,6 +29,7 @@ def dummy_stream_is_unidirectional(val: int):
 
 try:
 
+    import pylsqpack
     from aioquic.quic.connection import QuicConnection, NetworkAddress
     from aioquic.quic.events import (
         ConnectionTerminated,
@@ -63,6 +63,7 @@ try:
     from aioquic.quic.connection import stream_is_unidirectional
 
 except ImportError:
+    pylsqpack = object
     aioquic = object
     QuicConnection = object
     ConnectionTerminated = object

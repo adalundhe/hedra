@@ -17,6 +17,7 @@ from hedra.core.hooks.types.event.decorator import event
 from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.event_types import EventType
+from hedra.logging import logging_manager
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.metric import MetricsSet
 from hedra.reporting.metric.custom_metric import CustomMetric
@@ -302,6 +303,8 @@ class Analyze(Stage):
                         'graph_name': self.graph_name,
                         'graph_path': self.graph_path,
                         'graph_id': self.graph_id,
+                        'logfiles_directory': logging_manager.logfiles_directory,
+                        'log_level': logging_manager.log_level_name,
                         'source_stage_name': self.name,
                         'source_stage_context': {
                             context_key: context_value for context_key, context_value in serializable_context

@@ -42,6 +42,7 @@ setup(
         "Operating System :: OS Independent"
     ],
     install_requires=[
+        'hyperframe',
         'aiologger',
         'yaspin',
         'attr',

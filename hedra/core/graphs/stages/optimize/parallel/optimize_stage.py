@@ -116,6 +116,10 @@ def optimize_stage(serialized_config: str):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
+    from hedra.logging import (
+        logging_manager
+    )
+
     try:
         hedra_config_filepath = os.path.join(
             os.getcwd(),
@@ -143,15 +147,6 @@ def optimize_stage(serialized_config: str):
         logging_manager.update_log_level(log_level)
         logging_manager.logfiles_directory = logfiles_directory
 
-
-        logger = HedraLogger()
-        logger.initialize()
-        logger.filesystem.sync.create_logfile('hedra.core.log')
-        logger.filesystem.sync.create_logfile('hedra.optimize.log')
-
-        logger.filesystem.create_filelogger('hedra.core.log')
-        logger.filesystem.create_filelogger('hedra.optimize.log')
-
         thread_id = threading.current_thread().ident
         process_id = os.getpid()
 
@@ -160,7 +155,26 @@ def optimize_stage(serialized_config: str):
         graph_name: str = optimization_config.get('graph_name')
         graph_path: str= optimization_config.get('graph_path')
         graph_id: str = optimization_config.get('graph_id')
-        
+        logfiles_directory = optimization_config.get('logfiles_directory')
+        log_level = optimization_config.get('log_level')
+
+        logging_manager.disable(
+            LoggerTypes.DISTRIBUTED,
+            LoggerTypes.DISTRIBUTED_FILESYSTEM,
+            LoggerTypes.SPINNER
+        )
+
+        logging_manager.update_log_level(log_level)
+        logging_manager.logfiles_directory = logfiles_directory
+
+        logger = HedraLogger()
+        logger.initialize()
+        logger.filesystem.sync.create_logfile('hedra.core.log')
+        logger.filesystem.sync.create_logfile('hedra.optimize.log')
+
+        logger.filesystem.create_filelogger('hedra.core.log')
+        logger.filesystem.create_filelogger('hedra.optimize.log')
+            
         source_stage_name: str = optimization_config.get('source_stage_name')
         source_stage_id: str = optimization_config.get('source_stage_id')
         source_stage_context: Dict[str, Any] = optimization_config.get('source_stage_context')

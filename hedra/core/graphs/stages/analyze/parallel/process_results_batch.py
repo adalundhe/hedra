@@ -9,6 +9,10 @@ from typing import Any, Dict, List
 from hedra.logging import HedraLogger
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
+from hedra.logging import (
+    HedraLogger,
+    LoggerTypes
+)
 from hedra.reporting.processed_result.processed_results_group import ProcessedResultsGroup
 
 
@@ -16,14 +20,31 @@ from hedra.reporting.processed_result.processed_results_group import ProcessedRe
 def process_results_batch(config: Dict[str, Any]):
     import asyncio
     import uvloop
+    import warnings
     uvloop.install()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+    warnings.simplefilter("ignore")
+
+    from hedra.logging import (
+        logging_manager
+    )
     
     graph_name = config.get('graph_name')
     graph_id = config.get('graph_id')
+    logfiles_directory = config.get('logfiles_directory')
+    log_level = config.get('log_level')
     source_stage_name = config.get('source_stage_name')
     source_stage_id = config.get('source_stage_id')
+
+    logging_manager.disable(
+        LoggerTypes.DISTRIBUTED,
+        LoggerTypes.DISTRIBUTED_FILESYSTEM,
+        LoggerTypes.SPINNER
+    )
+
+    logging_manager.update_log_level(log_level)
+    logging_manager.logfiles_directory = logfiles_directory
 
     thread_id = threading.current_thread().ident
     process_id = os.getpid()

@@ -12,12 +12,15 @@ from pathlib import Path
 from typing import List, TextIO
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
-from dicttoxml import dicttoxml
 from xml.dom.minidom import parseString
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric.metrics_set import MetricsSet
 from .xml_config import XMLConfig
 
+try:
+    from dicttoxml import dicttoxml
+except Exception:
+    dicttoxml = object
 
 collections.Iterable = collections.abc.Iterable
 

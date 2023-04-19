@@ -1,10 +1,10 @@
-import json
 import threading
 import os
 import time
 import signal
 import dill
 import pickle
+import warnings
 from collections import defaultdict
 from typing import Dict, Any, List, Union
 from hedra.core.engines.client.config import Config
@@ -37,6 +37,8 @@ from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
 from hedra.reporting.reporter import ReporterConfig
+warnings.simplefilter("ignore")
+warnings.filterwarnings("ignore")
 
 
 async def start_execution(
@@ -45,26 +47,10 @@ async def start_execution(
     setup_stage: Setup,
     workers: int,
     source_stage_name: str,
-    source_stage_stream_configs: List[ReporterConfig]
+    source_stage_stream_configs: List[ReporterConfig],
+    logfiles_directory,
+    log_level
 ):
-
-    hedra_config_filepath = os.path.join(
-        os.getcwd(),
-        '.hedra.json'
-    )
-
-    hedra_config = {}
-    if os.path.exists(hedra_config_filepath):
-        with open(hedra_config_filepath, 'r') as hedra_config_file:
-            hedra_config = json.load(hedra_config_file)
-
-    logging_config = hedra_config.get('logging', {})
-    logfiles_directory = logging_config.get(
-        'logfiles_directory',
-        os.getcwd()
-    )
-
-    log_level = logging_config.get('log_level', 'info')
 
     logging_manager.disable(
         LoggerTypes.DISTRIBUTED,
@@ -77,6 +63,7 @@ async def start_execution(
 
 
     logger = HedraLogger()
+    logger.logger_directory = logfiles_directory
     logger.initialize()
     await logger.filesystem.aio.create_logfile('hedra.core.log')
     logger.filesystem.create_filelogger('hedra.core.log')
@@ -181,6 +168,10 @@ def execute_actions(parallel_config: str):
     import uvloop
     uvloop.install()
 
+    from hedra.logging import (
+        logging_manager
+    )
+
     try:
         loop = asyncio.get_event_loop()
     except Exception:
@@ -190,6 +181,7 @@ def execute_actions(parallel_config: str):
 
     def handle_loop_stop(signame):
         try:
+            loop.shutdown_asyncgens()
             loop.close()
 
         except BrokenPipeError:
@@ -210,6 +202,8 @@ def execute_actions(parallel_config: str):
         graph_name = parallel_config.get('graph_name')
         graph_path: str= parallel_config.get('graph_path') 
         graph_id = parallel_config.get('graph_id')
+        logfiles_directory = parallel_config.get('logfiles_directory')
+        log_level = parallel_config.get('log_level')
         source_stage_name = parallel_config.get('source_stage_name')
         source_stage_context: Dict[str, Any] = parallel_config.get('source_stage_context')
         source_stage_plugins = parallel_config.get('source_stage_plugins')
@@ -220,6 +214,15 @@ def execute_actions(parallel_config: str):
 
         thread_id = threading.current_thread().ident
         process_id = os.getpid()
+
+        logging_manager.disable(
+            LoggerTypes.DISTRIBUTED,
+            LoggerTypes.DISTRIBUTED_FILESYSTEM,
+            LoggerTypes.SPINNER
+        )
+
+        logging_manager.update_log_level(log_level)
+        logging_manager.logfiles_directory = logfiles_directory
 
         metadata_string = f'Graph - {graph_name}:{graph_id} - thread:{thread_id} - process:{process_id} - Stage: {source_stage_name}:{source_stage_id} - '
 
@@ -320,7 +323,9 @@ def execute_actions(parallel_config: str):
                 setup_stage,
                 workers,
                 source_stage_name,
-                source_stage_stream_configs
+                source_stage_stream_configs,
+                logfiles_directory,
+                log_level
             )
         )
 

@@ -1,5 +1,6 @@
 import aiodns
 import socket
+import psutil
 from ipaddress import ip_address, IPv4Address
 from urllib.parse import urlparse
 from asyncio.events import get_event_loop
@@ -92,12 +93,10 @@ class URL:
                 else:
                     socket_type = socket.AF_INET6
 
-
                 info = await self.loop.getaddrinfo(
                     address, 
                     self.port, 
                     family=self.family, 
-                    type=socket.SOL_SOCKET, 
                     proto=0, 
                     flags=0
                 )

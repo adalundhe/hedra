@@ -25,6 +25,7 @@ class HedraLogger:
         self.logger_types = logging_manager.logger_types.types
         self.log_level: LogLevel = None
         self.logger_types_map = LoggerTypesMap()
+        self.logger_directory: str = None
 
     def initialize(self, config: LoggingConfig=LoggingConfig()):
 
@@ -96,6 +97,7 @@ class HedraLogger:
     @property
     def filesystem(self) -> Logger[AsyncFilesystemLogger, SyncFilesystemLogger]:
         return self.loggers['filesystem']
+
 
     @property
     def distributed_filesystem(self) -> Logger[AsyncFilesystemLogger, SyncFilesystemLogger]:
