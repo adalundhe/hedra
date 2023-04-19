@@ -154,6 +154,8 @@ class Graph:
 
         execution_start = time.monotonic()
 
+        run_task = asyncio.current_task()
+
         await self.logger.hedra.aio.debug(f'{self.metadata_string} - Changed status to - {GraphStatus.RUNNING.name} - from - {GraphStatus.ASSEMBLING.name}')
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Changed status to - {GraphStatus.RUNNING.name} - from - {GraphStatus.ASSEMBLING.name}')
         
@@ -256,8 +258,15 @@ class Graph:
             transition_group.edges_by_name = None
             transition_group.adjacency_list = None
 
-    async def cleanup(self):
-        pass
+        pending_tasks = asyncio.all_tasks()
+
+        for task in pending_tasks:
+            if task != run_task and task.cancelled() is False:
+                task.cancel()
+
+    def cleanup(self):
+        for executor in self.runner.executors:
+            executor.close()
 
     def _append_stage(self, stage_type: StageTypes):
 

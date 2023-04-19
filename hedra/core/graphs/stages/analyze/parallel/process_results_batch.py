@@ -2,7 +2,6 @@
 import time
 import threading
 import os
-import signal 
 import dill
 from collections import defaultdict
 from typing import Any, Dict, List
@@ -18,12 +17,7 @@ from hedra.reporting.processed_result.processed_results_group import ProcessedRe
 
 
 def process_results_batch(config: Dict[str, Any]):
-    import asyncio
-    import uvloop
     import warnings
-    uvloop.install()
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     warnings.simplefilter("ignore")
 
     from hedra.logging import (
@@ -53,25 +47,6 @@ def process_results_batch(config: Dict[str, Any]):
 
     stage_name = config.get('analyze_stage_name')
     results_batch: List[BaseResult] = config.get('analyze_stage_batched_results', [])
-
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    def handle_loop_stop(signame):
-        try:
-            loop.close()
-
-        except BrokenPipeError:
-            pass
-
-        except RuntimeError:
-            pass
-
-    for signame in ('SIGINT', 'SIGTERM'):
-        loop.add_signal_handler(
-            getattr(signal, signame),
-            lambda signame=signame: handle_loop_stop(signame)
-        )
 
     try:
 

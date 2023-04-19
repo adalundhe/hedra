@@ -309,6 +309,8 @@ class Execute(Stage, Generic[Unpack[T]]):
             await self.logger.filesystem.aio['hedra.core'].info( f'{self.metadata_string} - Completed - {total_results} actions at  {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
             await self.logger.spinner.set_default_message(f'Stage - {self.name} completed {total_results} actions at {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
 
+            self.executor.shutdown()
+            
             return {
                 'execute_stage_streamed_analytics': [
                     results.get('streamed_analytics')
@@ -323,5 +325,4 @@ class Execute(Stage, Generic[Unpack[T]]):
 
     @event('aggregate_multiple_worker_results', 'setup_single_worker_job')
     async def complete(self):
-        self.executor.shutdown()
         return {}

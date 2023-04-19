@@ -1,7 +1,7 @@
 import asyncio
 import time
 import uuid
-import traceback
+import signal
 from typing import Dict, Any, Union, Coroutine, TypeVar
 from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
@@ -342,3 +342,6 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
         if self.closed is False:
             await self.pool.close()
             self.closed = True
+
+            for _ in range(self.sem._value):
+                self.sem.release()

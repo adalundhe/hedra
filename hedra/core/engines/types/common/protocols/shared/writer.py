@@ -1,3 +1,5 @@
+import asyncio
+import signal
 from asyncio import (
     Transport,
     DatagramTransport,
@@ -27,7 +29,7 @@ class Writer:
         self._protocol: Protocol = protocol
         # drain() expects that the reader has an exception() method
         self._reader = reader
-        self._loop = loop
+        self._loop: asyncio.AbstractEventLoop = loop
         self._complete_fut = self._loop.create_future()
         self._complete_fut.set_result(None)
 

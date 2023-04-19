@@ -5,6 +5,8 @@ import signal
 import dill
 import pickle
 import warnings
+import asyncio
+import gc
 from collections import defaultdict
 from typing import Dict, Any, List, Union
 from hedra.core.engines.client.config import Config
@@ -51,6 +53,8 @@ async def start_execution(
     logfiles_directory,
     log_level
 ):
+
+    current_task = asyncio.current_task()
 
     logging_manager.disable(
         LoggerTypes.DISTRIBUTED,
@@ -160,6 +164,14 @@ async def start_execution(
         'context': context
     }
 
+    pending_tasks = [
+        task for task in asyncio.all_tasks() if task != current_task
+    ]
+    
+    for task in pending_tasks:
+        if not task.cancelled():
+            task.cancel()
+
     return results_dict
 
 
@@ -181,8 +193,19 @@ def execute_actions(parallel_config: str):
 
     def handle_loop_stop(signame):
         try:
-            loop.shutdown_asyncgens()
+            pending_events = asyncio.all_tasks()
+            
+            for task in pending_events:
+                if not task.cancelled():
+                    try:
+                        task.cancel()
+                    except asyncio.CancelledError:
+                        pass
+                    except asyncio.InvalidStateError:
+                        pass
+                    
             loop.close()
+            gc.collect()
 
         except BrokenPipeError:
             pass
@@ -330,6 +353,7 @@ def execute_actions(parallel_config: str):
         )
 
         loop.close()
+        gc.collect()
 
         return result
 

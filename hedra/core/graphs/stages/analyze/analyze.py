@@ -531,11 +531,12 @@ class Analyze(Stage):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed results analysis for - {analyze_stage_stages_count} - stages in - {self.analysis_execution_time} seconds')
         await self.logger.spinner.set_default_message(f'Completed results analysis for {analyze_stage_total_group_results} actions and {analyze_stage_stages_count} stages over {self.analysis_execution_time} seconds')
 
+        self.executor.shutdown()
+        
         return {
             'analyze_stage_summary_metrics': summaries
         }
 
     @event('generate_summary')
     async def complete(self):
-        self.executor.shutdown()
         return {}

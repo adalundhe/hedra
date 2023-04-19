@@ -174,3 +174,12 @@ class BatchExecutor:
             child_processes = active_children()
             for child in child_processes:
                 child.kill()
+
+    def close(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            self.pool.shutdown()
+
+            child_processes = active_children()
+            for child in child_processes:
+                child.kill()
