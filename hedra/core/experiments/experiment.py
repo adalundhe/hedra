@@ -87,7 +87,7 @@ class Experiment:
             return [
                 math.ceil(
                     batch_size * dist_val
-                ) for dist_val in variant.distribution.generate()
+                ) for dist_val in variant.distribution.generate(batch_size)
             ]
 
         

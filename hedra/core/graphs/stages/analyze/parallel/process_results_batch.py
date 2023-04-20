@@ -13,6 +13,8 @@ from hedra.logging import (
     LoggerTypes
 )
 from hedra.reporting.processed_result.processed_results_group import ProcessedResultsGroup
+from hedra.versioning.flags.types.base.active import active_flags
+from hedra.versioning.flags.types.base.flag_type import FlagTypes
 
 
 
@@ -30,6 +32,9 @@ def process_results_batch(config: Dict[str, Any]):
     log_level = config.get('log_level')
     source_stage_name = config.get('source_stage_name')
     source_stage_id = config.get('source_stage_id')
+    enable_unstable_features = config.get('enable_unstable_features', False)
+
+    active_flags[FlagTypes.UNSTABLE_FEATURE] = enable_unstable_features
 
     logging_manager.disable(
         LoggerTypes.DISTRIBUTED,

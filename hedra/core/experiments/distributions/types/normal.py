@@ -8,7 +8,6 @@ class NormalDistribution(BaseDistribution):
     def __init__(
         self,
         size: int,
-        alpha: Union[int, float]=0.5,
         center: Union[int, float]=0.5,
         randomness: Union[int, float]=0.25
     ):
@@ -17,7 +16,6 @@ class NormalDistribution(BaseDistribution):
             center=center,
             randomness=randomness,
             frozen_distribution=norm(
-                alpha,
                 loc=center,
                 scale=randomness
             )

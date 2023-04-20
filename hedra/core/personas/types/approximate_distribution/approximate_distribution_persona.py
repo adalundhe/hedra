@@ -52,7 +52,7 @@ class ApproximateDistributionPersona(DefaultPersona):
     def __init__(self, config: Config):
         super().__init__(config)
 
-        self.distribution: List[float] = config.distribution
+        self.distribution: List[float] = config.experiment.get('distribution')
         self.persona_id = str(uuid.uuid4())
         self.type = PersonaTypes.APPROXIMATE_DISTRIBUTION
 

@@ -33,6 +33,8 @@ from hedra.core.personas.persona_registry import (
 from hedra.logging import logging_manager
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.reporter import ReporterConfig
+from hedra.versioning.flags.types.base.active import active_flags
+from hedra.versioning.flags.types.base.flag_type import FlagTypes
 from .parallel import execute_actions
 
 
@@ -164,6 +166,7 @@ class Execute(Stage, Generic[Unpack[T]]):
                         'graph_name': self.graph_name,
                         'graph_path': self.graph_path,
                         'graph_id': self.graph_id,
+                        'enable_unstable_features': active_flags[FlagTypes.UNSTABLE_FEATURE],
                         'source_stage_name': self.name,
                         'logfiles_directory': logging_manager.logfiles_directory,
                         'log_level': logging_manager.log_level_name,

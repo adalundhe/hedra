@@ -233,8 +233,8 @@ class Distribution:
 
         self.intervals = intervals
 
-    def generate(self):
+    def generate(self, batch_size: int):
         distribution = self.disribution_function(self.intervals)
-        return distribution.generate_distribution()
+        return distribution.generate_distribution(batch_size)
 
     

@@ -3,7 +3,7 @@ import asyncio
 import inspect
 import traceback
 from collections import defaultdict
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Union
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.hooks.types.base.event_types import EventType
 from hedra.core.hooks.types.base.hook import Hook
@@ -39,7 +39,7 @@ class SetupEdge(BaseEdge[Setup]):
         ]
 
         self.provides = [
-            'setup_stage_experiment_distributions',
+            'setup_stage_experiment_config',
             'execute_stage_streamed_analytics',
             'execute_stage_setup_hooks',
             'execute_stage_setup_config',
@@ -124,6 +124,7 @@ class SetupEdge(BaseEdge[Setup]):
             self.visited.append(self.source.name)
 
         except Exception as edge_exception:
+            print(traceback.format_exc())
             self.exception = edge_exception
 
         return None, self.destination.stage_type
@@ -148,7 +149,7 @@ class SetupEdge(BaseEdge[Setup]):
             ready_stages = self.edge_data.get('setup_stage_ready_stages', {})
             setup_candidates = self.edge_data.get('setup_stage_candidates', {})
             setup_config = self.edge_data.get('execute_stage_setup_config')
-            setup_stage_experiment_distributions = self.edge_data.get('setup_stage_experiment_distributions', {})
+            setup_stage_experiment_config: Dict[str, Union[str, int, List[float]]] = self.edge_data.get('setup_stage_experiment_config', {})
             execute_stage_setup_hooks = []
             setup_execute_stage: Execute = ready_stages.get(self.source.name)
 
@@ -158,7 +159,7 @@ class SetupEdge(BaseEdge[Setup]):
             self.stages_by_type[StageTypes.EXECUTE].update(ready_stages)
 
             self.next_history[(self.source.name, destination.name)].update({
-                'setup_stage_experiment_distributions': setup_stage_experiment_distributions,
+                'setup_stage_experiment_config': setup_stage_experiment_config,
                 'setup_stage_configs': setup_stage_configs,
                 'execute_stage_setup_hooks': execute_stage_setup_hooks,
                 'setup_stage_ready_stages': ready_stages,

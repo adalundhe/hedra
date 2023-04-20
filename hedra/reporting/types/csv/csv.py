@@ -354,10 +354,11 @@ class CSV:
                 
     async def close(self):
         
-        await self._loop.run_in_executor(
-            self._executor,
-            self.events_file.close
-        )
+        if self.events_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.events_file.close
+            )
 
 
         self._executor.shutdown()

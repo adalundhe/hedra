@@ -17,6 +17,7 @@ class Variant:
         self.stage_name = stage_name
         self.weight = weight
         self.distribution: Optional[Distribution] = None
+        self.intervals = distribution_intervals
         self.optimize_from: List[str] = optimize_from
         
         if distribution:

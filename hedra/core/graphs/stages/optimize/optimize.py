@@ -14,6 +14,8 @@ from hedra.core.hooks.types.event.decorator import event
 from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.logging import logging_manager
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
+from hedra.versioning.flags.types.base.active import active_flags
+from hedra.versioning.flags.types.base.flag_type import FlagTypes
 from .optimization.parameters import Parameter
 from .parallel import optimize_stage
 
@@ -70,7 +72,7 @@ class Optimize(Stage):
         self,
         setup_stage_configs: Dict[str, Config] = {},
         optimize_stage_candidates: Dict[str, Execute]={},
-        setup_stage_experiment_distributions: Dict[str, List[float]]={},
+        setup_stage_experiment_config: Dict[str, Union[str, int, List[float]]]={},
         execute_stage_streamed_analytics: Dict[str, List[StreamAnalytics]]={}
 
     ):
@@ -107,7 +109,7 @@ class Optimize(Stage):
         batched_stages: BatchedOptimzationCandidates = list(self.executor.partion_stage_batches(optimize_stages))
 
         return {
-            'setup_stage_experiment_distributions': setup_stage_experiment_distributions,
+            'setup_stage_experiment_config': setup_stage_experiment_config,
             'setup_stage_configs': setup_stage_configs,
             'execute_stage_streamed_analytics': execute_stage_streamed_analytics,
             'optimize_stage_candidates': optimize_stage_candidates,
@@ -123,7 +125,7 @@ class Optimize(Stage):
         setup_stage_configs: Dict[str, Config] = {},
         optimize_stage_stages_count: int=0,
         optimize_stage_batched_stages: BatchedOptimzationCandidates=[],
-        setup_stage_experiment_distributions: Dict[str, List[float]]={},
+        setup_stage_experiment_config: Dict[str, Union[str, int, List[float]]]={},
         execute_stage_streamed_analytics: Dict[str, List[StreamAnalytics]]={}
     ):
         batched_configs = []
@@ -150,6 +152,7 @@ class Optimize(Stage):
                     'graph_name': self.graph_name,
                     'graph_path': self.graph_path,
                     'graph_id': self.graph_id,
+                    'enable_unstable_features': active_flags[FlagTypes.UNSTABLE_FEATURE],
                     'logfiles_directory': logging_manager.logfiles_directory,
                     'log_level': logging_manager.log_level_name,
                     'worker_idx': worker_idx,
@@ -159,7 +162,7 @@ class Optimize(Stage):
                     'source_stage_name': self.name,
                     'source_stage_id': self.stage_id,
                     'execute_stage_name': stage_name,
-                    'setup_stage_experiment_distributions': setup_stage_experiment_distributions,
+                    'setup_stage_experiment_config': setup_stage_experiment_config,
                     'execute_stage_streamed_analytics': execute_stage_streamed_analytics,
                     'execute_stage_generation_count': assigned_workers_count,
                     'execute_stage_id': stage.execution_stage_id,

@@ -39,6 +39,8 @@ from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
 from hedra.reporting.reporter import ReporterConfig
+from hedra.versioning.flags.types.base.active import active_flags
+from hedra.versioning.flags.types.base.flag_type import FlagTypes
 warnings.simplefilter("ignore")
 warnings.filterwarnings("ignore")
 
@@ -225,6 +227,8 @@ def execute_actions(parallel_config: str):
         graph_name = parallel_config.get('graph_name')
         graph_path: str= parallel_config.get('graph_path') 
         graph_id = parallel_config.get('graph_id')
+        enable_unstable_features = parallel_config.get('enable_unstable_features', False)
+    
         logfiles_directory = parallel_config.get('logfiles_directory')
         log_level = parallel_config.get('log_level')
         source_stage_name = parallel_config.get('source_stage_name')
@@ -237,6 +241,8 @@ def execute_actions(parallel_config: str):
 
         thread_id = threading.current_thread().ident
         process_id = os.getpid()
+
+        active_flags[FlagTypes.UNSTABLE_FEATURE] = enable_unstable_features
 
         logging_manager.disable(
             LoggerTypes.DISTRIBUTED,

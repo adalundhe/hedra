@@ -37,7 +37,7 @@ class ExecuteEdge(BaseEdge[Execute]):
             'setup_stage_configs',
             'setup_stage_ready_stages',
             'setup_stage_candidates',
-            'setup_stage_experiment_distributions',
+            'setup_stage_experiment_config',
             'execute_stage_setup_config',
             'execute_stage_setup_by',
             'execute_stage_setup_hooks',
@@ -47,7 +47,7 @@ class ExecuteEdge(BaseEdge[Execute]):
 
         self.provides = [
             'setup_stage_configs',
-            'setup_stage_experiment_distributions',
+            'setup_stage_experiment_config',
             'execute_stage_results',
             'execute_stage_setup_hooks',
             'execute_stage_setup_config',

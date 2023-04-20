@@ -33,7 +33,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         )
 
         self.requires = [
-            'setup_stage_experiment_distributions',
+            'setup_stage_experiment_config',
             'execute_stage_streamed_analytics',
             'setup_stage_configs',
             'execute_stage_setup_hooks',
@@ -45,7 +45,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         ]
 
         self.provides = [
-            'setup_stage_experiment_distributions',
+            'setup_stage_experiment_config',
             'execute_stage_streamed_analytics',
             'setup_stage_configs',
             'optimize_stage_optimized_params',
@@ -239,7 +239,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         setup_stage_ready_stages: List[Stage] = []
         setup_stage_candidates: List[Stage] = []
         setup_stage_configs: Dict[str, Config] = {}
-        setup_stage_experiment_distributions: Dict[str, List[float]] = {}
+        setup_stage_experiment_config: Dict[str, Union[str, int, List[float]]] = {}
 
         for source_stage, destination_stage in self.history:
             
@@ -281,10 +281,10 @@ class OptimizeEdge(BaseEdge[Optimize]):
                     if stage_candidate not in setup_stage_candidates:
                         setup_stage_candidates.append(stage_candidate)
 
-                stage_distributions = previous_history.get('setup_stage_experiment_distributions')
+                stage_distributions = previous_history.get('setup_stage_experiment_config')
 
                 if stage_distributions:
-                    setup_stage_experiment_distributions.update(stage_distributions)
+                    setup_stage_experiment_config.update(stage_distributions)
 
             streamed_analytics = previous_history.get('execute_stage_streamed_analytics')
 
@@ -292,7 +292,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
                 execute_stage_streamed_analytics[source_stage].extend(streamed_analytics)
 
         self.edge_data = {
-            'setup_stage_experiment_distributions': setup_stage_experiment_distributions,
+            'setup_stage_experiment_config': setup_stage_experiment_config,
             'execute_stage_streamed_analytics': execute_stage_streamed_analytics,
             'setup_stage_configs': setup_stage_configs,
             'execute_stage_setup_config': execute_stage_setup_config,

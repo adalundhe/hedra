@@ -27,12 +27,12 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         )
 
         self.requires = [
-            'setup_stage_experiment_distributions',
+            'setup_stage_experiment_config',
             'execute_stage_streamed_analytics',
             'execute_stage_results'
         ]
         self.provides = [
-            'setup_stage_experiment_distributions',
+            'setup_stage_experiment_config',
             'execute_stage_streamed_analytics',
             'analyze_stage_summary_metrics'
         ]

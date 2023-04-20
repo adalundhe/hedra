@@ -35,9 +35,10 @@ from hedra.core.graphs.stages.optimize.optimization.algorithms import registered
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from hedra.logging import (
     HedraLogger,
-    LoggerTypes,
-    logging_manager
+    LoggerTypes
 )
+from hedra.versioning.flags.types.base.active import active_flags
+from hedra.versioning.flags.types.base.flag_type import FlagTypes
 
 
 HooksByType = Dict[HookType, Union[List[ActionHook], List[TaskHook]]]
@@ -121,31 +122,6 @@ def optimize_stage(serialized_config: str):
     )
 
     try:
-        hedra_config_filepath = os.path.join(
-            os.getcwd(),
-            '.hedra.json'
-        )
-
-        hedra_config = {}
-        if os.path.exists(hedra_config_filepath):
-            with open(hedra_config_filepath, 'r') as hedra_config_file:
-                hedra_config = json.load(hedra_config_file)
-
-        logging_config = hedra_config.get('logging', {})
-        logfiles_directory = logging_config.get(
-            'logfiles_directory',
-            os.getcwd()
-        )
-
-        log_level = logging_config.get('log_level', 'info')
-
-        logging_manager.disable(
-            LoggerTypes.DISTRIBUTED,
-            LoggerTypes.DISTRIBUTED_FILESYSTEM
-        )
-
-        logging_manager.update_log_level(log_level)
-        logging_manager.logfiles_directory = logfiles_directory
 
         thread_id = threading.current_thread().ident
         process_id = os.getpid()
@@ -157,6 +133,20 @@ def optimize_stage(serialized_config: str):
         graph_id: str = optimization_config.get('graph_id')
         logfiles_directory = optimization_config.get('logfiles_directory')
         log_level = optimization_config.get('log_level')
+        enable_unstable_features = optimization_config.get('enable_unstable_features', False)
+
+        active_flags[FlagTypes.UNSTABLE_FEATURE] = enable_unstable_features
+    
+        logfiles_directory = optimization_config.get('logfiles_directory')
+        log_level = optimization_config.get('log_level')
+
+        logging_manager.disable(
+            LoggerTypes.DISTRIBUTED,
+            LoggerTypes.DISTRIBUTED_FILESYSTEM
+        )
+
+        logging_manager.update_log_level(log_level)
+        logging_manager.logfiles_directory = logfiles_directory
 
         logging_manager.disable(
             LoggerTypes.DISTRIBUTED,
@@ -179,7 +169,7 @@ def optimize_stage(serialized_config: str):
         source_stage_id: str = optimization_config.get('source_stage_id')
         source_stage_context: Dict[str, Any] = optimization_config.get('source_stage_context')
 
-        setup_stage_experiment_distributions: Dict[str, List[float]] = optimization_config.get('setup_stage_experiment_distributions')
+        setup_stage_experiment_config: Dict[str, List[float]] = optimization_config.get('setup_stage_experiment_config')
         
         execute_stage_name: str = optimization_config.get('execute_stage_name')
         execute_stage_config: Config = optimization_config.get('execute_stage_config')
@@ -291,7 +281,7 @@ def optimize_stage(serialized_config: str):
             'iterations': optimizer_iterations,
             'algorithm': optimizer_algorithm,
             'time_limit': time_limit,
-            'distributions': setup_stage_experiment_distributions,
+            'distributions': setup_stage_experiment_config,
             'stream_analytics': execute_stage_streamed_analytics
         })
 

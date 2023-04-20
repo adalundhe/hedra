@@ -276,10 +276,12 @@ class XML:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Error Metrics to file - {self.metrics_filepath}')
 
     async def close(self):
-        await self._loop.run_in_executor(
-            self._executor,
-            self.events_file.close
-        )
+
+        if self.events_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.events_file.close
+            )
 
         self._executor.shutdown()
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')

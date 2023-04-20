@@ -40,7 +40,7 @@ class ActEdge(BaseEdge[Act]):
             'execute_stage_results',
             'execute_stage_streamed_analytics',
             'setup_stage_configs',
-            'setup_stage_experiment_distributions',
+            'setup_stage_experiment_config',
             'setup_stage_ready_stages',
             'setup_stage_candidates',
         ]
@@ -54,7 +54,7 @@ class ActEdge(BaseEdge[Act]):
             'execute_stage_streamed_analytics',
             'setup_stage_configs',
             'setup_stage_ready_stages',
-            'setup_stage_experiment_distributions',
+            'setup_stage_experiment_config',
         ]
 
         self.valid_states = [
@@ -264,7 +264,7 @@ class ActEdge(BaseEdge[Act]):
         setup_stage_ready_stages: List[Stage] = []
         setup_stage_candidates: List[Stage] = []
         setup_stage_configs: Dict[str, Config] = {}
-        setup_stage_experiment_distributions: Dict[str, List[float]] = {}
+        setup_stage_experiment_config: Dict[str, Union[str, int, List[float]]] = {}
 
         for source_stage, destination_stage in self.history:
             
@@ -306,10 +306,10 @@ class ActEdge(BaseEdge[Act]):
                     if stage_candidate not in setup_stage_candidates:
                         setup_stage_candidates.append(stage_candidate)
 
-                stage_distributions = previous_history.get('setup_stage_experiment_distributions')
+                stage_distributions = previous_history.get('setup_stage_experiment_config')
 
                 if stage_distributions:
-                    setup_stage_experiment_distributions.update(stage_distributions)
+                    setup_stage_experiment_config.update(stage_distributions)
             
             streamed_analytics = previous_history.get('execute_stage_streamed_analytics')
 

@@ -183,10 +183,12 @@ class JSON:
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping Error Metrics')
 
     async def close(self):
-        await self._loop.run_in_executor(
-            self._executor,
-            self.events_file.close
-        )
+        
+        if self.events_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.events_file.close
+            )
         
         self._executor.shutdown()
 
