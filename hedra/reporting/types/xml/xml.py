@@ -80,26 +80,28 @@ class XML:
             f'{filename}_{events_file_timestamp}.xml'
         )
 
-        self.events_file = await self._loop.run_in_executor(
-            self._executor,
-            functools.partial(
-                open,
-                self.events_filepath,
-                self.write_mode
-            )
-        )
+    async def submit_events(self, events: List[BaseProcessedResult]):
 
-        for signame in ('SIGINT', 'SIGTERM'):
-            self._loop.add_signal_handler(
-                getattr(signal, signame),
-                lambda signame=signame: handle_loop_stop(
-                    signame,
-                    self._executor,
-                    self._loop,
-                    self.events_file
+        if self.events_file is None:
+            self.events_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.events_filepath,
+                    self.write_mode
                 )
             )
-    async def submit_events(self, events: List[BaseProcessedResult]):
+
+            for signame in ('SIGINT', 'SIGTERM'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        self.events_file
+                    )
+                )
 
         events_xml = dicttoxml([
             event.to_dict() for event in events
