@@ -32,7 +32,8 @@ class Optimize(Stage):
         Parameter(
             'batch_size',
             minimum=0.5,
-            maximum=2
+            maximum=2,
+            feed_forward=True
         )
     ]
     

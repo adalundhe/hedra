@@ -85,7 +85,8 @@ class DefaultPersona:
         'stream_reporters',
         'stage_name',
         'optimization_active',
-        'pending'
+        'pending',
+        'collect_analytics'
     )    
 
     def __init__(self, config: Config):
@@ -124,10 +125,11 @@ class DefaultPersona:
 
         self.current_action_idx = 0
         self.optimized_params = None
-        self.streamed_analytics = []
+        self.streamed_analytics: StreamAnalytics = None
         self.stream_reporter_configs: List[ReporterConfig] = []
         self.stream_reporters: List[Reporter] = []
         self.stage_name: str = None
+        self.collect_analytics: bool = False
 
     def setup(self, hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]], metadata_string: str):
         self._setup(hooks, metadata_string)
@@ -152,7 +154,7 @@ class DefaultPersona:
 
         self._stream = len(self.stream_reporters) > 0 and self.optimization_active is False
 
-        if self._stream:
+        if self._stream or self.collect_analytics:
             self.stream = Stream()
             
     async def execute(self):
@@ -167,8 +169,7 @@ class DefaultPersona:
 
         await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Executing for a total of - {total_time} - seconds')
         loop = asyncio.get_running_loop()
-
-        if self._stream:
+        if self._stream or self.collect_analytics:
 
             for reporter in self.stream_reporters:
                 reporter.logger.filesystem.aio['hedra.reporting'].logger_enabled = False
@@ -301,28 +302,30 @@ class DefaultPersona:
                 batch_elapsed
             )
 
-            processed_results = [
-                results_types.get(
-                    result.type
-                )(
-                    self.stage_name,
-                    result
-                ) for result in self.stream.completed
-            ]
+            if self._stream:
+                processed_results = [
+                    results_types.get(
+                        result.type
+                    )(
+                        self.stage_name,
+                        result
+                    ) for result in self.stream.completed
+                ]
 
-            for reporter in self.stream_reporters:
-                stream_submission_tasks.append(
-                    asyncio.create_task(
-                        reporter.submit_events(processed_results)
+                for reporter in self.stream_reporters:
+                    stream_submission_tasks.append(
+                        asyncio.create_task(
+                            reporter.submit_events(processed_results)
+                        )
                     )
-                )
 
             batch_start = time.time()
             self.stream.completed = []
 
         self.stream.completed = []
 
-        await asyncio.gather(*stream_submission_tasks)
+        if self._stream:
+            await asyncio.gather(*stream_submission_tasks)
    
         self.completed_time = time.time() - start
 

@@ -42,10 +42,12 @@ class BaseDistribution:
             step_size
         ) * batch_size
 
-        return self._apply_averaging(
-            scaled_walk,
-            step_size
-        )
+        return [
+            math.ceil(step_batch_size) for step_batch_size in self._apply_averaging(
+                scaled_walk,
+                step_size
+            )
+        ]
         
     
     def _get_distribution_and_step_size(self) -> Tuple[int, int]:

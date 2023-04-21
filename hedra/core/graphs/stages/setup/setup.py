@@ -265,10 +265,11 @@ class Setup(Stage, Generic[Unpack[T]]):
                 if distribution is not None:
 
                     variant = self.experiment.get_variant(execute_stage_name)
-                    
+
                     experiment = {
                         'experiment_name': self.experiment.experiment_name,
                         'weight': variant.weight,
+                        'distribution_type': variant.distribution.selected_distribution,
                         'distribution': distribution,
                         'intervals': variant.intervals
                     }

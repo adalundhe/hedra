@@ -5,10 +5,11 @@ import threading
 import os
 from asyncio import Task
 from typing import Any, Dict, List, Union
+from hedra.core.engines.client.config import Config
 from hedra.core.personas.batching.param_type import ParamType
+from hedra.core.personas import get_persona
 from hedra.logging import HedraLogger
 from hedra.tools.data_structures import AsyncList
-from hedra.core.personas import get_persona
 from .algorithms import get_algorithm
 
 
@@ -40,7 +41,7 @@ class Optimizer:
         self.graph_id = config.get('graph_id')
         self.source_stage_name = config.get('source_stage_name')
         self.source_stage_id = config.get('source_stage_id')
-        self.stage_config = config.get('stage_config')
+        self.stage_config: Config = config.get('stage_config')
         self.stage_hooks = config.get('stage_hooks')
 
         self.metadata_string = f'Graph - {self.graph_name}:{self.graph_id} - thread:{self.thread_id} - process:{self.process_id} - Stage: {self.source_stage_name}:{self.source_stage_id} - Optimizer: {self.optimizer_id} - '
@@ -80,6 +81,8 @@ class Optimizer:
         self.logger.filesystem.sync['hedra.optimize'].info(f'{self.metadata_string} - Optimization config: Max Iter - {self.algorithm.max_iter}')
 
         self.start = time.time()
+
+        self._event_loop.set_exception_handler(self._handle_async_exception)
         results = self.algorithm.optimize(self._run_optimize)
 
         optimized_params = {}
@@ -115,14 +118,22 @@ class Optimizer:
         self._event_loop.close()
 
         return self.optimized_results
+    
+    def _setup_persona(self, stage_config: Config):
+        persona = get_persona(self.stage_config)
+        persona.optimization_active = True
+        persona.setup(self.stage_hooks, self.metadata_string)
+
+        return persona
+    
+    def _handle_async_exception(self, loop, ctx):
+        pass
 
     async def _optimize(self, xargs: List[Union[int, float]]):
 
         if self._current_iter < self.algorithm.max_iter and self.elapsed < self._optimization_time_limit:
 
-            persona = get_persona(self.stage_config)
-            persona.optimization_active = True
-            persona.setup(self.stage_hooks, self.metadata_string)
+            persona = self._setup_persona(self.stage_config)
 
             for idx, param in enumerate(xargs):
                 param_name = self.algorithm.param_names[idx]
@@ -200,7 +211,7 @@ class Optimizer:
     def _run_optimize(self, xargs):
 
         if self.elapsed > self._optimization_time_limit:
-            return 0
+            return float('inf')
 
         inverse_actions_per_second = self._event_loop.run_until_complete(
             self._optimize(xargs)

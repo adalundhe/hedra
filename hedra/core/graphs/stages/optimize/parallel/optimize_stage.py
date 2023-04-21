@@ -8,7 +8,7 @@ import pickle
 from collections import defaultdict
 from typing import Any, Dict, List, Union
 from hedra.core.engines.client.config import Config
-from hedra.core.graphs.stages.optimize.optimization import Optimizer
+from hedra.core.graphs.stages.optimize.optimization import Optimizer, DistributionFitOptimizer
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.setup.setup import Setup
 from hedra.core.hooks.types.base.event_graph import EventGraph
@@ -175,7 +175,7 @@ def optimize_stage(serialized_config: str):
         execute_stage_config: Config = optimization_config.get('execute_stage_config')
         execute_setup_stage_name: Config = optimization_config.get('execute_setup_stage_name')
         execute_stage_plugins: Dict[PluginType, List[str]] = optimization_config.get('execute_stage_plugins')
-        execute_stage_streamed_analytics: Dict[str, List[StreamAnalytics]] = optimization_config.get('execute_stage_streamed_analytics')
+        execute_stage_streamed_analytics: Dict[str, Dict[str, List[StreamAnalytics]]] = optimization_config.get('execute_stage_streamed_analytics')
         
         optimizer_params: List[str] = optimization_config.get('optimizer_params')
         optimizer_iterations: int = optimization_config.get('optimizer_iterations')
@@ -232,7 +232,7 @@ def optimize_stage(serialized_config: str):
 
         stage_engine_plugins: List[str] = execute_stage_plugins[PluginType.ENGINE]
         engine_plugins: Dict[str, EnginePlugin] = plugins_by_type[PluginType.ENGINE]
-        
+
         for plugin_name in stage_persona_plugins:
             plugin = persona_plugins.get(plugin_name)
             plugin.name = plugin_name
@@ -268,22 +268,42 @@ def optimize_stage(serialized_config: str):
 
         logger.filesystem.sync['hedra.optimize'].info(f'{metadata_string} - Setting up Optimization')
 
-        optimizer = Optimizer({
-            'graph_name': graph_name,
-            'graph_id': graph_id,
-            'source_stage_name': source_stage_name,
-            'source_stage_id': source_stage_id,
-            'params': optimizer_params,
-            'stage_name': execute_stage_name,
-            'stage_config': execute_stage_config,
-            'stage_hooks': setup_execute_stage.hooks,
-            'feed_forward': optimizer_feed_forward,
-            'iterations': optimizer_iterations,
-            'algorithm': optimizer_algorithm,
-            'time_limit': time_limit,
-            'distributions': setup_stage_experiment_config,
-            'stream_analytics': execute_stage_streamed_analytics
-        })
+        optimization_experiment_config = setup_stage_experiment_config.get(execute_stage_name)
+        if optimization_experiment_config:
+            optimizer = DistributionFitOptimizer({
+                'graph_name': graph_name,
+                'graph_id': graph_id,
+                'source_stage_name': source_stage_name,
+                'source_stage_id': source_stage_id,
+                'params': optimizer_params,
+                'stage_name': execute_stage_name,
+                'stage_config': execute_stage_config,
+                'stage_hooks': setup_execute_stage.hooks,
+                'feed_forward': optimizer_feed_forward,
+                'iterations': optimizer_iterations,
+                'algorithm': optimizer_algorithm,
+                'time_limit': time_limit,
+                'distributions': optimization_experiment_config,
+                'stream_analytics': execute_stage_streamed_analytics
+            })
+
+        else:
+            optimizer = Optimizer({
+                'graph_name': graph_name,
+                'graph_id': graph_id,
+                'source_stage_name': source_stage_name,
+                'source_stage_id': source_stage_id,
+                'params': optimizer_params,
+                'stage_name': execute_stage_name,
+                'stage_config': execute_stage_config,
+                'stage_hooks': setup_execute_stage.hooks,
+                'feed_forward': optimizer_feed_forward,
+                'iterations': optimizer_iterations,
+                'algorithm': optimizer_algorithm,
+                'time_limit': time_limit,
+                'distributions': setup_stage_experiment_config,
+                'stream_analytics': execute_stage_streamed_analytics
+            })
 
         optimizer._event_loop = loop
 
@@ -293,14 +313,10 @@ def optimize_stage(serialized_config: str):
                 optimizer._event_loop.close()
 
             except BrokenPipeError:
-                pid = os.getpid()
-                os.kill(pid, signal.SIGKILL)
-                os._exit(1)
+                pass
                 
             except RuntimeError:
-                pid = os.getpid()
-                os.kill(pid, signal.SIGKILL)
-                os._exit(1)
+                pass
 
         for signame in ('SIGINT', 'SIGTERM'):
             loop.add_signal_handler(
@@ -362,4 +378,5 @@ def optimize_stage(serialized_config: str):
         raise ProcessKilledError()
     
     except Exception as e:
+        print(traceback.format_exc())
         raise e
