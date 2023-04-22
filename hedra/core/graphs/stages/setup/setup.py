@@ -271,7 +271,12 @@ class Setup(Stage, Generic[Unpack[T]]):
                         'weight': variant.weight,
                         'distribution_type': variant.distribution.selected_distribution,
                         'distribution': distribution,
-                        'intervals': variant.intervals
+                        'intervals': variant.intervals,
+                        'interval_duration': round(
+                            config_copy.total_time/(variant.intervals - 1)
+                            , 
+                            2
+                        )
                     }
 
                     config_copy.experiment = experiment

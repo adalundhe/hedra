@@ -86,7 +86,8 @@ class DefaultPersona:
         'stage_name',
         'optimization_active',
         'pending',
-        'collect_analytics'
+        'collect_analytics',
+        'collection_interval'
     )    
 
     def __init__(self, config: Config):
@@ -130,6 +131,7 @@ class DefaultPersona:
         self.stream_reporters: List[Reporter] = []
         self.stage_name: str = None
         self.collect_analytics: bool = False
+        self.collection_interval: int = 1
 
     def setup(self, hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]], metadata_string: str):
         self._setup(hooks, metadata_string)
@@ -156,6 +158,10 @@ class DefaultPersona:
 
         if self._stream or self.collect_analytics:
             self.stream = Stream()
+
+    def set_concurrency(self, concurrency: int):
+        for hook in self._hooks:
+            hook.session.set_pool(concurrency)
             
     async def execute(self):
         hooks = self._hooks
@@ -293,7 +299,7 @@ class DefaultPersona:
 
         while self.completed_time < collection_stop_time and self.run_timer:
             self.completed_time = time.time() - start
-            await asyncio.sleep(1)
+            await asyncio.sleep(self.collection_interval)
 
             batch_elapsed = time.time() - batch_start
 

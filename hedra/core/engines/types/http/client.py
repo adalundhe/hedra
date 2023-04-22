@@ -342,6 +342,3 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
         if self.closed is False:
             await self.pool.close()
             self.closed = True
-
-            for _ in range(self.sem._value):
-                self.sem.release()

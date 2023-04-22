@@ -181,6 +181,7 @@ def optimize_stage(serialized_config: str):
         optimizer_iterations: int = optimization_config.get('optimizer_iterations')
         optimizer_algorithm: str = optimization_config.get('optimizer_algorithm')
         optimizer_feed_forward: bool = optimization_config.get('optimizer_feed_forward')
+        optimize_stage_workers: int = optimization_config.get('optimize_stage_workers')
         time_limit: int = optimization_config.get('time_limit')
         batch_size: int = optimization_config.get('execute_stage_batch_size')
 
@@ -270,6 +271,9 @@ def optimize_stage(serialized_config: str):
 
         optimization_experiment_config = setup_stage_experiment_config.get(execute_stage_name)
         if optimization_experiment_config:
+
+            execute_stage_config.experiment['distribution'] = execute_stage_config.experiment.get('distribution')
+
             optimizer = DistributionFitOptimizer({
                 'graph_name': graph_name,
                 'graph_id': graph_id,
@@ -305,29 +309,6 @@ def optimize_stage(serialized_config: str):
                 'stream_analytics': execute_stage_streamed_analytics
             })
 
-        optimizer._event_loop = loop
-
-        def handle_loop_stop(signame):
-            try:
-                optimizer._event_loop.stop()
-                optimizer._event_loop.close()
-
-            except BrokenPipeError:
-                pass
-                
-            except RuntimeError:
-                pass
-
-        for signame in ('SIGINT', 'SIGTERM'):
-            loop.add_signal_handler(
-                getattr(signal, signame),
-                lambda signame=signame: handle_loop_stop(signame)
-            )
-
-            optimizer._event_loop.add_signal_handler(
-                getattr(signal, signame),
-                lambda signame=signame: handle_loop_stop(signame)
-            )
 
         results = optimizer.optimize()
 
@@ -378,5 +359,4 @@ def optimize_stage(serialized_config: str):
         raise ProcessKilledError()
     
     except Exception as e:
-        print(traceback.format_exc())
         raise e

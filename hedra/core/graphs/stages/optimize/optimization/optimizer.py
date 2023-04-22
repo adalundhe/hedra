@@ -3,7 +3,7 @@ import time
 import asyncio
 import threading
 import os
-from asyncio import Task
+import signal
 from typing import Any, Dict, List, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.batching.param_type import ParamType
@@ -11,19 +11,6 @@ from hedra.core.personas import get_persona
 from hedra.logging import HedraLogger
 from hedra.tools.data_structures import AsyncList
 from .algorithms import get_algorithm
-
-
-async def cancel_pending(pend: Task):
-    try:
-        pend.cancel()
-        if not pend.cancelled():
-            await pend
-
-        return pend
-    
-    except asyncio.CancelledError as cancelled_error:
-        return cancelled_error
-
 
 
 class Optimizer:
@@ -43,6 +30,7 @@ class Optimizer:
         self.source_stage_id = config.get('source_stage_id')
         self.stage_config: Config = config.get('stage_config')
         self.stage_hooks = config.get('stage_hooks')
+        self.base_batch_size = self.stage_config.batch_size
 
         self.metadata_string = f'Graph - {self.graph_name}:{self.graph_id} - thread:{self.thread_id} - process:{self.process_id} - Stage: {self.source_stage_name}:{self.source_stage_id} - Optimizer: {self.optimizer_id} - '
 
@@ -68,7 +56,7 @@ class Optimizer:
 
         self.current_params = {}
         self.start = 0
-        self.elapsed = 00
+        self.elapsed = 0
 
     def optimize(self):
 
@@ -131,7 +119,7 @@ class Optimizer:
 
     async def _optimize(self, xargs: List[Union[int, float]]):
 
-        if self._current_iter < self.algorithm.max_iter and self.elapsed < self._optimization_time_limit:
+        if self._current_iter < self.algorithm.max_iter:
 
             persona = self._setup_persona(self.stage_config)
 
@@ -152,6 +140,7 @@ class Optimizer:
                 self.algorithm.current_params[param_name] = xargs[idx]
             
             persona = self.algorithm.update_params(persona)
+            persona.set_concurrency(persona.batch.size)
 
             await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter}')
 
@@ -161,16 +150,10 @@ class Optimizer:
 
             completed_count = 0
             try:
-                results = await asyncio.wait_for(
-                    persona.execute(),
-                    timeout=persona.total_time * 2
-                )
+                results = await persona.execute()
                 completed_count = len([result for result in results if result.error is None])
 
             except Exception:
-                pass
-
-            except ConnectionResetError:
                 pass
 
             elapsed = persona.end - persona.start
@@ -183,35 +166,38 @@ class Optimizer:
             if elapsed < 1:
                 elapsed = float('inf')
 
-            # This section necessary for low-bandwidth connections
-            # where the condensed runtime of optimize runs can
-            # result
-            all_tasks = asyncio.all_tasks()
-            running_task = asyncio.current_task()
-            for task in all_tasks:
-                if task != running_task and task.cancelled() is False:
-                    try:
-                        task.cancel()
-                        if task.cancelled() is False:
-                            await task
-                    
-                    except asyncio.CancelledError:
-                        pass
-                    except asyncio.InvalidStateError:
-                        pass
-                    except ConnectionResetError:
-                        pass
-
             await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Inverted APS score- {elapsed/completed_count}')
             
             return elapsed/completed_count
 
-        return float('inf')
+        return self.base_batch_size
 
     def _run_optimize(self, xargs):
 
-        if self.elapsed > self._optimization_time_limit:
-            return float('inf')
+        try:
+            self._event_loop = asyncio.get_event_loop()
+        except Exception:
+            self._event_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._event_loop)
+
+        def handle_loop_stop(signame):
+            try:
+                self._event_loop.close()
+
+            except BrokenPipeError:
+                pass
+                
+            except RuntimeError:
+                pass
+
+        for signame in ('SIGINT', 'SIGTERM'):
+
+            self._event_loop.add_signal_handler(
+                getattr(signal, signame),
+                lambda signame=signame: handle_loop_stop(signame)
+            )
+
+        self._event_loop.set_exception_handler(self._handle_async_exception)
 
         inverse_actions_per_second = self._event_loop.run_until_complete(
             self._optimize(xargs)

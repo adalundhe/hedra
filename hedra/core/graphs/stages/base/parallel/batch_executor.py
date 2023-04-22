@@ -3,7 +3,7 @@ import math
 import multiprocessing
 import psutil
 import warnings
-from multiprocessing import current_process, active_children
+from multiprocessing import active_children
 from types import FunctionType
 from concurrent.futures.process import BrokenProcessPool
 from concurrent.futures import ProcessPoolExecutor
@@ -18,7 +18,7 @@ class BatchExecutor:
     def __init__(
         self, 
         max_workers: int = psutil.cpu_count(logical=False),
-        start_method: str=multiprocessing.get_start_method()
+        start_method: str='spawn'
     ) -> None:
         self.max_workers = max_workers
         self.loop = asyncio.get_event_loop()

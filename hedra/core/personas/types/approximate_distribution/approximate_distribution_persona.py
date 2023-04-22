@@ -47,12 +47,14 @@ class ApproximateDistributionPersona(DefaultPersona):
         'stream_reporters',
         'stage_name',
         'distribution',
+        'collection_interval'
     )    
 
     def __init__(self, config: Config):
         super().__init__(config)
 
         self.distribution: List[float] = config.experiment.get('distribution')
+        self.collection_interval = config.experiment.get('interval_duration')
         self.persona_id = str(uuid.uuid4())
         self.type = PersonaTypes.APPROXIMATE_DISTRIBUTION
 

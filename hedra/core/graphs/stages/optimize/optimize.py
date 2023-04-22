@@ -174,6 +174,7 @@ class Optimize(Stage):
                     'optimizer_params': self.optimize_params,
                     'optimizer_iterations': self.optimize_iterations,
                     'optimizer_algorithm': self.algorithm,
+                    'optimize_stage_workers': self.workers,
                     'time_limit': self.time_limit
                 })
 
