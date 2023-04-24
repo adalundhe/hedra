@@ -6,6 +6,7 @@ from hedra.core.experiments.variant import Variant
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.batching.param_type import ParamType
 from hedra.core.personas.types.default_persona import DefaultPersona
+from statistics import mean
 from typing import Dict, Any, List, Union
 from .algorithms import PointOptimizer
 from .optimizer import Optimizer
@@ -58,6 +59,7 @@ class DistributionFitOptimizer(Optimizer):
         self.start = 0
 
         distribution_optimized_params = []
+        distribution_mean_errors = []
 
         for distribution_value, algorithm in zip(self.distribution, self.algorithms):
             self.completion_rates = defaultdict(list)
@@ -75,25 +77,15 @@ class DistributionFitOptimizer(Optimizer):
             self.elapsed = 0
             self._current_iter = 0
 
-            results = self.algorithm.optimize(self._run_optimize)
+            results: Dict[str, Dict[str, Union[int, float]]] = self.algorithm.optimize(self._run_optimize)
 
-            optimized_params = {}
+            optimization_results = results.get('batch_size')
+            optimized_distribution_value = optimization_results.get('minimized_distribution_value')
+            optimized_error_mean = optimization_results.get('minimized_error_mean')
 
-            for idx in range(len(results)):
-                param_name = self.algorithm.param_names[idx]
-                optimiazed_param_name = f'optimized_{param_name}'
-                param = self.algorithm.param_values.get(param_name, {})
-                param_type = param.get('type')
 
-                if param_type == ParamType.INTEGER:
-                    optimized_params[optimiazed_param_name] = int(results[idx])
-
-                else:
-                    optimized_params[optimiazed_param_name] = float(results[idx])
-
-            optimized_batch_size = optimized_params.get('optimized_batch_size')
-
-            distribution_optimized_params.append(optimized_batch_size)        
+            distribution_optimized_params.append(optimized_distribution_value)   
+            distribution_mean_errors.append(optimized_error_mean)     
         
         self.total_optimization_time = time.time() - self.start
 
@@ -102,6 +94,7 @@ class DistributionFitOptimizer(Optimizer):
 
         self.optimized_results = {
             'optimized_distribution': distribution_optimized_params,
+            'optimization_mean_error': mean(distribution_mean_errors),
             'optimization_iters': self.algorithm.max_iter,
             'optimization_iter_duation': self.algorithm.batch_time,
             'optimization_total_time': self.total_optimization_time,

@@ -242,7 +242,7 @@ class Optimize(Stage):
         }
 
     @context('collect_optimized_batch_sizes')
-    async def set_optimized_batch_size(
+    async def set_optimized_configs(
         self,
         optimize_stage_results: List[Any]=[],
         optimize_stage_candidates: Dict[str, Execute]={},
@@ -259,7 +259,7 @@ class Optimize(Stage):
         for optimization_result in optimize_stage_results:
             
             stage_name = optimization_result.get('stage')
-            optimized_config = optimization_result.get('config')
+            optimized_config: Config = optimization_result.get('config')
 
             stage = optimize_stage_candidates.get(stage_name)
             optimized_configs[stage.name] = optimized_config
@@ -297,7 +297,7 @@ class Optimize(Stage):
             'optimize_stage_context': stage_context
         }
 
-    @context('set_optimized_batch_size')
+    @context('set_optimized_configs')
     async def complete_optimization(
         self,
         optimize_stage_stage_names: str=None,

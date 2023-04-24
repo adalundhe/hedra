@@ -58,6 +58,8 @@ class PointOptimizer(BaseAlgorithm):
                         self.params_history[param_name].append(next_value)
 
         final_params = {}
+        minimized_error_mean = 0
+        minimized_parameter = 0
         for param_name in self.optimize_params:
 
             param_errors = self.param_errors[param_name]
@@ -77,12 +79,17 @@ class PointOptimizer(BaseAlgorithm):
             params_type = param.get('type')
 
             if params_type == ParamType.INTEGER:
-                final_params[param_name] = int(minimized_parameter)
+                minimized_parameter = int(minimized_parameter)
 
             else:
-                final_params[param_name] = float(minimized_parameter)
+                minimized_parameter = float(minimized_parameter)
 
-        return list(final_params.values())
+            final_params[param_name] = {
+                'minimized_distribution_value': minimized_parameter,
+                'minimized_error_mean': minimized_error_mean
+            }
+
+        return final_params
             
 
     def _compute_next_params(

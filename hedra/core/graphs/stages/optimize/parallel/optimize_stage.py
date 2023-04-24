@@ -314,6 +314,9 @@ def optimize_stage(serialized_config: str):
 
         results = optimizer.optimize()
 
+        if optimization_experiment_config:
+            execute_stage_config.experiment['distribution'] = results.get('optimized_distribution')
+
         execute_stage_config.batch_size = results.get('optimized_batch_size', execute_stage_config.batch_size)
         execute_stage_config.batch_interval = results.get('optimized_batch_interval', execute_stage_config.batch_gradient)
         execute_stage_config.batch_gradient = results.get('optimized_batch_gradient', execute_stage_config.batch_gradient)

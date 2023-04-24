@@ -306,10 +306,25 @@ def execute_actions(parallel_config: str):
         if partition_method == PartitionMethod.BATCHES and source_stage_config.optimized is False:
             if workers == worker_id:
                 source_stage_config.batch_size = int(source_stage_config.batch_size/workers) + (source_stage_config.batch_size%workers)
+
+                if source_stage_config.experiment:
+                    distribution = source_stage_config.experiment.get('distribution')
+
+                    for idx, distribution_value in enumerate(distribution):
+                        distribution[idx] = int(distribution_value/workers) + (distribution_value%workers)
+
+                    source_stage_config.experiment['distribution'] = distribution
             
             else:
                 source_stage_config.batch_size = int(source_stage_config.batch_size/workers)
 
+                if source_stage_config.experiment:
+                    distribution = source_stage_config.experiment.get('distribution')
+
+                    for idx, distribution_value in enumerate(distribution):
+                        distribution[idx] = int(distribution_value/workers)
+
+                    source_stage_config.experiment['distribution'] = distribution
 
         stage_persona_plugins: List[str] = source_stage_plugins[PluginType.PERSONA]
         persona_plugins: Dict[str, PersonaPlugin] = plugins_by_type[PluginType.PERSONA]
