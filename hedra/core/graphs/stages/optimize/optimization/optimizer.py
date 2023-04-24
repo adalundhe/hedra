@@ -8,9 +8,11 @@ from typing import Any, Dict, List, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.batching.param_type import ParamType
 from hedra.core.personas import get_persona
+from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.logging import HedraLogger
 from hedra.tools.data_structures import AsyncList
 from .algorithms import get_algorithm
+from .algorithms.types.base_algorithm import BaseAlgorithm
 
 
 class Optimizer:
@@ -41,7 +43,7 @@ class Optimizer:
 
         self._optimization_time_limit = config.get('time_limit', 60)
 
-        self.algorithm = get_algorithm(
+        self.algorithm: BaseAlgorithm = get_algorithm(
             self.algorithm_type,
             {
                 **config,
@@ -58,7 +60,7 @@ class Optimizer:
         self.start = 0
         self.elapsed = 0
 
-    def optimize(self):
+    def optimize(self) -> Dict[str, Union[int, float]]:
 
         results = None
 
@@ -107,19 +109,19 @@ class Optimizer:
 
         return self.optimized_results
     
-    def _setup_persona(self, stage_config: Config):
+    def _setup_persona(self, stage_config: Config) -> DefaultPersona:
         persona = get_persona(self.stage_config)
         persona.optimization_active = True
         persona.setup(self.stage_hooks, self.metadata_string)
 
         return persona
     
-    def _handle_async_exception(self, loop, ctx):
+    def _handle_async_exception(self, loop, ctx) -> None:
         pass
 
-    async def _optimize(self, xargs: List[Union[int, float]]):
+    async def _optimize(self, xargs: List[Union[int, float]]) -> float:
 
-        if self._current_iter < self.algorithm.max_iter:
+        if self._current_iter < self.algorithm.max_iter and self.elapsed < self.algorithm.time_limit:
 
             persona = self._setup_persona(self.stage_config)
 
@@ -140,7 +142,7 @@ class Optimizer:
                 self.algorithm.current_params[param_name] = xargs[idx]
             
             persona = self.algorithm.update_params(persona)
-            persona.set_concurrency(persona.batch.size)
+            await persona.set_concurrency(persona.batch.size)
 
             await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter}')
 
@@ -172,7 +174,7 @@ class Optimizer:
 
         return self.base_batch_size
 
-    def _run_optimize(self, xargs):
+    def _run_optimize(self, xargs: List[Union[int, float]]) -> float:
 
         try:
             self._event_loop = asyncio.get_event_loop()

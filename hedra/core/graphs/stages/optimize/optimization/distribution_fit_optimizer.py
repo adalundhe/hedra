@@ -7,7 +7,7 @@ from hedra.core.engines.client.config import Config
 from hedra.core.personas.batching.param_type import ParamType
 from hedra.core.personas.types.default_persona import DefaultPersona
 from statistics import mean
-from typing import Dict, Any, List, Union
+from typing import Dict, Any, List, Union, Tuple
 from .algorithms import PointOptimizer
 from .optimizer import Optimizer
 
@@ -44,13 +44,46 @@ class DistributionFitOptimizer(Optimizer):
             ))
             
 
-    def _setup_persona(self, stage_config: Config):
+    def _setup_persona(self, stage_config: Config) -> DefaultPersona:
         persona = DefaultPersona(stage_config)
         persona.setup(self.stage_hooks, self.metadata_string)
 
         return persona
     
-    def optimize(self):
+    def optimize(self) -> Dict[str, Union[int, float]]:
+
+        self._event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._event_loop)
+
+        def handle_loop_stop(signame):
+            try:
+                self._event_loop.close()
+
+            except BrokenPipeError:
+                pass
+                
+            except RuntimeError:
+                pass
+
+        for signame in ('SIGINT', 'SIGTERM'):
+
+            self._event_loop.add_signal_handler(
+                getattr(signal, signame),
+                lambda signame=signame: handle_loop_stop(signame)
+            )
+
+        self._event_loop.set_exception_handler(self._handle_async_exception)
+
+        optimization_results = self._event_loop.run_until_complete(
+            self._optimize_async()
+        )
+
+        self._event_loop.close()
+
+        return optimization_results
+
+    
+    async def _optimize_async(self) -> Dict[str, Union[int, float]]:
 
         results = None
 
@@ -73,11 +106,11 @@ class DistributionFitOptimizer(Optimizer):
 
             self.target_interval_completions = distribution_value
 
-            self.start = time.time()
             self.elapsed = 0
             self._current_iter = 0
+            self.start = time.time()
 
-            results: Dict[str, Dict[str, Union[int, float]]] = self.algorithm.optimize(self._run_optimize)
+            results: Dict[str, Dict[str, Union[int, float]]] = await self.algorithm.optimize(self._optimize_iteration)
 
             optimization_results = results.get('batch_size')
             optimized_distribution_value = optimization_results.get('minimized_distribution_value')
@@ -105,7 +138,7 @@ class DistributionFitOptimizer(Optimizer):
 
         return self.optimized_results
 
-    async def _optimize(self, xargs: List[Union[int, float]]):
+    async def _optimize_iteration(self, xargs: List[Union[int, float]]) -> Tuple[Union[None, float], int]:
 
         if self.elapsed > self.algorithm.time_limit:
             return None, self.target_interval_completions
@@ -130,7 +163,7 @@ class DistributionFitOptimizer(Optimizer):
 
         persona.total_time = self.algorithm.batch_time
         persona = self.algorithm.update_params(persona)
-        persona.set_concurrency(persona.batch.size)
+        await persona.set_concurrency(persona.batch.size)
 
         await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter}')
 
@@ -156,43 +189,10 @@ class DistributionFitOptimizer(Optimizer):
 
         await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Target error- {error}')
 
+        self._current_iter += 1
+        self.elapsed = time.time() - self.start
+
         if completed_count < 1:
             return -(self.base_batch_size**2),  self.target_interval_completions
         
         return error, self.target_interval_completions
-    
-    def _run_optimize(self, xargs):
-
-        self._event_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self._event_loop)
-
-        def handle_loop_stop(signame):
-            try:
-                self._event_loop.close()
-
-            except BrokenPipeError:
-                pass
-                
-            except RuntimeError:
-                pass
-
-        for signame in ('SIGINT', 'SIGTERM'):
-
-            self._event_loop.add_signal_handler(
-                getattr(signal, signame),
-                lambda signame=signame: handle_loop_stop(signame)
-            )
-
-        self._event_loop.set_exception_handler(self._handle_async_exception)
-
-        error, target_interval_completions = self._event_loop.run_until_complete(
-            self._optimize(xargs)
-        )
-
-        self._current_iter += 1
-        self.elapsed = time.time() - self.start
-
-        self._event_loop.close()
- 
-        return error, target_interval_completions
-    

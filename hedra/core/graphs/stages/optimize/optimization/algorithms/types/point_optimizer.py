@@ -26,9 +26,9 @@ class PointOptimizer(BaseAlgorithm):
         self.error_batch_size_map = defaultdict(list)
         self.param_errors = defaultdict(lambda: defaultdict(list))
         self._noise_scale = 0.1
+        self._target_value: int = None
 
-
-    def optimize(self, func):
+    async def optimize(self, func):
 
         for param_name, boundary in self._boundaries_by_param_name.items():
 
@@ -39,7 +39,7 @@ class PointOptimizer(BaseAlgorithm):
 
         for param_name in self.optimize_params:
             for _ in range(self.max_iter):
-                    error, target_value = func(
+                    error, target_value = await func(
                         list(self.next_params.values())
                     )
 
@@ -71,7 +71,15 @@ class PointOptimizer(BaseAlgorithm):
                 param_error_sums[param_value] = mean_errors
                 param_values_by_sum[mean_errors].append(param_value)
 
-            minimized_error_mean = min(list(param_error_sums.values()))
+            error_sums = list(param_error_sums.values())
+
+            if len(error_sums) > 0:
+                minimized_error_mean = min(error_sums)
+
+            else:
+                minimized_error_mean = 0
+                minimized_parameter = self._target_value
+
             minimized_parameter = min(param_values_by_sum[minimized_error_mean])
 
 
@@ -103,6 +111,9 @@ class PointOptimizer(BaseAlgorithm):
         adjustment_ratio = 1
         absolute_error = abs(error)
         completed = error + target_value
+
+        if self._target_value is None:
+            self._target_value = target_value
 
 
         if error > 0:

@@ -87,7 +87,8 @@ class DefaultPersona:
         'optimization_active',
         'pending',
         'collect_analytics',
-        'collection_interval'
+        'collection_interval',
+        'bypass_cleanup'
     )    
 
     def __init__(self, config: Config):
@@ -132,6 +133,8 @@ class DefaultPersona:
         self.stage_name: str = None
         self.collect_analytics: bool = False
         self.collection_interval: int = 1
+        self.pending: List[asyncio.Task] = []
+        self.bypass_cleanup: bool = False
 
     def setup(self, hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]], metadata_string: str):
         self._setup(hooks, metadata_string)
@@ -159,10 +162,10 @@ class DefaultPersona:
         if self._stream or self.collect_analytics:
             self.stream = Stream()
 
-    def set_concurrency(self, concurrency: int):
+    async def set_concurrency(self, concurrency: int):
         for hook in self._hooks:
-            hook.session.set_pool(concurrency)
-            
+            await hook.session.set_pool(concurrency)
+
     async def execute(self):
         hooks = self._hooks
         hook_names = ', '.join([
