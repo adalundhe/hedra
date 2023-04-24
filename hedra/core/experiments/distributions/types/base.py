@@ -1,6 +1,6 @@
 import math
 import numpy
-from typing import Union, List, Tuple
+from typing import Union, List, Tuple, Optional
 from numpy.random import normal
 
 class SciPyDistribution:
@@ -27,6 +27,18 @@ class BaseDistribution:
         self._upper_bound = 0.9
 
     def generate_distribution(self, batch_size: int) -> List[float]:
+        return [
+            math.ceil(
+                step_batch_size
+            ) for step_batch_size in self._generate_distribution(
+                scale_factor=batch_size
+            )
+        ]
+    
+    def generate_non_scaled_distribution(self):
+        return self._generate_distribution()
+    
+    def _generate_distribution(self, scale_factor: Optional[int]=None):
         distribution_size, step_size = self._get_distribution_and_step_size()
 
         distribution_sample = self._frozen_distribution.rvs(
@@ -37,18 +49,20 @@ class BaseDistribution:
         )
 
         generated_walk = self._generate_random_walk(distribution_sample)
-        scaled_walk = self._smooth_generated_walk(
+
+        smoothed_walk = self._smooth_generated_walk(
             generated_walk,
             step_size
-        ) * batch_size
+        )
 
-        return [
-            math.ceil(step_batch_size) for step_batch_size in self._apply_averaging(
-                scaled_walk,
-                step_size
-            )
-        ]
+        if scale_factor:
+            smoothed_walk *= scale_factor
         
+        return self._apply_averaging(
+            smoothed_walk,
+            step_size
+        )
+    
     
     def _get_distribution_and_step_size(self) -> Tuple[int, int]:
         if self.size <= 10:

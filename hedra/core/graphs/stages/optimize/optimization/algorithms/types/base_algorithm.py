@@ -37,6 +37,7 @@ class BaseAlgorithm:
         self.current_params = {}
         self.session = None
         self.distribution_idx: Optional[int] = distribution_idx
+        self._boundaries_by_param_name = {}
 
         if self.max_iter is None or self.max_iter <= 0:
             self.max_iter = 10
@@ -52,26 +53,27 @@ class BaseAlgorithm:
         self.param_values: Dict[str, Union[float, int]] = self.get_params()
         self.current_params = {}
 
-        optimize_params = [
+        self.optimize_params = [
             param_name for param_name in self.params.keys() if param_name in self.param_values
         ]
 
-        if len(optimize_params) < 1:
-            optimize_params = [
+        if len(self.optimize_params) < 1:
+            self.optimize_params = [
                 'batch_size'
             ]
 
-        for param_name in optimize_params:
+        for param_name in self.optimize_params:
             parameter = self.params.get(param_name)
                     
             param = self.param_values.get(param_name, {})
             value = param.get('value')
             params_type = param.get('type')
 
-            if self.distribution_idx:
+            if self.distribution_idx is not None:
                 parameter.minimum = 0.01
-                parameter.maximum = 1
+                parameter.maximum = 10
                 value = self.distribution[self.distribution_idx]
+                param['value'] = value
 
             min_range = parameter.minimum
             max_range = parameter.maximum
@@ -87,10 +89,9 @@ class BaseAlgorithm:
                     min_range = min_range * value
                     max_range = max_range * value
 
-            self.bounds.append((
-                min_range,
-                max_range
-            ))
+            boundaries = (min_range, max_range)
+            self.bounds.append(boundaries)
+            self._boundaries_by_param_name[param_name] = boundaries
 
             self.current_params[param_name] = value
             

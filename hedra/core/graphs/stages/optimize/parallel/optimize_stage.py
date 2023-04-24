@@ -272,7 +272,9 @@ def optimize_stage(serialized_config: str):
         optimization_experiment_config = setup_stage_experiment_config.get(execute_stage_name)
         if optimization_experiment_config:
 
-            execute_stage_config.experiment['distribution'] = execute_stage_config.experiment.get('distribution')
+            execute_stage_config.experiment['distribution'] = [
+                int(distribution_value/optimize_stage_workers) for distribution_value in execute_stage_config.experiment.get('distribution')
+            ]
 
             optimizer = DistributionFitOptimizer({
                 'graph_name': graph_name,

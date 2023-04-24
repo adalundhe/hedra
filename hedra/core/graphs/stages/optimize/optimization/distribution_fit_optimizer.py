@@ -1,13 +1,13 @@
 import asyncio
 import time
 import signal
+from collections import defaultdict
 from hedra.core.experiments.variant import Variant
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.batching.param_type import ParamType
 from hedra.core.personas.types.default_persona import DefaultPersona
 from typing import Dict, Any, List, Union
-from .algorithms import get_algorithm
-from .algorithms.types.base_algorithm import BaseAlgorithm
+from .algorithms import PointOptimizer
 from .optimizer import Optimizer
 
 
@@ -16,7 +16,7 @@ class DistributionFitOptimizer(Optimizer):
     def __init__(self, config: Dict[str, Any]) -> None:
         super().__init__(config)
 
-        self.algorithm: BaseAlgorithm = None
+        self.algorithm: PointOptimizer = None
 
         self.variant_weight = self.stage_config.experiment.get('weight')
         self.distribution_intervals = self.stage_config.experiment.get('intervals')
@@ -29,13 +29,12 @@ class DistributionFitOptimizer(Optimizer):
             distribution=self.distribution_type,
         )
 
-        self.algorithms: List[BaseAlgorithm] = []
+        self.algorithms: List[PointOptimizer] = []
         self.target_interval_completions: int = 0
-        self.completion_rates = {}
+        self.completion_rates = defaultdict(list)
 
         for distribution_idx in range(len(self.distribution)):
-            self.algorithms.append(get_algorithm(
-                self.algorithm_type,
+            self.algorithms.append(PointOptimizer(
                 {
                     **config,
                     'stage_config': self.stage_config
@@ -46,8 +45,6 @@ class DistributionFitOptimizer(Optimizer):
 
     def _setup_persona(self, stage_config: Config):
         persona = DefaultPersona(stage_config)
-        persona.collect_analytics = True
-        persona.optimization_active = True
         persona.setup(self.stage_hooks, self.metadata_string)
 
         return persona
@@ -63,8 +60,8 @@ class DistributionFitOptimizer(Optimizer):
         distribution_optimized_params = []
 
         for distribution_value, algorithm in zip(self.distribution, self.algorithms):
-            self.completion_rates = {}
-            self.algorithm: BaseAlgorithm = algorithm
+            self.completion_rates = defaultdict(list)
+            self.algorithm: PointOptimizer = algorithm
             self.algorithm.batch_time = self.stage_config.total_time/self.distribution_intervals
 
             self.logger.filesystem.sync['hedra.optimize'].info(f'{self.metadata_string} - Optimization config: Algorithm - {self.algorithm_type}')
@@ -82,19 +79,21 @@ class DistributionFitOptimizer(Optimizer):
 
             optimized_params = {}
 
-            for idx in range(len(results.x)):
+            for idx in range(len(results)):
                 param_name = self.algorithm.param_names[idx]
                 optimiazed_param_name = f'optimized_{param_name}'
                 param = self.algorithm.param_values.get(param_name, {})
                 param_type = param.get('type')
 
                 if param_type == ParamType.INTEGER:
-                    optimized_params[optimiazed_param_name] = int(results.x[idx])
+                    optimized_params[optimiazed_param_name] = int(results[idx])
 
                 else:
-                    optimized_params[optimiazed_param_name] = float(results.x[idx])
+                    optimized_params[optimiazed_param_name] = float(results[idx])
 
-            distribution_optimized_params.append(optimized_params.get('optimized_batch_size'))        
+            optimized_batch_size = optimized_params.get('optimized_batch_size')
+
+            distribution_optimized_params.append(optimized_batch_size)        
         
         self.total_optimization_time = time.time() - self.start
 
@@ -115,60 +114,59 @@ class DistributionFitOptimizer(Optimizer):
 
     async def _optimize(self, xargs: List[Union[int, float]]):
 
-        if self._current_iter <= self.algorithm.max_iter:
+        if self.elapsed > self.algorithm.time_limit:
+            return None, self.target_interval_completions
 
-            persona = self._setup_persona(self.stage_config)
+        persona = self._setup_persona(self.stage_config)
 
-            for idx, param in enumerate(xargs):
-                param_name = self.algorithm.param_names[idx]
-                param = self.algorithm.param_values.get(param_name, {})
-                param_type = param.get('type')
+        for idx, param in enumerate(xargs):
+            param_name = self.algorithm.param_names[idx]
+            param = self.algorithm.param_values.get(param_name, {})
+            param_type = param.get('type')
 
-                if param_type == ParamType.INTEGER:
-                    xargs[idx] = int(xargs[idx])
+            if param_type == ParamType.INTEGER:
+                xargs[idx] = int(xargs[idx])
 
-                else:
-                    xargs[idx] = float(xargs[idx])
+            else:
+                xargs[idx] = float(xargs[idx])
 
-                param['value'] = xargs[idx]
+            param['value'] = xargs[idx]
 
-                self.current_params[param_name] = xargs[idx]
-                self.algorithm.current_params[param_name] = xargs[idx]
+            self.current_params[param_name] = xargs[idx]
+            self.algorithm.current_params[param_name] = xargs[idx]
 
-            persona = self.algorithm.update_params(persona)
-            persona.set_concurrency(persona.batch.size)
+        persona.total_time = self.algorithm.batch_time
+        persona = self.algorithm.update_params(persona)
+        persona.set_concurrency(persona.batch.size)
 
-            await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter}')
+        await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter}')
 
-            await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Batch Size - {persona.batch.size}')
-            await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Batch Interval - {persona.batch.interval}')
-            await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Batch Gradient - {persona.batch.gradient}')
+        await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Batch Size - {persona.batch.size}')
+        await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Batch Interval - {persona.batch.interval}')
+        await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Batch Gradient - {persona.batch.gradient}')
 
-            completed_count = 0
+        completed_count = 0
 
-            try:
-                results = await persona.execute()
-                completed_count = len([result for result in results if result.error is None])
+        try:
+            results = await persona.execute()
+            completed_count = len([result for result in results if result.error is None])
 
-            except Exception:
-                pass
+        except Exception:
+            pass
 
-            elapsed = persona.end - persona.start
+        elapsed = persona.end - persona.start
 
-            await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - took - {round(elapsed, 2)} - seconds')
-       
-            if completed_count < 1:
-                completed_count = 1
+        await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - took - {round(elapsed, 2)} - seconds')
+    
+        self.completion_rates[persona.batch.size].append(completed_count)
+        error = completed_count - self.target_interval_completions
 
-            self.completion_rates[persona.batch.size] = completed_count
+        await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Target error- {error}')
 
-            error = (completed_count - self.target_interval_completions)**2
-
-            await self.logger.filesystem.aio['hedra.optimize'].debug(f'{self.metadata_string} - Optimizer iteration - {self._current_iter} - Target error- {error}')
-
-            return error
-
-        return self.base_batch_size**2
+        if completed_count < 1:
+            return -(self.base_batch_size**2),  self.target_interval_completions
+        
+        return error, self.target_interval_completions
     
     def _run_optimize(self, xargs):
 
@@ -194,7 +192,7 @@ class DistributionFitOptimizer(Optimizer):
 
         self._event_loop.set_exception_handler(self._handle_async_exception)
 
-        error = self._event_loop.run_until_complete(
+        error, target_interval_completions = self._event_loop.run_until_complete(
             self._optimize(xargs)
         )
 
@@ -203,5 +201,5 @@ class DistributionFitOptimizer(Optimizer):
 
         self._event_loop.close()
  
-        return error
+        return error, target_interval_completions
     

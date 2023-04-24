@@ -2,7 +2,8 @@ from typing import List, Tuple, Union, Dict, Optional
 from .types import (
     SHGOptimizer,
     DualAnnealingOptimizer,
-    DifferentialEvolutionOptimizer
+    DifferentialEvolutionOptimizer,
+    PointOptimizer
 )
 
 

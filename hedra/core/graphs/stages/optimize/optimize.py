@@ -27,7 +27,7 @@ class Optimize(Stage):
     stage_type=StageTypes.OPTIMIZE
     optimize_iterations=0
     algorithm='shg'
-    stage_time_limit='1m'
+    time_limit='1m'
     optimize_params: List[Parameter]=[
         Parameter(
             'batch_size',
@@ -44,8 +44,8 @@ class Optimize(Stage):
 
         self.results = None
 
-        time_parser = TimeParser(self.stage_time_limit)
-        self.time_limit = time_parser.time
+        time_parser = TimeParser(self.time_limit)
+        self.stage_time_limit = time_parser.time
         self.requires_shutdown = True
         self.allow_parallel = True
 
@@ -59,7 +59,7 @@ class Optimize(Stage):
 
         self.optimize_iterations = self.optimize_iterations
         self.algorithm = self.algorithm
-        self.stage_time_limit = self.stage_time_limit
+        self.time_limit = self.time_limit
         self.optimize_params = self.optimize_params
 
     @Internal()
@@ -175,7 +175,7 @@ class Optimize(Stage):
                     'optimizer_iterations': self.optimize_iterations,
                     'optimizer_algorithm': self.algorithm,
                     'optimize_stage_workers': self.workers,
-                    'time_limit': self.time_limit
+                    'time_limit': self.stage_time_limit
                 })
 
             configs[assigned_workers_count-1]['execute_stage_batch_size'] += batch_size%assigned_workers_count
