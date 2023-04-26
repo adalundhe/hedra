@@ -15,6 +15,8 @@ from hedra.core.engines.types.http2.stream import Stream
 from hedra.core.engines.types.http2.streams.stream_closed_by import StreamClosedBy
 from hedra.core.engines.types.http2.streams.stream_settings import Settings
 from hedra.core.engines.types.http2.streams.stream_settings_codes import SettingCodes
+from hedra.core.engines.types.tracing.trace_session import Trace
+
 from .action import HTTP2Action
 from .result import HTTP2Result
 from .windows import WindowManager
@@ -138,7 +140,13 @@ class HTTP2Pipe:
         stream.write(headers_frame.serialize())
         self._headers_sent = True
 
-    async def receive_response(self, response: HTTP2Result, stream: Stream):
+    async def receive_response(
+        self, 
+        action: HTTP2Action,
+        response: HTTP2Result, 
+        stream: Stream,
+        trace: Trace
+    ):
 
         done = False
         while done is False:
@@ -200,6 +208,13 @@ class HTTP2Pipe:
                             stream_events[0].data = frame_data
                             stream_events[0].flow_controlled_length = flow_controlled_length
 
+                            if trace and trace.on_response_data_received:
+                                await trace.on_response_data_received(
+                                    trace.span,
+                                    action,
+                                    response
+                                )
+
                         except StreamClosedError as e:
                             raise Exception(f'Connection - {stream.stream_id} err: {str(e._events[0])}')
 
@@ -230,6 +245,13 @@ class HTTP2Pipe:
 
                         frames = []
                         response.deferred_headers = deferred_headers
+
+                        if trace and trace.on_response_headers_received:
+                            await trace.on_response_headers_received(
+                                trace.span,
+                                action,
+                                response
+                            )
 
                     elif frame.type == 0x03:
                         # RESET

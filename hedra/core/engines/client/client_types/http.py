@@ -1,4 +1,3 @@
-import asyncio
 from typing import Dict, Iterator, List, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.http import (
@@ -9,6 +8,7 @@ from hedra.core.engines.types.http import (
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.client.store import ActionsStore
+from hedra.core.engines.types.tracing.trace_session import TraceSession
 from hedra.logging import HedraLogger
 from .base_client import BaseClient
 
@@ -21,12 +21,18 @@ class HTTPClient(BaseClient[MercuryHTTPClient, HTTPAction, HTTPResult]):
         if config is None:
             config = Config()
 
+        tracing_session: Union[TraceSession, None] = None
+        if config.tracing:
+            trace_config_dict = config.tracing.to_dict()
+            tracing_session = TraceSession(**trace_config_dict)
+
         self.session = MercuryHTTPClient(
             concurrency=config.batch_size,
             timeouts=Timeouts(
                 total_timeout=config.request_timeout
             ),
-            reset_connections=config.reset_connections
+            reset_connections=config.reset_connections,
+            tracing_session=tracing_session
         )
         self.request_type = RequestTypes.HTTP
         self.client_type = self.request_type.capitalize()
@@ -39,6 +45,8 @@ class HTTPClient(BaseClient[MercuryHTTPClient, HTTPAction, HTTPResult]):
 
         self.logger = HedraLogger()
         self.logger.initialize()
+
+
 
     def __getitem__(self, key: str):
         return self.session.registered.get(key)

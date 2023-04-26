@@ -6,17 +6,20 @@ from hedra.core.experiments.variant import Variant
 from hedra.core.engines.client.config import Config
 from hedra.core.personas.batching.param_type import ParamType
 from hedra.core.personas.types.default_persona import DefaultPersona
+from hedra.versioning.flags.types.unstable.flag import unstable
 from statistics import mean
 from typing import Dict, Any, List, Union, Tuple
 from .algorithms import PointOptimizer
 from .optimizer import Optimizer
 
 
+@unstable
 class DistributionFitOptimizer(Optimizer):
     
     def __init__(self, config: Dict[str, Any]) -> None:
         super().__init__(config)
 
+        self.optimization_start = 0
         self.algorithm: PointOptimizer = None
 
         self.variant_weight = self.stage_config.experiment.get('weight')
@@ -94,6 +97,8 @@ class DistributionFitOptimizer(Optimizer):
         distribution_optimized_params = []
         distribution_mean_errors = []
 
+        self.optimization_start = time.time()
+
         for distribution_value, algorithm in zip(self.distribution, self.algorithms):
             self.completion_rates = defaultdict(list)
             self.algorithm: PointOptimizer = algorithm
@@ -120,7 +125,7 @@ class DistributionFitOptimizer(Optimizer):
             distribution_optimized_params.append(optimized_distribution_value)   
             distribution_mean_errors.append(optimized_error_mean)     
         
-        self.total_optimization_time = time.time() - self.start
+        self.total_optimization_time = time.time() - self.optimization_start
 
         self.logger.filesystem.sync['hedra.optimize'].info(f'{self.metadata_string} - Optimization took - {round(self.total_optimization_time, 2)} - seconds')
         self.logger.filesystem.sync['hedra.optimize'].info(f'{self.metadata_string} - Optimization - max actions per second - {self._max_aps}')

@@ -5,6 +5,9 @@ from collections import defaultdict
 from typing_extensions import TypeVarTuple, Unpack
 from typing import Dict, Generic, List, Any, Optional, Union
 from hedra.core.experiments.experiment import Experiment
+from hedra.core.engines.client.client import Client
+from hedra.core.engines.client.config import Config
+from hedra.core.engines.client.tracing_config import TracingConfig
 from hedra.core.hooks.types.condition.decorator import condition
 from hedra.core.hooks.types.context.decorator import context
 from hedra.core.hooks.types.event.decorator import event
@@ -12,8 +15,6 @@ from hedra.core.hooks.types.transform.decorator import transform
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.internal.decorator import Internal
-from hedra.core.engines.client.config import Config
-from hedra.core.engines.client.client import Client
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -98,6 +99,7 @@ class Setup(Stage, Generic[Unpack[T]]):
     geolocation: Geolocation=None
     permissions: List[str]=[]
     playwright_options: Dict[str, Any]={}
+    tracing: TracingConfig=None
 
     
     def __init__(self) -> None:
@@ -131,7 +133,8 @@ class Setup(Stage, Generic[Unpack[T]]):
             locale=self.locale,
             geolocation=self.geolocation,
             permissions=self.permissions,
-            playwright_options=self.playwright_options
+            playwright_options=self.playwright_options,
+            tracing=self.tracing
         )
 
         self.client = Client(
@@ -162,6 +165,8 @@ class Setup(Stage, Generic[Unpack[T]]):
             'apply_channels',
             'complete'
         ]
+
+        self.tracing = self.tracing
 
     @Internal()
     async def run(self):
@@ -251,6 +256,9 @@ class Setup(Stage, Generic[Unpack[T]]):
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Engine plugin - {plugin.name} - for Execute stage - {execute_stage_name}')
 
             config_copy = setup_stage_target_config.copy()
+
+            if self.tracing:
+                config_copy.tracing = self.tracing
 
             if self.experiment and self.experiment.is_variant(execute_stage_name) and setup_stage_is_primary_thread:
                 config_copy.batch_size = self.experiment.get_variant_batch_size(

@@ -1,14 +1,17 @@
 import asyncio
 import time
 import uuid
-from typing import Dict, Coroutine, Union, TypeVar, Any
+from typing import Dict, Coroutine, Union, TypeVar, Any, Optional
 from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.http2.connection import HTTP2Connection
 from hedra.core.engines.types.common.ssl import get_http2_ssl_context
-from hedra.core.engines.types.common.concurrency import (
-    Semaphore
+from hedra.core.engines.types.common.concurrency import Semaphore
+from hedra.core.engines.types.tracing.trace_session import (
+    TraceSession, 
+    Trace
 )
+
 from .pool import HTTP2Pool
 from .action import HTTP2Action
 from .result import HTTP2Result
@@ -30,10 +33,17 @@ class MercuryHTTP2Client(BaseEngine[Union[A, HTTP2Action], Union[R, HTTP2Result]
         'pool',
         'active',
         'waiter',
-        'ssl_context'
+        'ssl_context',
+        'tracing_session'
     )
 
-    def __init__(self, concurrency: int = 10**3, timeouts: Timeouts = Timeouts(), reset_connections: bool=False) -> None:
+    def __init__(
+        self, 
+        concurrency: int = 10**3, 
+        timeouts: Timeouts = Timeouts(), 
+        reset_connections: bool=False,
+        tracing_session: Optional[TraceSession]=None
+    ) -> None:
         super(
             MercuryHTTP2Client,
             self
@@ -52,6 +62,7 @@ class MercuryHTTP2Client(BaseEngine[Union[A, HTTP2Action], Union[R, HTTP2Result]
             self.timeouts, 
             reset_connections=reset_connections
         )
+        self.tracing_session: Union[TraceSession, None] = tracing_session
 
         self.pool.create_pool()
         self.active = 0
@@ -60,7 +71,7 @@ class MercuryHTTP2Client(BaseEngine[Union[A, HTTP2Action], Union[R, HTTP2Result]
         self.ssl_context = get_http2_ssl_context()
     
     async def set_pool(self, concurrency: int):
-        self.sem = asyncio.Semaphore(value=concurrency)
+        self.sem = Semaphore(value=concurrency)
         self.pool = HTTP2Pool(
             concurrency, 
             self.timeouts,
@@ -136,11 +147,31 @@ class MercuryHTTP2Client(BaseEngine[Union[A, HTTP2Action], Union[R, HTTP2Result]
             raise e
 
     async def execute_prepared_request(self, action: HTTP2Action) -> Coroutine[Any, Any, HTTP2Result]:
+
+        trace: Union[Trace, None] = None
+        if self.tracing_session:
+            trace = self.tracing_session.create_trace()
+            await trace.on_request_start(action)
+
         response = HTTP2Result(action)
         response.wait_start = time.monotonic()
         self.active += 1
+
+        if trace and trace.on_connection_queued_start:
+            await trace.on_connection_queued_start(
+                trace.span,
+                action,
+                response
+            )
         
         async with self.sem:
+
+            if trace and trace.on_connection_queued_end:
+                await trace.on_connection_queued_end(
+                    trace.span,
+                    action,
+                    response
+                )
 
             pipe = self.pool.pipes.pop()
             connection = self.pool.connections.pop()
@@ -158,6 +189,13 @@ class MercuryHTTP2Client(BaseEngine[Union[A, HTTP2Action], Union[R, HTTP2Result]
 
                 response.start = time.monotonic()
 
+                if trace and trace.on_connection_create_start:
+                    await trace.on_connection_create_start(
+                        trace.span,
+                        action,
+                        response
+                    )
+
                 stream = await connection.connect(
                     action.url.hostname,
                     action.url.ip_addr,
@@ -171,15 +209,41 @@ class MercuryHTTP2Client(BaseEngine[Union[A, HTTP2Action], Union[R, HTTP2Result]
      
                 response.connect_end = time.monotonic()
 
+                if trace and trace.on_connection_create_end:
+                    await trace.on_connection_create_end(
+                        trace.span,
+                        action,
+                        response
+                    )
+
                 pipe.send_request_headers(action, stream)
+
+                if trace and trace.on_request_headers_sent:
+                    await trace.on_request_headers_sent(
+                        trace.span,
+                        action,
+                        response
+                    )
   
                 if action.encoded_data is not None:
                     await pipe.submit_request_body(action, stream)
 
                 response.write_end = time.monotonic()
 
+                if action.encoded_data and trace and trace.on_request_data_sent:
+                        await trace.on_request_data_sent(
+                            trace.span,
+                            action,
+                            response
+                        )
+
                 await asyncio.wait_for(
-                    pipe.receive_response(response, stream), 
+                    pipe.receive_response(
+                        action,
+                        response, 
+                        stream,
+                        trace
+                    ), 
                     timeout=self.timeouts.total_timeout
                 )
 
@@ -213,6 +277,9 @@ class MercuryHTTP2Client(BaseEngine[Union[A, HTTP2Action], Union[R, HTTP2Result]
 
                 self.pool.reset()
 
+                if trace and trace.on_request_exception:
+                    await trace.on_request_exception(response)
+
             self.active -= 1
             if self.waiter and self.active <= self.pool.size:
 
@@ -222,6 +289,9 @@ class MercuryHTTP2Client(BaseEngine[Union[A, HTTP2Action], Union[R, HTTP2Result]
 
                 except asyncio.InvalidStateError:
                     self.waiter = None
+
+            if trace and trace.on_request_end:
+                await trace.on_request_end(response)
 
             return response
 

@@ -1,5 +1,6 @@
 import psutil
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Optional
+from .tracing_config import TracingConfig
 from .time_parser import TimeParser
 
 
@@ -43,8 +44,14 @@ class Config:
         self.group_size = kwargs.get('group_size')
         self.playwright_options = kwargs.get('playwright_options', {})
         self.experiment: Dict[str, Union[str, int, List[float]]] = kwargs.get('experiment', {})
+        self.tracing: Optional[TracingConfig] = kwargs.get('tracing')
 
     def copy(self):
+
+        trace = None
+        if self.tracing:
+            trace = self.tracing.copy()
+
         return Config(**{
             'total_time': self.total_time_string,
             'log_level': self.log_level,
@@ -70,5 +77,6 @@ class Config:
             'color_scheme': self.color_scheme,
             'group_size': self.group_size,
             'playwright_options': self.playwright_options,
-            'experiment': self.experiment
+            'experiment': self.experiment,
+            'trace': trace
         })

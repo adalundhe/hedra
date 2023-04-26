@@ -1,13 +1,13 @@
 import asyncio
 import time
 import uuid
-import asyncio
-from typing import Dict, Union, Coroutine, Any
+from typing import Dict, Union, Coroutine, Any, Optional
 from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.concurrency import Semaphore
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.core.hooks.types.base.simple_context import SimpleContext
+from hedra.core.engines.types.tracing.trace_session import TraceSession
 from .task import Task
 from .result import TaskResult
 
@@ -23,10 +23,16 @@ class MercuryTaskRunner(BaseEngine[Task, Union[BaseResult, TaskResult]]):
         'sem',
         'active',
         'waiter',
-        'closed'
+        'closed',
+        'tracing_session'
     )
 
-    def __init__(self, concurrency: int=10**3, timeouts: Timeouts = Timeouts()) -> None:
+    def __init__(
+        self, 
+        concurrency: int=10**3, 
+        timeouts: Timeouts = Timeouts(),
+        tracing_session: Optional[TraceSession]=None
+    ) -> None:
         super(
             MercuryTaskRunner,
             self
@@ -47,6 +53,7 @@ class MercuryTaskRunner(BaseEngine[Task, Union[BaseResult, TaskResult]]):
         self.sem = asyncio.Semaphore(value=concurrency)
         self.active = 0
         self.waiter = None
+        self.tracing_session: TraceSession = tracing_session
 
     async def set_pool(self, concurrency: int):
         self.pool = SimpleContext()

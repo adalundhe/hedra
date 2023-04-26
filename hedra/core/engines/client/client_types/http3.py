@@ -8,6 +8,7 @@ from hedra.core.engines.types.http3 import(
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.client.store import ActionsStore
+from hedra.core.engines.types.tracing.trace_session import TraceSession
 from hedra.logging import HedraLogger
 from .base_client import BaseClient
 
@@ -17,13 +18,22 @@ class HTTP3Client(BaseClient[MercuryHTTP3Client, HTTP3Action, HTTP3Result]):
     def __init__(self, config: Config) -> None:
         super().__init__()
 
+        if config is None:
+            config = Config()
+
+        tracing_session: Union[TraceSession, None] = None
+        if config.tracing:
+            trace_config_dict = config.tracing.to_dict()
+            tracing_session = TraceSession(**trace_config_dict)
+
         self.session = MercuryHTTP3Client(
             concurrency=config.batch_size,
             timeouts=Timeouts(
                 connect_timeout=config.connect_timeout,
                 total_timeout=config.request_timeout
             ),
-            reset_connections=config.reset_connections
+            reset_connections=config.reset_connections,
+            tracing_session=tracing_session
         )
         self.request_type = RequestTypes.HTTP2
         self.client_type = self.request_type.capitalize()

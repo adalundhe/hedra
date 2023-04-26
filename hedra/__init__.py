@@ -13,7 +13,7 @@ from .core.hooks import (
     transform,
 )
 
-from hedra.core.graphs.stages.optimize.optimization.parameters import Parameter
+from hedra.core.engines.client import TracingConfig
 from hedra.core.experiments import (
     Experiment,
     Variant
@@ -27,7 +27,7 @@ from .core.graphs.stages import (
     Setup,
     Submit,
 )
-
+from hedra.core.graphs.stages.optimize.optimization.parameters import Parameter
 
 from .reporting import (
     AWSLambdaConfig,
