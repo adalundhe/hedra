@@ -1,6 +1,7 @@
 from typing import Dict, Generic, Union
 from typing_extensions import TypeVarTuple, Unpack
 from hedra.core.engines.client.config import Config
+from hedra.core.experiments.mutations.types.base.mutation import Mutation
 from .store import ActionsStore
 
 T = TypeVarTuple('T')
@@ -16,6 +17,7 @@ class PluginsStore(Generic[Unpack[T]]):
         self.intercept: bool = False
         self.metadata_string: str = metadata_string
         self.clients = {}
+        self.mutations: Dict[str, Mutation] = {}
 
     def __getitem__(self, plugin_name: str) -> Union[Unpack[T]]:
 
@@ -25,6 +27,7 @@ class PluginsStore(Generic[Unpack[T]]):
             custom_plugin.name = plugin_name
             custom_plugin.actions = self.actions
             custom_plugin.initialized = True
+            custom_plugin.mutations.update(self.mutations)
 
         custom_plugin.metadata_string = self.metadata_string
         custom_plugin.next_name = self.next_name

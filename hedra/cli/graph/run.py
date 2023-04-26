@@ -9,7 +9,6 @@ import ntpath
 import signal
 from multiprocessing import current_process, active_children
 from pathlib import Path
-from typing import List
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs import Graph
 from hedra.core.graphs.status import GraphStatus
@@ -20,7 +19,6 @@ from hedra.logging import (
     LoggerTypes,
     logging_manager
 )
-
 
 uvloop.install()
 
@@ -34,7 +32,7 @@ def run_graph(
     connection_validation_retries: int,
     enable_latest: bool,
 ):
-    
+
     if enable_latest:
         active_flags[FlagTypes.UNSTABLE_FEATURE] = True
 
@@ -147,7 +145,7 @@ def run_graph(
 
     def handle_loop_stop(signame):
         try:
-
+            graph.cleanup()
             child_processes = active_children()
             for child in child_processes:
                 child.kill()
@@ -176,9 +174,10 @@ def run_graph(
             getattr(signal, signame),
             lambda signame=signame: handle_loop_stop(signame)
         )
-
+    
     try:
         loop.run_until_complete(graph.run())
+        pass
         
     except BrokenPipeError:
         pass
@@ -214,5 +213,6 @@ def run_graph(
             
             except Exception:
                 pass
-
+            
+    graph.cleanup()
     os._exit(exit_code)

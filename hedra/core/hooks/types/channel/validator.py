@@ -10,3 +10,5 @@ class ChannelHookValidator(BaseModel):
     def validate_names(cls, vals):
         assert len(vals) > 0
         assert len(vals) == len(set(vals))
+
+        return vals

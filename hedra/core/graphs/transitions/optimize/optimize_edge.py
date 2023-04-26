@@ -33,6 +33,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         )
 
         self.requires = [
+            'setup_stage_experiment_config',
             'execute_stage_streamed_analytics',
             'setup_stage_configs',
             'execute_stage_setup_hooks',
@@ -44,6 +45,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         ]
 
         self.provides = [
+            'setup_stage_experiment_config',
             'execute_stage_streamed_analytics',
             'setup_stage_configs',
             'optimize_stage_optimized_params',
@@ -233,15 +235,17 @@ class OptimizeEdge(BaseEdge[Optimize]):
         execute_stage_setup_config: Config = None
         execute_stage_setup_hooks: Dict[str, ExecuteHooks] = {}
         execute_stage_setup_by: str = None
+        execute_stage_streamed_analytics: Dict[str, List[StreamAnalytics]]= defaultdict(list)
         setup_stage_ready_stages: List[Stage] = []
         setup_stage_candidates: List[Stage] = []
         setup_stage_configs: Dict[str, Config] = {}
-        execute_stage_streamed_analytics: List[StreamAnalytics] = []
+        setup_stage_experiment_config: Dict[str, Union[str, int, List[float]]] = {}
 
         for source_stage, destination_stage in self.history:
             
+            previous_history: Dict[str, Any] = self.history[(source_stage, destination_stage)]
+            
             if destination_stage == self.source.name:
-                previous_history: Dict[str, Any] = self.history[(source_stage, self.source.name)]
                 setup_stage_configs.update(
                     previous_history.get(
                         'setup_stage_configs',
@@ -277,14 +281,18 @@ class OptimizeEdge(BaseEdge[Optimize]):
                     if stage_candidate not in setup_stage_candidates:
                         setup_stage_candidates.append(stage_candidate)
 
-                execute_stage_streamed_analytics.extend(
-                    previous_history.get(
-                        'execute_stage_streamed_analytics',
-                        []
-                    )
-                )
-        
+                stage_distributions = previous_history.get('setup_stage_experiment_config')
+
+                if stage_distributions:
+                    setup_stage_experiment_config.update(stage_distributions)
+
+            streamed_analytics = previous_history.get('execute_stage_streamed_analytics')
+
+            if streamed_analytics:
+                execute_stage_streamed_analytics[source_stage].extend(streamed_analytics)
+
         self.edge_data = {
+            'setup_stage_experiment_config': setup_stage_experiment_config,
             'execute_stage_streamed_analytics': execute_stage_streamed_analytics,
             'setup_stage_configs': setup_stage_configs,
             'execute_stage_setup_config': execute_stage_setup_config,

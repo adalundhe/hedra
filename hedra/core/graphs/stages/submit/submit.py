@@ -198,3 +198,7 @@ class Submit(Stage, Generic[T]):
         await self.logger.spinner.set_default_message(f'Successfully submitted the results for {submit_stage_session_total} actions via {submit_stage_reporter_name} reporter')
 
         return {}
+    
+    @event('complete_submit_session')
+    async def close_session(self):
+        return {}

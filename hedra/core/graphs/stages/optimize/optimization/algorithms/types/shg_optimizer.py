@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple, Union, Optional
 from scipy.optimize import shgo
 from .base_algorithm import BaseAlgorithm
 
@@ -7,9 +7,13 @@ class SHGOptimizer(BaseAlgorithm):
 
     def __init__(
         self, 
-        config: Dict[str, Union[List[Tuple[Union[int, float]]], int]]
+        config: Dict[str, Union[List[Tuple[Union[int, float]]], int]],
+        distribution_idx: Optional[int]=None
     ) -> None:
-        super().__init__(config)
+        super().__init__(
+            config,
+            distribution_idx=distribution_idx
+        )
 
 
     def optimize(self, func):
@@ -18,7 +22,6 @@ class SHGOptimizer(BaseAlgorithm):
             self.bounds,
             options={
                 'maxfev': self.max_iter,
-                'maxiter': self.max_iter,
-                'local_iter': 1
+                'maxiter': self.max_iter
             }
         )

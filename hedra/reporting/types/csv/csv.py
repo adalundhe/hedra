@@ -76,31 +76,31 @@ class CSV:
             f'{filename}_{events_file_timestamp}.csv'
         )
 
-        self.events_file = await self._loop.run_in_executor(
-            self._executor,
-            functools.partial(
-                open,
-                self.events_filepath,
-                self.write_mode
-            )
-        )
-
-        for signame in ('SIGINT', 'SIGTERM'):
-            self._loop.add_signal_handler(
-                getattr(signal, signame),
-                lambda signame=signame: handle_loop_stop(
-                    signame,
-                    self._executor,
-                    self._loop,
-                    self.events_file
-                )
-            )
-
     async def submit_events(self, events: List[BaseProcessedResult]):
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Events to file - {self.events_filepath}')
-          
 
+        if self.events_file is None:
+            self.events_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.events_filepath,
+                    self.write_mode
+                )
+            )
+
+            for signame in ('SIGINT', 'SIGTERM'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        self.events_file
+                    )
+                )
+          
         for event in events:
             if self._events_csv_writer is None or self.write_mode == 'w':
                 self._events_csv_writer = csv.DictWriter(self.events_file, fieldnames=event.fields)
@@ -354,10 +354,11 @@ class CSV:
                 
     async def close(self):
         
-        await self._loop.run_in_executor(
-            self._executor,
-            self.events_file.close
-        )
+        if self.events_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.events_file.close
+            )
 
 
         self._executor.shutdown()

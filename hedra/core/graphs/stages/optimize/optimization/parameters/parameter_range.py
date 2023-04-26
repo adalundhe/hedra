@@ -12,3 +12,5 @@ class ParameterRange(BaseModel):
     @validator('minimum_range', 'maximum_range')
     def validate_param_range(cls, val):
         assert val > 0, "Order and weight values must be greater than zero!"
+
+        return val

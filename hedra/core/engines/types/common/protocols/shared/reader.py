@@ -1,7 +1,10 @@
+import signal
+import asyncio
 from asyncio import (
     Future,
     Transport,
-    get_event_loop
+    get_event_loop,
+    AbstractEventLoop
 )
 from asyncio.exceptions import LimitOverrunError
 from .constants import _DEFAULT_LIMIT
@@ -33,7 +36,8 @@ class Reader:
         if loop is None:
             self._loop = get_event_loop()
         else:
-            self._loop = loop
+            self._loop: AbstractEventLoop = loop
+
         self._buffer = bytearray()
         self._eof = False    # Whether we're done.
         self._waiter: Future = None  # A future used by _wait_for_data()

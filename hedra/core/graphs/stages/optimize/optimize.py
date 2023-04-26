@@ -6,13 +6,16 @@ from typing import Dict, List, Tuple, Any, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.client.time_parser import TimeParser
 from hedra.core.graphs.stages.execute import Execute
-from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.context.decorator import context
 from hedra.core.hooks.types.event.decorator import event
 from hedra.core.hooks.types.internal.decorator import Internal
+from hedra.logging import logging_manager
+from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
+from hedra.versioning.flags.types.base.active import active_flags
+from hedra.versioning.flags.types.base.flag_type import FlagTypes
 from .optimization.parameters import Parameter
 from .parallel import optimize_stage
 
@@ -24,12 +27,13 @@ class Optimize(Stage):
     stage_type=StageTypes.OPTIMIZE
     optimize_iterations=0
     algorithm='shg'
-    stage_time_limit='1m'
+    time_limit='1m'
     optimize_params: List[Parameter]=[
         Parameter(
             'batch_size',
             minimum=0.5,
-            maximum=2
+            maximum=2,
+            feed_forward=True
         )
     ]
     
@@ -40,8 +44,8 @@ class Optimize(Stage):
 
         self.results = None
 
-        time_parser = TimeParser(self.stage_time_limit)
-        self.time_limit = time_parser.time
+        time_parser = TimeParser(self.time_limit)
+        self.stage_time_limit = time_parser.time
         self.requires_shutdown = True
         self.allow_parallel = True
 
@@ -55,7 +59,7 @@ class Optimize(Stage):
 
         self.optimize_iterations = self.optimize_iterations
         self.algorithm = self.algorithm
-        self.stage_time_limit = self.stage_time_limit
+        self.time_limit = self.time_limit
         self.optimize_params = self.optimize_params
 
     @Internal()
@@ -69,6 +73,9 @@ class Optimize(Stage):
         self,
         setup_stage_configs: Dict[str, Config] = {},
         optimize_stage_candidates: Dict[str, Execute]={},
+        setup_stage_experiment_config: Dict[str, Union[str, int, List[float]]]={},
+        execute_stage_streamed_analytics: Dict[str, List[StreamAnalytics]]={}
+
     ):
         self.optimization_execution_time_start = time.monotonic()
 
@@ -78,8 +85,7 @@ class Optimize(Stage):
             'optimize_stage_candidates',
             'setup_stage_ready_stages',
             'execute_stage_setup_hooks',
-            'execute_stage_results',
-            'execute_stage_streamed_analytics'
+            'execute_stage_results'
         ]
 
         stage_names = ', '.join(list(optimize_stage_candidates.keys()))
@@ -104,7 +110,9 @@ class Optimize(Stage):
         batched_stages: BatchedOptimzationCandidates = list(self.executor.partion_stage_batches(optimize_stages))
 
         return {
+            'setup_stage_experiment_config': setup_stage_experiment_config,
             'setup_stage_configs': setup_stage_configs,
+            'execute_stage_streamed_analytics': execute_stage_streamed_analytics,
             'optimize_stage_candidates': optimize_stage_candidates,
             'optimize_stage_stage_names': stage_names,
             'optimize_stage_stages_count': stages_count,
@@ -118,6 +126,8 @@ class Optimize(Stage):
         setup_stage_configs: Dict[str, Config] = {},
         optimize_stage_stages_count: int=0,
         optimize_stage_batched_stages: BatchedOptimzationCandidates=[],
+        setup_stage_experiment_config: Dict[str, Union[str, int, List[float]]]={},
+        execute_stage_streamed_analytics: Dict[str, List[StreamAnalytics]]={}
     ):
         batched_configs = []
 
@@ -143,6 +153,9 @@ class Optimize(Stage):
                     'graph_name': self.graph_name,
                     'graph_path': self.graph_path,
                     'graph_id': self.graph_id,
+                    'enable_unstable_features': active_flags[FlagTypes.UNSTABLE_FEATURE],
+                    'logfiles_directory': logging_manager.logfiles_directory,
+                    'log_level': logging_manager.log_level_name,
                     'worker_idx': worker_idx,
                     'source_stage_context': {
                         context_key: context_value for context_key, context_value in serializable_context
@@ -150,6 +163,8 @@ class Optimize(Stage):
                     'source_stage_name': self.name,
                     'source_stage_id': self.stage_id,
                     'execute_stage_name': stage_name,
+                    'setup_stage_experiment_config': setup_stage_experiment_config,
+                    'execute_stage_streamed_analytics': execute_stage_streamed_analytics,
                     'execute_stage_generation_count': assigned_workers_count,
                     'execute_stage_id': stage.execution_stage_id,
                     'execute_stage_config': selected_stage_config,
@@ -159,7 +174,8 @@ class Optimize(Stage):
                     'optimizer_params': self.optimize_params,
                     'optimizer_iterations': self.optimize_iterations,
                     'optimizer_algorithm': self.algorithm,
-                    'time_limit': self.time_limit
+                    'optimize_stage_workers': self.workers,
+                    'time_limit': self.stage_time_limit
                 })
 
             configs[assigned_workers_count-1]['execute_stage_batch_size'] += batch_size%assigned_workers_count
@@ -226,7 +242,7 @@ class Optimize(Stage):
         }
 
     @context('collect_optimized_batch_sizes')
-    async def set_optimized_batch_size(
+    async def set_optimized_configs(
         self,
         optimize_stage_results: List[Any]=[],
         optimize_stage_candidates: Dict[str, Execute]={},
@@ -243,7 +259,7 @@ class Optimize(Stage):
         for optimization_result in optimize_stage_results:
             
             stage_name = optimization_result.get('stage')
-            optimized_config = optimization_result.get('config')
+            optimized_config: Config = optimization_result.get('config')
 
             stage = optimize_stage_candidates.get(stage_name)
             optimized_configs[stage.name] = optimized_config
@@ -281,7 +297,7 @@ class Optimize(Stage):
             'optimize_stage_context': stage_context
         }
 
-    @context('set_optimized_batch_size')
+    @context('set_optimized_configs')
     async def complete_optimization(
         self,
         optimize_stage_stage_names: str=None,

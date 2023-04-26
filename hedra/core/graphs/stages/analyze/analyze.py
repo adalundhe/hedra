@@ -17,6 +17,7 @@ from hedra.core.hooks.types.event.decorator import event
 from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.event_types import EventType
+from hedra.logging import logging_manager
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.metric import MetricsSet
 from hedra.reporting.metric.custom_metric import CustomMetric
@@ -32,6 +33,8 @@ from hedra.reporting.processed_result.types import (
     UDPProcessedResult,
     WebsocketProcessedResult,
 )
+from hedra.versioning.flags.types.base.active import active_flags
+from hedra.versioning.flags.types.base.flag_type import FlagTypes
 
 from .parallel import process_results_batch
 
@@ -302,6 +305,9 @@ class Analyze(Stage):
                         'graph_name': self.graph_name,
                         'graph_path': self.graph_path,
                         'graph_id': self.graph_id,
+                        'enable_unstable_features': active_flags[FlagTypes.UNSTABLE_FEATURE],
+                        'logfiles_directory': logging_manager.logfiles_directory,
+                        'log_level': logging_manager.log_level_name,
                         'source_stage_name': self.name,
                         'source_stage_context': {
                             context_key: context_value for context_key, context_value in serializable_context
@@ -528,11 +534,12 @@ class Analyze(Stage):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed results analysis for - {analyze_stage_stages_count} - stages in - {self.analysis_execution_time} seconds')
         await self.logger.spinner.set_default_message(f'Completed results analysis for {analyze_stage_total_group_results} actions and {analyze_stage_stages_count} stages over {self.analysis_execution_time} seconds')
 
+        self.executor.shutdown()
+        
         return {
             'analyze_stage_summary_metrics': summaries
         }
 
     @event('generate_summary')
     async def complete(self):
-        self.executor.shutdown()
         return {}

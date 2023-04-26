@@ -63,7 +63,7 @@ class HTTPConnection:
             except asyncio.TimeoutError:
                 raise Exception('Connection timed out.')
 
-            except ConnectionResetError:
+            except (ConnectionResetError, OSError,):
                 raise Exception('Connection reset.')
 
             except Exception as e:

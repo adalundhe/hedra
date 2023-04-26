@@ -18,7 +18,8 @@ class BaseAction(Generic[A]):
         'metadata', 
         'hooks',
         'event',
-        'action_args'
+        'action_args',
+        'mutations'
     )
 
     def __init__(

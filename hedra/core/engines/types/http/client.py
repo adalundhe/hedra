@@ -2,11 +2,16 @@ import asyncio
 import time
 import uuid
 import traceback
-from typing import Dict, Any, Union, Coroutine, TypeVar
+from typing import Dict, Any, Union, Coroutine, TypeVar, Optional
 from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.concurrency import Semaphore
+from hedra.core.engines.types.tracing.trace_session import (
+    TraceSession, 
+    Trace
+)
+
 from hedra.logging import HedraLogger
 from .connection import HTTPConnection
 from .action import HTTPAction
@@ -31,10 +36,17 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
         'active',
         'waiter',
         'ssl_context',
-        'logger'
+        'logger',
+        'tracing_session'
     )
 
-    def __init__(self, concurrency: int=10**3, timeouts: Timeouts = Timeouts(), reset_connections: bool=False) -> None:
+    def __init__(
+        self,
+        concurrency: int=10**3, 
+        timeouts: Timeouts = Timeouts(), 
+        reset_connections: bool=False,
+        tracing_session: Optional[TraceSession]=None
+    ) -> None:
         super(
             MercuryHTTPClient,
             self
@@ -49,11 +61,13 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
 
         self.sem = asyncio.Semaphore(value=concurrency)
         self.pool = Pool(concurrency, reset_connections=reset_connections)
-        self.pool.create_pool()
-        self.active = 0
-        self.waiter = None
+        self.tracing_session: Union[TraceSession, None] = tracing_session
         self.logger = HedraLogger()
         self.logger.initialize()
+        self.pool.create_pool()
+
+        self.active = 0
+        self.waiter = None
 
         self.ssl_context = get_default_ssl_context()
 
@@ -132,27 +146,53 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
             raise e
 
     async def execute_prepared_request(self, action: HTTPAction) -> Coroutine[Any, Any, HTTPResult]:
+        trace: Union[Trace, None] = None
+        if self.tracing_session:
+            trace = self.tracing_session.create_trace()
+            await trace.on_request_start(action)
   
         response = HTTPResult(action)
         response.wait_start = time.monotonic()
         self.active += 1
+
+        if trace and trace.on_connection_queued_start:
+            await trace.on_connection_queued_start(
+                trace.span,
+                action,
+                response
+            )
  
         async with self.sem:
+
+            if trace and trace.on_connection_queued_end:
+                await trace.on_connection_queued_end(
+                    trace.span,
+                    action,
+                    response
+                )
             
             try:
                 
                 connection = self.pool.connections.pop()
-                
+
                 if action.hooks.listen:
                     event = asyncio.Event()
                     action.hooks.channel_events.append(event)
                     await event.wait()
-
+                    
                 if action.hooks.before:
                     action = await self.execute_before(action)
                     action.setup()
 
                 response.start = time.monotonic()
+
+                if trace and trace.on_connection_create_start:
+                    await trace.on_connection_create_start(
+                        trace.span,
+                        action,
+                        response
+                    )
+
 
                 await connection.make_connection(
                     action.url.hostname,
@@ -165,16 +205,40 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
 
                 response.connect_end = time.monotonic()
 
+                if trace and trace.on_connection_create_end:
+                    await trace.on_connection_create_end(
+                        trace.span,
+                        action,
+                        response
+                    )
+
                 connection.write(action.encoded_headers)
+
+                if trace and trace.on_request_headers_sent:
+                    await trace.on_request_headers_sent(
+                        trace.span,
+                        action,
+                        response
+                    )
                 
                 if action.encoded_data:
                     if action.is_stream:
-                        action.write_chunks(connection)
+                        action.write_chunks(
+                            connection,
+                            trace
+                        )
 
                     else:
                         connection.write(action.encoded_data)
 
                 response.write_end = time.monotonic()
+
+                if action.encoded_data and trace and trace.on_request_data_sent:
+                        await trace.on_request_data_sent(
+                            trace.span,
+                            action,
+                            response
+                        )
 
                 response.response_code = await asyncio.wait_for(
                     connection.reader.readline_fast(),
@@ -186,13 +250,28 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
                     timeout=self.timeouts.socket_read_timeout
                 )
 
+                if trace and trace.on_response_headers_received:
+                    await trace.on_response_headers_received(
+                        trace.span,
+                        action,
+                        response
+                    )
+
                 status = response.status
             
                 if status >= 300 and status < 400:
+
+                    if trace and trace.on_request_redirect:
+                        await trace.on_request_redirect(
+                            trace.span,
+                            action,
+                            response
+                        )
+
                     elapsed_time = 0
                     redirect_time_start = time.time()
 
-                    for redirect_number in range(action.redirects):
+                    for _ in range(action.redirects):
 
                         if elapsed_time > self.timeouts.total_timeout:
                             response.status = 408
@@ -247,7 +326,6 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
                         if status >= 200 and status < 300:
                             break
 
-                        action.redirects -= redirect_number
                         elapsed_time = time.time() - redirect_time_start
 
                 content_length = headers.get(b'content-length')
@@ -291,12 +369,26 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
                             chunk[:-2]
                         )
 
+                        if trace and trace.on_response_chunk_received:
+                            await trace.on_response_chunk_received(
+                                trace.span,
+                                action,
+                                response
+                            )
+
                     all_chunks_read = True
          
                 response.complete = time.monotonic()
+
+                if trace and trace.on_response_data_received:
+                    await trace.on_response_data_received(
+                        trace.span,
+                        action,
+                        response
+                    )
+
                 response.headers = headers
                 response.body = body
-                
                 self.pool.connections.append(connection)
 
                 if action.hooks.after:
@@ -326,6 +418,9 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
 
                 self.pool.connections.append(HTTPConnection(reset_connection=self.pool.reset_connections))
 
+                if trace and trace.on_request_exception:
+                    await trace.on_request_exception(response)
+
             self.active -= 1
             if self.waiter and self.active <= self.pool.size:
 
@@ -335,6 +430,9 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
 
                 except asyncio.InvalidStateError:
                     self.waiter = None
+
+            if trace and trace.on_request_end:
+                await trace.on_request_end(response)
 
             return response
 

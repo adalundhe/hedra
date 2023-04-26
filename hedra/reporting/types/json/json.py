@@ -66,27 +66,28 @@ class JSON:
             f'{filename}_{events_file_timestamp}.json'
         )
 
-        self.events_file = await self._loop.run_in_executor(
-            self._executor,
-            functools.partial(
-                open,
-                self.events_filepath,
-                self.write_mode
-            )
-        )
+    async def submit_events(self, events: List[BaseProcessedResult]):
 
-        for signame in ('SIGINT', 'SIGTERM'):
-            self._loop.add_signal_handler(
-                getattr(signal, signame),
-                lambda signame=signame: handle_loop_stop(
-                    signame,
-                    self._executor,
-                    self._loop,
-                    self.events_file
+        if self.events_file is None:
+            self.events_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.events_filepath,
+                    self.write_mode
                 )
             )
 
-    async def submit_events(self, events: List[BaseProcessedResult]):
+            for signame in ('SIGINT', 'SIGTERM'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        self.events_file
+                    )
+                )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Events to file - {self.events_filepath}')
 
@@ -182,10 +183,12 @@ class JSON:
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping Error Metrics')
 
     async def close(self):
-        await self._loop.run_in_executor(
-            self._executor,
-            self.events_file.close
-        )
+        
+        if self.events_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.events_file.close
+            )
         
         self._executor.shutdown()
 

@@ -74,9 +74,12 @@ class Stream:
 
 
     async def execute_action(self, hook: Union[ActionHook, TaskHook]):
-        result: BaseResult = await hook.session.execute_prepared_request(
-            hook.action
-        )
+        try:
+            result: BaseResult = await hook.session.execute_prepared_request(
+                hook.action
+            )
+        except RuntimeError as runtime_error:
+            result = runtime_error
         
         self.completed_count += 1
         self.completed.append(result)

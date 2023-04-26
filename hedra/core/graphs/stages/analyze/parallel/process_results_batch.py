@@ -2,28 +2,48 @@
 import time
 import threading
 import os
-import signal 
 import dill
 from collections import defaultdict
 from typing import Any, Dict, List
 from hedra.logging import HedraLogger
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
+from hedra.logging import (
+    HedraLogger,
+    LoggerTypes
+)
 from hedra.reporting.processed_result.processed_results_group import ProcessedResultsGroup
+from hedra.versioning.flags.types.base.active import active_flags
+from hedra.versioning.flags.types.base.flag_type import FlagTypes
 
 
 
 def process_results_batch(config: Dict[str, Any]):
-    import asyncio
-    import uvloop
-    uvloop.install()
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    import warnings
+    warnings.simplefilter("ignore")
+
+    from hedra.logging import (
+        logging_manager
+    )
     
     graph_name = config.get('graph_name')
     graph_id = config.get('graph_id')
+    logfiles_directory = config.get('logfiles_directory')
+    log_level = config.get('log_level')
     source_stage_name = config.get('source_stage_name')
     source_stage_id = config.get('source_stage_id')
+    enable_unstable_features = config.get('enable_unstable_features', False)
+
+    active_flags[FlagTypes.UNSTABLE_FEATURE] = enable_unstable_features
+
+    logging_manager.disable(
+        LoggerTypes.DISTRIBUTED,
+        LoggerTypes.DISTRIBUTED_FILESYSTEM,
+        LoggerTypes.SPINNER
+    )
+
+    logging_manager.update_log_level(log_level)
+    logging_manager.logfiles_directory = logfiles_directory
 
     thread_id = threading.current_thread().ident
     process_id = os.getpid()
@@ -32,25 +52,6 @@ def process_results_batch(config: Dict[str, Any]):
 
     stage_name = config.get('analyze_stage_name')
     results_batch: List[BaseResult] = config.get('analyze_stage_batched_results', [])
-
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    def handle_loop_stop(signame):
-        try:
-            loop.close()
-
-        except BrokenPipeError:
-            pass
-
-        except RuntimeError:
-            pass
-
-    for signame in ('SIGINT', 'SIGTERM'):
-        loop.add_signal_handler(
-            getattr(signal, signame),
-            lambda signame=signame: handle_loop_stop(signame)
-        )
 
     try:
 

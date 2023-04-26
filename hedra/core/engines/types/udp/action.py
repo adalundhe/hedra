@@ -21,7 +21,8 @@ class UDPAction(BaseAction):
         'is_stream',
         'ssl_context',
         'event',
-        'action_args'
+        'action_args',
+        'mutations'
     )
     
     def __init__(

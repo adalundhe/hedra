@@ -30,8 +30,11 @@ from hedra.core.personas.persona_registry import (
     registered_personas, 
     DefaultPersona
 )
+from hedra.logging import logging_manager
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.reporter import ReporterConfig
+from hedra.versioning.flags.types.base.active import active_flags
+from hedra.versioning.flags.types.base.flag_type import FlagTypes
 from .parallel import execute_actions
 
 
@@ -163,7 +166,10 @@ class Execute(Stage, Generic[Unpack[T]]):
                         'graph_name': self.graph_name,
                         'graph_path': self.graph_path,
                         'graph_id': self.graph_id,
+                        'enable_unstable_features': active_flags[FlagTypes.UNSTABLE_FEATURE],
                         'source_stage_name': self.name,
+                        'logfiles_directory': logging_manager.logfiles_directory,
+                        'log_level': logging_manager.log_level_name,
                         'source_stage_context': {
                             context_key: context_value for context_key, context_value in serializable_context
                         },
@@ -306,6 +312,8 @@ class Execute(Stage, Generic[Unpack[T]]):
             await self.logger.filesystem.aio['hedra.core'].info( f'{self.metadata_string} - Completed - {total_results} actions at  {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
             await self.logger.spinner.set_default_message(f'Stage - {self.name} completed {total_results} actions at {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
 
+            self.executor.shutdown()
+            
             return {
                 'execute_stage_streamed_analytics': [
                     results.get('streamed_analytics')
@@ -320,5 +328,4 @@ class Execute(Stage, Generic[Unpack[T]]):
 
     @event('aggregate_multiple_worker_results', 'setup_single_worker_job')
     async def complete(self):
-        self.executor.shutdown()
         return {}

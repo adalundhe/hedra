@@ -20,7 +20,8 @@ class Task(BaseAction):
         'event',
         'args',
         'params',
-        'task_args'
+        'task_args',
+        'mutations'
     )
 
     def __init__(

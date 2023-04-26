@@ -1,8 +1,9 @@
 from __future__ import annotations
 import asyncio
 import inspect
+import traceback
 from collections import defaultdict
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Union
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.hooks.types.base.event_types import EventType
 from hedra.core.hooks.types.base.hook import Hook
@@ -38,6 +39,7 @@ class SetupEdge(BaseEdge[Setup]):
         ]
 
         self.provides = [
+            'setup_stage_experiment_config',
             'execute_stage_streamed_analytics',
             'execute_stage_setup_hooks',
             'execute_stage_setup_config',
@@ -99,21 +101,25 @@ class SetupEdge(BaseEdge[Setup]):
                 self.destination.context = SimpleContext()
 
             for execute_stage in setup_candidates.values():
-                execute_stage.state = StageStates.SETUP
 
-                if execute_stage.context is None:
-                    execute_stage.context = SimpleContext()
+                if execute_stage.name != self.destination.name:
+                    execute_stage.state = StageStates.SETUP
 
-                self._update(execute_stage)
+                    if execute_stage.context is None:
+                        execute_stage.context = SimpleContext()
+                    
+                    self._update(execute_stage)
 
             
             for optimize_stage in optimize_candidates.values():
-                optimize_stage.state = StageStates.SETUP
 
-                if optimize_stage.context is None:
-                    optimize_stage.context = SimpleContext()
+                if optimize_stage.name != self.destination.name:
+                    optimize_stage.state = StageStates.SETUP
 
-                self._update(optimize_stage)
+                    if optimize_stage.context is None:
+                        optimize_stage.context = SimpleContext()
+
+                    self._update(optimize_stage)
             
             self.visited.append(self.source.name)
 
@@ -142,6 +148,7 @@ class SetupEdge(BaseEdge[Setup]):
             ready_stages = self.edge_data.get('setup_stage_ready_stages', {})
             setup_candidates = self.edge_data.get('setup_stage_candidates', {})
             setup_config = self.edge_data.get('execute_stage_setup_config')
+            setup_stage_experiment_config: Dict[str, Union[str, int, List[float]]] = self.edge_data.get('setup_stage_experiment_config', {})
             execute_stage_setup_hooks = []
             setup_execute_stage: Execute = ready_stages.get(self.source.name)
 
@@ -151,6 +158,7 @@ class SetupEdge(BaseEdge[Setup]):
             self.stages_by_type[StageTypes.EXECUTE].update(ready_stages)
 
             self.next_history[(self.source.name, destination.name)].update({
+                'setup_stage_experiment_config': setup_stage_experiment_config,
                 'setup_stage_configs': setup_stage_configs,
                 'execute_stage_setup_hooks': execute_stage_setup_hooks,
                 'setup_stage_ready_stages': ready_stages,

@@ -84,10 +84,6 @@ class Experiment:
         variant = self.get_variant(stage_name)
 
         if variant.distribution:
-            return [
-                math.ceil(
-                    batch_size * dist_val
-                ) for dist_val in variant.distribution.generate()
-            ]
+            return variant.distribution.generate(batch_size)
 
         

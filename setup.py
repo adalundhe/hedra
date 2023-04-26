@@ -42,6 +42,7 @@ setup(
         "Operating System :: OS Independent"
     ],
     install_requires=[
+        'hyperframe',
         'aiologger',
         'yaspin',
         'attr',
@@ -95,6 +96,7 @@ setup(
             'cryptography==38.0.4',
             'aioquic',
             'dicttoxml',
+            'opentelemetry-api'
         ],
         'all-engines': [
             'grpcio',
@@ -103,7 +105,7 @@ setup(
             'playwright',
             'cryptography==38.0.4',
             'aioquic',
-
+            'opentelemetry-api'
         ],
         'all-reporters': [
             'azure-cosmos',
@@ -199,6 +201,9 @@ setup(
         ],
         'xml': [
             'dicttoxml'
+        ],
+        'opentelemetry': [
+            'opentelemetry-api'
         ]
     },
     python_requires='>=3.8'

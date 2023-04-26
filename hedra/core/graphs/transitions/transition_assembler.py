@@ -64,6 +64,7 @@ class TransitionAssembler:
         self.adjacency_list: Dict[str, List[Transition]] = defaultdict(list)
         self.execute_stages: List[Stage] = []
         self.streaming_submit_stages: List[Stage] = []
+        self.executors: List[BatchExecutor] = []
 
         self._graph_metadata_log_string = f'Graph - {self.graph_name}:{self.graph_id} - thread:{self._thread_id} - process:{self._process_id} - '
 
@@ -168,6 +169,7 @@ class TransitionAssembler:
                     self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Stage - {stage.name} - provisioned - {stage.workers} - workers')
 
                     stage.executor = BatchExecutor(stage.workers)
+                    self.executors.append(stage.executor)
 
                 else:
                     parallel_stages.append((
@@ -177,6 +179,7 @@ class TransitionAssembler:
             
             if len(parallel_stages) > 0:
                 batch_executor = BatchExecutor(max_workers=stage_pool_size)
+                self.executors.append(batch_executor)
 
                 batched_stages: List[Tuple[str, Stage, int]] = batch_executor.partion_stage_batches(parallel_stages)
                 
@@ -187,6 +190,7 @@ class TransitionAssembler:
 
                     stage.workers = assigned_workers_count
                     stage.executor = BatchExecutor(max_workers=assigned_workers_count)
+                    self.executors.append(stage.executor)
 
                     stages[stage.name] = stage
 

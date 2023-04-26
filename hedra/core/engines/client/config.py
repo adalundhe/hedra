@@ -1,6 +1,7 @@
 import psutil
-from typing import List
-from pydantic import BaseModel
+from typing import List, Union, Dict
+from hedra.core.experiments.mutations.types.base.mutation import Mutation
+from .tracing_config import TracingConfig
 from .time_parser import TimeParser
 
 
@@ -43,9 +44,16 @@ class Config:
         self.color_scheme = kwargs.get('color_scheme')
         self.group_size = kwargs.get('group_size')
         self.playwright_options = kwargs.get('playwright_options', {})
-        self.distribution: List[float] = None
+        self.experiment: Dict[str, Union[str, int, List[float]]] = kwargs.get('experiment', {})
+        self.tracing: Union[TracingConfig, None] = kwargs.get('tracing')
+        self.mutations: Union[List[Mutation], None] = kwargs.get('mutations', [])
 
     def copy(self):
+
+        trace = None
+        if self.tracing:
+            trace = self.tracing.copy()
+
         return Config(**{
             'total_time': self.total_time_string,
             'log_level': self.log_level,
@@ -71,5 +79,7 @@ class Config:
             'color_scheme': self.color_scheme,
             'group_size': self.group_size,
             'playwright_options': self.playwright_options,
-            'distribution': self.distribution
+            'experiment': self.experiment,
+            'trace': trace,
+            'mutations': self.mutations
         })

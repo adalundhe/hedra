@@ -12,12 +12,15 @@ from pathlib import Path
 from typing import List, TextIO
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
-from dicttoxml import dicttoxml
 from xml.dom.minidom import parseString
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric.metrics_set import MetricsSet
 from .xml_config import XMLConfig
 
+try:
+    from dicttoxml import dicttoxml
+except Exception:
+    dicttoxml = object
 
 collections.Iterable = collections.abc.Iterable
 
@@ -77,26 +80,28 @@ class XML:
             f'{filename}_{events_file_timestamp}.xml'
         )
 
-        self.events_file = await self._loop.run_in_executor(
-            self._executor,
-            functools.partial(
-                open,
-                self.events_filepath,
-                self.write_mode
-            )
-        )
+    async def submit_events(self, events: List[BaseProcessedResult]):
 
-        for signame in ('SIGINT', 'SIGTERM'):
-            self._loop.add_signal_handler(
-                getattr(signal, signame),
-                lambda signame=signame: handle_loop_stop(
-                    signame,
-                    self._executor,
-                    self._loop,
-                    self.events_file
+        if self.events_file is None:
+            self.events_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.events_filepath,
+                    self.write_mode
                 )
             )
-    async def submit_events(self, events: List[BaseProcessedResult]):
+
+            for signame in ('SIGINT', 'SIGTERM'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        self.events_file
+                    )
+                )
 
         events_xml = dicttoxml([
             event.to_dict() for event in events
@@ -271,10 +276,12 @@ class XML:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Error Metrics to file - {self.metrics_filepath}')
 
     async def close(self):
-        await self._loop.run_in_executor(
-            self._executor,
-            self.events_file.close
-        )
+
+        if self.events_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.events_file.close
+            )
 
         self._executor.shutdown()
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')

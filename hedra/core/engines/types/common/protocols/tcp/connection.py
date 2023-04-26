@@ -1,5 +1,6 @@
 import asyncio
 import socket
+import signal
 from asyncio.constants import SSL_HANDSHAKE_TIMEOUT
 from ssl import SSLContext
 from typing import Optional

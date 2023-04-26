@@ -145,7 +145,8 @@ class PlaywrightCommand:
         'metadata',
         'hooks',
         'event',
-        'command_args'
+        'command_args',
+        'mutations'
     )
     
     def __init__(self, 

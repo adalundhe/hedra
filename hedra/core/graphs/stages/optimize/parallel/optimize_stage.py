@@ -8,7 +8,7 @@ import pickle
 from collections import defaultdict
 from typing import Any, Dict, List, Union
 from hedra.core.engines.client.config import Config
-from hedra.core.graphs.stages.optimize.optimization import Optimizer
+from hedra.core.graphs.stages.optimize.optimization import Optimizer, DistributionFitOptimizer
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.setup.setup import Setup
 from hedra.core.hooks.types.base.event_graph import EventGraph
@@ -32,11 +32,13 @@ from hedra.core.graphs.stages.base.import_tools import (
     set_stage_hooks
 )
 from hedra.core.graphs.stages.optimize.optimization.algorithms import registered_algorithms
+from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from hedra.logging import (
     HedraLogger,
-    LoggerTypes,
-    logging_manager
+    LoggerTypes
 )
+from hedra.versioning.flags.types.base.active import active_flags
+from hedra.versioning.flags.types.base.flag_type import FlagTypes
 
 
 HooksByType = Dict[HookType, Union[List[ActionHook], List[TaskHook]]]
@@ -115,41 +117,11 @@ def optimize_stage(serialized_config: str):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
+    from hedra.logging import (
+        logging_manager
+    )
+
     try:
-        hedra_config_filepath = os.path.join(
-            os.getcwd(),
-            '.hedra.json'
-        )
-
-        hedra_config = {}
-        if os.path.exists(hedra_config_filepath):
-            with open(hedra_config_filepath, 'r') as hedra_config_file:
-                hedra_config = json.load(hedra_config_file)
-
-        logging_config = hedra_config.get('logging', {})
-        logfiles_directory = logging_config.get(
-            'logfiles_directory',
-            os.getcwd()
-        )
-
-        log_level = logging_config.get('log_level', 'info')
-
-        logging_manager.disable(
-            LoggerTypes.DISTRIBUTED,
-            LoggerTypes.DISTRIBUTED_FILESYSTEM
-        )
-
-        logging_manager.update_log_level(log_level)
-        logging_manager.logfiles_directory = logfiles_directory
-
-
-        logger = HedraLogger()
-        logger.initialize()
-        logger.filesystem.sync.create_logfile('hedra.core.log')
-        logger.filesystem.sync.create_logfile('hedra.optimize.log')
-
-        logger.filesystem.create_filelogger('hedra.core.log')
-        logger.filesystem.create_filelogger('hedra.optimize.log')
 
         thread_id = threading.current_thread().ident
         process_id = os.getpid()
@@ -159,17 +131,57 @@ def optimize_stage(serialized_config: str):
         graph_name: str = optimization_config.get('graph_name')
         graph_path: str= optimization_config.get('graph_path')
         graph_id: str = optimization_config.get('graph_id')
+        logfiles_directory = optimization_config.get('logfiles_directory')
+        log_level = optimization_config.get('log_level')
+        enable_unstable_features = optimization_config.get('enable_unstable_features', False)
+
+        active_flags[FlagTypes.UNSTABLE_FEATURE] = enable_unstable_features
+    
+        logfiles_directory = optimization_config.get('logfiles_directory')
+        log_level = optimization_config.get('log_level')
+
+        logging_manager.disable(
+            LoggerTypes.DISTRIBUTED,
+            LoggerTypes.DISTRIBUTED_FILESYSTEM
+        )
+
+        logging_manager.update_log_level(log_level)
+        logging_manager.logfiles_directory = logfiles_directory
+
+        logging_manager.disable(
+            LoggerTypes.DISTRIBUTED,
+            LoggerTypes.DISTRIBUTED_FILESYSTEM,
+            LoggerTypes.SPINNER
+        )
+
+        logging_manager.update_log_level(log_level)
+        logging_manager.logfiles_directory = logfiles_directory
+
+        logger = HedraLogger()
+        logger.initialize()
+        logger.filesystem.sync.create_logfile('hedra.core.log')
+        logger.filesystem.sync.create_logfile('hedra.optimize.log')
+
+        logger.filesystem.create_filelogger('hedra.core.log')
+        logger.filesystem.create_filelogger('hedra.optimize.log')
+            
         source_stage_name: str = optimization_config.get('source_stage_name')
         source_stage_id: str = optimization_config.get('source_stage_id')
         source_stage_context: Dict[str, Any] = optimization_config.get('source_stage_context')
+
+        setup_stage_experiment_config: Dict[str, List[float]] = optimization_config.get('setup_stage_experiment_config')
+        
         execute_stage_name: str = optimization_config.get('execute_stage_name')
         execute_stage_config: Config = optimization_config.get('execute_stage_config')
         execute_setup_stage_name: Config = optimization_config.get('execute_setup_stage_name')
         execute_stage_plugins: Dict[PluginType, List[str]] = optimization_config.get('execute_stage_plugins')
+        execute_stage_streamed_analytics: Dict[str, Dict[str, List[StreamAnalytics]]] = optimization_config.get('execute_stage_streamed_analytics')
+        
         optimizer_params: List[str] = optimization_config.get('optimizer_params')
         optimizer_iterations: int = optimization_config.get('optimizer_iterations')
         optimizer_algorithm: str = optimization_config.get('optimizer_algorithm')
         optimizer_feed_forward: bool = optimization_config.get('optimizer_feed_forward')
+        optimize_stage_workers: int = optimization_config.get('optimize_stage_workers')
         time_limit: int = optimization_config.get('time_limit')
         batch_size: int = optimization_config.get('execute_stage_batch_size')
 
@@ -221,7 +233,7 @@ def optimize_stage(serialized_config: str):
 
         stage_engine_plugins: List[str] = execute_stage_plugins[PluginType.ENGINE]
         engine_plugins: Dict[str, EnginePlugin] = plugins_by_type[PluginType.ENGINE]
-        
+
         for plugin_name in stage_persona_plugins:
             plugin = persona_plugins.get(plugin_name)
             plugin.name = plugin_name
@@ -257,50 +269,53 @@ def optimize_stage(serialized_config: str):
 
         logger.filesystem.sync['hedra.optimize'].info(f'{metadata_string} - Setting up Optimization')
 
-        optimizer = Optimizer({
-            'graph_name': graph_name,
-            'graph_id': graph_id,
-            'source_stage_name': source_stage_name,
-            'source_stage_id': source_stage_id,
-            'params': optimizer_params,
-            'stage_name': execute_stage_name,
-            'stage_config': execute_stage_config,
-            'stage_hooks': setup_execute_stage.hooks,
-            'feed_forward': optimizer_feed_forward,
-            'iterations': optimizer_iterations,
-            'algorithm': optimizer_algorithm,
-            'time_limit': time_limit
-        })
+        optimization_experiment_config = setup_stage_experiment_config.get(execute_stage_name)
+        if optimization_experiment_config and execute_stage_config.experiment.get('distribution'):
 
-        optimizer._event_loop = loop
+            execute_stage_config.experiment['distribution'] = [
+                int(distribution_value/optimize_stage_workers) for distribution_value in execute_stage_config.experiment.get('distribution')
+            ]
 
-        def handle_loop_stop(signame):
-            try:
-                optimizer._event_loop.stop()
-                optimizer._event_loop.close()
+            optimizer = DistributionFitOptimizer({
+                'graph_name': graph_name,
+                'graph_id': graph_id,
+                'source_stage_name': source_stage_name,
+                'source_stage_id': source_stage_id,
+                'params': optimizer_params,
+                'stage_name': execute_stage_name,
+                'stage_config': execute_stage_config,
+                'stage_hooks': setup_execute_stage.hooks,
+                'feed_forward': optimizer_feed_forward,
+                'iterations': optimizer_iterations,
+                'algorithm': optimizer_algorithm,
+                'time_limit': time_limit,
+                'distributions': optimization_experiment_config,
+                'stream_analytics': execute_stage_streamed_analytics
+            })
 
-            except BrokenPipeError:
-                pid = os.getpid()
-                os.kill(pid, signal.SIGKILL)
-                os._exit(1)
-                
-            except RuntimeError:
-                pid = os.getpid()
-                os.kill(pid, signal.SIGKILL)
-                os._exit(1)
+        else:
+            optimizer = Optimizer({
+                'graph_name': graph_name,
+                'graph_id': graph_id,
+                'source_stage_name': source_stage_name,
+                'source_stage_id': source_stage_id,
+                'params': optimizer_params,
+                'stage_name': execute_stage_name,
+                'stage_config': execute_stage_config,
+                'stage_hooks': setup_execute_stage.hooks,
+                'feed_forward': optimizer_feed_forward,
+                'iterations': optimizer_iterations,
+                'algorithm': optimizer_algorithm,
+                'time_limit': time_limit,
+                'distributions': setup_stage_experiment_config,
+                'stream_analytics': execute_stage_streamed_analytics
+            })
 
-        for signame in ('SIGINT', 'SIGTERM'):
-            loop.add_signal_handler(
-                getattr(signal, signame),
-                lambda signame=signame: handle_loop_stop(signame)
-            )
-
-            optimizer._event_loop.add_signal_handler(
-                getattr(signal, signame),
-                lambda signame=signame: handle_loop_stop(signame)
-            )
 
         results = optimizer.optimize()
+
+        if optimization_experiment_config:
+            execute_stage_config.experiment['distribution'] = results.get('optimized_distribution')
 
         execute_stage_config.batch_size = results.get('optimized_batch_size', execute_stage_config.batch_size)
         execute_stage_config.batch_interval = results.get('optimized_batch_interval', execute_stage_config.batch_gradient)
@@ -349,4 +364,5 @@ def optimize_stage(serialized_config: str):
         raise ProcessKilledError()
     
     except Exception as e:
+        print(traceback.format_exc())
         raise e

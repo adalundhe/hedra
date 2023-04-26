@@ -2,7 +2,7 @@ import asyncio
 import time
 import uuid
 from collections import deque
-from typing import Dict, Any, Union, Coroutine, TypeVar
+from typing import Dict, Any, Union, Coroutine, TypeVar, Optional
 from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
 from hedra.core.engines.types.common.timeouts import Timeouts
@@ -13,6 +13,11 @@ from hedra.core.engines.types.common.protocols.udp.quic_protocol import (
     FrameType,
     encode_frame
 )
+from hedra.core.engines.types.tracing.trace_session import (
+    TraceSession, 
+    Trace
+)
+
 from hedra.logging import HedraLogger
 from hedra.versioning.flags.types.unstable.flag import unstable
 from .connection import HTTP3Connection
@@ -38,10 +43,17 @@ class MercuryHTTP3Client(BaseEngine[Union[A, HTTP3Action], Union[R, HTTP3Result]
         'active',
         'waiter',
         'ssl_context',
-        'logger'
+        'logger',
+        'tracing_session'
     )
 
-    def __init__(self, concurrency: int=10**3, timeouts: Timeouts = Timeouts(), reset_connections: bool=False) -> None:
+    def __init__(
+        self, 
+        concurrency: int=10**3, 
+        timeouts: Timeouts = Timeouts(), 
+        reset_connections: bool=False,
+        tracing_session: Optional[TraceSession]=None
+    ) -> None:
         super().__init__()
 
         self.session_id = str(uuid.uuid4())
@@ -53,11 +65,12 @@ class MercuryHTTP3Client(BaseEngine[Union[A, HTTP3Action], Union[R, HTTP3Result]
 
         self.sem = asyncio.Semaphore(value=concurrency)
         self.pool = Pool(concurrency, reset_connections=reset_connections)
+        self.tracing_session: Union[TraceSession, None] = tracing_session
+        self.logger = HedraLogger()
+        self.logger.initialize()
         self.pool.create_pool()
         self.active = 0
         self.waiter = None
-        self.logger = HedraLogger()
-        self.logger.initialize()
 
         self.ssl_context = get_default_ssl_context()
 
@@ -133,15 +146,35 @@ class MercuryHTTP3Client(BaseEngine[Union[A, HTTP3Action], Union[R, HTTP3Result]
             raise e
 
     async def execute_prepared_request(self, action: HTTP3Action) -> Coroutine[Any, Any, HTTP3Result]:
+
+        trace: Union[Trace, None] = None
+        if self.tracing_session:
+            trace = self.tracing_session.create_trace()
+            await trace.on_request_start(action)
   
         response = HTTP3Result(action)
         response.wait_start = time.monotonic()
         self.active += 1
+
+        if trace and trace.on_connection_queued_start:
+            await trace.on_connection_queued_start(
+                trace.span,
+                action,
+                response
+            )
  
         async with self.sem:
-            connection = self.pool.connections.pop()
+
+            if trace and trace.on_connection_queued_end:
+                await trace.on_connection_queued_end(
+                    trace.span,
+                    action,
+                    response
+                )
             
             try:
+
+                connection = self.pool.connections.pop()
                 
                 if action.hooks.listen:
                     event = asyncio.Event()
@@ -154,6 +187,13 @@ class MercuryHTTP3Client(BaseEngine[Union[A, HTTP3Action], Union[R, HTTP3Result]
 
                 response.start = time.monotonic()
 
+                if trace and trace.on_connection_create_start:
+                    await trace.on_connection_create_start(
+                        trace.span,
+                        action,
+                        response
+                    )
+
                 await connection.make_connection(
                     action.url.ip_addr,
                     action.url.port,
@@ -163,6 +203,13 @@ class MercuryHTTP3Client(BaseEngine[Union[A, HTTP3Action], Union[R, HTTP3Result]
                 )
 
                 response.connect_end = time.monotonic()
+
+                if trace and trace.on_connection_create_end:
+                    await trace.on_connection_create_end(
+                        trace.span,
+                        action,
+                        response
+                    )
 
                 stream_id = connection.protocol._quic.get_next_available_stream_id()
                 
@@ -186,6 +233,7 @@ class MercuryHTTP3Client(BaseEngine[Union[A, HTTP3Action], Union[R, HTTP3Result]
                     stream.headers_send_state = HeadersState.AFTER_HEADERS
                 else:
                     stream.headers_send_state = HeadersState.AFTER_TRAILERS
+
                 connection.protocol._quic.send_stream_data(
                     stream_id, encode_frame(
                         FrameType.HEADERS, 
@@ -193,6 +241,13 @@ class MercuryHTTP3Client(BaseEngine[Union[A, HTTP3Action], Union[R, HTTP3Result]
                     ), 
                     not action.encoded_data
                 )
+
+                if trace and trace.on_request_headers_sent:
+                    await trace.on_request_headers_sent(
+                        trace.span,
+                        action,
+                        response
+                    )
 
                 if action.encoded_data:
                     stream = connection.protocol._get_or_create_stream(stream_id)
@@ -215,6 +270,13 @@ class MercuryHTTP3Client(BaseEngine[Union[A, HTTP3Action], Union[R, HTTP3Result]
 
                 response.write_end = time.monotonic()
 
+                if action.encoded_data and trace and trace.on_request_data_sent:
+                        await trace.on_request_data_sent(
+                            trace.span,
+                            action,
+                            response
+                        )
+
                 response_frames: ResponseFrameCollection = await asyncio.wait_for(
                     waiter,
                     timeout=self.timeouts.total_timeout
@@ -223,11 +285,26 @@ class MercuryHTTP3Client(BaseEngine[Union[A, HTTP3Action], Union[R, HTTP3Result]
                 headers: Dict[str, Union[bytes, int]] = {}
                 for header_key, header_value in response_frames.headers_frame.headers:
                     headers[header_key] = header_value
+
+                if trace and trace.on_response_headers_received:
+                    await trace.on_response_headers_received(
+                        trace.span,
+                        action,
+                        response
+                    )
                 
                 response.headers = headers
                 status = response.status
 
                 if status >= 300 and status < 400:
+
+                    if trace and trace.on_request_redirect:
+                        await trace.on_request_redirect(
+                            trace.span,
+                            action,
+                            response
+                        )
+                    
                     elapsed_time = 0
                     redirect_time_start = time.time()
 
@@ -326,8 +403,16 @@ class MercuryHTTP3Client(BaseEngine[Union[A, HTTP3Action], Union[R, HTTP3Result]
                         action.redirects -= redirect_number
                         elapsed_time = time.time() - redirect_time_start
 
-                response.headers = headers
                 response.complete = time.monotonic()
+
+                if trace and trace.on_response_data_received:
+                    await trace.on_response_data_received(
+                        trace.span,
+                        action,
+                        response
+                    )
+
+                response.headers = headers
                 self.pool.connections.append(connection)
 
                 if action.hooks.after:
@@ -357,6 +442,9 @@ class MercuryHTTP3Client(BaseEngine[Union[A, HTTP3Action], Union[R, HTTP3Result]
 
                 self.pool.connections.append(HTTP3Connection(reset_connection=self.pool.reset_connections))
 
+                if trace and trace.on_request_exception:
+                    await trace.on_request_exception(response)
+
             self.active -= 1
             if self.waiter and self.active <= self.pool.size:
 
@@ -366,6 +454,9 @@ class MercuryHTTP3Client(BaseEngine[Union[A, HTTP3Action], Union[R, HTTP3Result]
 
                 except asyncio.InvalidStateError:
                     self.waiter = None
+
+            if trace and trace.on_request_end:
+                await trace.on_request_end(response)
 
             return response
 

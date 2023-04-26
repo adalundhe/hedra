@@ -13,10 +13,19 @@ from .core.hooks import (
     transform,
 )
 
-from hedra.core.graphs.stages.optimize.optimization.parameters import Parameter
+from hedra.core.engines.client import TracingConfig
+from hedra.core.engines.types.tracing.trace import Trace
 from hedra.core.experiments import (
     Experiment,
     Variant
+)
+
+from hedra.core.experiments.mutations import (
+    DeformHeader,
+    InjectHeader,
+    InjectJunkData,
+    InjectPing,
+    SmuggleRequest
 )
 
 from .core.graphs.stages import (
@@ -27,7 +36,7 @@ from .core.graphs.stages import (
     Setup,
     Submit,
 )
-
+from hedra.core.graphs.stages.optimize.optimization.parameters import Parameter
 
 from .reporting import (
     AWSLambdaConfig,

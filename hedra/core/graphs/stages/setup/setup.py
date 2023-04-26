@@ -3,8 +3,11 @@ import psutil
 import traceback
 from collections import defaultdict
 from typing_extensions import TypeVarTuple, Unpack
-from typing import Dict, Generic, List, Any, Optional
+from typing import Dict, Generic, List, Any, Optional, Union
 from hedra.core.experiments.experiment import Experiment
+from hedra.core.engines.client.client import Client
+from hedra.core.engines.client.config import Config
+from hedra.core.engines.client.tracing_config import TracingConfig
 from hedra.core.hooks.types.condition.decorator import condition
 from hedra.core.hooks.types.context.decorator import context
 from hedra.core.hooks.types.event.decorator import event
@@ -12,8 +15,6 @@ from hedra.core.hooks.types.transform.decorator import transform
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.internal.decorator import Internal
-from hedra.core.engines.client.config import Config
-from hedra.core.engines.client.client import Client
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -57,9 +58,11 @@ class SetupCall:
             try:
 
                 self.hook.stage_instance.client._config = self.config
+                self.hook.stage_instance.client.set_mutations()
                 await self.hook.call()
 
             except Exception as setup_exception:
+
                 self.exception = setup_exception
 
                 self.error_traceback = str(traceback.format_exc())
@@ -97,6 +100,7 @@ class Setup(Stage, Generic[Unpack[T]]):
     geolocation: Geolocation=None
     permissions: List[str]=[]
     playwright_options: Dict[str, Any]={}
+    tracing: TracingConfig=None
 
     
     def __init__(self) -> None:
@@ -130,7 +134,8 @@ class Setup(Stage, Generic[Unpack[T]]):
             locale=self.locale,
             geolocation=self.geolocation,
             permissions=self.permissions,
-            playwright_options=self.playwright_options
+            playwright_options=self.playwright_options,
+            tracing=self.tracing
         )
 
         self.client = Client(
@@ -161,6 +166,8 @@ class Setup(Stage, Generic[Unpack[T]]):
             'apply_channels',
             'complete'
         ]
+
+        self.tracing = self.tracing
 
     @Internal()
     async def run(self):
@@ -194,6 +201,7 @@ class Setup(Stage, Generic[Unpack[T]]):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting setup')
         
         return {
+            'setup_stage_experiment_config': {},
             'setup_stage_target_stages_count': len(setup_stage_target_stages),
             'setup_stage_target_config': setup_stage_target_config,
             'setup_stage_target_stages': setup_stage_target_stages,
@@ -207,7 +215,8 @@ class Setup(Stage, Generic[Unpack[T]]):
         self, 
         setup_stage_target_stages: Dict[str, Stage]={},
         setup_stage_target_config: Config=None,
-        setup_stage_is_primary_thread: bool=True
+        setup_stage_is_primary_thread: bool=True,
+        setup_stage_experiment_config: Dict[str, Union[str, int, List[float]]]={},
     ):
         execute_stage_names = ', '.join(list(setup_stage_target_stages.keys()))
 
@@ -247,29 +256,68 @@ class Setup(Stage, Generic[Unpack[T]]):
 
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Engine plugin - {plugin.name} - for Execute stage - {execute_stage_name}')
 
+            existing_stage_config = setup_stage_configs.get(execute_stage_name)
+            if existing_stage_config:
+                return {
+                    'setup_stage_configs': setup_stage_configs,
+                    'setup_stage_target_stages': setup_stage_target_stages,
+                    'setup_stage_experiment_config': setup_stage_experiment_config
+                }
+
             config_copy = setup_stage_target_config.copy()
 
-            if self.experiment and self.experiment.is_variant(execute_stage_name) and setup_stage_is_primary_thread:
-                config_copy.batch_size = self.experiment.get_variant_batch_size(
-                    execute_stage_name
-                )
+            if self.tracing:
+                config_copy.tracing = self.tracing
 
-                distribution = self.experiment.calculate_distribution(
-                    execute_stage_name,
-                    config_copy.batch_size
-                )
+            if self.experiment and self.experiment.is_variant(execute_stage_name):
 
-                if distribution is not None:
-                    config_copy.distribution = distribution
-                    config_copy.persona_type = self.persona_types['approx-dist']
 
+                variant = self.experiment.get_variant(execute_stage_name)
+
+                experiment = {
+                    'experiment_name': self.experiment.experiment_name,
+                    'weight': variant.weight,
+                }
+
+                if setup_stage_is_primary_thread:
+                    config_copy.batch_size = self.experiment.get_variant_batch_size(
+                        execute_stage_name
+                    )
+
+                    distribution = self.experiment.calculate_distribution(
+                        execute_stage_name,
+                        config_copy.batch_size
+                    )
+
+                    if distribution is not None:
+
+
+                        experiment.update({
+                            'distribution_type': variant.distribution.selected_distribution,
+                            'distribution': distribution,
+                            'intervals': variant.intervals,
+                            'interval_duration': round(
+                                config_copy.total_time/(variant.intervals - 1)
+                                , 
+                                2
+                            )
+                        })
+
+                        config_copy.experiment = experiment
+                        config_copy.persona_type = self.persona_types['approx-dist']
+
+                if variant.mutations:
+                    config_copy.mutations = variant.get_mutations()
+
+                setup_stage_experiment_config[execute_stage_name] = experiment
 
             setup_stage_configs[execute_stage_name] = config_copy
             setup_stage_target_stages[execute_stage_name] = execute_stage
 
         return  {
             'setup_stage_configs': setup_stage_configs,
-            'setup_stage_target_stages': setup_stage_target_stages
+            'setup_stage_target_stages': setup_stage_target_stages,
+            'setup_stage_experiment_config': setup_stage_experiment_config
         }
 
     @event('configure_target_stages')
@@ -315,7 +363,7 @@ class Setup(Stage, Generic[Unpack[T]]):
                 config_copy = setup_stage_configs.get(
                     hook.stage
                 )
-
+                
                 hook.stage_instance.client._config = config_copy
 
                 execute_stage_name = hook.stage_instance.name
@@ -431,14 +479,22 @@ class Setup(Stage, Generic[Unpack[T]]):
         self,
         setup_stage_tasks: TaskHook=None,
         setup_stage_has_tasks: bool=False,
-        setup_stage_target_config: Config=None
+        setup_stage_configs: Dict[str, Config] = {},
     ):
         if setup_stage_has_tasks and isinstance(setup_stage_tasks, TaskHook):
             hook = setup_stage_tasks
             execute_stage: Stage = hook.stage_instance
             execute_stage.client.next_name = hook.name
             execute_stage.client.intercept = True
-            execute_stage_name = execute_stage.name
+
+            config_copy = setup_stage_configs.get(
+                hook.stage
+            )
+                
+            execute_stage.client._config = config_copy
+            execute_stage.client.set_mutations()
+
+            execute_stage_name = hook.stage_instance.name
 
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Loading Task hook - {hook.name}:{hook.hook_id} - to Execute stage - {execute_stage_name}')
 
@@ -450,7 +506,7 @@ class Setup(Stage, Generic[Unpack[T]]):
                 tags=hook.metadata.tags
             )
             
-            await session.set_pool(setup_stage_target_config.batch_size)
+            await session.set_pool(config_copy.batch_size)
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved task and session for Task - {hook.name}:{task.action_id} - Execute stage - {execute_stage_name}')
 
@@ -488,7 +544,8 @@ class Setup(Stage, Generic[Unpack[T]]):
         setup_stage_target_stages: Dict[str, Stage]=[],
         setup_stage_actions: List[ActionHook]=[],
         setup_stage_tasks: List[TaskHook]=[],
-        setup_stage_target_config: Config=None
+        setup_stage_target_config: Config=None,
+        setup_stage_experiment_config: Dict[str, Union[str, int, List[float]]]={},
     ):
         actions_by_stage = defaultdict(list)
         tasks_by_stage = defaultdict(list)
@@ -527,6 +584,7 @@ class Setup(Stage, Generic[Unpack[T]]):
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Generated - {tasks_generated_count} - Tasks for Execute stage - {execute_stage.name}')
 
         return {
+            'setup_stage_experiment_config': setup_stage_experiment_config,
             'setup_stage_configs': setup_stage_configs,
             'execute_stage_setup_by': self.name,
             'execute_stage_setup_hooks': execute_stage_setup_hooks,

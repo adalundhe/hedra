@@ -29,7 +29,6 @@ class BaseEvent(Generic[T]):
 
     def __init__(self, target: Hook, source: Hook) -> None:
         
-        target.is_event = True
         self.target = target
         self.target_is_event = False
 

@@ -2,7 +2,8 @@ import asyncio
 import math
 import multiprocessing
 import psutil
-from multiprocessing import current_process, active_children
+import warnings
+from multiprocessing import active_children
 from types import FunctionType
 from concurrent.futures.process import BrokenProcessPool
 from concurrent.futures import ProcessPoolExecutor
@@ -17,7 +18,7 @@ class BatchExecutor:
     def __init__(
         self, 
         max_workers: int = psutil.cpu_count(logical=False),
-        start_method: str=multiprocessing.get_start_method()
+        start_method: str='spawn'
     ) -> None:
         self.max_workers = max_workers
         self.loop = asyncio.get_event_loop()
@@ -165,8 +166,20 @@ class BatchExecutor:
         return batches
 
     async def shutdown(self):
-        self.pool.shutdown()
 
-        child_processes = active_children()
-        for child in child_processes:
-            child.kill()
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            self.pool.shutdown()
+
+            child_processes = active_children()
+            for child in child_processes:
+                child.kill()
+
+    def close(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            self.pool.shutdown()
+
+            child_processes = active_children()
+            for child in child_processes:
+                child.kill()

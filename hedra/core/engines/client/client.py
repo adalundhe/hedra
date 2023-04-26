@@ -2,9 +2,10 @@ import uuid
 import threading
 import os
 from asyncio import Future
-from typing import Dict, Generic, Iterable, Union
+from typing import Dict, Generic, Iterable, Union, Optional
 from typing_extensions import TypeVarTuple, Unpack
 from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core.experiments.mutations.types.base.mutation import Mutation
 from .store import ActionsStore
 from .config import Config
 from .client_types import  (
@@ -35,7 +36,8 @@ class Client(Generic[Unpack[T]]):
         graph_name: str,
         graph_id: str,
         stage_name: str,
-        stage_id: str
+        stage_id: str,
+        config: Optional[Config]=None
     ) -> None:
 
         self.client_id = str(uuid.uuid4())
@@ -47,7 +49,7 @@ class Client(Generic[Unpack[T]]):
         self.next_name = None
         self.intercept = False
 
-        self._config: Config = None
+        self._config: Config = config
         self._http = HTTPClient
         self._http2 = HTTP2Client
         self._http3 = HTTP3Client
@@ -63,6 +65,7 @@ class Client(Generic[Unpack[T]]):
         self._plugin = PluginsStore[Unpack[T]](self.metadata_string)
 
         self.actions = ActionsStore(self.metadata_string)
+        self.mutations: Dict[str, Mutation] = {}
 
     def __getitem__(self, key: str):
         return self.clients.get(key)
@@ -75,6 +78,12 @@ class Client(Generic[Unpack[T]]):
             if session.waiter:
                 yield session.waiter
 
+    def set_mutations(self):
+        if self._config.mutations:
+            for mutation in self._config.mutations:
+                for target in mutation.targets:
+                    self.mutations[target] = mutation
+                    
     @property
     def thread_id(self) -> int:
         return threading.current_thread().ident
@@ -97,6 +106,9 @@ class Client(Generic[Unpack[T]]):
         self._plugin.intercept = self.intercept
         self._plugin.next_name = self.next_name
 
+        self._plugin.mutations.update(self.mutations)
+        self.mutations.update(self._plugin.mutations)
+
         return self._plugin
 
     @property
@@ -106,6 +118,9 @@ class Client(Generic[Unpack[T]]):
             self._http.metadata_string = self.metadata_string
             self._http.actions = self.actions
             self.clients[RequestTypes.HTTP] = self._http
+
+            self._http.mutations.update(self.mutations)
+            self.mutations.update(self._http.mutations)
 
         self._http.next_name = self.next_name
         self._http.intercept = self.intercept
@@ -118,7 +133,10 @@ class Client(Generic[Unpack[T]]):
             self._http2.metadata_string = self.metadata_string
             self._http2.actions = self.actions
             self.clients[RequestTypes.HTTP2] = self._http2
-       
+
+            self._http.mutations.update(self.mutations)
+            self.mutations.update(self._http2.mutations)
+
         self._http2.next_name = self.next_name
         self._http2.intercept = self.intercept
         return self._http2
@@ -130,6 +148,9 @@ class Client(Generic[Unpack[T]]):
             self._http3.metadata_string = self.metadata_string
             self._http3.actions = self.actions
             self.clients[RequestTypes.HTTP3] = self._http3
+
+            self._http3.mutations.update(self.mutations)
+            self.mutations.update(self._http3.mutations)
        
         self._http3.next_name = self.next_name
         self._http3.intercept = self.intercept
@@ -143,6 +164,9 @@ class Client(Generic[Unpack[T]]):
             self._grpc.actions = self.actions
             self.clients[RequestTypes.GRPC] = self._grpc
 
+            self._grpc.mutations.update(self.mutations)
+            self.mutations.update(self._grpc.mutations)
+
         self._grpc.next_name = self.next_name
         self._grpc.intercept = self.intercept
         return self._grpc
@@ -154,6 +178,9 @@ class Client(Generic[Unpack[T]]):
             self._graphql.metadata_string = self.metadata_string
             self._graphql.actions = self.actions
             self.clients[RequestTypes.GRAPHQL] = self._graphql
+
+            self._graphql.mutations.update(self.mutations)
+            self.mutations.update(self._graphql.mutations)
 
         self._graphql.next_name = self.next_name
         self._graphql.intercept = self.intercept
@@ -171,6 +198,9 @@ class Client(Generic[Unpack[T]]):
             self._graphqlh2.actions = self.actions
             self.clients[RequestTypes.GRAPHQL_HTTP2] = self._graphqlh2
 
+            self._graphqlh2.mutations.update(self.mutations)
+            self.mutations.update(self._graphqlh2.mutations)
+
         self._graphqlh2.next_name = self.next_name
         self._graphqlh2.intercept = self.intercept
         return self._graphql
@@ -182,6 +212,9 @@ class Client(Generic[Unpack[T]]):
             self._websocket.metadata_string = self.metadata_string
             self._websocket.actions = self.actions
             self.clients[RequestTypes.WEBSOCKET] = self._websocket
+
+            self._websocket.mutations.update(self.mutations)
+            self.mutations.update(self._websocket.mutations)
 
         self._websocket.next_name = self.next_name
         self._websocket.intercept = self.intercept
@@ -195,6 +228,9 @@ class Client(Generic[Unpack[T]]):
             self._playwright.actions = self.actions
             self.clients[RequestTypes.PLAYWRIGHT] = self._playwright
 
+            self._playwright.mutations.update(self.mutations)
+            self.mutations.update(self._playwright.mutations)
+
         self._playwright.next_name = self.next_name
         self._playwright.intercept = self.intercept
         return self._playwright
@@ -207,6 +243,9 @@ class Client(Generic[Unpack[T]]):
             self._udp.actions = self.actions
             self.clients[RequestTypes.UDP] = self._udp
 
+            self._udp.mutations.update(self.mutations)
+            self.mutations.update(self._udp.mutations)
+
         self._udp.next_name = self.next_name
         self._udp.intercept = self.intercept
         return self._udp
@@ -218,6 +257,9 @@ class Client(Generic[Unpack[T]]):
             self._task = self._task(self._config)
             self._task.metadata_string = self.metadata_string
             self.clients[RequestTypes.TASK] = self._task
+            
+            self._task.mutations.update(self.mutations)
+            self.mutations.update(self._task.mutations)
 
         self._task.next_name = self.next_name
         return self._task

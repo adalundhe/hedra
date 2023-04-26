@@ -15,6 +15,7 @@ from hedra.core.graphs.stages.analyze.analyze import Analyze
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from hedra.reporting.reporter import ReporterConfig
 
 
@@ -36,6 +37,7 @@ class ExecuteEdge(BaseEdge[Execute]):
             'setup_stage_configs',
             'setup_stage_ready_stages',
             'setup_stage_candidates',
+            'setup_stage_experiment_config',
             'execute_stage_setup_config',
             'execute_stage_setup_by',
             'execute_stage_setup_hooks',
@@ -45,6 +47,7 @@ class ExecuteEdge(BaseEdge[Execute]):
 
         self.provides = [
             'setup_stage_configs',
+            'setup_stage_experiment_config',
             'execute_stage_results',
             'execute_stage_setup_hooks',
             'execute_stage_setup_config',
@@ -246,12 +249,13 @@ class ExecuteEdge(BaseEdge[Execute]):
         execute_stage_setup_by: str = None
         setup_stage_ready_stages: List[Stage] = []
         setup_stage_candidates: List[Stage] = []
-        execute_stage_streamed_analytics = []
+        execute_stage_streamed_analytics: Dict[str, List[StreamAnalytics]] = defaultdict(list)
 
         for source_stage, destination_stage in self.history:
+            
+            previous_history: Dict[str, Any]  = self.history[(source_stage, destination_stage)]
 
             if destination_stage == self.source.name:
-                previous_history = self.history[(source_stage, self.source.name)]
 
                 setup_stage_configs: Dict[str, Config] = previous_history['setup_stage_configs']
 
@@ -286,9 +290,10 @@ class ExecuteEdge(BaseEdge[Execute]):
                     if stage_candidate not in setup_stage_candidates:
                         setup_stage_candidates.append(stage_candidate)
 
-                execute_stage_streamed_analytics.extend(
-                    previous_history.get('execute_stage_streamed_analytics', [])
-                )
+            streamed_analytics = previous_history.get('execute_stage_streamed_analytics')
+
+            if streamed_analytics:
+                execute_stage_streamed_analytics[source_stage].extend(streamed_analytics)
 
         stream_configs = self.source.context.get('execute_stage_stream_configs')
         if stream_configs:

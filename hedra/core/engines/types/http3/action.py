@@ -44,7 +44,6 @@ class HTTP3Action(HTTPAction):
 
         self.redirects = redirects
         self.hooks: Hooks[HTTP3Action] = Hooks()
-
     
     def _setup_headers(self) -> Union[bytes, Dict[str, str]]:
 

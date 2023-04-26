@@ -14,3 +14,5 @@ class TransformHookValidator(BaseModel):
     @validator('names')
     def validate_names(cls, vals):
         assert len(vals) == len(set(vals))
+
+        return vals
