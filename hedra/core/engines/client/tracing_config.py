@@ -40,7 +40,10 @@ class TracingConfig:
         on_dns_resolve_host_start: Optional[TraceSignal]=None,
         on_dns_resolve_host_end: Optional[TraceSignal]=None,
         on_dns_cache_hit: Optional[TraceSignal]=None,
-        on_dns_cache_miss: Optional[TraceSignal]=None
+        on_dns_cache_miss: Optional[TraceSignal]=None,
+        on_task_start: Optional[TraceSignal]=None,
+        on_task_end: Optional[TraceSignal]=None,
+        on_task_error: Optional[TraceSignal]=None
     ) -> None:
 
         if url_filter is None:
@@ -69,6 +72,10 @@ class TracingConfig:
         self.on_dns_cache_hit: TraceSignal = on_dns_cache_hit
         self.on_dns_cache_miss: TraceSignal = on_dns_cache_miss
 
+        self.on_task_start = on_task_start
+        self.on_task_end = on_task_end
+        self.on_task_error = on_task_error
+
     def copy(self) -> TracingConfig:
         return TracingConfig(
             url_filter=self.url_filter,
@@ -90,6 +97,9 @@ class TracingConfig:
             on_dns_resolve_host_end=self.on_dns_resolve_host_end,
             on_dns_cache_hit=self.on_dns_cache_hit,
             on_dns_cache_miss=self.on_dns_cache_miss,
+            on_task_start=self.on_task_start,
+            on_task_end=self.on_task_end,
+            on_task_error=self.on_task_error,
         )
     
     def to_dict(self) -> Dict[str, OpenTelemetryTracingConfig]:
@@ -113,4 +123,7 @@ class TracingConfig:
             'on_dns_resolve_host_end': self.on_dns_resolve_host_end,
             'on_dns_cache_hit': self.on_dns_cache_hit,
             'on_dns_cache_miss': self.on_dns_cache_miss,
+            'on_task_start': self.on_task_start,
+            'on_task_end': self.on_task_end,
+            'on_task_error': self.on_task_error,
         }

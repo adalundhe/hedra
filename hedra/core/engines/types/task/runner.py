@@ -1,13 +1,18 @@
 import asyncio
 import time
 import uuid
+import traceback
 from typing import Dict, Union, Coroutine, Any, Optional
 from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.concurrency import Semaphore
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.core.hooks.types.base.simple_context import SimpleContext
-from hedra.core.engines.types.tracing.trace_session import TraceSession
+from hedra.core.engines.types.tracing.trace_session import (
+    TraceSession, 
+    Trace
+)
+
 from .task import Task
 from .result import TaskResult
 
@@ -73,13 +78,32 @@ class MercuryTaskRunner(BaseEngine[Task, Union[BaseResult, TaskResult]]):
 
     async def execute_prepared_request(self, task: Task) -> Coroutine[Any, Any, Union[BaseResult, TaskResult]]:
 
+        trace: Union[Trace, None] = None
+        if self.tracing_session:
+            trace = self.tracing_session.create_trace()
+            await trace.on_request_start(task)
+
         result = None
         wait_start = time.monotonic()
         self.active += 1
 
+        if trace and trace.on_connection_queued_start:
+            await trace.on_connection_queued_start(
+                trace.span,
+                task,
+                result
+            )
+
         start = 0
  
         async with self.sem:
+
+            if trace and trace.on_connection_queued_end:
+                await trace.on_connection_queued_end(
+                    trace.span,
+                    task,
+                    result
+                )
             
             try:
 
@@ -92,6 +116,13 @@ class MercuryTaskRunner(BaseEngine[Task, Union[BaseResult, TaskResult]]):
                     task = await self.execute_before(task)
 
                 start = time.monotonic()
+
+                if trace and trace.on_task_start:
+                    await trace.on_task_start(
+                        trace.span,
+                        task,
+                        result
+                    )
 
                 result: BaseResult = await task.execute(**{
                     name: value for name, value in task.task_args.items() if name in task.params
@@ -124,6 +155,13 @@ class MercuryTaskRunner(BaseEngine[Task, Union[BaseResult, TaskResult]]):
                 result.complete = time.monotonic()
                 result.error = str(e)
 
+                if trace and trace.on_task_error:
+                    await trace.on_task_error(
+                        trace.span,
+                        task,
+                        result
+                    )
+
             self.active -= 1
             if self.waiter and self.active <= self.concurrency:
 
@@ -133,6 +171,13 @@ class MercuryTaskRunner(BaseEngine[Task, Union[BaseResult, TaskResult]]):
 
                 except asyncio.InvalidStateError:
                     self.waiter = None
+
+            if trace and trace.on_task_end:
+                await trace.on_task_end(
+                    trace.span,
+                    task,
+                    result
+                )
 
             return result
 

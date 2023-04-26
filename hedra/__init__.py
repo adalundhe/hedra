@@ -14,6 +14,7 @@ from .core.hooks import (
 )
 
 from hedra.core.engines.client import TracingConfig
+from hedra.core.engines.types.tracing.trace import Trace
 from hedra.core.experiments import (
     Experiment,
     Variant

@@ -8,7 +8,10 @@ from hedra.core.engines.types.http3 import(
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.client.store import ActionsStore
-from hedra.core.engines.types.tracing.trace_session import TraceSession
+from hedra.core.engines.types.tracing.trace_session import (
+    TraceSession, 
+    Trace
+)
 from hedra.logging import HedraLogger
 from .base_client import BaseClient
 
@@ -54,8 +57,13 @@ class HTTP3Client(BaseClient[MercuryHTTP3Client, HTTP3Action, HTTP3Result]):
         headers: Dict[str, str] = {}, 
         user: str = None,
         tags: List[Dict[str, str]] = [],
-        redirects: int=3
+        redirects: int=3,
+        trace: Trace=None
     ):
+        if trace and self.session.tracing_session is None:
+            self.session.tracing_session = TraceSession(
+                **trace.to_dict()
+            )
 
         request = HTTP3Action(
             self.next_name,
@@ -77,8 +85,13 @@ class HTTP3Client(BaseClient[MercuryHTTP3Client, HTTP3Action, HTTP3Result]):
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
         tags: List[Dict[str, str]] = [],
-        redirects: int=3
+        redirects: int=3,
+        trace: Trace=None
     ):
+        if trace and self.session.tracing_session is None:
+            self.session.tracing_session = TraceSession(
+                **trace.to_dict()
+            )
 
         request = HTTP3Action(
             self.next_name,
@@ -100,8 +113,13 @@ class HTTP3Client(BaseClient[MercuryHTTP3Client, HTTP3Action, HTTP3Result]):
         headers: Dict[str, str] = {}, 
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
-        tags: List[Dict[str, str]] = []
+        tags: List[Dict[str, str]] = [],
+        trace: Trace=None
     ):
+        if trace and self.session.tracing_session is None:
+            self.session.tracing_session = TraceSession(
+                **trace.to_dict()
+            )
 
         request = HTTP3Action(
             self.next_name,
@@ -123,8 +141,13 @@ class HTTP3Client(BaseClient[MercuryHTTP3Client, HTTP3Action, HTTP3Result]):
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
         tags: List[Dict[str, str]] = [],
-        redirects: int=3
+        redirects: int=3,
+        trace: Trace=None
     ):
+        if trace and self.session.tracing_session is None:
+            self.session.tracing_session = TraceSession(
+                **trace.to_dict()
+            )
 
         request = HTTP3Action(
             self.next_name,
@@ -146,8 +169,13 @@ class HTTP3Client(BaseClient[MercuryHTTP3Client, HTTP3Action, HTTP3Result]):
         headers: Dict[str, str] = {}, 
         user: str = None,
         tags: List[Dict[str, str]] = [],
-        redirects: int=3
+        redirects: int=3,
+        trace: Trace=None
     ):
+        if trace and self.session.tracing_session is None:
+            self.session.tracing_session = TraceSession(
+                **trace.to_dict()
+            )
 
         request = HTTP3Action(
             self.next_name,

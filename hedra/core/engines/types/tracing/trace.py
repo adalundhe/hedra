@@ -9,6 +9,8 @@ from .tracing_types import (
     TraceSignal,
     UrlFilter
 )
+from .url_filters import default_params_strip_filter
+
 
 def skip_import(*args, **kwargs):
     pass
@@ -44,6 +46,13 @@ except ImportError:
 __name__ = 'hedra'
 __version__ = "0.7.12"
 
+OpenTelemetryTracingConfig = Union[
+    UrlFilter,
+    RequestHook,
+    ResponseHook,
+    TraceSignal
+]
+
 
 @unstable
 class Trace:
@@ -73,7 +82,9 @@ class Trace:
         'on_dns_resolve_host_end',
         'on_dns_cache_hit',
         'on_dns_cache_miss',
-        '_trace_config',
+        'on_task_start',
+        'on_task_end',
+        'on_task_error',
         '_context_active'
     )
 
@@ -82,8 +93,27 @@ class Trace:
         url_filter: Optional[UrlFilter]=None,
         request_hook: Optional[RequestHook]=None,
         response_hook: Optional[ResponseHook]=None,
-        **kwargs: Dict[str, TraceSignal]
+        on_request_headers_sent: Optional[TraceSignal]=None,
+        on_request_data_sent: Optional[TraceSignal]=None,
+        on_request_chunk_sent: Optional[TraceSignal]=None,
+        on_response_headers_received: Optional[TraceSignal]=None,
+        on_response_data_received: Optional[TraceSignal]=None,
+        on_response_chunk_received: Optional[TraceSignal]=None,
+        on_request_redirect: Optional[TraceSignal]=None,
+        on_connection_queued_start: Optional[TraceSignal]=None,
+        on_connection_queued_end: Optional[TraceSignal]=None,
+        on_connection_create_start: Optional[TraceSignal]=None,
+        on_connection_create_end: Optional[TraceSignal]=None,
+        on_connection_reuse_connection: Optional[TraceSignal]=None,
+        on_dns_resolve_host_start: Optional[TraceSignal]=None,
+        on_dns_resolve_host_end: Optional[TraceSignal]=None,
+        on_dns_cache_hit: Optional[TraceSignal]=None,
+        on_dns_cache_miss: Optional[TraceSignal]=None,
+        on_task_start: Optional[TraceSignal]=None,
+        on_task_end: Optional[TraceSignal]=None,
+        on_task_error: Optional[TraceSignal]=None
     ) -> None:
+    
     
         
         self.allowed_traces = [
@@ -103,33 +133,41 @@ class Trace:
             'on_dns_resolve_host_end',
             'on_dns_cache_hit',
             'on_dns_cache_miss',
+            'on_task_start',
+            'on_task_end',
+            'on_task_error'
         ]
+
+        if url_filter is None:
+            url_filter = default_params_strip_filter
 
         self.url_filter = url_filter
 
         self.request_hook: Union[RequestHook, None] = request_hook
         self.response_hook: Union[RequestHook, None] = response_hook
 
-        self.on_request_headers_sent: TraceSignal = kwargs.get('on_request_headers_sent')
-        self.on_request_data_sent: TraceSignal = kwargs.get('on_request_data_sent')
-        self.on_request_chunk_sent: TraceSignal = kwargs.get('on_request_chunk_sent')
-        self.on_response_headers_received: TraceSignal = kwargs.get('on_response_headers_received')
-        self.on_response_data_received: TraceSignal = kwargs.get('on_response_data_received')
-        self.on_response_chunk_received: TraceSignal = kwargs.get('on_response_chunk_received')
-        self.on_request_redirect: TraceSignal = kwargs.get('on_request_redirect')
+        self.on_request_headers_sent: TraceSignal = on_request_headers_sent
+        self.on_request_data_sent: TraceSignal = on_request_data_sent
+        self.on_request_chunk_sent: TraceSignal = on_request_chunk_sent
+        self.on_request_redirect: TraceSignal = on_request_redirect
+        self.on_response_headers_received = on_response_headers_received
+        self.on_response_data_received = on_response_data_received
+        self.on_response_chunk_received: TraceSignal = on_response_chunk_received
 
-        self.on_connection_queued_start: TraceSignal = kwargs.get('on_connection_queued_start')
-        self.on_connection_queued_end: TraceSignal = kwargs.get('on_connection_queued_end')
-        self.on_connection_create_start: TraceSignal = kwargs.get('on_connection_create_start')
-        self.on_connection_create_end: TraceSignal = kwargs.get('on_connection_create_end')
-        self.on_connection_reuse_connection: TraceSignal = kwargs.get('on_connection_reuse_connection')
+        self.on_connection_queued_start: TraceSignal = on_connection_queued_start
+        self.on_connection_queued_end: TraceSignal = on_connection_queued_end
+        self.on_connection_create_start: TraceSignal = on_connection_create_start
+        self.on_connection_create_end: TraceSignal = on_connection_create_end
+        self.on_connection_reuse_connection: TraceSignal = on_connection_reuse_connection
 
-        self.on_dns_resolve_host_start: TraceSignal = kwargs.get('on_dns_resolve_host_start')
-        self.on_dns_resolve_host_end: TraceSignal = kwargs.get('on_dns_resolve_host_end')
-        self.on_dns_cache_hit: TraceSignal = kwargs.get('on_dns_cache_hit')
-        self.on_dns_cache_miss: TraceSignal = kwargs.get('on_dns_cache_miss')
+        self.on_dns_resolve_host_start: TraceSignal = on_dns_resolve_host_start
+        self.on_dns_resolve_host_end: TraceSignal = on_dns_resolve_host_end
+        self.on_dns_cache_hit: TraceSignal = on_dns_cache_hit
+        self.on_dns_cache_miss: TraceSignal = on_dns_cache_miss
 
-        self._trace_config= kwargs
+        self.on_task_start = on_task_start
+        self.on_task_end = on_task_end
+        self.on_task_error = on_task_error
 
         self.tracer = get_tracer(__name__, __version__, None)
         self.span: Span = None
@@ -143,9 +181,55 @@ class Trace:
         return Trace(
             tracer=self.tracer,
             url_filter=self.url_filter,
-            **self._trace_config,
+            request_hook=self.request_hook,
+            response_hook=self.response_hook,
+            on_request_headers_sent=self.on_request_chunk_sent,
+            on_request_data_sent=self.on_request_data_sent,
+            on_request_chunk_sent=self.on_request_chunk_sent,
+            on_request_redirect=self.on_request_redirect,
+            on_response_headers_received=self.on_response_headers_received,
+            on_response_data_received=self.on_response_data_received,
+            on_response_chunk_received=self.on_response_chunk_received,
+            on_connection_queued_start=self.on_connection_queued_start,
+            on_connection_queued_end=self.on_connection_queued_end,
+            on_connection_create_start=self.on_connection_create_start,
+            on_connection_create_end=self.on_connection_create_end,
+            on_connection_reuse_connection=self.on_connection_reuse_connection,
+            on_dns_resolve_host_start=self.on_dns_resolve_host_start,
+            on_dns_resolve_host_end=self.on_dns_resolve_host_end,
+            on_dns_cache_hit=self.on_dns_cache_hit,
+            on_dns_cache_miss=self.on_dns_cache_miss,
+            on_task_start=self.on_task_start,
+            on_task_end=self.on_task_end,
+            on_task_error=self.on_task_error,
             **kwargs
         )
+    
+    def to_dict(self) -> Dict[str, OpenTelemetryTracingConfig]:
+        return {
+            'url_filter': self.url_filter,
+            'request_hook': self.request_hook,
+            'response_hook': self.response_hook,
+            'on_request_headers_sent': self.on_request_chunk_sent,
+            'on_request_data_sent': self.on_request_data_sent,
+            'on_request_chunk_sent': self.on_request_chunk_sent,
+            'on_request_redirect': self.on_request_redirect,
+            'on_response_headers_received': self.on_response_headers_received,
+            'on_response_data_received': self.on_response_data_received,
+            'on_response_chunk_received': self.on_response_chunk_received,
+            'on_connection_queued_start': self.on_connection_queued_start,
+            'on_connection_queued_end': self.on_connection_queued_end,
+            'on_connection_create_start': self.on_connection_create_start,
+            'on_connection_create_end': self.on_connection_create_end,
+            'on_connection_reuse_connection': self.on_connection_reuse_connection,
+            'on_dns_resolve_host_start': self.on_dns_resolve_host_start,
+            'on_dns_resolve_host_end': self.on_dns_resolve_host_end,
+            'on_dns_cache_hit': self.on_dns_cache_hit,
+            'on_dns_cache_miss': self.on_dns_cache_miss,
+            'on_task_start': self.on_task_start,
+            'on_task_end': self.on_task_end,
+            'on_task_error': self.on_task_error,
+        }
     
     def add_trace(self, trace_signal: TraceSignal) -> None:
         trace_name = trace_signal.__name__
@@ -167,6 +251,8 @@ class Trace:
 
         http_method = request.method.upper()
         request_span_name = f"HTTP {http_method}"
+
+        request_url = request.url.full
 
         if callable(self.url_filter):
             request_url = (
