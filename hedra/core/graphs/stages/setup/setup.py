@@ -479,14 +479,22 @@ class Setup(Stage, Generic[Unpack[T]]):
         self,
         setup_stage_tasks: TaskHook=None,
         setup_stage_has_tasks: bool=False,
-        setup_stage_target_config: Config=None
+        setup_stage_configs: Dict[str, Config] = {},
     ):
         if setup_stage_has_tasks and isinstance(setup_stage_tasks, TaskHook):
             hook = setup_stage_tasks
             execute_stage: Stage = hook.stage_instance
             execute_stage.client.next_name = hook.name
             execute_stage.client.intercept = True
-            execute_stage_name = execute_stage.name
+
+            config_copy = setup_stage_configs.get(
+                hook.stage
+            )
+                
+            execute_stage.client._config = config_copy
+            execute_stage.client.set_mutations()
+
+            execute_stage_name = hook.stage_instance.name
 
             await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Loading Task hook - {hook.name}:{hook.hook_id} - to Execute stage - {execute_stage_name}')
 
@@ -498,7 +506,7 @@ class Setup(Stage, Generic[Unpack[T]]):
                 tags=hook.metadata.tags
             )
             
-            await session.set_pool(setup_stage_target_config.batch_size)
+            await session.set_pool(config_copy.batch_size)
 
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Successfully retrieved task and session for Task - {hook.name}:{task.action_id} - Execute stage - {execute_stage_name}')
 

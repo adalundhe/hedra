@@ -69,7 +69,7 @@ class InjectJunkData(Mutation):
     async def mutate(self, action: Request=None) -> Request:
 
         chance_roll = random.uniform(0, 1)
-        if chance_roll > self.chance:
+        if chance_roll <= self.chance:
             return action
 
         if action.method not in ['POST', 'PUT', 'PATCH']:

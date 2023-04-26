@@ -136,7 +136,7 @@ class Client(Generic[Unpack[T]]):
 
             self._http.mutations.update(self.mutations)
             self.mutations.update(self._http2.mutations)
-       
+
         self._http2.next_name = self.next_name
         self._http2.intercept = self.intercept
         return self._http2
@@ -257,7 +257,7 @@ class Client(Generic[Unpack[T]]):
             self._task = self._task(self._config)
             self._task.metadata_string = self.metadata_string
             self.clients[RequestTypes.TASK] = self._task
-
+            
             self._task.mutations.update(self.mutations)
             self.mutations.update(self._task.mutations)
 
