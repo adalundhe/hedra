@@ -134,7 +134,7 @@ class Client(Generic[Unpack[T]]):
             self._http2.actions = self.actions
             self.clients[RequestTypes.HTTP2] = self._http2
 
-            self._http.mutations.update(self.mutations)
+            self._http2.mutations.update(self.mutations)
             self.mutations.update(self._http2.mutations)
 
         self._http2.next_name = self.next_name
