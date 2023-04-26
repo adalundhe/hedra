@@ -70,6 +70,8 @@ class InjectPing(Mutation):
         except Exception:
             pass
 
+        print('HERE!', action)
+
         return action
     
     def copy(self):
