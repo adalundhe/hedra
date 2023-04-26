@@ -270,7 +270,7 @@ def optimize_stage(serialized_config: str):
         logger.filesystem.sync['hedra.optimize'].info(f'{metadata_string} - Setting up Optimization')
 
         optimization_experiment_config = setup_stage_experiment_config.get(execute_stage_name)
-        if optimization_experiment_config:
+        if optimization_experiment_config and execute_stage_config.experiment.get('distribution'):
 
             execute_stage_config.experiment['distribution'] = [
                 int(distribution_value/optimize_stage_workers) for distribution_value in execute_stage_config.experiment.get('distribution')
@@ -364,4 +364,5 @@ def optimize_stage(serialized_config: str):
         raise ProcessKilledError()
     
     except Exception as e:
+        print(traceback.format_exc())
         raise e

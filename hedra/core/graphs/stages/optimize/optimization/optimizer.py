@@ -72,7 +72,6 @@ class Optimizer:
 
         self.start = time.time()
 
-        self._event_loop.set_exception_handler(self._handle_async_exception)
         results = self.algorithm.optimize(self._run_optimize)
 
         optimized_params = {}
@@ -182,24 +181,24 @@ class Optimizer:
             self._event_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self._event_loop)
 
-        def handle_loop_stop(signame):
-            try:
-                self._event_loop.close()
+            self._event_loop.set_exception_handler(self._handle_async_exception)
 
-            except BrokenPipeError:
-                pass
-                
-            except RuntimeError:
-                pass
+            def handle_loop_stop(signame):
+                try:
+                    self._event_loop.close()
 
-        for signame in ('SIGINT', 'SIGTERM'):
+                except BrokenPipeError:
+                    pass
+                    
+                except RuntimeError:
+                    pass
 
-            self._event_loop.add_signal_handler(
-                getattr(signal, signame),
-                lambda signame=signame: handle_loop_stop(signame)
-            )
+            for signame in ('SIGINT', 'SIGTERM'):
 
-        self._event_loop.set_exception_handler(self._handle_async_exception)
+                self._event_loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(signame)
+                )
 
         inverse_actions_per_second = self._event_loop.run_until_complete(
             self._optimize(xargs)

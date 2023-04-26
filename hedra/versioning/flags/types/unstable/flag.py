@@ -10,3 +10,8 @@ def unstable(feature):
         return feature(*args, **kwargs)
     
     return wrap_feature
+
+
+@flag_registrar(FlagTypes.UNSTABLE_FEATURE)
+def unstable_threadsafe(feature):
+    return feature

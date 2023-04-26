@@ -2,6 +2,7 @@ from typing import Tuple, Any
 from types import SimpleNamespace
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.engines.types.common.base_action import BaseAction
+from hedra.versioning.flags.types.unstable.flag import unstable_threadsafe
 from .validator import MutationValidator
 
 
@@ -26,6 +27,8 @@ class Mutation:
         self.stage: Any = SimpleNamespace(
             context=SimpleContext()
         )
+
+        unstable_threadsafe(Mutation)
 
     async def mutate(self, action: BaseAction=None):
         raise NotImplementedError(
