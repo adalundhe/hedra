@@ -20,6 +20,14 @@ from hedra.core.experiments import (
     Variant
 )
 
+from hedra.core.experiments.mutations import (
+    DeformHeader,
+    InjectHeader,
+    InjectJunkData,
+    InjectPing,
+    SmuggleRequest
+)
+
 from .core.graphs.stages import (
     Act,
     Analyze,

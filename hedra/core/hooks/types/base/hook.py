@@ -24,7 +24,6 @@ class Hook:
         self.stage = stage
         self.hook_type = hook_type
         self.stage_instance: Any = None
-        self.is_event = False
         self.conditions: List[Callable[..., Any]] = []
         self.args = inspect.signature(call)
         self.params = self.args.parameters

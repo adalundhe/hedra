@@ -14,3 +14,5 @@ class TaskHookValidator(BaseModel):
     @validator('weight', 'order')
     def validate_weight_and_order(cls, val):
         assert val > 0
+
+        return val

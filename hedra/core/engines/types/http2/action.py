@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Iterator, Union, List, Any
+from typing import Dict, Iterator, Union, List, Any, Tuple
 from urllib.parse import urlencode
 from hedra.core.engines.types.common.base_action import BaseAction
 from hedra.core.engines.types.common.constants import NEW_LINE
@@ -27,7 +27,9 @@ class HTTP2Action(BaseAction):
         'hpack_encoder',
         '_remote_settings',
         'event',
-        'action_args'
+        'action_args',
+        '_header_items',
+        'mutations'
     )
     
     def __init__(
@@ -53,6 +55,7 @@ class HTTP2Action(BaseAction):
         self.url = URL(url, family=address_family, protocol=protocol)
 
         self._headers = headers
+        self._header_items: List[Tuple[str, str]] = list(headers.items())
         self._data = data
 
         self.encoded_data = None
@@ -89,8 +92,9 @@ class HTTP2Action(BaseAction):
         return self._headers
 
     @headers.setter
-    def headers(self, value):
+    def headers(self, value: Dict[str, str]):
         self._headers = value
+        self._header_items = list(value.items())
         self.encoded_headers = None
 
     def setup(self):
@@ -143,7 +147,7 @@ class HTTP2Action(BaseAction):
                 k.lower(), 
                 v
             )
-            for k, v in self._headers.items()
+            for k, v in self._header_items
             if k.lower()
             not in (
                 b"host",

@@ -17,3 +17,5 @@ class MetricHookValidator(BaseModel):
 
         assert val in valid_metric_types
 
+        return val
+

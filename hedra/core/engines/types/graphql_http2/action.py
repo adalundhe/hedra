@@ -1,6 +1,5 @@
 import json
-from types import FunctionType
-from typing import Coroutine, Dict, Iterator, Union, List
+from typing import Dict, Iterator, Union, List
 from hedra.core.engines.types.common.hooks import Hooks
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.http2.action import HTTP2Action

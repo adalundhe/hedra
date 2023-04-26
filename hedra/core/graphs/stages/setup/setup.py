@@ -58,6 +58,7 @@ class SetupCall:
             try:
 
                 self.hook.stage_instance.client._config = self.config
+                self.hook.stage_instance.client.set_mutations()
                 await self.hook.call()
 
             except Exception as setup_exception:
@@ -255,44 +256,60 @@ class Setup(Stage, Generic[Unpack[T]]):
 
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Engine plugin - {plugin.name} - for Execute stage - {execute_stage_name}')
 
+            existing_stage_config = setup_stage_configs.get(execute_stage_name)
+            if existing_stage_config:
+                return {
+                    'setup_stage_configs': setup_stage_configs,
+                    'setup_stage_target_stages': setup_stage_target_stages,
+                    'setup_stage_experiment_config': setup_stage_experiment_config
+                }
+
             config_copy = setup_stage_target_config.copy()
 
             if self.tracing:
                 config_copy.tracing = self.tracing
 
-            if self.experiment and self.experiment.is_variant(execute_stage_name) and setup_stage_is_primary_thread:
-                config_copy.batch_size = self.experiment.get_variant_batch_size(
-                    execute_stage_name
-                )
-
-                distribution = self.experiment.calculate_distribution(
-                    execute_stage_name,
-                    config_copy.batch_size
-                )
-
-                if distribution is not None:
-
-                    variant = self.experiment.get_variant(execute_stage_name)
-
-                    experiment = {
-                        'experiment_name': self.experiment.experiment_name,
-                        'weight': variant.weight,
-                        'distribution_type': variant.distribution.selected_distribution,
-                        'distribution': distribution,
-                        'intervals': variant.intervals,
-                        'interval_duration': round(
-                            config_copy.total_time/(variant.intervals - 1)
-                            , 
-                            2
-                        )
-                    }
-
-                    config_copy.experiment = experiment
-                    config_copy.persona_type = self.persona_types['approx-dist']
+            if self.experiment and self.experiment.is_variant(execute_stage_name):
 
 
-                    setup_stage_experiment_config[execute_stage_name] = experiment
+                variant = self.experiment.get_variant(execute_stage_name)
 
+                experiment = {
+                    'experiment_name': self.experiment.experiment_name,
+                    'weight': variant.weight,
+                }
+
+                if setup_stage_is_primary_thread:
+                    config_copy.batch_size = self.experiment.get_variant_batch_size(
+                        execute_stage_name
+                    )
+
+                    distribution = self.experiment.calculate_distribution(
+                        execute_stage_name,
+                        config_copy.batch_size
+                    )
+
+                    if distribution is not None:
+
+
+                        experiment.update({
+                            'distribution_type': variant.distribution.selected_distribution,
+                            'distribution': distribution,
+                            'intervals': variant.intervals,
+                            'interval_duration': round(
+                                config_copy.total_time/(variant.intervals - 1)
+                                , 
+                                2
+                            )
+                        })
+
+                        config_copy.experiment = experiment
+                        config_copy.persona_type = self.persona_types['approx-dist']
+
+                if variant.mutations:
+                    config_copy.mutations = variant.get_mutations()
+
+                setup_stage_experiment_config[execute_stage_name] = experiment
 
             setup_stage_configs[execute_stage_name] = config_copy
             setup_stage_target_stages[execute_stage_name] = execute_stage
@@ -346,7 +363,7 @@ class Setup(Stage, Generic[Unpack[T]]):
                 config_copy = setup_stage_configs.get(
                     hook.stage
                 )
-
+                
                 hook.stage_instance.client._config = config_copy
 
                 execute_stage_name = hook.stage_instance.name

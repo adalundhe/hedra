@@ -1,6 +1,6 @@
 import uuid
 import asyncio
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Dict
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types import (
     MercuryGraphQLClient,
@@ -23,6 +23,9 @@ from hedra.core.engines.types.task import Task, TaskResult
 from hedra.core.engines.types.udp import UDPAction, UDPResult
 from hedra.core.engines.types.websocket import WebsocketAction, WebsocketResult
 from hedra.core.engines.client.store import ActionsStore
+from hedra.core.experiments.mutations.types.base.mutation import Mutation
+from hedra.core.hooks.types.event.event import Event
+from hedra.core.hooks.types.event.hook import EventHook
 from hedra.logging import HedraLogger
 
 S = TypeVar(
@@ -82,7 +85,29 @@ class BaseClient(Generic[S, A, R]):
         self.logger = HedraLogger()
         self.logger.initialize()
 
+        self.mutations: Dict[str, Mutation] = {}
+
     async def _execute_action(self, action: A) -> R:
+        
+        if self.mutations.get(action.name):
+            mutation = self.mutations[action.name]
+
+            if action.hooks.before is None:
+                action.hooks.before = []
+
+            mutation_event = Event(
+                None,
+                EventHook(
+                    mutation.name,
+                    mutation.name,
+                    mutation.mutate,
+                    action.name
+                )
+            )
+
+            mutation_event.source.stage_instance = mutation.stage
+            action.hooks.before.append([mutation_event])
+
         await self.logger.filesystem.aio['hedra.core'].debug(
             f'{self.metadata_string} - {self.client_type} Client {self.client_id} - Preparing Action - {action.name}:{action.action_id}'
         )

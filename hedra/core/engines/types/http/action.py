@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Iterator, Union, List, Any
+from typing import Dict, Iterator, Union, List, Any, Tuple
 from urllib.parse import urlencode
 from hedra.core.engines.types.common.hooks import Hooks
 from hedra.core.engines.types.common.base_action import BaseAction
@@ -25,7 +25,9 @@ class HTTPAction(BaseAction):
         'is_stream',
         'ssl_context',
         'redirects',
-        'action_args'
+        'action_args',
+        'mutations',
+        '_header_items'
     )
     
     def __init__(
@@ -52,6 +54,7 @@ class HTTPAction(BaseAction):
         self.url = URL(url, family=address_family, protocol=protocol)
 
         self._headers = headers
+        self._header_items: List[Tuple[str, str]] = list(headers.items())
         self._data = data
 
         self.encoded_data = None
@@ -84,8 +87,9 @@ class HTTPAction(BaseAction):
         return self._headers
 
     @headers.setter
-    def headers(self, value):
+    def headers(self, value: Dict[str, str]):
         self._headers = value
+        self._header_items: List[Tuple[str, str]] = list(value.items())
         self.encoded_headers = None
 
     def setup(self):
@@ -135,15 +139,16 @@ class HTTPAction(BaseAction):
         if port not in [80, 443]:
             hostname = f'{hostname}:{port}'
 
-        self._headers = {
-            "HOST": hostname,
-            "User-Agent": "mercury-http",
-            "Keep-Alive": "timeout=60, max=100000",
-            "Content-Lenth": self.size,
-            **self._headers
-        }
+        header_items = [
+            ("HOST", hostname),
+            ("User-Agent", "mercury-http"),
+            ("Keep-Alive", "timeout=60, max=100000"),
+            ("Content-Length", self.size)
+        ]
 
-        for key, value in self._headers.items():
+        header_items.extend(self._header_items)
+
+        for key, value in header_items:
             get_base += f"{key}: {value}{NEW_LINE}"
 
         self.encoded_headers = (get_base + NEW_LINE).encode()

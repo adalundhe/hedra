@@ -16,3 +16,5 @@ class DependsValidator(BaseModel):
 
         for val in vals:
             assert issubclass(val, Stage)
+
+        return vals

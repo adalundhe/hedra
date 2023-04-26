@@ -1,5 +1,6 @@
 import psutil
-from typing import List, Union, Dict, Optional
+from typing import List, Union, Dict
+from hedra.core.experiments.mutations.types.base.mutation import Mutation
 from .tracing_config import TracingConfig
 from .time_parser import TimeParser
 
@@ -44,7 +45,8 @@ class Config:
         self.group_size = kwargs.get('group_size')
         self.playwright_options = kwargs.get('playwright_options', {})
         self.experiment: Dict[str, Union[str, int, List[float]]] = kwargs.get('experiment', {})
-        self.tracing: Optional[TracingConfig] = kwargs.get('tracing')
+        self.tracing: Union[TracingConfig, None] = kwargs.get('tracing')
+        self.mutations: Union[List[Mutation], None] = kwargs.get('mutations', [])
 
     def copy(self):
 
@@ -78,5 +80,6 @@ class Config:
             'group_size': self.group_size,
             'playwright_options': self.playwright_options,
             'experiment': self.experiment,
-            'trace': trace
+            'trace': trace,
+            'mutations': self.mutations
         })

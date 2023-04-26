@@ -1,6 +1,7 @@
 import asyncio
 import time
 import uuid
+import traceback
 from typing import Dict, Any, Union, Coroutine, TypeVar, Optional
 from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
@@ -145,7 +146,6 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
             raise e
 
     async def execute_prepared_request(self, action: HTTPAction) -> Coroutine[Any, Any, HTTPResult]:
-
         trace: Union[Trace, None] = None
         if self.tracing_session:
             trace = self.tracing_session.create_trace()
@@ -179,7 +179,7 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
                     event = asyncio.Event()
                     action.hooks.channel_events.append(event)
                     await event.wait()
-
+                    
                 if action.hooks.before:
                     action = await self.execute_before(action)
                     action.setup()
