@@ -19,6 +19,7 @@ from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.event_types import EventType
 from hedra.logging import logging_manager
 from hedra.plugins.types.plugin_types import PluginType
+from hedra.reporting.experiment import ExperimentMetricsSet
 from hedra.reporting.metric import MetricsSet
 from hedra.reporting.metric.custom_metric import CustomMetric
 from hedra.reporting.processed_result import results_types, ProcessedResultsGroup
@@ -61,9 +62,13 @@ RawResultsPairs = List[Tuple[Dict[str,  List[Tuple[str, Any]]]]]
 
 ProcessedResults = Dict[str, Union[Dict[str, Union[int, float, int]], int]]
 
-ProcessedResultsSet = List[Dict[str, Union[Dict[str, Union[int, float, int]], int]]]
+ProcessedMetricsSet = Dict[str, MetricsSet]
+ProcessedStageMetricsSet = Dict[str, Union[int, float, Dict[str, ProcessedMetricsSet]]]
 
-CustoMetricsSet = Dict[str, Dict[str, Dict[str, Union[int, float, Any]]]]
+ProcessedResultsSet = List[Tuple[str, Dict[str, ProcessedStageMetricsSet], int]]
+
+
+CustomMetricsSet = Dict[str, Dict[str, Dict[str, Union[int, float, Any]]]]
 
 EventsSet = Dict[str, Dict[str, ProcessedResultsGroup]]
 
@@ -191,24 +196,33 @@ class Analyze(Stage):
                 )
             )
 
-    @event('add_shutdown_handler')
+    @condition('add_shutdown_handler')
+    async def check_if_has_multiple_workers(self):
+        return {
+            'analyze_stage_has_multiple_workers': self.total_pool_cpus > 1
+        }
+
+    @event('check_if_has_multiple_workers')
     async def generate_deserialized_results(
         self,
-        analyze_stage_raw_results: RawResultsSet={}
+        analyze_stage_raw_results: RawResultsSet={},
+        analyze_stage_has_multiple_workers: bool=False
     ):
         deserialized_results = dict(analyze_stage_raw_results)
-        for results_set_name, results_set in analyze_stage_raw_results.items():
-            
-            results_set_copy = results_set.copy()
-            results_set_copy.results = await self._loop.run_in_executor(
-                self._executor,
-                functools.partial(
-                    deserialize_results,
-                    results_set.results
-                )
-            )
 
-            deserialized_results[results_set_name] = results_set_copy
+        if analyze_stage_has_multiple_workers:
+            for results_set_name, results_set in analyze_stage_raw_results.items():
+                
+                results_set_copy = results_set.copy()
+                results_set_copy.results = await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        deserialize_results,
+                        results_set.results
+                    )
+                )
+
+                deserialized_results[results_set_name] = results_set_copy
 
 
         return {
@@ -243,9 +257,8 @@ class Analyze(Stage):
     async def create_stage_batches(
         self,
         analyze_stage_raw_results: RawResultsSet=[],
-        analyze_stage_batches: List[Tuple[str, Any, int]]=[],
+        analyze_stage_batches: List[Tuple[str, Any, int]]=[]
     ):
-
         stage_total_times = {}
         stage_batch_sizes = {}
 
@@ -289,43 +302,44 @@ class Analyze(Stage):
         self,
         analyze_stage_batches: List[Tuple[str, Any, int]]=[],
         analyze_stage_batch_sizes: Dict[str, List[List[Any]]]=[],
-        analyze_stage_metric_hook_names: List[str]=[]
+        analyze_stage_metric_hook_names: List[str]=[],
+        analyze_stage_has_multiple_workers: bool=False
     ):
+        if analyze_stage_has_multiple_workers:
+            stage_configs = []
+            serializable_context = self.context.as_serializable()
 
-        stage_configs = []
-        serializable_context = self.context.as_serializable()
+            for stage_name, _, assigned_workers_count in analyze_stage_batches:
 
-        for stage_name, _, assigned_workers_count in analyze_stage_batches:
+                stage_configs.append((
+                    stage_name,
+                    assigned_workers_count,
+                    [
+                        {
+                            'graph_name': self.graph_name,
+                            'graph_path': self.graph_path,
+                            'graph_id': self.graph_id,
+                            'enable_unstable_features': active_flags[FlagTypes.UNSTABLE_FEATURE],
+                            'logfiles_directory': logging_manager.logfiles_directory,
+                            'log_level': logging_manager.log_level_name,
+                            'source_stage_name': self.name,
+                            'source_stage_context': {
+                                context_key: context_value for context_key, context_value in serializable_context
+                            },
+                            'source_stage_id': self.stage_id,
+                            'analyze_stage_name': stage_name,
+                            'analyze_stage_metric_hooks': list(analyze_stage_metric_hook_names),
+                            'analyze_stage_batched_results': batch
+                        } for batch in analyze_stage_batch_sizes[stage_name]
+                    ]
+                ))
+                
 
-            stage_configs.append((
-                stage_name,
-                assigned_workers_count,
-                [
-                    {
-                        'graph_name': self.graph_name,
-                        'graph_path': self.graph_path,
-                        'graph_id': self.graph_id,
-                        'enable_unstable_features': active_flags[FlagTypes.UNSTABLE_FEATURE],
-                        'logfiles_directory': logging_manager.logfiles_directory,
-                        'log_level': logging_manager.log_level_name,
-                        'source_stage_name': self.name,
-                        'source_stage_context': {
-                            context_key: context_value for context_key, context_value in serializable_context
-                        },
-                        'source_stage_id': self.stage_id,
-                        'analyze_stage_name': stage_name,
-                        'analyze_stage_metric_hooks': list(analyze_stage_metric_hook_names),
-                        'analyze_stage_batched_results': batch
-                    } for batch in analyze_stage_batch_sizes[stage_name]
-                ]
-            ))
-            
+                await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Assigned {assigned_workers_count} to process results from stage - {stage_name}')
 
-            await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Assigned {assigned_workers_count} to process results from stage - {stage_name}')
-
-        return {
-            'analyze_stage_configs': stage_configs,
-        }
+            return {
+                'analyze_stage_configs': stage_configs,
+            }
     
     @condition('assign_stage_batches')
     async def check_if_multiple_stages(
@@ -344,10 +358,11 @@ class Analyze(Stage):
         analyze_stage_total_group_results: int=0,
         analyze_stage_configs: List[StageConfig]=[],
         multiple_stages_to_process: bool=False,
-        analyze_stage_deserialized_results: RawResultsSet = {}
+        analyze_stage_deserialized_results: RawResultsSet = {},
+        analyze_stage_has_multiple_workers: bool=False
     ):
 
-        if multiple_stages_to_process:
+        if multiple_stages_to_process and analyze_stage_has_multiple_workers:
             await self.logger.spinner.append_message(
                 f'Calculating results for - {analyze_stage_stages_count} - stages'
             )
@@ -437,7 +452,7 @@ class Analyze(Stage):
     @event('calculate_custom_metrics')
     async def generate_metrics_sets(
         self,
-        analyze_stage_custom_metrics_set: CustoMetricsSet={},
+        analyze_stage_custom_metrics_set: CustomMetricsSet={},
         analyze_stage_events_set: EventsSet={},
         analyze_stage_total_times: Dict[str, float]={},
     ):
@@ -505,14 +520,69 @@ class Analyze(Stage):
         return {
             'analyze_stage_processed_results': processed_results
         }
+    
+    @event('generate_metrics_sets')
+    async def generate_experiment_metrics(
+        self,
+        analyze_stage_processed_results: ProcessedResultsSet=[],
+        analyze_stage_raw_results: RawResultsSet=[],
+    ):
+        
+        experiment_metrics_sets: Dict[str, ExperimentMetricsSet] = {}
 
-    @context('generate_metrics_sets')
+        for stage_name, processed_results_set in analyze_stage_processed_results:
+
+
+            stage_metrics = processed_results_set.get(
+                'stage_metrics',{}
+            ).get(
+                stage_name, {}
+            )
+            
+            stage_metrics_sets = stage_metrics.get('actions')
+
+            raw_results_set = analyze_stage_raw_results.get(stage_name)
+            experiment = raw_results_set.experiment
+            
+            if experiment:
+                variant = experiment.get('experiment_variant')
+                variant_name = variant.get('variant_stage')
+                mutations = variant.get('variant_mutations')
+
+                experiment_name = experiment.get('experiment_name')
+
+
+                experiment_metrics_set = experiment_metrics_sets.get(experiment_name)
+                if experiment_metrics_set is None:
+                    experiment_metrics_set = ExperimentMetricsSet()
+
+                if experiment_metrics_set.experiment_name is None:
+                    experiment_metrics_set.experiment_name = experiment.get('experiment_name')
+
+                
+                if experiment_metrics_set.randomized is None:
+                    experiment_metrics_set.randomized = experiment.get('experiment_randomized')
+
+                experiment_metrics_set.participants.append(stage_name)
+
+                experiment_metrics_set.variants[variant_name] = variant
+                experiment_metrics_set.mutations.extend(mutations)
+                experiment_metrics_set.metrics.update(stage_metrics_sets)
+
+                experiment_metrics_sets[experiment_name] = experiment_metrics_set
+
+        return {
+            'experiment_metrics_sets': experiment_metrics_sets
+        }
+
+    @context('generate_experiment_metrics')
     async def generate_summary(
         self,
         analyze_stage_stages_count: int=0,
         analyze_stage_total_group_results: int=0,
         analyze_stage_processed_results: ProcessedResultsSet=[],
-        analyze_stage_contexts: Dict[str, Any]={}
+        analyze_stage_contexts: Dict[str, Any]={},
+        experiment_metrics_sets: Dict[str, ExperimentMetricsSet]={}
     ):
 
         self.context[self.name] = analyze_stage_contexts
@@ -520,7 +590,8 @@ class Analyze(Stage):
         summaries = {
             'stages': {},
             'source': self.name,
-            'stage_totals': {}
+            'stage_totals': {},
+            'experiment_metrics_sets': experiment_metrics_sets
         }
 
         for stage_name, result in analyze_stage_processed_results:

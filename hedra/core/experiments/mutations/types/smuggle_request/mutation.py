@@ -4,11 +4,11 @@ import random
 from hedra.core.engines.types.graphql.action import GraphQLAction
 from hedra.core.engines.types.graphql_http2.action import GraphQLHTTP2Action
 from hedra.core.engines.types.grpc.action import GRPCAction
-from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.http.action import HTTPAction
 from hedra.core.engines.types.http2.action import HTTP2Action
 from hedra.core.engines.types.http3.action import HTTP3Action
 from hedra.core.experiments.mutations.types.base.mutation import Mutation
+from hedra.core.experiments.mutations.types.base.mutation_type import MutationType
 from typing import Union, Optional, Dict, Tuple
 from .validator import SmuggleRequestValidator
 
@@ -37,6 +37,7 @@ class SmuggleRequest(Mutation):
         super().__init__(
             name, 
             chance,
+            MutationType.SMUGGLE_REQUEST,
             *targets
         )
 

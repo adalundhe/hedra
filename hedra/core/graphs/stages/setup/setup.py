@@ -276,7 +276,8 @@ class Setup(Stage, Generic[Unpack[T]]):
 
                 experiment = {
                     'experiment_name': self.experiment.experiment_name,
-                    'weight': variant.weight,
+                    'random': self.experiment.random,
+                    'weight': variant.weight
                 }
 
                 if setup_stage_is_primary_thread:
@@ -297,8 +298,7 @@ class Setup(Stage, Generic[Unpack[T]]):
                             'distribution': distribution,
                             'intervals': variant.intervals,
                             'interval_duration': round(
-                                config_copy.total_time/(variant.intervals - 1)
-                                , 
+                                config_copy.total_time/(variant.intervals - 1), 
                                 2
                             )
                         })

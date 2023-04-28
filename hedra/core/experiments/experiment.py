@@ -1,6 +1,6 @@
 import math
 import random
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Iterable
 from hedra.versioning.flags.types.unstable.flag import unstable
 from .variant import Variant
 
@@ -12,7 +12,7 @@ class Experiment:
         self,
         experiment_name: str,
         participants: List[Variant],
-        random: bool=False
+        random: bool=True
     ) -> None:
         self.experiment_name = experiment_name
         self.participants: Dict[str, Variant] = {
@@ -21,6 +21,10 @@ class Experiment:
         self.source_batch_size: int = 0
         self.random: bool = random
         self.participants_count = len(participants)
+
+    def __iter__(self):
+        for participant in self.participants.values():
+            yield participant
 
     def assign_weights(self):
 

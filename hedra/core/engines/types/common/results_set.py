@@ -11,17 +11,22 @@ from hedra.core.engines.types.playwright import PlaywrightResult
 from hedra.core.engines.types.task import TaskResult
 from hedra.core.engines.types.udp import UDPResult
 from hedra.core.engines.types.websocket import WebsocketResult
-from hedra.reporting.processed_result.results import results_types
 
 
 ResultsBatch = Dict[str, Union[List[BaseResult], float]]
+
+MutationConfig = Dict[str, Union[str, float, List[str]]]
+
+VariantConfig = Dict[str, Union[int, str, float, List[float], MutationConfig]]
+
+ExperimentConfig = Dict[str, Union[str, bool, VariantConfig]]
 
 
 class ResultsSet:
 
     def __init__(
         self,
-        execution_results: Dict[str, Union[int, float, List[ResultsBatch]]]
+        execution_results: Dict[str, Union[int, float, List[ResultsBatch], ExperimentConfig]]
     ) -> None:
 
         self.stage: str = execution_results.get('stage')
@@ -32,6 +37,7 @@ class ResultsSet:
         self.results: List[BaseResult] = execution_results.get('stage_results', [])
 
         self.serialized_results: List[Dict[str, Any]] = execution_results.get('serialized_results', [])
+        self.experiment = execution_results.get('experiment')
 
         self.types = {
             RequestTypes.GRAPHQL: GraphQLResult,

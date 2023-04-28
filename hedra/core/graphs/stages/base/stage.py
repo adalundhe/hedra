@@ -45,6 +45,7 @@ class Stage:
         self.allow_parallel = False
         self.executor: BatchExecutor = None
         self.plugins_by_type: Dict[PluginType, Dict[str, Plugin]] = defaultdict(dict)
+        self.total_pool_cpus: int = 1
 
         self.core_config = {}
         self.context: Optional[SimpleContext] = None

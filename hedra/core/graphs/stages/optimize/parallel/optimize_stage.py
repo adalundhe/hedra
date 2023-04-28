@@ -269,8 +269,7 @@ def optimize_stage(serialized_config: str):
 
         logger.filesystem.sync['hedra.optimize'].info(f'{metadata_string} - Setting up Optimization')
 
-        optimization_experiment_config = setup_stage_experiment_config.get(execute_stage_name)
-        if optimization_experiment_config and execute_stage_config.experiment.get('distribution'):
+        if execute_stage_config.experiment and execute_stage_config.experiment.get('distribution'):
 
             execute_stage_config.experiment['distribution'] = [
                 int(distribution_value/optimize_stage_workers) for distribution_value in execute_stage_config.experiment.get('distribution')
@@ -289,7 +288,6 @@ def optimize_stage(serialized_config: str):
                 'iterations': optimizer_iterations,
                 'algorithm': optimizer_algorithm,
                 'time_limit': time_limit,
-                'distributions': optimization_experiment_config,
                 'stream_analytics': execute_stage_streamed_analytics
             })
 
@@ -307,14 +305,13 @@ def optimize_stage(serialized_config: str):
                 'iterations': optimizer_iterations,
                 'algorithm': optimizer_algorithm,
                 'time_limit': time_limit,
-                'distributions': setup_stage_experiment_config,
                 'stream_analytics': execute_stage_streamed_analytics
             })
 
 
         results = optimizer.optimize()
 
-        if optimization_experiment_config:
+        if execute_stage_config.experiment and results.get('optimized_distribution'):
             execute_stage_config.experiment['distribution'] = results.get('optimized_distribution')
 
         execute_stage_config.batch_size = results.get('optimized_batch_size', execute_stage_config.batch_size)

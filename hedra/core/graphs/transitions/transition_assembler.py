@@ -158,6 +158,8 @@ class TransitionAssembler:
 
             for stage in stages.values():
 
+                stage.total_pool_cpus = self.cpus
+
                 for plugin_name, plugin in stage.plugins.items():
                     plugins[plugin.type][plugin_name] = plugin
 

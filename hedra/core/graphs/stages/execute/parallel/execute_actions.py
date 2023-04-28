@@ -54,7 +54,7 @@ async def start_execution(
     source_stage_stream_configs: List[ReporterConfig],
     logfiles_directory,
     log_level
-):
+) -> Dict[str, Any]:
 
     current_task = asyncio.current_task()
 
@@ -93,7 +93,6 @@ async def start_execution(
     await logger.filesystem.aio['hedra.core'].info(
         f'{metadata_string} - Executing {execution_hooks_count} actions with a batch size of {persona_config.batch_size} for {persona_config.total_time} seconds using Persona - {persona.type.capitalize()}'
     )
-
 
     for hook in actions_and_tasks:
 
@@ -360,7 +359,7 @@ def execute_actions(parallel_config: str):
             execute_stage.name: execute_stage
         }
 
-        result = loop.run_until_complete(
+        results = loop.run_until_complete(
             start_execution(
                 metadata_string,
                 source_stage_config,
@@ -376,7 +375,7 @@ def execute_actions(parallel_config: str):
         loop.close()
         gc.collect()
 
-        return result
+        return results
 
     except BrokenPipeError:
         raise ProcessKilledError()
