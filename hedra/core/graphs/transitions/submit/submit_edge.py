@@ -2,7 +2,7 @@ from __future__  import annotations
 import inspect
 import asyncio
 from collections import defaultdict
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.submit.submit import Submit
@@ -12,11 +12,12 @@ from hedra.reporting.metric import MetricsSet
 from hedra.reporting.metric.custom_metric import CustomMetric
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.stages.types.stage_states import StageStates
+from hedra.reporting.metric.stage_metrics_summary import StageMetricsSummary
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 
 
 CustomMetricSet = Dict[str, Dict[str, CustomMetric]]
-MetricsSetGroup = Dict[str, Dict[str, Dict[str, Dict[str, MetricsSet]]]]
+MetricsSetGroup = Dict[str, Union[str, Dict[str, StageMetricsSummary]]]
 
 
 class SubmitEdge(BaseEdge[Submit]):
@@ -149,12 +150,12 @@ class SubmitEdge(BaseEdge[Submit]):
         
         events: List[BaseProcessedResult] = []
         metrics: List[MetricsSet] = []
-        session_totals: Dict[str, int] = {}
+        session_total: int = 0
 
         for source_stage, destination_stage in self.history:
             if destination_stage == self.source.name:
 
-                previous_history = self.history[(source_stage, self.source.name)]
+                previous_history: Dict[str, Any] = self.history[(source_stage, self.source.name)]
             
                 analyze_stage_summary_metrics: MetricsSetGroup = previous_history.get(
                     'analyze_stage_summary_metrics'
@@ -166,26 +167,18 @@ class SubmitEdge(BaseEdge[Submit]):
 
                 events.extend(analyze_stage_events)
 
-                stage_totals: Dict[str, int] = analyze_stage_summary_metrics.get(
-                    'stage_totals', 
-                    {}
-                )
 
-                for stage_name, stage_total in stage_totals.items():
-
-                    if session_totals.get(stage_name) is None:   
-                        session_totals[stage_name] = stage_total
-
-
-                stage_summaries = analyze_stage_summary_metrics.get('stages', {})
-                for stage in stage_summaries.values():
+                stage_metrics_summaries = analyze_stage_summary_metrics.get('stages', {})
+                for stage_metrics_summary in stage_metrics_summaries.values():
                     metrics.extend(list(
-                        stage.get('actions', {}).values()
+                        stage_metrics_summary.metrics_sets.values()
                     ))
+
+                    session_total += stage_metrics_summary.total_completed
 
         self.edge_data['analyze_stage_events'] = events
         self.edge_data['analyze_stage_summary_metrics'] = metrics
-        self.edge_data['analyze_stage_session_total'] = sum(session_totals.values())
+        self.edge_data['analyze_stage_session_total'] = session_total
 
 
 

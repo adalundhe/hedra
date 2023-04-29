@@ -21,6 +21,7 @@ from hedra.logging import logging_manager
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.experiment.experiment_metrics_set import ExperimentMetricsSet
 from hedra.reporting.metric import MetricsSet
+from hedra.reporting.metric.stage_metrics_summary import StageMetricsSummary
 from hedra.reporting.metric.custom_metric import CustomMetric
 from hedra.reporting.processed_result import results_types, ProcessedResultsGroup
 from hedra.reporting.processed_result.types import (
@@ -65,7 +66,7 @@ ProcessedResults = Dict[str, Union[Dict[str, Union[int, float, int]], int]]
 ProcessedMetricsSet = Dict[str, MetricsSet]
 ProcessedStageMetricsSet = Dict[str, Union[int, float, Dict[str, ProcessedMetricsSet]]]
 
-ProcessedResultsSet = List[Tuple[str, Dict[str, ProcessedStageMetricsSet], int]]
+ProcessedResultsSet = List[Tuple[str, StageMetricsSummary]]
 
 
 CustomMetricsSet = Dict[str, Dict[str, Dict[str, Union[int, float, Any]]]]
@@ -461,6 +462,7 @@ class Analyze(Stage):
         
         for stage_name, stage_events in analyze_stage_events_set.items():    
 
+            stage_metrics_summary = StageMetricsSummary()
             grouped_stats = {}
 
             stage_total = 0
@@ -495,6 +497,8 @@ class Analyze(Stage):
                     events_group.tags
                 )
 
+                stage_metrics_summary.metrics_sets[event_group_name] = metric
+
                 grouped_stats[event_group_name] = metric
 
                 stage_total += events_group.total
@@ -503,18 +507,18 @@ class Analyze(Stage):
         
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Calculated results for - {stage_total} - actions from stage - {stage_name}')
 
+            stage_metrics_summary.total_completed = stage_total
+            stage_metrics_summary.total_time = stage_total_time
+            stage_metrics_summary.actions_per_second = round(
+                stage_total/stage_total_time,
+                2
+            )
+
+            stage_metrics_summary.calculate_action_and_task_metrics()
+
             processed_results.append((
                 stage_name,
-                {
-                    'stage_metrics': {
-                        stage_name: {
-                            'total': stage_total,
-                            'actions_per_second': stage_total/stage_total_time,
-                            'actions': grouped_stats
-                        }
-                    },
-                    'stage_total': stage_total
-                }
+                stage_metrics_summary
             ))
 
         return {
@@ -530,16 +534,10 @@ class Analyze(Stage):
         
         experiment_metrics_sets: Dict[str, ExperimentMetricsSet] = {}
 
-        for stage_name, processed_results_set in analyze_stage_processed_results:
+        for stage_name, stage_metrics in analyze_stage_processed_results:
 
-
-            stage_metrics = processed_results_set.get(
-                'stage_metrics',{}
-            ).get(
-                stage_name, {}
-            )
             
-            stage_metrics_sets = stage_metrics.get('actions')
+            stage_metrics_sets = stage_metrics.metrics_sets
 
             raw_results_set = analyze_stage_raw_results.get(stage_name)
             experiment = raw_results_set.experiment
@@ -595,16 +593,14 @@ class Analyze(Stage):
 
         self.context[self.name] = analyze_stage_contexts
         
-        summaries = {
+        summaries: Dict[str, Union[int, Dict[str, MetricsSet]]] = {
             'stages': {},
             'source': self.name,
-            'stage_totals': {},
             'experiment_metrics_sets': experiment_metrics_sets
         }
 
-        for stage_name, result in analyze_stage_processed_results:
-            summaries['stages'].update(result.get('stage_metrics'))
-            summaries['stage_totals'][stage_name] = result.get('stage_total')
+        for stage_name, stage_metrics in analyze_stage_processed_results:
+            summaries['stages'][stage_name] = stage_metrics
 
         self.analysis_execution_time = round(
             time.monotonic() - self.analysis_execution_time_start

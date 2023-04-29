@@ -2,13 +2,12 @@ from collections import OrderedDict
 from tabulate import tabulate
 from typing import Dict, List, Union
 from hedra.logging import HedraLogger
+from hedra.reporting.experiment.experiment_metrics_set_types import (
+    MutationSummary,
+    VariantSummary,
+    ExperimentSummary
+)
 
-
-MutationSummary = Dict[str, Union[int, float, bool, str]]
-
-VariantSummary = Dict[str, Union[int, float, bool, str, Dict[str, MutationSummary]]]
-
-ExperimentSummary = Dict[str, Union[int, float, Dict[str, VariantSummary], List[str]]]
 
 
 class ExperimentsSummaryTable:
@@ -58,7 +57,7 @@ class ExperimentsSummaryTable:
 
         if self.mutations_table:
             self.logger.console.sync.info('Mutations:')
-            self.logger.console.sync.info(f'''{self.mutations_table}\n''')
+            self.logger.console.sync.info(f'''{self.mutations_table}''')
 
     def _generate_experiments_table(self) -> str:
 
@@ -69,8 +68,11 @@ class ExperimentsSummaryTable:
             table_row = OrderedDict()
 
             for field_name in self.experiments_table_headers_keys:
+
+                experiment_summary_dict = experiment_summary.dict()
+
                 header_name = self.experiments_table_headers.get(field_name)
-                table_row[header_name] = experiment_summary.get(field_name) 
+                table_row[header_name] = experiment_summary_dict.get(field_name) 
 
             experiment_table_rows.append(table_row)
 
@@ -90,14 +92,16 @@ class ExperimentsSummaryTable:
         variant_table_rows: List[OrderedDict] = []
 
         for experiment_summary in self.experiments_summaries.values():
-            experiment_variants = experiment_summary.get('experiment_variant_summaries')
 
-            for variant_summary in experiment_variants.values():
+            for variant_summary in experiment_summary.experiment_variant_summaries.values():
                 table_row = OrderedDict()
 
                 for field_name in self.variants_table_headers_keys:
+
+                    variant_summary_dict = variant_summary.dict()
+
                     header_name = self.variants_table_headers.get(field_name)
-                    table_row[header_name] = variant_summary.get(field_name) 
+                    table_row[header_name] = variant_summary_dict.get(field_name) 
 
                 variant_table_rows.append(table_row)
 
@@ -116,18 +120,18 @@ class ExperimentsSummaryTable:
         mutation_table_rows: List[OrderedDict] = []
 
         for experiment_summary in self.experiments_summaries.values():
-            experiment_variants = experiment_summary.get('experiment_variant_summaries')
 
-            for variant_summary in experiment_variants.values():
+            for variant_summary in experiment_summary.experiment_variant_summaries.values():
 
-                variant_mutations = variant_summary.get('variant_mutation_summaries')
+                for mutation_summary in variant_summary.variant_mutation_summaries.values():
 
-                for mutation_summary in variant_mutations.values():
+                    mutation_summary_dict = mutation_summary.dict()
+
                     table_row = OrderedDict()
 
                     for field_name in self.mutations_table_headers_keys:
                         header_name = self.mutations_table_headers.get(field_name)
-                        table_row[header_name] = mutation_summary.get(field_name) 
+                        table_row[header_name] = mutation_summary_dict.get(field_name) 
 
                     mutation_table_rows.append(table_row)
 
