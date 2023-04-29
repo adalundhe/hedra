@@ -19,7 +19,7 @@ from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.event_types import EventType
 from hedra.logging import logging_manager
 from hedra.plugins.types.plugin_types import PluginType
-from hedra.reporting.experiment import ExperimentMetricsSet
+from hedra.reporting.experiment.experiment_metrics_set import ExperimentMetricsSet
 from hedra.reporting.metric import MetricsSet
 from hedra.reporting.metric.custom_metric import CustomMetric
 from hedra.reporting.processed_result import results_types, ProcessedResultsGroup
@@ -565,11 +565,19 @@ class Analyze(Stage):
 
                 experiment_metrics_set.participants.append(stage_name)
 
+                variant['stage_batch_size'] = raw_results_set.stage_batch_size
+                variant['stage_optimized'] = raw_results_set.stage_optimized
+                variant['stage_persona_type'] = raw_results_set.stage_persona_type
+                variant['stage_workers'] = raw_results_set.stage_workers
+
                 experiment_metrics_set.variants[variant_name] = variant
-                experiment_metrics_set.mutations.extend(mutations)
-                experiment_metrics_set.metrics.update(stage_metrics_sets)
+                experiment_metrics_set.mutations[variant_name] = mutations
+                experiment_metrics_set.metrics[variant_name] = stage_metrics_sets
 
                 experiment_metrics_sets[experiment_name] = experiment_metrics_set
+
+        for experiment_metrics_set in experiment_metrics_sets.values():
+            experiment_metrics_set.generate_experiment_summary()
 
         return {
             'experiment_metrics_sets': experiment_metrics_sets

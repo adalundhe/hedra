@@ -100,6 +100,7 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             self.visited.append(self.source.name)
 
         except Exception as edge_exception:
+            print(traceback.format_exc())
             self.exception = edge_exception
 
         return None, self.destination.stage_type
@@ -117,7 +118,6 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             })
 
         if self.skip_stage is False:
-
             self.next_history.update({
                 (self.source.name, destination.name): {
                     'analyze_stage_summary_metrics': self.edge_data.get(

@@ -161,6 +161,8 @@ class Graph:
         
         self.status = GraphStatus.RUNNING
 
+        summary_output: Dict[str, Stage] = {}
+
         for transition_group in self._transitions:
 
             is_idle_transition = False
@@ -217,6 +219,12 @@ class Graph:
                         )
 
                         await error_transtiton.execute() 
+ 
+                    if transition.edge.source.stage_type == StageTypes.ANALYZE:
+                        stage_name = transition.edge.source.name
+                        submit_stage_context = transition.edge.source.context
+
+                        summary_output[stage_name] = submit_stage_context.get('analyze_stage_summary_metrics')
 
                 if self.status == GraphStatus.FAILED:
                     status_spinner.finalize()
@@ -246,8 +254,10 @@ class Graph:
 
         self.execution_time = execution_start - time.monotonic()
 
+
         for transition_group in self._transitions:
             for transition in transition_group:
+
                 transition.edge.source.context = None
                 transition.edge.destination.context = None
                 transition.edge.history = None
@@ -263,6 +273,8 @@ class Graph:
         for task in pending_tasks:
             if task != run_task and task.cancelled() is False:
                 task.cancel()
+
+        return summary_output
 
     def cleanup(self):
         for executor in self.runner.executors:

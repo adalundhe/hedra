@@ -1,3 +1,4 @@
+import psutil
 from collections import defaultdict
 from typing import Dict, List, Union, Any
 from hedra.core.engines.types.common.types import RequestTypes
@@ -33,6 +34,13 @@ class ResultsSet:
         self.total_elapsed: float = execution_results.get('total_elapsed', 0)
         self.total_results: int = execution_results.get('total_results', 0)
 
+        self.stage_batch_size = execution_results.get('stage_batch_size', 0)
+        self.stage_optimized = execution_results.get('stage_optimized', False)
+        self.stage_persona_type = execution_results.get('stage_persona_type', 'default')
+        self.stage_workers = execution_results.get(
+            'stage_persona_type',
+            psutil.cpu_count(logical=False)
+        )
 
         self.results: List[BaseResult] = execution_results.get('stage_results', [])
 

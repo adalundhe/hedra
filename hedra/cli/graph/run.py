@@ -19,6 +19,7 @@ from hedra.logging import (
     LoggerTypes,
     logging_manager
 )
+from hedra.logging.table.summary_table import SummaryTable
 
 uvloop.install()
 
@@ -174,10 +175,13 @@ def run_graph(
             getattr(signal, signame),
             lambda signame=signame: handle_loop_stop(signame)
         )
-    
+
     try:
-        loop.run_until_complete(graph.run())
-        pass
+        graph_execution_results = loop.run_until_complete(graph.run())
+        summary_table = SummaryTable(graph_execution_results)
+        
+        summary_table.generate_tables()
+        summary_table.show_tables()
         
     except BrokenPipeError:
         pass

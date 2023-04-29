@@ -36,7 +36,7 @@ class SubmitEdge(BaseEdge[Submit]):
             'analyze_stage_summary_metrics'
         ]
         self.provides = [
-            'analyze_stage_summary_metrics'
+            'submit_stage_metrics'
         ]
 
     async def transition(self):
@@ -91,7 +91,7 @@ class SubmitEdge(BaseEdge[Submit]):
         if self.skip_stage is False:
             self.next_history.update({
                 (self.source.name, destination.name): {
-                    'analyze_stage_summary_metrics': self.edge_data['analyze_stage_summary_metrics'] 
+                    'submit_stage_metrics': self.edge_data['submit_stage_metrics'] 
                 }
             })
 

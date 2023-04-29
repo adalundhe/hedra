@@ -1,4 +1,17 @@
-from typing import Union, List
+import statistics
+from typing import Union, List, Dict, Any
+from hedra.core.experiments.distribution_types import DistributionTypes
+from hedra.reporting.metric import MetricsSet
+
+
+RawSummaryItem = Dict[str, Union[str, int, float, bool, List[float]]]
+
+MutationSummary = Dict[str, Union[int, float, bool, str]]
+
+VariantSummary = Dict[str, Union[int, float, bool, str, MutationSummary]]
+
+ExperimentSummary = Dict[str, Union[int, float, Dict[str, VariantSummary], List[str]]]
+
 
 class ExperimentMetricsSet:
 
@@ -6,6 +19,234 @@ class ExperimentMetricsSet:
         self.experiment_name: Union[str, None] = None
         self.randomized: Union[bool, None] = None
         self.participants: List[str] = []
-        self.variants = {}
-        self.mutations = []
-        self.metrics = {}
+        self.variants: Dict[str, Dict[str, Any]] = {}
+        self.mutations: Dict[str, List[Dict[str, Any]]] = {}
+        self.metrics: Dict[str, Dict[str, MetricsSet]] = {}
+        
+        self.experiments_table_headers: Dict[str, str] = {}
+        self.variants_table_headers: Dict[str, str] = {}
+        self.mutations_table_headers: Dict[str, str] = {}
+        self.mutations_summaries: Dict[str, str] = {}
+
+        self.experiments_summary: ExperimentSummary = {}
+
+        self.experiments_table_header_keys = [
+            'experiment_name',
+            'experiment_randomized',
+            'experiment_completed',
+            'experiment_succeeded',
+            'experiment_failed',
+            'experiment_median_actions_per_second'
+        ]
+
+        self.variants_table_header_keys = [
+            'variant_participant_name',
+            'variant_experiment',
+            'variant_weight',
+            'variant_distribution_type',
+            'variant_distribution_interval_duration',
+            'variant_completed',
+            'variant_succeeded',
+            'variant_failed',
+            'variant_actions_per_second',
+            'variant_relative_completed',
+            'variant_relative_succeeded',
+            'variant_relative_failed',
+            'variant_relative_actions_per_second'
+        ]
+
+        self.mutations_table_headers_keys = [
+            'mutation_name',
+            'mutation_experiment_name',
+            'mutation_variant_name',
+            'mutation_targets',
+            'mutation_type'
+        ]
+
+    def generate_variant_summaries(self) -> Dict[str, VariantSummary]:
+
+        variants_summaries = {}
+
+        for participant in self.participants:
+            variant = self.variants.get(participant)
+            mutations = self.mutations.get(participant)
+            metrics_set = self.metrics.get(participant)
+
+            group_variant_summaries: Dict[str, Union[int, List[float]]] = {
+                'variant_completed': 0,
+                'variant_succeeded': 0,
+                'variant_failed': 0,
+                'variant_actions_per_second': []
+            }
+            for variant_metric_set in metrics_set.values():
+                group_variant_summaries['variant_completed'] += variant_metric_set.common_stats.get('total')
+                group_variant_summaries['variant_succeeded'] += variant_metric_set.common_stats.get('succeeded')
+                group_variant_summaries['variant_failed'] += variant_metric_set.common_stats.get('failed')
+                group_variant_summaries['variant_actions_per_second'].append(
+                    variant_metric_set.common_stats.get('actions_per_second')
+                )
+
+            group_variant_summaries['variant_actions_per_second'] = round(
+                statistics.median(
+                    group_variant_summaries.get('variant_actions_per_second')
+                ), 2
+            )
+
+            variant_distribution_type: DistributionTypes = variant.get('variant_distribution_type')
+
+            variant_summary = {
+                'variant_participant_name': participant,
+                'variant_weight': variant.get('variant_weight'),
+                'variant_distribution_type': variant_distribution_type.name.capitalize(),
+                'variant_distribution_interval_duration': variant.get('variant_distribution_interval_duration'),
+                'variant_mutation_summaries': {},
+                **group_variant_summaries,
+            }
+
+
+            if len(mutations) > 0:
+
+                for mutation in mutations:
+
+                    mutation_name = mutation.get('mutation_name')
+
+                    mutations_summary = {
+                        'mutation_experiment_name': self.experiment_name,
+                        'mutation_variant_name': participant,
+                        'mutation_name': mutation_name,
+                        'mutation_chance': str(mutation.get('mutation_chance')),
+                        'mutation_targets': ', '.join(mutation.get('mutation_targets')),
+                        'mutation_type': mutation.get('mutation_type')
+                    }
+
+                    self.mutations_table_headers.update({
+                        header_name: header_name.replace(
+                            'mutation_', ''
+                        ).replace(
+                            '_', ' '
+                        ) for header_name in mutations_summary.keys()
+                    })
+                        
+                    self.mutations_summaries[mutation_name] = mutations_summary
+
+                    variant_summary['variant_mutation_summaries'][mutation_name] = mutations_summary
+
+            variants_summaries[participant] = variant_summary
+
+        return variants_summaries
+    
+    def generate_experiment_summary(self) -> None:
+        variant_summaries = self.generate_variant_summaries()
+
+        experiment_summary: RawSummaryItem = {
+            'experiment_name': self.experiment_name,
+            'experiment_randomized': self.randomized,
+            'experiment_completed': 0,
+            'experiment_succeeded': 0,
+            'experiment_failed': 0,
+            'experiment_variant_summaries': {}
+        }
+
+        experiment_actions_per_second = []
+
+        for participant in self.participants:
+
+            selected_variant_summary = variant_summaries.get(participant)
+            selected_variant_summary['variant_experiment'] = self.experiment_name
+
+            variant_stats: Dict[str, List[Union[int, float]]] = {
+                'alt_variants_completed': [],
+                'alt_variants_succeeded': [],
+                'alt_variants_failed': [],
+                'alt_variants_actions_per_second': [],
+            }
+
+            for variant_name, variant_summary in variant_summaries.items():
+
+                if variant_name != participant:
+
+                    variant_stats['alt_variants_completed'].append(
+                        variant_summary.get('variant_completed')
+                    )
+
+                    variant_stats['alt_variants_succeeded'].append(
+                        variant_summary.get('variant_succeeded')
+                    )
+
+                    variant_stats['alt_variants_failed'].append(
+                        variant_summary.get('variant_failed')
+                    )
+
+                    variant_stats['alt_variants_actions_per_second'].append(
+                        variant_summary.get('variant_actions_per_second')
+                    )
+            
+            variant_total_completed = selected_variant_summary.get('variant_completed')
+            mean_alt_variants_total_completed = statistics.mean(
+                variant_stats.get('alt_variants_completed')
+            )
+
+            selected_variant_summary['variant_relative_completed'] = round(
+                variant_total_completed/mean_alt_variants_total_completed,
+                2
+            )
+            
+            variant_total_succeeded = selected_variant_summary.get('variant_succeeded')
+            mean_alt_variants_total_succeeded = statistics.mean(
+                variant_stats.get('alt_variants_succeeded')
+            )
+
+            selected_variant_summary['variant_relative_succeeded'] = round(
+                variant_total_succeeded/mean_alt_variants_total_succeeded,
+                2
+            )
+
+            variant_total_failed = selected_variant_summary.get('variant_failed')
+            mean_alt_variants_total_failed = statistics.mean(
+                variant_stats.get('alt_variants_failed')
+            )
+
+            selected_variant_summary['variant_relative_failed'] = round(
+                variant_total_failed/mean_alt_variants_total_failed,
+                2
+            )
+
+            variant_total_actions_per_second = selected_variant_summary.get('variant_actions_per_second')
+            median_alt_variants_actions_per_second = statistics.median(
+                variant_stats.get('alt_variants_actions_per_second')
+            )
+
+            selected_variant_summary['variant_relative_actions_per_second'] = round(
+                variant_total_actions_per_second/median_alt_variants_actions_per_second,
+                2
+            )
+
+            self.variants_table_headers.update({
+                header_name: header_name.replace(
+                    'variant_', ''
+                ).replace(
+                    '_', ' '
+                ) for header_name in selected_variant_summary.keys() if 'mutation' not in header_name
+            })
+
+            experiment_summary['experiment_variant_summaries'][participant] = selected_variant_summary
+
+            experiment_summary['experiment_completed'] += selected_variant_summary.get('variant_completed')
+            experiment_summary['experiment_succeeded'] += selected_variant_summary.get('variant_succeeded')
+            experiment_summary['experiment_failed'] += selected_variant_summary.get('variant_failed')
+            
+            experiment_actions_per_second.append(
+                variant_summary.get('variant_actions_per_second')
+            )
+
+        experiment_summary['experiment_median_actions_per_second'] = statistics.median(experiment_actions_per_second)
+
+        self.experiments_table_headers = {
+            header_name: header_name.replace(
+                'experiment_', ''
+            ).replace(
+                '_', ' '
+            ) for header_name in experiment_summary.keys() if 'variant' not in header_name
+        }
+        
+        self.experiments_summary = experiment_summary

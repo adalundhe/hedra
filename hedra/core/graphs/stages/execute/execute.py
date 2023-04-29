@@ -329,7 +329,8 @@ class Execute(Stage, Generic[Unpack[T]]):
         self,
         execute_stage_has_multiple_workers: bool = False,
         execute_stage_persona: DefaultPersona=None,
-        execute_stage_experiment: Optional[Dict[str, Any]]=None
+        execute_stage_experiment: Optional[Dict[str, Any]]=None,
+        execute_stage_setup_config: Config=None,
     ):
         if execute_stage_has_multiple_workers is False:
 
@@ -360,6 +361,10 @@ class Execute(Stage, Generic[Unpack[T]]):
                 ],
                 'execute_stage_results': ResultsSet({
                     'stage': self.name,
+                    'stage_batch_size': execute_stage_setup_config.batch_size,
+                    'stage_persona_type': execute_stage_setup_config.persona_type,
+                    'stage_workers': self.workers,
+                    'stage_optimized': self.optimized,
                     'stage_results': results,
                     'total_results': total_results,
                     'total_elapsed': total_elapsed,

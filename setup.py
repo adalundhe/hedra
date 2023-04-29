@@ -58,7 +58,8 @@ setup(
         'uvloop',
         'tdigest',
         'pydantic',
-        'GitPython'
+        'GitPython',
+        'tabulate'
     ],
     entry_points = {
         'console_scripts': [

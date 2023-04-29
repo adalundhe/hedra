@@ -361,5 +361,4 @@ def optimize_stage(serialized_config: str):
         raise ProcessKilledError()
     
     except Exception as e:
-        print(traceback.format_exc())
         raise e
