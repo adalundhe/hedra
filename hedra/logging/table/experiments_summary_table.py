@@ -104,7 +104,7 @@ class ExperimentsSummaryTable:
         return tabulate(
             list(sorted(
                 variant_table_rows,
-                key=lambda row: row['participant name']
+                key=lambda row: row['name']
             )),
             headers='keys',
             missingval='None',
