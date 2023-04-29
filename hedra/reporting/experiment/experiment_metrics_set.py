@@ -36,23 +36,23 @@ class ExperimentMetricsSet:
             'experiment_completed',
             'experiment_succeeded',
             'experiment_failed',
-            'experiment_median_actions_per_second'
+            'experiment_median_aps'
         ]
 
         self.variants_table_header_keys = [
-            'variant_participant_name',
+            'variant_name',
             'variant_experiment',
             'variant_weight',
-            'variant_distribution_type',
-            'variant_distribution_interval_duration',
+            'variant_distribution',
+            'variant_distribution_interval',
             'variant_completed',
             'variant_succeeded',
             'variant_failed',
             'variant_actions_per_second',
-            'variant_relative_completed',
-            'variant_relative_succeeded',
-            'variant_relative_failed',
-            'variant_relative_actions_per_second'
+            'variant_ratio_completed',
+            'variant_ratio_succeeded',
+            'variant_ratio_failed',
+            'variant_ratio_aps'
         ]
 
         self.mutations_table_headers_keys = [
@@ -95,10 +95,10 @@ class ExperimentMetricsSet:
             variant_distribution_type: DistributionTypes = variant.get('variant_distribution_type')
 
             variant_summary = {
-                'variant_participant_name': participant,
+                'variant_name': participant,
                 'variant_weight': variant.get('variant_weight'),
-                'variant_distribution_type': variant_distribution_type.name.capitalize(),
-                'variant_distribution_interval_duration': variant.get('variant_distribution_interval_duration'),
+                'variant_distribution': variant_distribution_type.name.capitalize(),
+                'variant_distribution_interval': variant.get('variant_distribution_interval_duration'),
                 'variant_mutation_summaries': {},
                 **group_variant_summaries,
             }
@@ -186,7 +186,7 @@ class ExperimentMetricsSet:
                 variant_stats.get('alt_variants_completed')
             )
 
-            selected_variant_summary['variant_relative_completed'] = round(
+            selected_variant_summary['variant_ratio_completed'] = round(
                 variant_total_completed/mean_alt_variants_total_completed,
                 2
             )
@@ -196,7 +196,7 @@ class ExperimentMetricsSet:
                 variant_stats.get('alt_variants_succeeded')
             )
 
-            selected_variant_summary['variant_relative_succeeded'] = round(
+            selected_variant_summary['variant_ratio_succeeded'] = round(
                 variant_total_succeeded/mean_alt_variants_total_succeeded,
                 2
             )
@@ -206,7 +206,7 @@ class ExperimentMetricsSet:
                 variant_stats.get('alt_variants_failed')
             )
 
-            selected_variant_summary['variant_relative_failed'] = round(
+            selected_variant_summary['variant_ratio_failed'] = round(
                 variant_total_failed/mean_alt_variants_total_failed,
                 2
             )
@@ -216,7 +216,7 @@ class ExperimentMetricsSet:
                 variant_stats.get('alt_variants_actions_per_second')
             )
 
-            selected_variant_summary['variant_relative_actions_per_second'] = round(
+            selected_variant_summary['variant_ratio_aps'] = round(
                 variant_total_actions_per_second/median_alt_variants_actions_per_second,
                 2
             )
@@ -239,7 +239,7 @@ class ExperimentMetricsSet:
                 variant_summary.get('variant_actions_per_second')
             )
 
-        experiment_summary['experiment_median_actions_per_second'] = statistics.median(experiment_actions_per_second)
+        experiment_summary['experiment_median_aps'] = statistics.median(experiment_actions_per_second)
 
         self.experiments_table_headers = {
             header_name: header_name.replace(

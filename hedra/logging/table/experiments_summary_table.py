@@ -76,7 +76,10 @@ class ExperimentsSummaryTable:
 
 
         return tabulate(
-            experiment_table_rows,
+            list(sorted(
+                experiment_table_rows,
+                key=lambda row: row['name']
+            )),
             headers='keys',
             missingval='None',
             tablefmt="simple_outline"
@@ -84,7 +87,7 @@ class ExperimentsSummaryTable:
 
     def _generate_variants_table(self) -> str:
 
-        variant_table_rows: List[str] = []
+        variant_table_rows: List[OrderedDict] = []
 
         for experiment_summary in self.experiments_summaries.values():
             experiment_variants = experiment_summary.get('experiment_variant_summaries')
@@ -99,7 +102,10 @@ class ExperimentsSummaryTable:
                 variant_table_rows.append(table_row)
 
         return tabulate(
-            variant_table_rows,
+            list(sorted(
+                variant_table_rows,
+                key=lambda row: row['participant name']
+            )),
             headers='keys',
             missingval='None',
             tablefmt="simple_outline"
@@ -107,7 +113,7 @@ class ExperimentsSummaryTable:
     
     def _generate_mutations_table(self) -> str:
 
-        mutation_table_rows: List[str] = []
+        mutation_table_rows: List[OrderedDict] = []
 
         for experiment_summary in self.experiments_summaries.values():
             experiment_variants = experiment_summary.get('experiment_variant_summaries')
@@ -126,7 +132,10 @@ class ExperimentsSummaryTable:
                     mutation_table_rows.append(table_row)
 
         return tabulate(
-            mutation_table_rows,
+            list(sorted(
+                mutation_table_rows,
+                key=lambda row: row['name']
+            )),
             headers='keys',
             missingval='None',
             tablefmt="simple_outline"
