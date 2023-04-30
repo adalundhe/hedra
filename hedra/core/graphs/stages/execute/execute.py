@@ -24,6 +24,7 @@ from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
 from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from hedra.core.personas.persona_registry import (
     get_persona, 
     registered_personas, 
@@ -238,10 +239,11 @@ class Execute(Stage, Generic[Unpack[T]]):
         self,
         execute_stage_has_multiple_workers: bool = False,
         execute_stage_results: List[List[Any]]=[],
-        execute_stage_experiment: Optional[Dict[str, Any]]=None
+        execute_stage_experiment: Optional[Dict[str, Any]]=None,
+        execute_stage_setup_config: Config=None,
     ):
         if execute_stage_has_multiple_workers:
-            execute_stage_streamed_analytics = []
+            execute_stage_streamed_analytics: List[StreamAnalytics] = []
             aggregate_results = []
             elapsed_times = []
             stage_contexts = defaultdict(list)
@@ -272,6 +274,11 @@ class Execute(Stage, Generic[Unpack[T]]):
                 'execute_stage_streamed_analytics': execute_stage_streamed_analytics,
                 'execute_stage_results':  ResultsSet({
                     'stage': self.name,
+                    'streamed_analytics': execute_stage_streamed_analytics,
+                    'stage_batch_size': execute_stage_setup_config.batch_size,
+                    'stage_persona_type': execute_stage_setup_config.persona_type,
+                    'stage_workers': self.workers,
+                    'stage_optimized': self.optimized,
                     'stage_results': aggregate_results,
                     'total_results': total_results,
                     'total_elapsed': total_elapsed,
@@ -361,6 +368,9 @@ class Execute(Stage, Generic[Unpack[T]]):
                 ],
                 'execute_stage_results': ResultsSet({
                     'stage': self.name,
+                    'streamed_analytics': [
+                        execute_stage_persona.streamed_analytics
+                    ],
                     'stage_batch_size': execute_stage_setup_config.batch_size,
                     'stage_persona_type': execute_stage_setup_config.persona_type,
                     'stage_workers': self.workers,

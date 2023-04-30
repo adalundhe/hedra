@@ -1,7 +1,12 @@
+from decimal import Decimal
 from pydantic import (
     BaseModel,
-    StrictFloat
+    StrictFloat,
+    StrictStr,
+    StrictInt
 )
+from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
+from typing import Union, List
 
 
 class TotalMetrics(BaseModel):
@@ -106,3 +111,24 @@ class ReadingMetrics(WritingMetrics):
 
 class GroupMetricsSet(ReadingMetrics):
     pass
+
+
+class StageMetrics(BaseModel):
+    name: StrictStr
+    persona: StrictStr
+    batch_size: StrictInt
+    total: StrictInt
+    succeeded: StrictInt
+    failed: StrictInt
+    aps: StrictFloat
+    time: StrictFloat
+    μ_sec: Union[StrictFloat, Decimal]
+    μ_waiting: Union[StrictFloat, Decimal]
+    μ_connecting: Union[StrictFloat, Decimal]
+    μ_reading: Union[StrictFloat, Decimal]
+    μ_writing: Union[StrictFloat, Decimal]
+    streamed_completion_rates: Union[List[float], None]
+    streamed_completed: Union[List[float], None]
+    streamed_succeeded: Union[List[float], None]
+    streamed_failed: Union[List[float], None]
+    streamed_batch_timings: Union[List[float], None]

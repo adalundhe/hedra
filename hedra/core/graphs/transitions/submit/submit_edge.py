@@ -174,7 +174,7 @@ class SubmitEdge(BaseEdge[Submit]):
                         stage_metrics_summary.metrics_sets.values()
                     ))
 
-                    session_total += stage_metrics_summary.total_completed
+                    session_total += stage_metrics_summary.stage_metrics.total
 
         self.edge_data['analyze_stage_events'] = events
         self.edge_data['analyze_stage_summary_metrics'] = metrics

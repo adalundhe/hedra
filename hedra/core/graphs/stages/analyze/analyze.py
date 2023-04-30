@@ -17,6 +17,7 @@ from hedra.core.hooks.types.event.decorator import event
 from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.event_types import EventType
+from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from hedra.logging import logging_manager
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.experiment.experiment_metrics_set import ExperimentMetricsSet
@@ -262,6 +263,9 @@ class Analyze(Stage):
     ):
         stage_total_times = {}
         stage_batch_sizes = {}
+        stage_streamed_analytics: Dict[str, List[StreamAnalytics]] = {}
+        analyze_stage_batch_configs = {}
+        stage_personas = {}
 
         for stage_name, _, assigned_workers_count in analyze_stage_batches:
             
@@ -272,6 +276,7 @@ class Analyze(Stage):
             stage_total_time = stage_results.total_elapsed
             
             stage_total_times[stage_name] = stage_total_time
+            stage_streamed_analytics[stage_name] = stage_results.stage_streamed_analytics
 
             results_count = len(results)
             
@@ -290,19 +295,24 @@ class Analyze(Stage):
                     results[assigned_workers_count * batch_size:]
                 )
 
-            stage_batch_sizes[stage_name] = stage_batches
+            analyze_stage_batch_configs[stage_name] = stage_batches
+            stage_batch_sizes[stage_name] = stage_results.stage_batch_size
+            stage_personas[stage_name] = stage_results.stage_persona_type
 
         return {
             'analyze_stage_target_stages': {},
+            'analyze_stage_batch_configs': analyze_stage_batch_configs,
             'analyze_stage_total_times': stage_total_times,
-            'analyze_stage_batch_sizes': stage_batch_sizes
+            'analyze_stage_batch_sizes': stage_batch_sizes,
+            'analyze_stage_personas': stage_personas,
+            'analyze_stage_streamed_analytics': stage_streamed_analytics
         }
 
     @context('create_stage_batches')
     async def assign_stage_batches(
         self,
         analyze_stage_batches: List[Tuple[str, Any, int]]=[],
-        analyze_stage_batch_sizes: Dict[str, List[List[Any]]]=[],
+        analyze_stage_batch_configs: Dict[str, List[List[Any]]]=[],
         analyze_stage_metric_hook_names: List[str]=[],
         analyze_stage_has_multiple_workers: bool=False
     ):
@@ -331,7 +341,7 @@ class Analyze(Stage):
                             'analyze_stage_name': stage_name,
                             'analyze_stage_metric_hooks': list(analyze_stage_metric_hook_names),
                             'analyze_stage_batched_results': batch
-                        } for batch in analyze_stage_batch_sizes[stage_name]
+                        } for batch in analyze_stage_batch_configs[stage_name]
                     ]
                 ))
                 
@@ -360,7 +370,7 @@ class Analyze(Stage):
         analyze_stage_configs: List[StageConfig]=[],
         multiple_stages_to_process: bool=False,
         analyze_stage_deserialized_results: RawResultsSet = {},
-        analyze_stage_has_multiple_workers: bool=False
+        analyze_stage_has_multiple_workers: bool=False,
     ):
 
         if multiple_stages_to_process and analyze_stage_has_multiple_workers:
@@ -456,17 +466,28 @@ class Analyze(Stage):
         analyze_stage_custom_metrics_set: CustomMetricsSet={},
         analyze_stage_events_set: EventsSet={},
         analyze_stage_total_times: Dict[str, float]={},
+        analyze_stage_personas: Dict[str, str]={},
+        analyze_stage_batch_sizes: Dict[str, int]={},
+        analyze_stage_streamed_analytics: Dict[str, List[StreamAnalytics]] = {}
     ):
 
         processed_results = []
         
         for stage_name, stage_events in analyze_stage_events_set.items():    
 
-            stage_metrics_summary = StageMetricsSummary()
-            grouped_stats = {}
-
-            stage_total = 0
             stage_total_time = analyze_stage_total_times.get(stage_name)
+
+            persona_type = analyze_stage_personas.get(stage_name)
+            batch_size = analyze_stage_batch_sizes.get(stage_name)
+
+            stage_metrics_summary = StageMetricsSummary(
+                stage_name=stage_name,
+                persona_type=persona_type,
+                batch_size=batch_size,
+                total_elapsed=stage_total_time,
+                stage_streamed_analytics=analyze_stage_streamed_analytics.get(stage_name)
+            )
+            grouped_stats = {}
 
             for event_group_name, events_group in stage_events.items():  
 
@@ -501,20 +522,10 @@ class Analyze(Stage):
 
                 grouped_stats[event_group_name] = metric
 
-                stage_total += events_group.total
-
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Convererted stats for stage - {stage_name} to metrics set')
         
-            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Calculated results for - {stage_total} - actions from stage - {stage_name}')
-
-            stage_metrics_summary.total_completed = stage_total
-            stage_metrics_summary.total_time = stage_total_time
-            stage_metrics_summary.actions_per_second = round(
-                stage_total/stage_total_time,
-                2
-            )
-
             stage_metrics_summary.calculate_action_and_task_metrics()
+            await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Calculated results for - {stage_metrics_summary.stage_metrics.total} - actions from stage - {stage_name}')
 
             processed_results.append((
                 stage_name,

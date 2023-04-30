@@ -12,6 +12,7 @@ from hedra.core.engines.types.playwright import PlaywrightResult
 from hedra.core.engines.types.task import TaskResult
 from hedra.core.engines.types.udp import UDPResult
 from hedra.core.engines.types.websocket import WebsocketResult
+from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 
 
 ResultsBatch = Dict[str, Union[List[BaseResult], float]]
@@ -31,6 +32,8 @@ class ResultsSet:
     ) -> None:
 
         self.stage: str = execution_results.get('stage')
+        self.stage_streamed_analytics: Union[List[StreamAnalytics], None] = execution_results.get('streamed_analytics')
+
         self.total_elapsed: float = execution_results.get('total_elapsed', 0)
         self.total_results: int = execution_results.get('total_results', 0)
 
@@ -89,6 +92,11 @@ class ResultsSet:
     def copy(self):
         return ResultsSet({
             'stage': self.stage,
+            'streamed_analytics': list(self.stage_streamed_analytics),
+            'stage_batch_size': self.stage_batch_size,
+            'stage_persona_type': self.stage_persona_type,
+            'stage_workers': self.stage_workers,
+            'stage_optimized': self.stage_optimized,
             'total_elapsed': self.total_elapsed,
             'total_results': self.total_results,
             'stage_results': list(self.results),

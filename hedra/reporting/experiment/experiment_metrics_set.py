@@ -45,15 +45,20 @@ class ExperimentMetricsSet:
             'variant_weight',
             'variant_distribution',
             'variant_distribution_interval',
-            'variant_completed',
-            'variant_succeeded',
-            'variant_failed',
-            'variant_actions_per_second',
             'variant_ratio_completed',
             'variant_ratio_succeeded',
             'variant_ratio_failed',
             'variant_ratio_aps'
         ]
+
+        self.variants_stats_table_header_keys = [
+            'variant_name',
+            'variant_completed',
+            'variant_succeeded',
+            'variant_failed',
+            'variant_actions_per_second',
+        ]
+
 
         self.mutations_table_headers_keys = [
             'mutation_name',

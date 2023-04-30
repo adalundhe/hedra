@@ -59,7 +59,8 @@ setup(
         'tdigest',
         'pydantic',
         'GitPython',
-        'tabulate'
+        'tabulate',
+        'plotille'
     ],
     entry_points = {
         'console_scripts': [
