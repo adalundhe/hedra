@@ -30,7 +30,7 @@ class ExecutionSummaryTable:
         self._graph_time_steps: List[int] = []
 
         self.session_metrics: List[str] = [
-            'completed',
+            'total',
             'succeeded',
             'failed'
         ]
@@ -84,7 +84,7 @@ class ExecutionSummaryTable:
 
         self.logger.console.sync.info('')
 
-        if self._has_streamed:
+        if self._has_streamed and self.enabled_tables.get('stages'):
             completion_rates = self.stage_streamed_data.get('completion_rates')
             for stage_name, stage_completion_rates in completion_rates.items():
 

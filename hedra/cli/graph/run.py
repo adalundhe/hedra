@@ -20,6 +20,9 @@ from hedra.logging import (
     logging_manager
 )
 from hedra.logging.table.summary_table import SummaryTable
+from hedra.logging.table.table_types import GraphExecutionResults
+from typing import Dict, Union
+
 
 uvloop.install()
 
@@ -27,6 +30,8 @@ def run_graph(
     path: str, 
     cpus: int, 
     skip: str,
+    show_summaries: str,
+    hide_summaries: str,
     log_level: str, 
     logfiles_directory: str,
     bypass_connection_validation: bool,
@@ -176,12 +181,11 @@ def run_graph(
             lambda signame=signame: handle_loop_stop(signame)
         )
 
+
+    graph_execution_results: Union[GraphExecutionResults, None] = None
+
     try:
         graph_execution_results = loop.run_until_complete(graph.run())
-        summary_table = SummaryTable(graph_execution_results)
-        
-        summary_table.generate_tables()
-        summary_table.show_tables()
         
     except BrokenPipeError:
         pass
@@ -201,9 +205,29 @@ def run_graph(
         exit_code = 1  
 
     else:
+
+        if graph_execution_results:
+            enabled_summaries = show_summaries.split(',')
+            disabled_summaries = hide_summaries.split(',')
+
+            summaries_visibility_config: Dict[str, bool] = {}
+
+            for enabled_summary in enabled_summaries:
+                summaries_visibility_config[enabled_summary] = True
+
+            for disabled_summary in disabled_summaries:
+                summaries_visibility_config[disabled_summary] = False
+                
+            summary_table = SummaryTable(
+                graph_execution_results,
+                summaries_visibility_config=summaries_visibility_config
+            )
+            
+            summary_table.generate_tables()
+            summary_table.show_tables()
+            
         logger.filesystem.sync['hedra.core'].info(f'{graph.metadata_string} - Completed - {graph.logger.spinner.display.total_timer.elapsed_message}\n')
         logger.console.sync.info(f'\nGraph - {graph_name.capitalize()} - completed! {graph.logger.spinner.display.total_timer.elapsed_message}\n')
-
     
     if graph.status == GraphStatus.FAILED or graph.status == GraphStatus.COMPLETE:
         child_processes = active_children()

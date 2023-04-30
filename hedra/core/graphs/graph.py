@@ -11,6 +11,7 @@ from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.transitions.transition_group import TransitionGroup
 from hedra.logging import HedraLogger
+from hedra.logging.table.table_types import GraphExecutionResults
 from .transitions import TransitionAssembler, local_transitions
 from .status import GraphStatus
 
@@ -34,6 +35,7 @@ class Graph:
         self.graph_path = config.get('graph_path')
         self.graph_id = str(uuid.uuid4())
         self.graph_skipped_stages = config.get('graph_skipped_stages', [])
+
         self.status = GraphStatus.INITIALIZING
         self.graph = networkx.DiGraph()
         self.logger = HedraLogger()
@@ -150,7 +152,7 @@ class Graph:
         self.logger.hedra.sync.debug(f'{self.metadata_string} - Assembly complete')
         self.logger.filesystem.sync['hedra.core'].debug(f'{self.metadata_string} - Assembly complete')
 
-    async def run(self):
+    async def run(self) -> GraphExecutionResults:
 
         execution_start = time.monotonic()
 
@@ -161,7 +163,7 @@ class Graph:
         
         self.status = GraphStatus.RUNNING
 
-        summary_output: Dict[str, Stage] = {}
+        summary_output: GraphExecutionResults = {}
 
         for transition_group in self._transitions:
 

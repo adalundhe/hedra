@@ -46,7 +46,7 @@ class ExperimentsSummaryTable:
     def show_tables(self):
 
         if self.enabled_tables.get('experiments'):
-            self.logger.console.sync.filter('\nExperiments\n')
+            self.logger.console.sync.info('\nExperiments\n')
             self.logger.console.sync.info(f'''{self.experiments_table}\n''')
 
         if self.enabled_tables.get('variants'):

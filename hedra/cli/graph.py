@@ -20,14 +20,24 @@ def graph():
     help='Number of CPUs to use. Default is the number of physical processesors available to the system.'
 )
 @click.option(
-    '--log-level',
-    default='info',
-    help='Set log level.'
-)
-@click.option(
     '--skip',
     default='',
     help='Comma-delimited list of Stage names to skip.'
+)
+@click.option(
+    '--show-summaries',
+    default='',
+    help='Comma-delimited list of results tables to show upon completion.'
+)
+@click.option(
+    '--hide-summaries',
+    default='',
+    help='Comma-delimited list of results tables to omit upon completion.'
+)
+@click.option(
+    '--log-level',
+    default='info',
+    help='Set log level.'
 )
 @click.option(
     '--log-directory',
@@ -57,6 +67,8 @@ def run(
     path: str, 
     cpus: int, 
     skip: str,
+    show_summaries: str,
+    hide_summaries: str,
     log_level: str, 
     log_directory: str,
     bypass_connection_validation: bool,
@@ -67,6 +79,8 @@ def run(
         path, 
         cpus,
         skip, 
+        show_summaries,
+        hide_summaries,
         log_level, 
         log_directory,
         bypass_connection_validation,

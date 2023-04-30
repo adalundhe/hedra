@@ -13,7 +13,8 @@ class SummaryTable:
 
     def __init__(
         self,
-        graph_execution_results: GraphExecutionResults
+        graph_execution_results: GraphExecutionResults,
+        summaries_visibility_config: Dict[str, bool]={}
     ) -> None:
         self.experiment_summary_table: Union[ExperimentsSummaryTable, None] = None
         self.execution_summary_table: Union[ExecutionSummaryTable, None] = None
@@ -68,6 +69,7 @@ class SummaryTable:
                     )
 
         self.execution_summary_table = ExecutionSummaryTable(execution_results)
+        self.execution_summary_table.enabled_tables.update(summaries_visibility_config)
         
 
         if len(experiment_summaries) > 0:
@@ -76,6 +78,8 @@ class SummaryTable:
                 experiment_headers,
                 experiment_headers_keys
             )
+            
+            self.experiment_summary_table.enabled_tables.update(summaries_visibility_config)
 
     def generate_tables(self):
         self.execution_summary_table.generate_tables()
