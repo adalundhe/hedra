@@ -69,7 +69,9 @@ class SummaryTable:
                     )
 
         self.execution_summary_table = ExecutionSummaryTable(execution_results)
-        self.execution_summary_table.enabled_tables.update(summaries_visibility_config)
+        self.execution_summary_table.enabled_tables.update({
+            table_name: enabled for table_name, enabled in summaries_visibility_config.items() if table_name in self.execution_summary_table.enabled_tables
+        })
         
 
         if len(experiment_summaries) > 0:
@@ -79,7 +81,9 @@ class SummaryTable:
                 experiment_headers_keys
             )
             
-            self.experiment_summary_table.enabled_tables.update(summaries_visibility_config)
+            self.experiment_summary_table.enabled_tables.update({
+                table_name: enabled for table_name, enabled in summaries_visibility_config.items() if table_name in self.experiment_summary_table.enabled_tables
+            })
 
     def generate_tables(self):
         self.execution_summary_table.generate_tables()

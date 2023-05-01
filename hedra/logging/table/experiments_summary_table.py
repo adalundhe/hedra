@@ -44,10 +44,8 @@ class ExperimentsSummaryTable:
         self.mutations_table = self._generate_mutations_table()
 
     def show_tables(self):
-
-        enabled = True in list(self.enabled_tables.values())
-
-        if enabled:
+        
+        if any(self.enabled_tables.values()):
             self.logger.console.sync.info('\n-- Experiments --')
 
         if self.enabled_tables.get('experiments'):
