@@ -9,6 +9,13 @@ from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from typing import Union, List, Dict
 
 
+class CommonMetrics(BaseModel):
+    total: StrictInt
+    succeeded: StrictInt
+    failed: StrictInt
+    aps: StrictFloat
+
+
 class TotalMetrics(BaseModel):
     total_med: StrictFloat
     total_μ: StrictFloat

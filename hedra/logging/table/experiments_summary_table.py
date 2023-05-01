@@ -33,7 +33,7 @@ class ExperimentsSummaryTable:
 
         self.enabled_tables = {
             'experiments': False,
-            'variants': True,
+            'variants': False,
             'mutations': False
         }
 

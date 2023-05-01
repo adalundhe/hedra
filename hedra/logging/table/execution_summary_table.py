@@ -27,6 +27,8 @@ class ExecutionSummaryTable:
         self.stage_streamed_data = defaultdict(dict)
         self._has_streamed = False
         self._graph_time_steps: List[int] = []
+        self.actions_and_tasks_common_table_rows: List[OrderedDict] = []
+        self.actions_and_tasks_common_table: Union[str, None] = None
 
         self.session_metrics: List[str] = [
             'total',
@@ -40,7 +42,8 @@ class ExecutionSummaryTable:
         self.enabled_tables = {
             'session': False,
             'stages': True,
-            'actions': True
+            'actions': True,
+            'timings': False
         }
 
         self.actions_and_tasks_table_rows: Dict[str, List[OrderedDict]] = defaultdict(list)
@@ -117,6 +120,26 @@ class ExecutionSummaryTable:
                 )
             )
 
+        self.actions_and_tasks_common_table_rows = list(sorted(
+            self.actions_and_tasks_common_table_rows,
+            key=lambda row: row['name']
+        ))
+
+        self.actions_and_tasks_common_table = tabulate(
+                self.actions_and_tasks_common_table_rows,
+                headers='keys',
+                missingval='None',
+                tablefmt="simple",
+                floatfmt=(
+                    '.2f',
+                    '.2f',
+                    '.2f',
+                    '.2f',
+                    '.2f',
+                    '.2f'
+                )
+            )
+
     def show_tables(self):
 
         self.logger.console.sync.info('')
@@ -159,7 +182,11 @@ class ExecutionSummaryTable:
 
         if self.enabled_tables.get('actions'):
             self.logger.console.sync.info('\n-- Actions and Tasks --\n')
-            
+
+            self.logger.console.sync.info('Overall:\n')
+            self.logger.console.sync.info(f'''{self.actions_and_tasks_common_table}\n''')
+
+        if self.enabled_tables.get('actions') and self.enabled_tables.get('timings'):
             for table_name, table in self.actions_and_tasks_tables.items():
                 self.logger.console.sync.info(f'{table_name.capitalize()}:\n')
                 self.logger.console.sync.info(f'''{table}\n''')
@@ -209,6 +236,17 @@ class ExecutionSummaryTable:
 
         for stage_name, stage_metrics in self.execution_results.items():
             for action_or_task_name, group_metrics_set in stage_metrics.action_and_task_metrics.items():
+
+                table_row = OrderedDict()
+                table_row['name'] = action_or_task_name
+                table_row['stage'] = stage_name
+
+                common_metrics = stage_metrics.common_metrics.get(action_or_task_name)
+                common_metrics_data = common_metrics.dict()
+                for field_name, field_value in common_metrics_data.items():
+                    table_row[field_name] = field_value
+
+                self.actions_and_tasks_common_table_rows.append(table_row)
 
                 for group in stage_metrics.groups:
                     table_row = OrderedDict()

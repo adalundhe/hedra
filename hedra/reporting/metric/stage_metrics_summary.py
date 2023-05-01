@@ -3,7 +3,8 @@ from decimal import Decimal
 from typing import Dict, List, Optional, Union
 from .metrics_set_types import (
     GroupMetricsSet,
-    StageMetrics
+    StageMetrics,
+    CommonMetrics
 )
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from .metrics_set import MetricsSet
@@ -88,6 +89,12 @@ class StageMetricsSummary:
             'reading'
         ]
 
+        self.common_fields: List[str] = [
+            'total',
+            'succeeded',
+            'failed'
+        ]
+
         self.fields: List[str] = [
             'med',
             'μ',
@@ -147,6 +154,8 @@ class StageMetricsSummary:
             ) for header_name in self.action_or_task_header_keys
         }
 
+        self.common_metrics: Dict[str, CommonMetrics] = {}
+
     def calculate_action_and_task_metrics(self):
         self._group_action_and_task_metrics()
         self._calculate_stage_totals()
@@ -167,6 +176,7 @@ class StageMetricsSummary:
             self.stage_metrics.failed += metric_set.common_stats.get('failed')
 
             grouped_metrics = {}
+            common_metrics = {}
 
             for group_name, group_metrics in metric_set.groups.items():
 
@@ -178,6 +188,12 @@ class StageMetricsSummary:
 
                         grouped_metrics[metric_key] = field_value
 
+            for table_key in self.common_fields:
+                common_metrics[table_key] = metric_set.common_stats.get(table_key)
+            
+            common_metrics['aps'] = metric_set.common_stats.get('actions_per_second')
+
+            self.common_metrics[action_or_task_name] = CommonMetrics(**common_metrics)
             self.action_and_task_metrics[action_or_task_name] = GroupMetricsSet(**grouped_metrics)
         
     def _calculate_stage_totals(self):
