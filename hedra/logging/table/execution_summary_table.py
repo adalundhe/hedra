@@ -225,7 +225,6 @@ class ExecutionSummaryTable:
                             '_', ' '
                         )
 
-                        table_name = f'{header_name} sec'
-                        table_row[table_name] = field_value
+                        table_row[header_name] = field_value
                     
                     self.actions_and_tasks_table_rows[group].append(table_row)
