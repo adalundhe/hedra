@@ -1,5 +1,6 @@
 from __future__ import annotations
 import networkx
+import matplotlib.pyplot as plt
 from collections import defaultdict
 from typing import List, Union, Dict
 from hedra.core.hooks.types.base.event import BaseEvent
@@ -177,5 +178,4 @@ class EventGraph:
             
             event.source.stage_instance.dispatcher.add_event(event)
         
-        # networkx.draw_networkx(self.hooks_graph, pos=networkx.spring_layout(self.hooks_graph), with_labels=True, arrows=True)
-        # plt.show()
+     

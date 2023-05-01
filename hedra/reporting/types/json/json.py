@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import List, TextIO
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
+from hedra.reporting.experiment.experiment_metrics_set import ExperimentMetricsSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
 from .json_config import JSONConfig
@@ -39,6 +40,8 @@ class JSON:
     def __init__(self, config: JSONConfig) -> None:
         self.events_filepath = config.events_filepath
         self.metrics_filepath = config.metrics_filepath
+        self.experiments_filepath = config.experiments_filepath
+        
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._loop: asyncio.AbstractEventLoop = None
 
@@ -48,6 +51,8 @@ class JSON:
         self.logger.initialize()
 
         self.events_file: TextIO = None
+        self.experiments_file: TextIO = None
+        self.metrics_file: TextIO = None
         self.write_mode = 'w'
         self.pattern = re.compile("_copy[0-9]+")
 
@@ -65,6 +70,48 @@ class JSON:
             directory,
             f'{filename}_{events_file_timestamp}.json'
         )
+
+    async def submit_experiments(self, experiments: List[ExperimentMetricsSet]):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Experiments to file - {self.experiments_filepath}')
+
+        records = {}
+        for experiment_metrics_set in experiments:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Experiment - {experiment_metrics_set.experiment_name}:{experiment_metrics_set.experiment_metrics_set_id}')
+
+            records[experiment_metrics_set.experiment_name] = experiment_metrics_set.experiments_summary.dict()
+        
+        if self.experiments_file is None:
+            self.experiments_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.experiments_filepath,
+                    'w'
+                )
+            )
+
+            for signame in ('SIGINT', 'SIGTERM'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        self.experiments_file
+                    )
+                )
+
+        await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                json.dump,
+                records, 
+                self.experiments_file, 
+                indent=4
+            )
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Experiments to file - {self.experiments_filepath}')
 
     async def submit_events(self, events: List[BaseProcessedResult]):
 
@@ -150,29 +197,25 @@ class JSON:
                 'groups': groups
             }
 
-        metrics_file = await self._loop.run_in_executor(
-            self._executor,
-            functools.partial(
-                open,
-                self.metrics_filepath,
-                'w'
+        if self.metrics_file is None:
+            self.metrics_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.metrics_filepath,
+                    'w'
+                )
             )
-        )
 
         await self._loop.run_in_executor(
             self._executor,
             functools.partial(
                 json.dump,
                 records, 
-                metrics_file, 
+                self.metrics_file, 
                 indent=4
             )
         )
-
-        await self._loop.run_in_executor(
-            self._executor,
-            metrics_file.close
-        )        
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Metrics to file - {self.metrics_filepath}')
 
@@ -189,7 +232,18 @@ class JSON:
                 self._executor,
                 self.events_file.close
             )
-        
+
+        if self.experiments_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.experiments_file.close
+            )
+        if self.metrics_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.metrics_file.close
+            )        
+            
         self._executor.shutdown()
 
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')

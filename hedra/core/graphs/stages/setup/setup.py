@@ -172,6 +172,7 @@ class Setup(Stage, Generic[Unpack[T]]):
     @Internal()
     async def run(self):
         await self.setup_events()
+        self.dispatcher.assemble_execution_graph()
         await self.dispatcher.dispatch_events(self.name)
 
     @Internal()
@@ -179,12 +180,12 @@ class Setup(Stage, Generic[Unpack[T]]):
         await self.setup_events()
         
         initial_events = dict(**self.dispatcher.initial_events)
-        for stage in self.dispatcher.initial_events:
-            self.dispatcher.initial_events[stage] = [
-                initial_event for initial_event in self.dispatcher.initial_events[stage] if initial_event.source.shortname in self.source_internal_events
-            ]
+        self.dispatcher.skip_list.extend([
+            stage_event.event_name for stage_event in self.dispatcher.events_by_name.values() if stage_event.source.shortname not in self.internal_events
+        ])
 
         self.dispatcher.initial_events = initial_events
+        self.dispatcher.assemble_execution_graph()
         await self.dispatcher.dispatch_events(self.name)
     
     @context()

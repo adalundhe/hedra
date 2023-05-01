@@ -40,4 +40,5 @@ class Act(Stage, Generic[Unpack[T]]):
     @Internal()
     async def run(self):
         await self.setup_events()
+        self.dispatcher.assemble_execution_graph()
         await self.dispatcher.dispatch_events(self.name)

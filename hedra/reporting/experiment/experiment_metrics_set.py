@@ -1,4 +1,5 @@
 import statistics
+import uuid
 from typing import Union, List, Dict, Any
 from hedra.core.experiments.distribution_types import DistributionTypes
 from hedra.reporting.metric import MetricsSet
@@ -16,6 +17,7 @@ RawSummaryItem = Dict[str, Union[str, int, float, bool, List[float]]]
 class ExperimentMetricsSet:
 
     def __init__(self) -> None:
+        self.experiment_metrics_set_id = uuid.uuid4()
         self.experiment_name: Union[str, None] = None
         self.randomized: Union[bool, None] = None
         self.participants: List[str] = []

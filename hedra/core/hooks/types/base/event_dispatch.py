@@ -1,5 +1,7 @@
 from __future__ import annotations
 import asyncio
+import networkx
+import matplotlib.pyplot as plt
 from collections import OrderedDict, defaultdict
 from typing import List, Union, Dict, Any, Tuple
 from hedra.core.hooks.types.action.event import ActionEvent
@@ -43,6 +45,7 @@ class EventDispatcher:
         self.channels: Dict[str, ChannelEvent] = {}
         self.skip_list = []
         self.source_name = None
+        self.graph: networkx.DiGraph = networkx.DiGraph()
 
     def __iter__(self):
         for event_type in self.events:
@@ -82,6 +85,7 @@ class EventDispatcher:
             ]
 
         dispatcher.assemble_action_and_task_subgraphs()
+        dispatcher.assemble_execution_graph()
 
         return dispatcher
 
@@ -102,6 +106,16 @@ class EventDispatcher:
 
         self.events_by_name[event.event_name] = event
         self.events[event.event_type].append(event)
+
+        self.graph.add_node(
+            event.event_name,
+            event=event
+        )
+
+    def assemble_execution_graph(self):
+        for event in self.events_by_name.values():
+            for target in event.next_map:
+                self.graph.add_edge(event.event_name, target)
 
     def assemble_action_and_task_subgraphs(self):
         for event_name, event in self.actions_and_tasks.items():
@@ -167,11 +181,7 @@ class EventDispatcher:
 
     async def dispatch_events(self, stage_name: str):
 
-        await asyncio.gather(*[
-            asyncio.create_task(
-                self._execute_batch(initial_event)
-            ) for initial_event in self.initial_events[stage_name] if initial_event.event_name not in self.skip_list
-        ])        
+        await self._execute_batch()       
 
     def _prepend_action_or_task_event(self, dependency_event: BaseEvent, action_or_task: BaseEvent):
         execution_path = list(dependency_event.execution_path)
@@ -216,10 +226,10 @@ class EventDispatcher:
 
         return execution_path
 
-    async def _execute_batch(self, initial_event: BaseEvent):
-        for layer in initial_event.execution_path:
+    async def _execute_batch(self):
+        for layer in networkx.topological_generations(self.graph):
             layer_events = [
-                self.events_by_name.get(event_name) for event_name in layer
+                self.events_by_name.get(event_name) for event_name in layer if event_name not in self.skip_list
             ]
 
             results: List[Dict[str, Any]] = await asyncio.gather(*[

@@ -188,6 +188,13 @@ class Reporter:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected')
 
+    async def submit_experiments(self, experiments: List[Any]):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting {len(experiments)} experiments')
+        await self.selected_reporter.submit_experiments(experiments)
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted {len(experiments)} experiments')
+
+
     async def submit_common(self, metrics: List[Any]):
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting {len(metrics)} shared metrics')
         await self.selected_reporter.submit_common(metrics)

@@ -144,6 +144,7 @@ class Analyze(Stage):
         self.executor.batch_by_stages = True
 
         await self.setup_events()
+        self.dispatcher.assemble_execution_graph()
         await self.dispatcher.dispatch_events(self.name)
 
     @context()
@@ -499,7 +500,10 @@ class Analyze(Stage):
                     'total': events_group.total,
                     'succeeded': events_group.succeeded,
                     'failed': events_group.failed,
-                    'actions_per_second': events_group.total/stage_total_time,
+                    'actions_per_second': round(
+                        events_group.total/stage_total_time,
+                        2
+                    ),
                     'errors': list([
                         {
                             'message': error_message,

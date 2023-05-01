@@ -48,9 +48,9 @@ class BaseEvent(Generic[T]):
         self.as_hook = False
         self.context: SimpleContext = SimpleContext()
         self.events: Dict[str, BaseEvent] = {}
-        self.execution_path = []
-        self.previous_map = []
-        self.next_map = []
+        self.execution_path: List[List[str]] = []
+        self.previous_map: List[str] = []
+        self.next_map: List[str] = []
         self.next_args: Dict[str, Dict[str,Any]] = defaultdict(dict)
 
     def __getattribute__(self, name: str) -> Any:

@@ -1,6 +1,7 @@
 from __future__  import annotations
 import inspect
 import asyncio
+import traceback
 from collections import defaultdict
 from typing import List, Dict, Any, Union
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
@@ -8,6 +9,7 @@ from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.submit.submit import Submit
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.registrar import registrar
+from hedra.reporting.experiment.experiment_metrics_set import ExperimentMetricsSet
 from hedra.reporting.metric import MetricsSet
 from hedra.reporting.metric.custom_metric import CustomMetric
 from hedra.core.hooks.types.base.simple_context import SimpleContext
@@ -34,7 +36,7 @@ class SubmitEdge(BaseEdge[Submit]):
         self.requires = [
             'analyze_stage_session_total',
             'analyze_stage_events',
-            'analyze_stage_summary_metrics'
+            'analyze_stage_summary_metrics',
         ]
         self.provides = [
             'submit_stage_metrics'
@@ -74,6 +76,7 @@ class SubmitEdge(BaseEdge[Submit]):
             self.visited.append(self.source.name)
 
         except Exception as edge_exception:
+            print(traceback.format_exc())
             self.exception = edge_exception
 
         return None, self.destination.stage_type
@@ -150,6 +153,7 @@ class SubmitEdge(BaseEdge[Submit]):
         
         events: List[BaseProcessedResult] = []
         metrics: List[MetricsSet] = []
+        experiments: List[ExperimentMetricsSet] = []
         session_total: int = 0
 
         for source_stage, destination_stage in self.history:
@@ -176,9 +180,15 @@ class SubmitEdge(BaseEdge[Submit]):
 
                     session_total += stage_metrics_summary.stage_metrics.total
 
-        self.edge_data['analyze_stage_events'] = events
-        self.edge_data['analyze_stage_summary_metrics'] = metrics
-        self.edge_data['analyze_stage_session_total'] = session_total
+                experiment_metrics_sets = analyze_stage_summary_metrics.get('experiment_metrics_sets', {})
+                experiments.extend(list(
+                    experiment_metrics_sets.values()
+                ))
+
+        self.edge_data['submit_stage_events'] = events
+        self.edge_data['submit_stage_experiment_metrics'] = experiments
+        self.edge_data['submit_stage_summary_metrics'] = metrics
+        self.edge_data['submit_stage_session_total'] = session_total
 
 
 

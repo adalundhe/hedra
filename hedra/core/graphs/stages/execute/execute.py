@@ -90,6 +90,7 @@ class Execute(Stage, Generic[Unpack[T]]):
     @Internal()
     async def run(self):
         await self.setup_events()
+        self.dispatcher.assemble_execution_graph()
         await self.dispatcher.dispatch_events(self.name)
 
     @context()
@@ -106,7 +107,9 @@ class Execute(Stage, Generic[Unpack[T]]):
             'execute_stage_results',
             'execute_stage_streamed_analytics'
         ]
-        persona_type_name = execute_stage_setup_config.persona_type.capitalize()
+        persona_type_name = '-'.join([
+            segment.capitalize() for segment in execute_stage_setup_config.persona_type.split('-')
+        ])
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing - {execute_stage_setup_config.batch_size} - VUs over {self.workers} threads for {execute_stage_setup_config.total_time_string} using - {persona_type_name} - persona')
         await self.logger.spinner.append_message(f'Stage {self.name} executing - {execute_stage_setup_config.batch_size} - VUs over {self.workers} threads for {execute_stage_setup_config.total_time_string} using - {persona_type_name} - persona')
