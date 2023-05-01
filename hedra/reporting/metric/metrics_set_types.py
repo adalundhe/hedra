@@ -6,112 +6,148 @@ from pydantic import (
     StrictInt
 )
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
-from typing import Union, List
+from typing import Union, List, Dict
 
 
 class TotalMetrics(BaseModel):
-    total_median: StrictFloat
-    total_mean: StrictFloat
-    total_variance: StrictFloat
-    total_stdev: StrictFloat
-    total_minimum: StrictFloat
-    total_maximum: StrictFloat
-    total_quantile_10th: StrictFloat
-    total_quantile_20th: StrictFloat
-    total_quantile_30th: StrictFloat
-    total_quantile_40th: StrictFloat
-    total_quantile_50th: StrictFloat
-    total_quantile_60th: StrictFloat
-    total_quantile_70th: StrictFloat
-    total_quantile_80th: StrictFloat
-    total_quantile_90th: StrictFloat
-    total_quantile_95th: StrictFloat
-    total_quantile_99th: StrictFloat
+    total_med: StrictFloat
+    total_μ: StrictFloat
+    total_var: StrictFloat
+    total_std: StrictFloat
+    total_min: StrictFloat
+    total_max: StrictFloat
+    total_q_10: StrictFloat
+    total_q_20: StrictFloat
+    total_q_30: StrictFloat
+    total_q_40: StrictFloat
+    total_q_50: StrictFloat
+    total_q_60: StrictFloat
+    total_q_70: StrictFloat
+    total_q_80: StrictFloat
+    total_q_90: StrictFloat
+    total_q_95: StrictFloat
+    total_q_99: StrictFloat
 
 
 class WaitingMetrics(TotalMetrics):
-    waiting_median: StrictFloat
-    waiting_mean: StrictFloat
-    waiting_variance: StrictFloat
-    waiting_stdev: StrictFloat
-    waiting_minimum: StrictFloat
-    waiting_maximum: StrictFloat
-    waiting_quantile_10th: StrictFloat
-    waiting_quantile_20th: StrictFloat
-    waiting_quantile_30th: StrictFloat
-    waiting_quantile_40th: StrictFloat
-    waiting_quantile_50th: StrictFloat
-    waiting_quantile_60th: StrictFloat
-    waiting_quantile_70th: StrictFloat
-    waiting_quantile_80th: StrictFloat
-    waiting_quantile_90th: StrictFloat
-    waiting_quantile_95th: StrictFloat
-    waiting_quantile_99th: StrictFloat
+    waiting_med: StrictFloat
+    waiting_μ: StrictFloat
+    waiting_var: StrictFloat
+    waiting_std: StrictFloat
+    waiting_min: StrictFloat
+    waiting_max: StrictFloat
+    waiting_q_10: StrictFloat
+    waiting_q_20: StrictFloat
+    waiting_q_30: StrictFloat
+    waiting_q_40: StrictFloat
+    waiting_q_50: StrictFloat
+    waiting_q_60: StrictFloat
+    waiting_q_70: StrictFloat
+    waiting_q_80: StrictFloat
+    waiting_q_90: StrictFloat
+    waiting_q_95: StrictFloat
+    waiting_q_99: StrictFloat
 
 
 class ConnectingMetrics(WaitingMetrics):
-    connecting_median: StrictFloat
-    connecting_mean: StrictFloat
-    connecting_variance: StrictFloat
-    connecting_stdev: StrictFloat
-    connecting_minimum: StrictFloat
-    connecting_maximum: StrictFloat
-    connecting_quantile_10th: StrictFloat
-    connecting_quantile_20th: StrictFloat
-    connecting_quantile_30th: StrictFloat
-    connecting_quantile_40th: StrictFloat
-    connecting_quantile_50th: StrictFloat
-    connecting_quantile_60th: StrictFloat
-    connecting_quantile_70th: StrictFloat
-    connecting_quantile_80th: StrictFloat
-    connecting_quantile_90th: StrictFloat
-    connecting_quantile_95th: StrictFloat
-    connecting_quantile_99th: StrictFloat
+    connecting_med: StrictFloat
+    connecting_μ: StrictFloat
+    connecting_var: StrictFloat
+    connecting_std: StrictFloat
+    connecting_min: StrictFloat
+    connecting_max: StrictFloat
+    connecting_q_10: StrictFloat
+    connecting_q_20: StrictFloat
+    connecting_q_30: StrictFloat
+    connecting_q_40: StrictFloat
+    connecting_q_50: StrictFloat
+    connecting_q_60: StrictFloat
+    connecting_q_70: StrictFloat
+    connecting_q_80: StrictFloat
+    connecting_q_90: StrictFloat
+    connecting_q_95: StrictFloat
+    connecting_q_99: StrictFloat
 
 
 class WritingMetrics(ConnectingMetrics):
-    writing_median: StrictFloat
-    writing_mean: StrictFloat
-    writing_variance: StrictFloat
-    writing_stdev: StrictFloat
-    writing_minimum: StrictFloat
-    writing_maximum: StrictFloat
-    writing_quantile_10th: StrictFloat
-    writing_quantile_20th: StrictFloat
-    writing_quantile_30th: StrictFloat
-    writing_quantile_40th: StrictFloat
-    writing_quantile_50th: StrictFloat
-    writing_quantile_60th: StrictFloat
-    writing_quantile_70th: StrictFloat
-    writing_quantile_80th: StrictFloat
-    writing_quantile_90th: StrictFloat
-    writing_quantile_95th: StrictFloat
-    writing_quantile_99th: StrictFloat
+    writing_med: StrictFloat
+    writing_μ: StrictFloat
+    writing_var: StrictFloat
+    writing_std: StrictFloat
+    writing_min: StrictFloat
+    writing_max: StrictFloat
+    writing_q_10: StrictFloat
+    writing_q_20: StrictFloat
+    writing_q_30: StrictFloat
+    writing_q_40: StrictFloat
+    writing_q_50: StrictFloat
+    writing_q_60: StrictFloat
+    writing_q_70: StrictFloat
+    writing_q_80: StrictFloat
+    writing_q_90: StrictFloat
+    writing_q_95: StrictFloat
+    writing_q_99: StrictFloat
 
 
 class ReadingMetrics(WritingMetrics):
-    reading_median: StrictFloat
-    reading_mean: StrictFloat
-    reading_variance: StrictFloat
-    reading_stdev: StrictFloat
-    reading_minimum: StrictFloat
-    reading_maximum: StrictFloat
-    reading_quantile_10th: StrictFloat
-    reading_quantile_20th: StrictFloat
-    reading_quantile_30th: StrictFloat
-    reading_quantile_40th: StrictFloat
-    reading_quantile_50th: StrictFloat
-    reading_quantile_60th: StrictFloat
-    reading_quantile_70th: StrictFloat
-    reading_quantile_80th: StrictFloat
-    reading_quantile_90th: StrictFloat
-    reading_quantile_95th: StrictFloat
-    reading_quantile_99th: StrictFloat
+    reading_med: StrictFloat
+    reading_μ: StrictFloat
+    reading_var: StrictFloat
+    reading_std: StrictFloat
+    reading_min: StrictFloat
+    reading_max: StrictFloat
+    reading_q_10: StrictFloat
+    reading_q_20: StrictFloat
+    reading_q_30: StrictFloat
+    reading_q_40: StrictFloat
+    reading_q_50: StrictFloat
+    reading_q_60: StrictFloat
+    reading_q_70: StrictFloat
+    reading_q_80: StrictFloat
+    reading_q_90: StrictFloat
+    reading_q_95: StrictFloat
+    reading_q_99: StrictFloat
 
 
 class GroupMetricsSet(ReadingMetrics):
-    pass
 
+    def get_group(self, group: str) -> Dict[str, Union[int, float]]:
+        return {
+            key: value for key, value in self.dict().items() if group in key
+        }
+
+
+    @property
+    def total(self) -> Dict[str, Union[int, float]]:
+        return {
+            key: value for key, value in self.dict().items() if 'total' in key
+        }
+
+
+    @property
+    def waiting(self) -> Dict[str, Union[int, float]]:
+        return {
+            key: value for key, value in self.dict().items() if 'waiting' in key
+        }
+
+    @property
+    def connecting(self) -> Dict[str, Union[int, float]]:
+        return {
+            key: value for key, value in self.dict().items() if 'connecting' in key
+        }
+    
+    @property
+    def reading(self) -> Dict[str, Union[int, float]]:
+        return {
+            key: value for key, value in self.dict().items() if 'reading' in key
+        }
+    
+    @property
+    def writing(self) -> Dict[str, Union[int, float]]:
+        return {
+            key: value for key, value in self.dict().items() if 'writing' in key
+        }
+        
 
 class StageMetrics(BaseModel):
     name: StrictStr

@@ -3,9 +3,8 @@ from collections import (
     OrderedDict,
     defaultdict
 )
-from termcolor import colored
 from tabulate import tabulate
-from typing import List, Union
+from typing import List, Union, Dict
 from .table_types import ExecutionResults
 from hedra.logging import HedraLogger
 
@@ -40,12 +39,16 @@ class ExecutionSummaryTable:
 
         self.enabled_tables = {
             'session': False,
-            'stages': True
+            'stages': True,
+            'actions': False
         }
 
+        self.actions_and_tasks_table_rows: Dict[str, List[OrderedDict]] = defaultdict(list)
+        self.actions_and_tasks_tables: Dict[str, str] = {}
 
     def generate_tables(self):
         self._generate_stage_and_session_tables()
+        self._generate_actions_and_tasks_table()
 
         self.session_table = tabulate(
             self.session_table_rows,
@@ -80,6 +83,40 @@ class ExecutionSummaryTable:
             )
         )
 
+        for table_name, table_rows in self.actions_and_tasks_table_rows.items():
+            self.actions_and_tasks_table_rows[table_name] = list(sorted(
+                table_rows,
+                key=lambda row: row['name']
+            ))
+
+            self.actions_and_tasks_tables[table_name] = tabulate(
+                self.actions_and_tasks_table_rows[table_name],
+                headers='keys',
+                missingval='None',
+                tablefmt="simple",
+                floatfmt=(
+                    '.2E', 
+                    '.2E', 
+                    '.2E', 
+                    '.2E', 
+                    '.2E', 
+                    '.2E', 
+                    '.2E', 
+                    '.2E', 
+                    '.2E', 
+                    '.2E', 
+                    '.2E', 
+                    '.2E', 
+                    '.2E', 
+                    '.2E', 
+                    '.2E', 
+                    '.2E', 
+                    '.2E',
+                    '.2E', 
+                    '.2E'
+                )
+            )
+
     def show_tables(self):
 
         self.logger.console.sync.info('')
@@ -112,13 +149,20 @@ class ExecutionSummaryTable:
                 self.logger.console.sync.info(f'''{scatter_plot}\n''')
         
         if self.enabled_tables.get('session'):
-            self.logger.console.sync.info('\nSession:\n')
+            self.logger.console.sync.info('\n-- Session --\n')
             self.logger.console.sync.info(f'''{self.session_table}\n''')
 
 
         if self.enabled_tables.get('stages'):
-            self.logger.console.sync.info('\nStages:\n')
+            self.logger.console.sync.info('\n-- Stages --\n')
             self.logger.console.sync.info(f'''{self.stages_table}\n''')
+
+        if self.enabled_tables.get('actions'):
+            self.logger.console.sync.info('\n-- Actions and Tasks --\n')
+            
+            for table_name, table in self.actions_and_tasks_tables.items():
+                self.logger.console.sync.info(f'{table_name.capitalize()}:\n')
+                self.logger.console.sync.info(f'''{table}\n''')
 
     def _generate_stage_and_session_tables(self):
         
@@ -160,6 +204,28 @@ class ExecutionSummaryTable:
                 self.stage_streamed_data['completion_rates'][stage_summary.stage_metrics.name] = stage_summary.stage_metrics.streamed_completion_rates
 
         self.session_table_rows.append(session_row)
+
+    def _generate_actions_and_tasks_table(self):
+
+        for stage_name, stage_metrics in self.execution_results.items():
+            for action_or_task_name, group_metrics_set in stage_metrics.action_and_task_metrics.items():
+
+                for group in stage_metrics.groups:
+                    table_row = OrderedDict()
+                    table_row['name'] = action_or_task_name
+                    table_row['stage'] = stage_name
+                
+                    metrics = group_metrics_set.get_group(group)
             
+                    for field_name, field_value in metrics.items():
+                        
+                        header_name = field_name.replace(
+                            f'{group}_', ''
+                        ).replace(
+                            '_', ' '
+                        )
 
-
+                        table_name = f'{header_name} sec'
+                        table_row[table_name] = field_value
+                    
+                    self.actions_and_tasks_table_rows[group].append(table_row)

@@ -45,8 +45,10 @@ class ExperimentsSummaryTable:
 
     def show_tables(self):
 
+        self.logger.console.sync.info('\n-- Experiments --\n')
+
         if self.enabled_tables.get('experiments'):
-            self.logger.console.sync.info('\nExperiments\n')
+            self.logger.console.sync.info('\nExperiments:\n')
             self.logger.console.sync.info(f'''{self.experiments_table}\n''')
 
         if self.enabled_tables.get('variants'):

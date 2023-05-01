@@ -89,6 +89,26 @@ class StageMetricsSummary:
         ]
 
         self.fields: List[str] = [
+            'med',
+            'μ',
+            'var',
+            'std',
+            'min',
+            'max',
+            'q_10',
+            'q_20',
+            'q_30',
+            'q_40',
+            'q_50',
+            'q_60',
+            'q_70',
+            'q_80',
+            'q_90',
+            'q_95',
+            'q_99'
+        ]
+
+        self._record_fields: List[str] = [
             'median',
             'mean',
             'variance',
@@ -108,6 +128,11 @@ class StageMetricsSummary:
             'quantile_99th'
         ]
 
+        self._record_fields_map: Dict[str, str] = {}
+
+        for record_field, table_field in zip(self._record_fields, self.fields):
+            self._record_fields_map[record_field] = table_field
+        
         self.action_or_task_header_keys: List[str] = []
 
         for group in self.groups:
@@ -147,9 +172,11 @@ class StageMetricsSummary:
 
                 for field_name, field_value in group_metrics.record.items():
                     if isinstance(field_value, (int, float,)):
-                        metric_key = f'{group_name}_{field_name}'
-                        grouped_metrics[metric_key] = field_value
 
+                        table_field_name = self._record_fields_map.get(field_name)
+                        metric_key = f'{group_name}_{table_field_name}'
+
+                        grouped_metrics[metric_key] = field_value
 
             self.action_and_task_metrics[action_or_task_name] = GroupMetricsSet(**grouped_metrics)
         
@@ -160,11 +187,11 @@ class StageMetricsSummary:
         )
 
         for group_metrics_set in self.action_and_task_metrics.values():
-            self.stage_metrics.μ_sec = group_metrics_set.total_mean
-            self.stage_metrics.μ_waiting += group_metrics_set.waiting_mean
-            self.stage_metrics.μ_connecting += group_metrics_set.connecting_mean
-            self.stage_metrics.μ_writing += group_metrics_set.writing_mean
-            self.stage_metrics.μ_reading += group_metrics_set.reading_mean
+            self.stage_metrics.μ_sec = group_metrics_set.total_μ
+            self.stage_metrics.μ_waiting += group_metrics_set.waiting_μ
+            self.stage_metrics.μ_connecting += group_metrics_set.connecting_μ
+            self.stage_metrics.μ_writing += group_metrics_set.writing_μ
+            self.stage_metrics.μ_reading += group_metrics_set.reading_μ
 
 
         self.stage_metrics.μ_sec = Decimal(
