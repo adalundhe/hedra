@@ -40,7 +40,7 @@ class ExecutionSummaryTable:
         self.enabled_tables = {
             'session': False,
             'stages': True,
-            'actions': False
+            'actions': True
         }
 
         self.actions_and_tasks_table_rows: Dict[str, List[OrderedDict]] = defaultdict(list)
