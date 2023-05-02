@@ -6,13 +6,13 @@ import uuid
 import psutil
 import signal
 import os
-import re
 import time
 from pathlib import Path
 from typing import List, TextIO
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from xml.dom.minidom import parseString
+from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric.metrics_set import MetricsSet
 from .xml_config import XMLConfig
@@ -44,6 +44,7 @@ class XML:
     def __init__(self, config: XMLConfig) -> None:
         self.events_filepath = config.events_filepath
         self.metrics_filepath = Path(config.metrics_filepath).absolute()
+        self.experiments_filepath = config.experiments_filepath
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._loop: asyncio.AbstractEventLoop = None
 
@@ -52,17 +53,158 @@ class XML:
         self.logger = HedraLogger()
         self.logger.initialize()
 
+        experiments_path = Path(self.experiments_filepath)
+        experiments_directory = experiments_path.parent
+        experiments_filename = experiments_path.stem
+
+        self.variants_filepath = os.path.join(
+            experiments_directory,
+            f'{experiments_filename}_variants.xml'
+        )
+
+        self.mutations_filepath = os.path.join(
+            experiments_directory,
+            f'{experiments_filename}_mutations.xml'
+        )
+
         filepath = Path(config.metrics_filepath)
         base_filepath = filepath.parent
         base_filename = filepath.stem
 
-        self.shared_metrics_filepath = f'{base_filepath}/{base_filename}_shared.xml'
-        self.custom_metrics_filepath = f'{base_filepath}/{base_filename}_custom.xml'
-        self.errors_metrics_filepath = f'{base_filepath}/{base_filename}_errors.xml'
+        self.shared_metrics_filepath = os.path.join(
+            base_filepath,
+            f'{base_filename}_shared.xml'
+        )
+
+        self.custom_metrics_filepath = os.path.join(
+            base_filepath,
+            f'{base_filename}_custom.xml'
+        )
+
+        self.errors_metrics_filepath = os.path.join(
+            base_filepath,
+            f'{base_filename}_errors.xml'
+        )
 
         self.events_file: TextIO = None
-        self.write_mode = 'w'
-        self.pattern = re.compile("_[0-9]+")
+        self.experiments_file: TextIO = None
+        self.variants_file: TextIO = None
+        self.mutations_file: TextIO = None
+
+        self.write_mode = 'w' if config.overwrite else 'a'
+    
+    async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Experiments to file - {self.experiments_filepath}')
+
+        if self.experiments_file is None:
+            self.experiments_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.experiments_filepath,
+                    self.write_mode
+                )
+            )
+
+            for signame in ('SIGINT', 'SIGTERM'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        self.experiments_file
+                    )
+                )
+
+        experiments_xml = dicttoxml(
+            experiment_metrics.experiments, 
+            custom_root='experiments'
+        )
+
+        experiments_xml = parseString(experiments_xml)
+
+        await self._loop.run_in_executor(
+            self._executor,
+            self.experiments_file.write,
+            experiments_xml.toprettyxml()
+        )
+
+    async def submit_variants(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        if self.variants_file is None:
+            self.variants_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.variants_filepath,
+                    self.write_mode
+                )
+            )
+
+            for signame in ('SIGINT', 'SIGTERM'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        self.variants_file
+                    )
+                )
+
+        variants_xml = dicttoxml(
+            experiment_metrics.variants, 
+            custom_root='variants'
+        )
+
+        variants_xml = parseString(variants_xml)
+
+        await self._loop.run_in_executor(
+            self._executor,
+            self.variants_file.write,
+            variants_xml.toprettyxml()
+        )
+
+    async def submit_mutations(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        if self.mutations_file is None:
+            self.mutations_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.mutations_filepath,
+                    self.write_mode
+                )
+            )
+
+            for signame in ('SIGINT', 'SIGTERM'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        self.mutations_file
+                    )
+                ) 
+
+        
+
+        mutations_xml = dicttoxml(
+            experiment_metrics.mutations, 
+            custom_root='mutations'
+        )
+        
+        mutations_xml = parseString(mutations_xml)
+
+        await self._loop.run_in_executor(
+            self._executor,
+            self.mutations_file.write,
+            mutations_xml.toprettyxml()
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Events to file - {self.events_filepath}')
 
     async def connect(self):
         self._loop = asyncio._get_running_loop()
@@ -281,6 +423,24 @@ class XML:
             await self._loop.run_in_executor(
                 self._executor,
                 self.events_file.close
+            )
+
+        if self.experiments_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.experiments_file.close
+            )
+
+        if self.variants_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.variants_file.close
+            )
+
+        if self.mutations_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.mutations_file.close
             )
 
         self._executor.shutdown()

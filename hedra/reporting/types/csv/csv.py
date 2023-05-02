@@ -11,7 +11,12 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
-from hedra.reporting.experiment.experiment_metrics_set import ExperimentMetricsSet
+from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
+from hedra.reporting.experiment.experiment_metrics_set import (
+    ExperimentSummary,
+    VariantSummary,
+    MutationSummary
+)
 from hedra.reporting.metric.metrics_set import MetricsSet
 from .csv_config import CSVConfig
 has_connector = True
@@ -72,16 +77,28 @@ class CSV:
         self.experiments_file: TextIO = None
         self.variants_file: TextIO = None
         self.mutations_file: TextIO = None
-        self.write_mode = 'w'
+        self.mutations_file: TextIO = None
+        self.write_mode = 'w' if config.overwrite else 'a'
 
 
         filepath = Path(config.metrics_filepath)
         base_filepath = filepath.parent
         base_filename = filepath.stem
 
-        self.shared_metrics_filepath = f'{base_filepath}/{base_filename}_shared.csv'
-        self.custom_metrics_filepath = f'{base_filepath}/{base_filename}_custom.csv'
-        self.errors_metrics_filepath = f'{base_filepath}/{base_filename}_errors.csv'
+        self.shared_metrics_filepath = os.path.join(
+            base_filepath,
+            f'{base_filename}_shared.csv'
+        )
+
+        self.custom_metrics_filepath = os.path.join(
+            base_filepath,
+            f'{base_filename}_custom.csv'
+        )
+
+        self.errors_metrics_filepath = os.path.join(
+            base_filepath,
+            f'{base_filename}_errors.csv'
+        )
 
     async def connect(self):
         self._loop = asyncio._get_running_loop()
@@ -99,55 +116,11 @@ class CSV:
             f'{filename}_{events_file_timestamp}.csv'
         )
 
-    async def submit_experiments(self, experiments: List[ExperimentMetricsSet]):
+
+
+    async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Experiments to file - {self.experiments_filepath}')
 
-        experiments_table_headers: List[str] = []
-        experiments_records = []
-
-        variants_table_headers: List[str] = []
-        variant_records = []
-
-        mutations_table_headers: List[str] = []
-        muations_records = []
-
-        for experiment_metrics_set in experiments:
-            
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Experiment - {experiment_metrics_set.experiment_name}:{experiment_metrics_set.experiment_metrics_set_id}')
-
-            if len(experiments_table_headers) == 0:
-                experiments_table_headers = experiment_metrics_set.experiments_table_header_keys
-
-            experiments_records.append(experiment_metrics_set.experiments_summary.dict(
-                include={header for header in experiments_table_headers}
-            ))
-
-            if len(variants_table_headers) == 0:
-                variants_table_headers.extend(list(
-                    set([
-                        *experiment_metrics_set.variants_table_header_keys,
-                        *experiment_metrics_set.variants_stats_table_header_keys
-                    ])
-                ))
-        
-
-            if len(mutations_table_headers) == 0:
-                mutations_table_headers = experiment_metrics_set.mutations_table_headers_keys
-            
-         
-            for variant in experiment_metrics_set.experiments_summary.experiment_variant_summaries.values():
-                variant_records.append(
-                    variant.dict(
-                        include={header for header in variants_table_headers}
-                    )
-                )
-
-                for mutation in variant.variant_mutation_summaries.values():
-                    muations_records.append(
-                        mutation.dict(
-                            include={header for header in mutations_table_headers}
-                        )
-                    )
 
         if self.experiments_file is None:
             self.experiments_file = await self._loop.run_in_executor(
@@ -173,7 +146,7 @@ class CSV:
         if self._experiments_writer is None or self.write_mode == 'w':
             self._experiments_writer = csv.DictWriter(
                 self.experiments_file, 
-                fieldnames=experiments_table_headers
+                fieldnames=experiment_metrics.experiments_headers
             )
 
             await self._loop.run_in_executor(
@@ -184,8 +157,10 @@ class CSV:
         await self._loop.run_in_executor(
             self._executor,
             self._experiments_writer.writerows,
-            experiments_records
+            experiment_metrics.experiments
         )
+
+    async def submit_variants(self, experiment_metrics: ExperimentMetricsCollectionSet):
 
         if self.variants_file is None:
             self.variants_file = await self._loop.run_in_executor(
@@ -211,7 +186,7 @@ class CSV:
         if self._variants_writer is None or self.write_mode == 'w':
             self._variants_writer = csv.DictWriter(
                 self.variants_file, 
-                fieldnames=variants_table_headers
+                fieldnames=experiment_metrics.variants_headers
             )
 
             await self._loop.run_in_executor(
@@ -222,8 +197,10 @@ class CSV:
         await self._loop.run_in_executor(
             self._executor,
             self._variants_writer.writerows,
-            variant_records
+            experiment_metrics.variants
         )
+
+    async def submit_mutations(self, experiment_metrics: ExperimentMetricsCollectionSet):
 
         if self.mutations_file is None:
             self.mutations_file = await self._loop.run_in_executor(
@@ -249,7 +226,7 @@ class CSV:
         if self._mutations_writer is None or self.write_mode == 'w':
             self._mutations_writer = csv.DictWriter(
                 self.mutations_file, 
-                fieldnames=mutations_table_headers
+                fieldnames=experiment_metrics.mutations_headers
             )
 
             await self._loop.run_in_executor(
@@ -260,7 +237,7 @@ class CSV:
         await self._loop.run_in_executor(
             self._executor,
             self._mutations_writer.writerows,
-            muations_records
+            experiment_metrics.mutations
         )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Experiments to file - {self.experiments_filepath}')
@@ -334,6 +311,17 @@ class CSV:
                 )
         )
 
+        for signame in ('SIGINT', 'SIGTERM'):
+            self._loop.add_signal_handler(
+                getattr(signal, signame),
+                lambda signame=signame: handle_loop_stop(
+                    signame,
+                    self._executor,
+                    self._loop,
+                    shared_metrics_file
+                )
+            )
+
         if self._stage_metrics_csv_writer is None:
             self._stage_metrics_csv_writer = csv.DictWriter(shared_metrics_file, fieldnames=headers)
 
@@ -380,6 +368,17 @@ class CSV:
                 'w'
             )
         )
+
+        for signame in ('SIGINT', 'SIGTERM'):
+            self._loop.add_signal_handler(
+                getattr(signal, signame),
+                lambda signame=signame: handle_loop_stop(
+                    signame,
+                    self._executor,
+                    self._loop,
+                    metrics_file
+                )
+            )
 
         for metrics_set in metrics:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
@@ -444,6 +443,17 @@ class CSV:
                 )       
             )
 
+            for signame in ('SIGINT', 'SIGTERM'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        custom_metrics_file
+                    )
+                )
+
             for metrics_set in metrics_sets:
                 for custom_metric in metrics_set.custom_metrics.values():
                     headers.append(
@@ -506,6 +516,17 @@ class CSV:
                 'w'
             )
         )
+
+        for signame in ('SIGINT', 'SIGTERM'):
+            self._loop.add_signal_handler(
+                getattr(signal, signame),
+                lambda signame=signame: handle_loop_stop(
+                    signame,
+                    self._executor,
+                    self._loop,
+                    errors_file
+                )
+            )
             
         if self._errors_csv_writer is None:
 

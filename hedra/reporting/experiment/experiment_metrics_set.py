@@ -3,6 +3,7 @@ import uuid
 from typing import Union, List, Dict, Any
 from hedra.core.experiments.distribution_types import DistributionTypes
 from hedra.reporting.metric import MetricsSet
+from .experiments_collection import ExperimentMetricsCollection
 from .experiment_metrics_set_types import (
     MutationSummary,
     VariantSummary,
@@ -10,11 +11,47 @@ from .experiment_metrics_set_types import (
 )
 
 
-
 RawSummaryItem = Dict[str, Union[str, int, float, bool, List[float]]]
 
 
 class ExperimentMetricsSet:
+
+    experiments_table_header_keys = [
+        'experiment_name',
+        'experiment_randomized',
+        'experiment_completed',
+        'experiment_succeeded',
+        'experiment_failed',
+        'experiment_median_aps'
+    ]
+
+    variants_table_header_keys = [
+        'variant_name',
+        'variant_experiment',
+        'variant_weight',
+        'variant_distribution',
+        'variant_distribution_interval',
+        'variant_ratio_completed',
+        'variant_ratio_succeeded',
+        'variant_ratio_failed',
+        'variant_ratio_aps',
+    ]
+
+    variants_stats_table_header_keys = [
+        'variant_name',
+        'variant_completed',
+        'variant_succeeded',
+        'variant_failed',
+        'variant_actions_per_second',
+    ]
+    
+    mutations_table_headers_keys = [
+        'mutation_name',
+        'mutation_experiment_name',
+        'mutation_variant_name',
+        'mutation_targets',
+        'mutation_type'
+    ]
 
     def __init__(self) -> None:
         self.experiment_metrics_set_id = uuid.uuid4()
@@ -32,43 +69,20 @@ class ExperimentMetricsSet:
 
         self.experiments_summary: ExperimentSummary = {}
 
-        self.experiments_table_header_keys = [
-            'experiment_name',
-            'experiment_randomized',
-            'experiment_completed',
-            'experiment_succeeded',
-            'experiment_failed',
-            'experiment_median_aps'
-        ]
-
-        self.variants_table_header_keys = [
-            'variant_name',
-            'variant_experiment',
-            'variant_weight',
-            'variant_distribution',
-            'variant_distribution_interval',
-            'variant_ratio_completed',
-            'variant_ratio_succeeded',
-            'variant_ratio_failed',
-            'variant_ratio_aps'
-        ]
-
-        self.variants_stats_table_header_keys = [
-            'variant_name',
-            'variant_completed',
-            'variant_succeeded',
-            'variant_failed',
-            'variant_actions_per_second',
-        ]
-
-
-        self.mutations_table_headers_keys = [
-            'mutation_name',
-            'mutation_experiment_name',
-            'mutation_variant_name',
-            'mutation_targets',
-            'mutation_type'
-        ]
+    @classmethod
+    def experiments_fields(cls):
+        return cls.experiments_table_header_keys
+    
+    @classmethod
+    def variants_fields(cls):
+        return list(set([
+            *cls.variants_table_header_keys,
+            *cls.variants_stats_table_header_keys
+        ]))
+    
+    @classmethod
+    def mutations_fields(cls):
+        return cls.mutations_table_headers_keys
 
     def generate_variant_summaries(self) -> Dict[str, VariantSummary]:
 
@@ -259,3 +273,32 @@ class ExperimentMetricsSet:
         }
         
         self.experiments_summary = experiment_summary
+
+    
+    def split_experiments_metrics(self) -> ExperimentMetricsCollection:
+
+        variant_records: List[VariantSummary] = []
+
+        mutations_records: List[MutationSummary] = []
+
+        for variant in self.experiments_summary.experiment_variant_summaries.values():
+            variant_records.append(
+                variant.dict(
+                    include={header for header in self.variants_fields()}
+                )
+            )
+
+            for mutation in variant.variant_mutation_summaries.values():
+                mutations_records.append(
+                    mutation.dict(
+                        include={header for header in self.mutations_table_headers_keys}
+                    )
+                )
+
+        return ExperimentMetricsCollection(
+            experiment=self.experiments_summary.dict(
+                include={header for header in self.experiments_table_header_keys}
+            ),
+            variants=variant_records,
+            mutations=mutations_records
+        )

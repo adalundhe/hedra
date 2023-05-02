@@ -20,6 +20,7 @@ class BigQueryConfig(BaseModel):
     dataset_name: str
     events_table: str = 'events'
     metrics_table: str = 'metrics'
+    experiments_table: str= 'experiments'
     retry_timeout: int = 10
     custom_fields: Dict[str, bigquery.SchemaField] = {}
     reporter_type: ReporterTypes=ReporterTypes.BigQuery

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import List, TextIO
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
-from hedra.reporting.experiment.experiment_metrics_set import ExperimentMetricsSet
+from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
 from .json_config import JSONConfig
@@ -53,7 +53,7 @@ class JSON:
         self.events_file: TextIO = None
         self.experiments_file: TextIO = None
         self.metrics_file: TextIO = None
-        self.write_mode = 'w'
+        self.write_mode = 'w' if config.overwrite else 'a'
         self.pattern = re.compile("_copy[0-9]+")
 
     async def connect(self):
@@ -71,15 +71,9 @@ class JSON:
             f'{filename}_{events_file_timestamp}.json'
         )
 
-    async def submit_experiments(self, experiments: List[ExperimentMetricsSet]):
+    async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Experiments to file - {self.experiments_filepath}')
 
-        records = {}
-        for experiment_metrics_set in experiments:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Experiment - {experiment_metrics_set.experiment_name}:{experiment_metrics_set.experiment_metrics_set_id}')
-
-            records[experiment_metrics_set.experiment_name] = experiment_metrics_set.experiments_summary.dict()
-        
         if self.experiments_file is None:
             self.experiments_file = await self._loop.run_in_executor(
                 self._executor,
@@ -105,13 +99,24 @@ class JSON:
             self._executor,
             functools.partial(
                 json.dump,
-                records, 
+                {
+                    'experiments': experiment_metrics.experiments,
+                    'variants': experiment_metrics.variants,
+                    'mutations': experiment_metrics.mutations
+                }, 
                 self.experiments_file, 
                 indent=4
             )
         )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Experiments to file - {self.experiments_filepath}')
+
+
+    async def submit_variants(self, experiment_metrics: ExperimentMetricsCollectionSet):
+        pass
+
+    async def submit_mutations(self, experiment_metrics: ExperimentMetricsCollectionSet):
+        pass
 
     async def submit_events(self, events: List[BaseProcessedResult]):
 

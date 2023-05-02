@@ -6,6 +6,7 @@ import psutil
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
+from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
 from hedra.reporting.types import ReporterTypes
@@ -28,6 +29,7 @@ class AWSLambda:
 
         self.events_lambda_name = config.events_lambda
         self.metrics_lambda_name = config.metrics_lambda 
+        self.experiments_lambda_name = config.experiments_lambda
 
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._client = None
@@ -58,6 +60,30 @@ class AWSLambda:
         )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Successfully opened connection to AWS - Region: {self.region_name}')
+
+    async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Experiments to file - {self.experiments_lambda_name}')
+        
+        await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                self._client.invoke,
+                FunctionName=self.experiments_lambda_name,
+                Payload=json.dumps({
+                    'experiments': experiment_metrics.experiments,
+                    'variants': experiment_metrics.variants,
+                    'mutations': experiment_metrics.mutations
+                })
+            )
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Experiments to file - {self.experiments_lambda_name}')
+
+    async def submit_variants(self, experiment_metrics: ExperimentMetricsCollectionSet):
+        pass
+
+    async def submit_mutations(self, experiment_metrics: ExperimentMetricsCollectionSet):
+        pass
 
     async def submit_events(self, events: List[BaseProcessedResult]):
 
