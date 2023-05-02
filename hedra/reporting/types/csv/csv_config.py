@@ -6,4 +6,5 @@ from hedra.reporting.types.common.types import ReporterTypes
 class CSVConfig(BaseModel):
     events_filepath: str=f'{os.getcwd()}/events.csv'
     metrics_filepath: str=f'{os.getcwd()}/metrics.csv'
+    experiments_filepath: str=f'{os.getcwd()}/experiments.csv'
     reporter_type: ReporterTypes=ReporterTypes.CSV

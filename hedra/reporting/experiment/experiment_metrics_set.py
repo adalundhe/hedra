@@ -123,7 +123,7 @@ class ExperimentMetricsSet:
                         'mutation_variant_name': participant,
                         'mutation_name': mutation_name,
                         'mutation_chance': mutation.get('mutation_chance'),
-                        'mutation_targets': ', '.join(mutation.get('mutation_targets')),
+                        'mutation_targets': ':'.join(mutation.get('mutation_targets')),
                         'mutation_type': mutation.get('mutation_type')
                     })
 
