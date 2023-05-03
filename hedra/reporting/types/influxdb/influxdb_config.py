@@ -10,5 +10,6 @@ class InfluxDBConfig(BaseModel):
     connect_timeout: int=10000
     events_bucket: str='events'
     metrics_bucket: str='metrics'
+    experiments_bucket: str='experiments'
     secure: bool=False
     reporter_type: ReporterTypes=ReporterTypes.InfluxDB

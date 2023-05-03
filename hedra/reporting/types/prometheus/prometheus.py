@@ -2,8 +2,8 @@ import asyncio
 import uuid
 import functools
 from typing import List, Dict
-from numpy import float32, float64, int16, int32, int64
 from hedra.logging import HedraLogger
+from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import (
     MetricsSet,
@@ -57,8 +57,13 @@ class Prometheus:
             'maximum': 'gauge'
         }
 
-        self._events = {}
-        self._metrics = {}
+        self._events: Dict[str, PrometheusMetric] = {}
+        self._metrics: Dict[str, Dict[str, PrometheusMetric]] = {}
+
+        self._experiments: Dict[str, Dict[str, PrometheusMetric]] = {}
+        self._variants: Dict[str, Dict[str, PrometheusMetric]] = {}
+        self._mutations: Dict[str, Dict[str, PrometheusMetric]] = {}
+
         self._shared_metrics = {}
         self._custom_metrics: Dict[str, PrometheusMetric] = {}
         self._errors = {}
@@ -127,6 +132,150 @@ class Prometheus:
             )
 
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Pushed to Prometheus Pushgateway via HTTP')
+
+    async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments to Prometheus - Namespace: {self.namespace}')
+        
+        for experiment in experiment_metrics.experiment_summaries:
+            
+            experiment_id = uuid.uuid4()
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Experiments Set - {experiment.experiment_name}:{experiment_id}')
+
+            tags = [
+                f'{tag.name}:{tag.value}' for tag in experiment.tags
+            ]
+            
+            experiment_stats = self._experiments.get(experiment.experiment_name)
+            if experiment_stats is None:
+                experiment_stats = {}
+
+                for field in experiment.stats.keys():
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Experiment- {experiment.experiment_name}:{field}')
+
+                    metric_name = f'{experiment.experiment_name}_{field}'.replace('.', '_')
+                    metric_type = self.types_map.get(field)
+
+                    prometheus_metric = PrometheusMetric(
+                        metric_name,
+                        metric_type,
+                        metric_description=f'{experiment.experiment_name} {field}',
+                        metric_labels=[
+                            *tags
+                        ],
+                        metric_namespace=self.namespace,
+                        registry=self.registry
+                    )
+                    prometheus_metric.create_metric()
+                    
+                    experiment_stats[field] = prometheus_metric
+                
+                self._experiments[experiment.experiment_name] = experiment_stats
+
+            self._experiments[experiment.experiment_name] = experiment_stats
+            for field, value in experiment.stats.items():
+                metric = experiment_stats.get(field)
+                metric.update(value)
+
+        await self._submit_to_pushgateway()
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Experiments to Prometheus - Namespace: {self.namespace}')
+
+    async def submit_variants(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Variants to Prometheus - Namespace: {self.namespace}')
+        
+        for variant in experiment_metrics.variant_summaries:
+            
+            variant_id = uuid.uuid4()
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Variants Set - {variant.variant_name}:{variant_id}')
+
+            tags = [
+                f'{tag.name}:{tag.value}' for tag in variant.tags
+            ]
+            
+            variant_stats = self._variants.get(variant.variant_name)
+            if variant_stats is None:
+                variant_stats = {}
+
+                for field in variant.stats.keys():
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Variants- {variant.variant_name}:{field}')
+
+                    metric_name = f'{variant.variant_name}_{field}'.replace('.', '_')
+                    metric_type = self.types_map.get(field)
+
+                    prometheus_metric = PrometheusMetric(
+                        metric_name,
+                        metric_type,
+                        metric_description=f'{variant.variant_name} {field}',
+                        metric_labels=[
+                            *tags
+                        ],
+                        metric_namespace=self.namespace,
+                        registry=self.registry
+                    )
+                    prometheus_metric.create_metric()
+                    
+                    variant_stats[field] = prometheus_metric
+                
+                self._variants[variant.variant_name] = variant_stats
+
+            self._variants[variant.variant_name] = variant_stats
+            for field, value in variant.stats.items():
+                metric = variant_stats.get(field)
+                metric.update(value)
+
+        await self._submit_to_pushgateway()
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Variants to Prometheus - Namespace: {self.namespace}')
+
+    async def submit_mutations(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Mutations to Prometheus - Namespace: {self.namespace}')
+        
+        for mutation in experiment_metrics.mutation_summaries:
+            
+            mutation_id = uuid.uuid4()
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Mutations Set - {mutation.mutation_name}:{mutation_id}')
+
+            tags = [
+                f'{tag.name}:{tag.value}' for tag in mutation.tags
+            ]
+            
+            mutation_stats = self._mutations.get(mutation.mutation_name)
+            if mutation_stats is None:
+                mutation_stats = {}
+
+                for field in mutation.stats.keys():
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Mutations- {mutation.mutation_name}:{field}')
+
+                    metric_name = f'{mutation.mutation_name}_{field}'.replace('.', '_')
+                    metric_type = self.types_map.get(field)
+
+                    prometheus_metric = PrometheusMetric(
+                        metric_name,
+                        metric_type,
+                        metric_description=f'{mutation.mutation_name} {field}',
+                        metric_labels=[
+                            *tags
+                        ],
+                        metric_namespace=self.namespace,
+                        registry=self.registry
+                    )
+                    prometheus_metric.create_metric()
+                    
+                    mutation_stats[field] = prometheus_metric
+                
+                self._mutations[mutation.mutation_name] = mutation_stats
+
+            self._mutations[mutation.mutation_name] = mutation_stats
+            for field, value in mutation.stats.items():
+                metric = mutation_stats.get(field)
+                metric.update(value)
+
+        await self._submit_to_pushgateway()
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Mutations to Prometheus - Namespace: {self.namespace}')
 
     async def submit_events(self, events: List[BaseProcessedResult]):
 

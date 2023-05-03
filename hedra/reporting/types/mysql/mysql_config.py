@@ -18,6 +18,7 @@ class MySQLConfig(BaseModel):
     password: str
     events_table: str='events'
     metrics_table: str='metrics'
+    experiments_table: str='experiments'
     custom_fields: Dict[str, sqlalchemy.Column]={}
     reporter_type: ReporterTypes=ReporterTypes.MySQL
 

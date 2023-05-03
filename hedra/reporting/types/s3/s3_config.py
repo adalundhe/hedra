@@ -9,4 +9,5 @@ class S3Config(BaseModel):
     buckets_namespace: str
     events_bucket: str='events'
     metrics_bucket: str='metrics'
+    experiments_bucket: str='experiments'
     reporter_type: ReporterTypes=ReporterTypes.S3

@@ -235,8 +235,9 @@ class StageMetricsSummary:
             len(stream.interval_completion_rates) for stream in self.stage_streamed_analytics
         )
         self.stage_metrics.streamed_completion_rates = [0 for _ in range(bins_count)]
-
+        
         for idx in range(bins_count):
+
             self.stage_metrics.streamed_completion_rates[idx] = round(
                 self.stage_metrics.streamed_completed[idx]/self.stage_metrics.streamed_batch_timings[idx],
                 2
@@ -352,6 +353,9 @@ class StageMetricsSummary:
             streamed_batch_timings[idx] = statistics.median(batch_timings)
 
         for idx, batch_timing in enumerate(streamed_batch_timings):
-            streamed_batch_timings[idx] = int(batch_timing)
+            streamed_batch_timings[idx] = round(
+                batch_timing,
+                2
+            )
 
         self.stage_metrics.streamed_batch_timings = streamed_batch_timings

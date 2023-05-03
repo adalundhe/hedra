@@ -5,6 +5,7 @@ import uuid
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
+from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
 
@@ -48,19 +49,85 @@ class Honeycomb:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to Honeycomb.IO')
 
+    async def submit_experiments(self, expoeriment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments to Honeycomb.IO')
+
+        for experiment in expoeriment_metrics.experiment_summaries:
+
+            honeycomb_event = libhoney.Event(data={
+                **experiment.record
+            })
+
+            await self._loop.run_in_executor(
+                self._executor,
+                honeycomb_event.send
+            )
+
+        await self._loop.run_in_executor(
+            self._executor,
+            libhoney.flush
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Experiments to Honeycomb.IO')
+
+    async def submit_variants(self, expoeriment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Variants to Honeycomb.IO')
+
+        for variant in expoeriment_metrics.variant_summaries:
+
+            honeycomb_event = libhoney.Event(data={
+                **variant.record
+            })
+
+            await self._loop.run_in_executor(
+                self._executor,
+                honeycomb_event.send
+            )
+
+        await self._loop.run_in_executor(
+            self._executor,
+            libhoney.flush
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Variants to Honeycomb.IO')
+    
+    async def submit_mutations(self, expoeriment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Mutations to Honeycomb.IO')
+
+        for mutation in expoeriment_metrics.mutation_summaries:
+
+            honeycomb_event = libhoney.Event(data={
+                **mutation.record
+            })
+
+            await self._loop.run_in_executor(
+                self._executor,
+                honeycomb_event.send
+            )
+
+        await self._loop.run_in_executor(
+            self._executor,
+            libhoney.flush
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Mutations to Honeycomb.IO')
+
     async def submit_events(self, events: List[BaseProcessedResult]):
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to Honeycomb.IO')
 
         for event in events:
 
-            Honeycomb_event = libhoney.Event(data={
+            honeycomb_event = libhoney.Event(data={
                 **event.record
             })
 
             await self._loop.run_in_executor(
                 self._executor,
-                Honeycomb_event.send
+                honeycomb_event.send
             )
 
         await self._loop.run_in_executor(

@@ -118,7 +118,7 @@ class Datadog:
                 f'experiment_randomized:{experiment.experiment_randomized}'
             ]
 
-            for field, value in experiment.stats():
+            for field, value in experiment.stats:
 
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Experiments - {experiment.experiment_name}:{field}')
 
@@ -158,7 +158,7 @@ class Datadog:
                 f'variant_distribution:{variant.variant_distribution}',
             ]
 
-            for field, value in variant.stats():
+            for field, value in variant.stats:
 
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Variant - {variant.variant_name}:{field}')
 
@@ -200,7 +200,7 @@ class Datadog:
                 f'mutation_type:{mutation.mutation_type}',
             ]
 
-            for field, value in mutation.stats():
+            for field, value in mutation.stats:
 
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Mutation - {mutation.mutation_name}:{field}')
 

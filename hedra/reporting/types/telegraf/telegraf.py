@@ -48,7 +48,7 @@ class Telegraf(StatsD):
 
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Experiment - {experiment.experiment_name}:{experiment_id}')
             
-            for field, value in experiment.stats():
+            for field, value in experiment.stats:
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Experiment field - {experiment.experiment_name}:{field}')
 
                 self.connection.send_telegraf(
@@ -67,7 +67,7 @@ class Telegraf(StatsD):
 
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Variant - {variant.variant_name}:{variant_id}')
             
-            for field, value in variant.stats():
+            for field, value in variant.stats:
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Variants field - {variant.variant_name}:{field}')
 
                 self.connection.send_telegraf(
@@ -86,7 +86,7 @@ class Telegraf(StatsD):
 
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Mutation - {mutation.mutation_name}:{mutation_id}')
             
-            for field, value in mutation.stats():
+            for field, value in mutation.stats:
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Mutatio field - {mutation.mutation_name}:{field}')
 
                 self.connection.send_telegraf(

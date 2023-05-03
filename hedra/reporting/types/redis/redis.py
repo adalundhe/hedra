@@ -2,6 +2,7 @@ import json
 import uuid
 from typing import List
 from hedra.logging import HedraLogger
+from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
 
@@ -28,6 +29,11 @@ class Redis:
         self.database = config.database
         self.events_channel = config.events_channel
         self.metrics_channel = config.metrics_channel
+
+        self.experiments_channel = config.experiments_channel
+        self.variants_channel = f'{config.experiments_channel}_variants'
+        self.mutations_channel = f'{config.experiments_channel}_mutations'
+
         self.shared_metrics_channel = f'{self.metrics_channel}_metrics'
         self.errors_channel = f'{self.metrics_channel}_errors'
         self.custom_metrics_channel = f'{self.metrics_channel}_custom'
@@ -51,10 +57,79 @@ class Redis:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to Redis instance at - {self.base}://{self.host} - Database: {self.database}')
 
+    async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        if self.channel_type == 'channel':
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments to Channel - {self.experiments_channel}')
+            
+            for experiment in experiment_metrics.experiment_summaries:
+                await self.connection.publish(
+                    self.experiments_channel,
+                    json.dumps(experiment.record)
+                )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Experiments to Channel - {self.experiments_channel}')
+
+        else:
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments to Redis Set - {self.experiments_channel}')
+            for experiment in experiment_metrics.experiment_summaries:
+                await self.connection.sadd(
+                    self.experiments_channel,
+                    json.dumps(experiment.record)
+                )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Experiments to Redis Set - {self.experiments_channel}')
+
+    async def submit_variants(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        if self.channel_type == 'channel':
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Variants to Channel - {self.variants_channel}')
+            
+            for variant in experiment_metrics.variant_summaries:
+                await self.connection.publish(
+                    self.variants_channel,
+                    json.dumps(variant.record)
+                )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Variants to Channel - {self.variants_channel}')
+
+        else:
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Variants to Redis Set - {self.variants_channel}')
+            for variant in experiment_metrics.variant_summaries:
+                await self.connection.sadd(
+                    self.variants_channel,
+                    json.dumps(variant.record)
+                )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Variants to Redis Set - {self.variants_channel}')
+
+    async def submit_mutations(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        if self.channel_type == 'channel':
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Mutations to Channel - {self.mutations_channel}')
+            
+            for mutation in experiment_metrics.mutation_summaries:
+                await self.connection.publish(
+                    self.mutations_channel,
+                    json.dumps(mutation.record)
+                )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Mutations to Channel - {self.mutations_channel}')
+
+        else:
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Mutations to Redis Set - {self.mutations_channel}')
+            for mutation in experiment_metrics.mutation_summaries:
+                await self.connection.sadd(
+                    self.mutations_channel,
+                    json.dumps(mutation.record)
+                )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Mutations to Redis Set - {self.mutations_channel}')
+
     async def submit_events(self, events: List[BaseProcessedResult]):
 
         if self.channel_type == 'channel':
-            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to Channel - {self.errors_channel}')
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to Channel - {self.events_channel}')
             
             for event in events:
                 await self.connection.publish(
@@ -62,17 +137,17 @@ class Redis:
                     json.dumps(event.record)
                 )
 
-            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Events to Channel - {self.errors_channel}')
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Events to Channel - {self.events_channel}')
 
         else:
-            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to Redis Set - {self.errors_channel}')
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to Redis Set - {self.events_channel}')
             for event in events:
                 await self.connection.sadd(
                     self.events_channel,
                     json.dumps(events.record)
                 )
 
-            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Events to Redis Set - {self.errors_channel}')
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Events to Redis Set - {self.events_channel}')
 
     async def submit_common(self, metrics_sets: List[MetricsSet]):
 

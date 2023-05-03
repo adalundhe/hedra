@@ -1,7 +1,7 @@
 import uuid
-from collections import defaultdict
 from typing import List
 from hedra.logging import HedraLogger
+from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
 
@@ -25,8 +25,14 @@ class MongoDB:
         self.username = config.username
         self.password = config.password
         self.database_name = config.database
+
         self.events_collection = config.events_collection
         self.metrics_collection = config.metrics_collection
+
+        self.experiments_collection = config.experiments_collection
+        self.variants_collection = f'{config.experiments_collection}_variants'
+        self.mutations_collection = f'{config.experiments_collection}_mutations'
+
         self.shared_metrics_collection = f'{self.metrics_collection}_common'
         self.errors_collection = f'{self.metrics_collection}_errors'
         self.custom_metrics_collection = f'{self.metrics_collection}_custom'
@@ -53,6 +59,24 @@ class MongoDB:
         self.database = self.connection[self.database_name]
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to MongoDB instance at - {self.host} - Database: {self.database_name}')
+
+    async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet): 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments to Collection - {self.experiments_collection}')
+        await self.database[self.events_collection].insert_many(experiment_metrics.experiments)
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Experiments to Collection - {self.experiments_collection}')
+
+    async def submit_variants(self, experiment_metrics: ExperimentMetricsCollectionSet): 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Variants to Collection - {self.variants_collection}')
+        await self.database[self.events_collection].insert_many(experiment_metrics.variants)
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Variants to Collection - {self.variants_collection}')
+
+    async def submit_mutations(self, experiment_metrics: ExperimentMetricsCollectionSet): 
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Mutations to Collection - {self.mutations_collection}')
+        await self.database[self.events_collection].insert_many(experiment_metrics.mutations)
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Mutations to Collection - {self.mutations_collection}')
 
     async def submit_events(self, events: List[BaseProcessedResult]): 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to Collection - {self.events_collection}')

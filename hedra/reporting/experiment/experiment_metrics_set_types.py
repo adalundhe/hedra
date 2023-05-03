@@ -1,4 +1,5 @@
-from hedra.reporting.metric.metric_types import MetricType, metric_type_map
+from hedra.reporting.metric.metric_types import MetricType
+from hedra.reporting.tags import Tag
 from pydantic import (
     BaseModel, 
     StrictStr, 
@@ -13,19 +14,29 @@ from typing import (
 )
 
 
-
-
 class MutationSummary(BaseModel):
+    mutation_name: StrictStr
     mutation_experiment_name: StrictStr
     mutation_variant_name: StrictStr
-    mutation_name: StrictStr
     mutation_chance: StrictFloat
     mutation_targets: StrictStr
     mutation_type: StrictStr
 
-    def stats(self):
+    @property
+    def stats(self) -> Dict[str, Union[int, float]]:
         return {
             'mutation_chance': self.mutation_chance
+        }
+    
+    @property
+    def record(self) -> Dict[str, Union[str, bool, int, float]]:
+        return {
+            'mutation_name': self.mutation_name,
+            'mutation_experiment_name': self.mutation_experiment_name,
+            'mutation_variant_name': self.mutation_variant_name,
+            'mutation_targets': self.mutation_targets,
+            'mutation_type': self.mutation_type,
+            **self.stats
         }
     
     @property
@@ -33,6 +44,23 @@ class MutationSummary(BaseModel):
         return {
             'mutation_chance': MetricType.SAMPLE
         }
+    
+    @property
+    def tags(self):
+        tag_fields = {
+            'mutation_name': self.mutation_name,
+            'mutation_experiment_name': self.mutation_experiment_name,
+            'mutation_variant_name': self.mutation_variant_name,
+            'mutation_targets': self.mutation_targets,
+            'mutation_type': self.mutation_type,
+        }
+
+        return [
+            Tag(
+                tag_field_name,
+                tag_field_value
+            ) for tag_field_name, tag_field_value in tag_fields.items()
+        ]
 
 
 class VariantSummary(BaseModel):
@@ -51,7 +79,8 @@ class VariantSummary(BaseModel):
     variant_ratio_failed: Union[StrictFloat, None]
     variant_ratio_aps: Union[StrictFloat, None]
 
-    def stats(self):
+    @property
+    def stats(self) -> Dict[str, Union[int, float]]:
         return {
             'variant_weight': self.variant_weight,
             'variant_distribution_interval': self.variant_distribution_interval,
@@ -63,6 +92,15 @@ class VariantSummary(BaseModel):
             'variant_ratio_succeeded': self.variant_ratio_succeeded,
             'variant_ratio_failed': self.variant_ratio_failed,
             'variant_ratio_aps': self.variant_ratio_aps
+        }
+    
+    @property
+    def record(self) -> Dict[str, Union[str, bool, int, float]]:
+        return {
+            'variant_name': self.variant_name,
+            'variant_experiment': self.variant_experiment,
+            'variant_distribution': self.variant_distribution,
+            **self.stats
         }
     
     @property
@@ -80,6 +118,21 @@ class VariantSummary(BaseModel):
             'variant_ratio_aps': MetricType.SAMPLE
         }
 
+    @property
+    def tags(self):
+        tag_fields = {
+            'variant_name': self.variant_name,
+            'variant_experiment': self.variant_experiment,
+            'variant_distribution': self.variant_distribution,
+        }
+
+        return [
+            Tag(
+                tag_field_name,
+                tag_field_value
+            ) for tag_field_name, tag_field_value in tag_fields.items()
+        ]
+
 
 class ExperimentSummary(BaseModel):
     experiment_name: StrictStr
@@ -90,12 +143,21 @@ class ExperimentSummary(BaseModel):
     experiment_median_aps: StrictFloat
     experiment_variant_summaries: Dict[str, VariantSummary]
 
-    def stats(self):
+    @property
+    def stats(self) -> Dict[str, Union[int, float]]:
         return {
             'experiment_completed': self.experiment_completed,
             'experiment_succeeded': self.experiment_succeeded,
             'experiment_failed': self.experiment_failed,
             'experiment_median_aps': self.experiment_median_aps
+        }
+    
+    @property
+    def record(self) -> Dict[str, Union[str, bool, int, float]]:
+        return {
+            'experiment_name': self.experiment_name,
+            'experiment_randomized': self.experiment_randomized,
+            **self.stats
         }
     
     @property
@@ -106,3 +168,17 @@ class ExperimentSummary(BaseModel):
             'experiment_failed': MetricType.COUNT,
             'experiment_median_aps': MetricType.SAMPLE
         }
+    
+    @property
+    def tags(self):
+        tag_fields = {
+            'experiment_name': self.experiment_name,
+            'experiment_randomized': self.experiment_randomized,
+        }
+
+        return [
+            Tag(
+                tag_field_name,
+                tag_field_value
+            ) for tag_field_name, tag_field_value in tag_fields.items()
+        ]

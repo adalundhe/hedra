@@ -18,7 +18,6 @@ class CassandraConfig(BaseModel):
     username: Optional[str]=None
     password: Optional[str]=None
     keyspace: str='hedra'
-    custom_fields: Dict[str, columns.Column]={}
     events_table: str='events'
     metrics_table: str='metrics'
     experiments_table: str='experiments'

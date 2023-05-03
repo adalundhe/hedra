@@ -16,6 +16,7 @@ class SQLiteConfig(BaseModel):
     path: str=f'{os.getcwd()}/results.db'
     events_table: str='events'
     metrics_table: str='metrics'
+    experiments_table: str='experiments'
     custom_fields: Dict[str, sqlalchemy.Column]={}
     reporter_type: ReporterTypes=ReporterTypes.SQLite
 

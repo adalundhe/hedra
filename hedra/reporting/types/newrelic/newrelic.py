@@ -6,6 +6,7 @@ import uuid
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
+from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
 
@@ -64,6 +65,54 @@ class NewRelic:
         await asyncio.sleep(1)
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to NewRelic - Using config at path - {self.config_path} - Environment - {self.environment}')
+
+    async def submit_experiments(self, experiments_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments to NewRelic')
+
+        for experiment in experiments_metrics.experiment_summaries:
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.record_custom_event,
+                    experiment.experiment_name,
+                    experiment.record
+                )
+            )
+        
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Experiments to NewRelic')
+
+    async def submit_variants(self, experiments_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Variants to NewRelic')
+
+        for variant in experiments_metrics.variant_summaries:
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.record_custom_event,
+                    variant.variant_name,
+                    variant.record
+                )
+            )
+        
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Variants to NewRelic')
+
+    async def submit_mutations(self, experiments_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Mutations to NewRelic')
+
+        for mutation in experiments_metrics.mutation_summaries:
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.record_custom_event,
+                    mutation.mutation_name,
+                    mutation.record
+                )
+            )
+        
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Mutations to NewRelic')
 
     async def submit_events(self, events: List[BaseProcessedResult]):
 
