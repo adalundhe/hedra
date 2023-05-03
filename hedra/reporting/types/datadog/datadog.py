@@ -1,6 +1,7 @@
 import uuid
 from numpy import float32, float64, int16, int32, int64
 from hedra.logging import HedraLogger
+from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import (
     MetricsSet,
@@ -101,6 +102,126 @@ class Datadog:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to Datadogg API')
 
+    async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments to Datadog API')
+
+        experiments_series = []
+        for experiment in experiment_metrics.experiment_summaries:
+
+            experiment_id = uuid.uuid4()
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Experiment - {experiment.experiment_name}:{experiment_id}')
+
+            tags = [
+                f'experiment_name:{experiment.experiment_name}',
+                f'experiment_randomized:{experiment.experiment_randomized}'
+            ]
+
+            for field, value in experiment.stats():
+
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Experiments - {experiment.experiment_name}:{field}')
+
+                metric_type = experiment.types_map.get(field)
+                datadog_metric_type = self._datadog_api_map.get(metric_type.value)
+
+                series = MetricSeries(
+                    f'{experiment.experiment_name}_{field}', 
+                    [MetricPoint(
+                        timestamp=int(datetime.now().timestamp()),
+                        value=value
+                    )],
+                    type=datadog_metric_type,
+                    tags=tags
+                )
+
+                experiments_series.append(series)
+                
+        await self.metrics_api.submit_metrics(MetricPayload(experiments_series))
+        
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments to Datadog API')
+    
+    async def submit_variants(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Variants to Datadog API')
+
+        variant_series = []
+        for variant in experiment_metrics.variant_summaries:
+
+            variant_id = uuid.uuid4()
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Variants - {variant.variant_name}:{variant_id}')
+
+            tags = [
+                f'variant_name:{variant.variant_name}',
+                f'variant_experiment:{variant.variant_experiment}',
+                f'variant_distribution:{variant.variant_distribution}',
+            ]
+
+            for field, value in variant.stats():
+
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Variant - {variant.variant_name}:{field}')
+
+                metric_type = variant.types_map.get(field)
+                datadog_metric_type = self._datadog_api_map.get(metric_type.value)
+
+                series = MetricSeries(
+                    f'{variant.variant_name}_{field}', 
+                    [MetricPoint(
+                        timestamp=int(datetime.now().timestamp()),
+                        value=value
+                    )],
+                    type=datadog_metric_type,
+                    tags=tags
+                )
+
+                variant_series.append(series)
+                
+        await self.metrics_api.submit_metrics(MetricPayload(variant_series))
+        
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Variants to Datadog API')
+    
+    async def submit_mutations(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Variants to Datadog API')
+
+        mutation_series = []
+        for mutation in experiment_metrics.mutation_summaries:
+
+            mutation_id = uuid.uuid4()
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Mutations - {mutation.mutation_name}:{mutation_id}')
+
+            tags = [
+                f'mutation_name:{mutation.mutation_name}',
+                f'mutation_experiment_name:{mutation.mutation_experiment_name}',
+                f'mutation_variant_name:{mutation.mutation_variant_name}',
+                f'mutation_targets:{mutation.mutation_targets}',
+                f'mutation_type:{mutation.mutation_type}',
+            ]
+
+            for field, value in mutation.stats():
+
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Mutation - {mutation.mutation_name}:{field}')
+
+                metric_type = mutation.types_map.get(field)
+                datadog_metric_type = self._datadog_api_map.get(metric_type.value)
+
+                series = MetricSeries(
+                    f'{mutation.mutation_name}_{field}', 
+                    [MetricPoint(
+                        timestamp=int(datetime.now().timestamp()),
+                        value=value
+                    )],
+                    type=datadog_metric_type,
+                    tags=tags
+                )
+
+                mutation_series.append(series)
+                
+        await self.metrics_api.submit_metrics(MetricPayload(mutation_series))
+        
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Mutations to Datadog API')
 
     async def submit_events(self, events: List[BaseProcessedResult]):
 

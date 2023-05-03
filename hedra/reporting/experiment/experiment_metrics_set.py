@@ -49,6 +49,7 @@ class ExperimentMetricsSet:
         'mutation_name',
         'mutation_experiment_name',
         'mutation_variant_name',
+        'mutation_chance',
         'mutation_targets',
         'mutation_type'
     ]
@@ -277,9 +278,9 @@ class ExperimentMetricsSet:
     
     def split_experiments_metrics(self) -> ExperimentMetricsCollection:
 
-        variant_records: List[VariantSummary] = []
-
-        mutations_records: List[MutationSummary] = []
+        variant_records: List[Dict[str, str]] = []
+        mutations_records: List[Dict[str, str]] = []
+        mutations_summaries: List[MutationSummary] = []
 
         for variant in self.experiments_summary.experiment_variant_summaries.values():
             variant_records.append(
@@ -295,10 +296,15 @@ class ExperimentMetricsSet:
                     )
                 )
 
+                mutations_summaries.append(mutation)
+
         return ExperimentMetricsCollection(
             experiment=self.experiments_summary.dict(
                 include={header for header in self.experiments_table_header_keys}
             ),
             variants=variant_records,
-            mutations=mutations_records
+            mutations=mutations_records,
+            experiment_summary=self.experiments_summary,
+            variant_summaries=list(self.experiments_summary.experiment_variant_summaries.values()),
+            mutation_summaries=mutations_summaries
         )

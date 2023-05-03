@@ -221,6 +221,7 @@ class BigQuery:
                     bigquery.SchemaField('mutation_name', 'STRING', mode='REQUIRED'),
                     bigquery.SchemaField('mutation_experiment_name', 'STRING', mode='REQUIRED'),
                     bigquery.SchemaField('mutation_variant_name', 'STRING', mode='REQUIRED'),
+                    bigquery.SchemaField('mutation_chance', 'FLOAT64', mode='REQUIRED'),
                     bigquery.SchemaField('mutation_targets', 'STRING', mode='REQUIRED'),
                     bigquery.SchemaField('mutation_type', 'STRING', mode='REQUIRED'),
                 ])

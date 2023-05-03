@@ -2,6 +2,7 @@
 import uuid
 from typing import List
 from hedra.logging import HedraLogger
+from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
 
@@ -36,6 +37,64 @@ class Telegraf(StatsD):
         )
 
         self.statsd_type = 'Telegraf'
+
+    async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments to {self.statsd_type}')
+
+        for experiment in experiment_metrics.experiment_summaries:
+
+            experiment_id = uuid.uuid4()
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Experiment - {experiment.experiment_name}:{experiment_id}')
+            
+            for field, value in experiment.stats():
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Experiment field - {experiment.experiment_name}:{field}')
+
+                self.connection.send_telegraf(
+                    f'{experiment.experiment_name}_{field}', value
+                )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Experiments to {self.statsd_type}')
+
+    async def submit_variants(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Variants to {self.statsd_type}')
+
+        for variant in experiment_metrics.variant_summaries:
+
+            variant_id = uuid.uuid4()
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Variant - {variant.variant_name}:{variant_id}')
+            
+            for field, value in variant.stats():
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Variants field - {variant.variant_name}:{field}')
+
+                self.connection.send_telegraf(
+                    f'{variant.variant_name}_{field}', value
+                )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Variants to {self.statsd_type}')
+
+    async def submit_mutations(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Mutations to {self.statsd_type}')
+
+        for mutation in experiment_metrics.mutation_summaries:
+
+            mutation_id = uuid.uuid4()
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Mutation - {mutation.mutation_name}:{mutation_id}')
+            
+            for field, value in mutation.stats():
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Mutatio field - {mutation.mutation_name}:{field}')
+
+                self.connection.send_telegraf(
+                    f'{mutation.mutation_name}_{field}', value
+                )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Mutations to {self.statsd_type}')
+
 
     async def submit_events(self, events: List[BaseProcessedResult]):
 

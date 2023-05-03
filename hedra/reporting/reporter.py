@@ -2,7 +2,7 @@ from __future__ import annotations
 import uuid
 import threading
 import os
-from typing import Any, List, TypeVar, Union
+from typing import Any, List, TypeVar, Union, Dict
 from hedra.logging import HedraLogger
 from hedra.plugins.types.reporter.reporter_config import ReporterConfig
 from .experiment.experiments_collection import (
@@ -205,52 +205,43 @@ class Reporter:
             experiment.split_experiments_metrics() for experiment in experiment_metrics_sets
         ]
 
-        experiments: List[ExperimentSummary] = [
+        experiments: List[Dict[str, str]] = [
             metrics_collection.experiment for metrics_collection in experiment_metrics
         ]
 
-        variants: List[VariantSummary] = []
+        variants: List[Dict[str, str]] = []
+        variants_summaries: List[VariantSummary] = []
         for metrics_collection in experiment_metrics:
             variants.extend(metrics_collection.variants)
+            variants_summaries.extend(metrics_collection.variant_summaries)
 
         mutations: List[MutationSummary] = []
+        mutations_summaries: List[MutationSummary] = []
         for metrics_collection in experiment_metrics:
             mutations.extend(metrics_collection.mutations)
-            
+            mutations_summaries.extend(metrics_collection.mutation_summaries)
 
-        await self.selected_reporter.submit_experiments(
-            ExperimentMetricsCollectionSet(
-                experiments_metrics_fields=ExperimentMetricsSet.experiments_fields(),
-                variants_metrics_fields=ExperimentMetricsSet.variants_fields(),
-                mutations_metrics_fields=ExperimentMetricsSet.mutations_fields(),
-                experiments=experiments,
-                variants=variants,
-                mutations=mutations
-            )
+        experiment_metrics_collection_set = ExperimentMetricsCollectionSet(
+            experiments_metrics_fields=ExperimentMetricsSet.experiments_fields(),
+            variants_metrics_fields=ExperimentMetricsSet.variants_fields(),
+            mutations_metrics_fields=ExperimentMetricsSet.mutations_fields(),
+            experiments=experiments,
+            variants=variants,
+            mutations=mutations,
+            experiment_summaries=[
+                experiment.experiments_summary for experiment in experiment_metrics_sets
+            ],
+            variant_summaries=variants_summaries,
+            mutation_summaries=mutations_summaries
         )
+        
 
-        await self.selected_reporter.submit_variants(
-            ExperimentMetricsCollectionSet(
-                experiments_metrics_fields=ExperimentMetricsSet.experiments_fields(),
-                variants_metrics_fields=ExperimentMetricsSet.variants_fields(),
-                mutations_metrics_fields=ExperimentMetricsSet.mutations_fields(),
-                experiments=experiments,
-                variants=variants,
-                mutations=mutations
-            )
-        )
+        await self.selected_reporter.submit_experiments(experiment_metrics_collection_set)
+
+        await self.selected_reporter.submit_variants(experiment_metrics_collection_set)
 
         if len(mutations) > 0:
-            await self.selected_reporter.submit_mutations(
-                ExperimentMetricsCollectionSet(
-                    experiments_metrics_fields=ExperimentMetricsSet.experiments_fields(),
-                    variants_metrics_fields=ExperimentMetricsSet.variants_fields(),
-                    mutations_metrics_fields=ExperimentMetricsSet.mutations_fields(),
-                    experiments=experiments,
-                    variants=variants,
-                    mutations=mutations
-                )
-            )
+            await self.selected_reporter.submit_mutations(experiment_metrics_collection_set)
 
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted {len(experiments)} experiments')

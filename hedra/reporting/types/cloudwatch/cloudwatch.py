@@ -7,6 +7,7 @@ from typing import List
 
 import psutil
 from hedra.logging import HedraLogger
+from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
 from concurrent.futures import ThreadPoolExecutor
@@ -30,12 +31,20 @@ class Cloudwatch:
         self.region_name = config.region_name
         self.iam_role_arn = config.iam_role_arn
         self.schedule_rate = config.schedule_rate
+
         self.cloudwatch_targets = config.cloudwatch_targets
         self.aws_resource_arns = config.aws_resource_arns
         self.submit_timeout = config.submit_timeout
+
         self.events_rule_name = config.events_rule
         self.metrics_rule_name = config.metrics_rule
-        self.errors_rule_name = 'stage_errors'
+
+        self.shared_metrics_rule_name = f'{config.metrics_rule}_shared'
+        self.errors_rule_name = f'{config.metrics_rule}_errors'
+
+        self.experiments_rule_name = config.experiments_rule
+        self.variants_rule_name = f'{config.experiments_rule}_variants'
+        self.mutations_rule_name = f'{config.experiments_rule}_mutations'
 
         self.session_uuid = str(uuid.uuid4())
         self.metadata_string: str = None
@@ -43,8 +52,8 @@ class Cloudwatch:
         self.logger.initialize()
 
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
-        self.events_rule = None
-        self.metrics_rule= None
+
+        self.experiments_rule = None
 
         self.client = None
         self._loop = asyncio.get_event_loop()
@@ -65,6 +74,87 @@ class Cloudwatch:
         )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created AWS Cloudwatch client for region - {self.region_name}')
+
+    async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments to Cloudwatch rule - {self.experiments_rule_name}')
+
+        cloudwatch_events = [
+            {
+                'Time': datetime.datetime.now(),
+                'Detail': json.dumps(experiment),
+                'DetailType': self.experiments_rule_name,
+                'Resources': self.aws_resource_arns,
+                'Source': self.experiments_rule_name
+            } for experiment in experiment_metrics.experiments
+        ]
+
+        await asyncio.wait_for(
+            self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.put_events,
+                    Entries=cloudwatch_events
+                )
+            ),
+            timeout=self.submit_timeout
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Experiments to Cloudwatch rule - {self.experiments_rule_name}')
+
+    async def submit_variants(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Variants to Cloudwatch rule - {self.variants_rule_name}')
+
+        cloudwatch_events = [
+            {
+                'Time': datetime.datetime.now(),
+                'Detail': json.dumps(variant),
+                'DetailType': self.variants_rule_name,
+                'Resources': self.aws_resource_arns,
+                'Source': self.variants_rule_name
+            } for variant in experiment_metrics.variants
+        ]
+
+        await asyncio.wait_for(
+            self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.put_events,
+                    Entries=cloudwatch_events
+                )
+            ),
+            timeout=self.submit_timeout
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Variants to Cloudwatch rule - {self.variants_rule_name}')
+
+    async def submit_mutations(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Mutations to Cloudwatch rule - {self.mutations_rule_name}')
+
+        cloudwatch_events = [
+            {
+                'Time': datetime.datetime.now(),
+                'Detail': json.dumps(mutation),
+                'DetailType': self.mutations_rule_name,
+                'Resources': self.aws_resource_arns,
+                'Source': self.mutations_rule_name
+            } for mutation in experiment_metrics.mutations
+        ]
+
+        await asyncio.wait_for(
+            self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.put_events,
+                    Entries=cloudwatch_events
+                )
+            ),
+            timeout=self.submit_timeout
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Mutations to Cloudwatch rule - {self.mutations_rule_name}')
 
     async def submit_events(self, events: List[BaseProcessedResult]):
 
@@ -107,9 +197,9 @@ class Cloudwatch:
                     'group': 'common',
                     **metrics_set.common_stats
                 }),
-                'DetailType': self.events_rule_name,
+                'DetailType': self.shared_metrics_rule_name,
                 'Resources': self.aws_resource_arns,
-                'Source': self.metrics_rule_name
+                'Source': self.shared_metrics_rule_name
             } for metrics_set in metrics_sets
         ]
 

@@ -23,9 +23,11 @@ class GoogleCloudStorage:
 
     def __init__(self, config: GoogleCloudStorageConfig) -> None:
         self.service_account_json_path = config.service_account_json_path
+
         self.bucket_namespace = config.bucket_namespace
         self.events_bucket_name = config.events_bucket
         self.metrics_bucket_name = config.metrics_bucket
+        
         self.shared_metrics_bucket_name = f'{config.metrics_bucket}_shared'
         self.errors_bucket_name = f'{config.metrics_bucket}_errors'
         self.custom_metrics_bucket_name = f'{config.metrics_bucket}_custom'

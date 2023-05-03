@@ -98,7 +98,8 @@ setup(
             'cryptography==38.0.4',
             'aioquic',
             'dicttoxml',
-            'opentelemetry-api'
+            'opentelemetry-api',
+            'datadog_api_client'
         ],
         'all-engines': [
             'grpcio',
@@ -132,6 +133,8 @@ setup(
             'google-cloud-bigtable',
             'google-cloud-storage',
             'dicttoxml',
+            'datadog-api-client',
+            'aiosonic'
 
         ],
         'playwright': [
@@ -160,7 +163,8 @@ setup(
             'cassandra-driver'
         ],
         'datadog': [
-            'datadog'
+            'datadog-api-client',
+            'aiosonic'
         ],
         'mongodb': [
             'motor'

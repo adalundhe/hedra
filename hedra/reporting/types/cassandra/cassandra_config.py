@@ -21,6 +21,7 @@ class CassandraConfig(BaseModel):
     custom_fields: Dict[str, columns.Column]={}
     events_table: str='events'
     metrics_table: str='metrics'
+    experiments_table: str='experiments'
     replication_strategy: str='SimpleStrategy'
     replication: int=3
     ssl: Optional[SSLContext]=None
