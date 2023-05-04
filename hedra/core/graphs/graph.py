@@ -226,7 +226,10 @@ class Graph:
                         stage_name = transition.edge.source.name
                         submit_stage_context = transition.edge.source.context
 
-                        summary_output[stage_name] = submit_stage_context.get('analyze_stage_summary_metrics')
+                        analyze_stage_summary_metrics = submit_stage_context.get('analyze_stage_summary_metrics')
+
+                        if analyze_stage_summary_metrics:
+                            summary_output[stage_name] = analyze_stage_summary_metrics
 
                 if self.status == GraphStatus.FAILED:
                     status_spinner.finalize()

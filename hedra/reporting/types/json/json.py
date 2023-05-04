@@ -11,7 +11,6 @@ import time
 from pathlib import Path
 from typing import List, TextIO, Dict
 from concurrent.futures import ThreadPoolExecutor
-from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.metric import MetricsSet

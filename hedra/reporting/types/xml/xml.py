@@ -8,12 +8,13 @@ import signal
 import os
 import time
 from pathlib import Path
-from typing import List, TextIO
+from typing import List, TextIO, Dict
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from xml.dom.minidom import parseString
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric.metrics_set import MetricsSet
 from .xml_config import XMLConfig
 
@@ -86,12 +87,60 @@ class XML:
             f'{base_filename}_errors.xml'
         )
 
+        self.streams_metrics_filepath = config.streams_filepath
+
         self.events_file: TextIO = None
+        self.metrics_file: TextIO = None
         self.experiments_file: TextIO = None
         self.variants_file: TextIO = None
         self.mutations_file: TextIO = None
+        self.streams_file: TextIO = None
 
         self.write_mode = 'w' if config.overwrite else 'a'
+
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+        if self.streams_file is None:
+            self.streams_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.streams_metrics_filepath,
+                    self.write_mode
+                )
+            )
+
+            for signame in ('SIGINT', 'SIGTERM'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        self.streams_file
+                    )
+                )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Streams to file - {self.streams_metrics_filepath}')
+
+        streams_data = [
+            {
+                'stage': stream_name,
+                **stream_set.record 
+            } for stream_name, stream_set in stream_metrics.items()
+        ]
+
+        streams_xml = dicttoxml(
+            streams_data, 
+            custom_root='streams'
+        )
+
+        streams_xml = parseString(streams_xml)
+
+        await self._loop.run_in_executor(
+            self._executor,
+            self.streams_file.write,
+            streams_xml.toprettyxml()
+        )
     
     async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Experiments to file - {self.experiments_filepath}')
@@ -441,6 +490,12 @@ class XML:
             await self._loop.run_in_executor(
                 self._executor,
                 self.mutations_file.close
+            )
+        
+        if self.streams_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.streams_file.close
             )
 
         self._executor.shutdown()

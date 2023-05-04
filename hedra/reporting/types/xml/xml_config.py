@@ -16,5 +16,9 @@ class XMLConfig(BaseModel):
         os.getcwd(),
         'experiments.xml'
     )
+    streams_filepath: str=os.path.join(
+        os.getcwd(),
+        'streams.xml'
+    )
     overwrite: bool=True
     reporter_type: ReporterTypes=ReporterTypes.XML

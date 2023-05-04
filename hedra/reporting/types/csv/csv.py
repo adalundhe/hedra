@@ -6,17 +6,13 @@ import os
 import functools
 import signal
 import time
-from typing import List, TextIO
+from typing import List, TextIO, Dict
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
-from hedra.reporting.experiment.experiment_metrics_set import (
-    ExperimentSummary,
-    VariantSummary,
-    MutationSummary
-)
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric.metrics_set import MetricsSet
 from .csv_config import CSVConfig
 has_connector = True
@@ -58,6 +54,8 @@ class CSV:
             f'{experiments_filename}_mutations.csv'
         )
 
+        self.streams_filepath = config.streams_filepath
+
         self.session_uuid = str(uuid.uuid4())
         self.metadata_string: str = None
         self.logger = HedraLogger()
@@ -71,13 +69,17 @@ class CSV:
         self._experiments_writer: csv.DictWriter = None
         self._variants_writer: csv.DictWriter = None
         self._mutations_writer: csv.DictWriter = None
+        self._streams_writer: csv.DictWriter = None
 
         self._loop: asyncio.AbstractEventLoop = None
+
         self.events_file: TextIO = None 
+        self.metrics_file: TextIO = None
         self.experiments_file: TextIO = None
         self.variants_file: TextIO = None
         self.mutations_file: TextIO = None
-        self.mutations_file: TextIO = None
+        self.streams_file: TextIO = None
+
         self.write_mode = 'w' if config.overwrite else 'a'
 
 
@@ -116,11 +118,58 @@ class CSV:
             f'{filename}_{events_file_timestamp}.csv'
         )
 
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+        if self.streams_file is None:
+            self.streams_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.streams_filepath,
+                    self.write_mode
+                )
+            )
 
+            for signame in ('SIGINT', 'SIGTERM'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        self.streams_file
+                    )
+                )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Streams to file - {self.streams_filepath}')
+
+        streams_data = [
+            {
+                'stage': stream_name,
+                **stream_set.record 
+            } for stream_name, stream_set in stream_metrics.items()
+        ]
+
+        headers = list(streams_data[0].keys())
+
+        if self._experiments_writer is None or self.write_mode == 'w':
+            self._streams_writer = csv.DictWriter(
+                self.streams_file, 
+                fieldnames=headers
+            )
+
+            await self._loop.run_in_executor(
+                self._executor,
+                self._streams_writer.writeheader
+            )
+
+        await self._loop.run_in_executor(
+            self._executor,
+            self._streams_writer.writerows,
+            streams_data
+        )
 
     async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Experiments to file - {self.experiments_filepath}')
-
 
         if self.experiments_file is None:
             self.experiments_file = await self._loop.run_in_executor(
@@ -146,7 +195,7 @@ class CSV:
         if self._experiments_writer is None or self.write_mode == 'w':
             self._experiments_writer = csv.DictWriter(
                 self.experiments_file, 
-                fieldnames=experiment_metrics.experiments_headers
+                fieldnames=experiment_metrics.experiments_metrics_fields
             )
 
             await self._loop.run_in_executor(
@@ -186,7 +235,7 @@ class CSV:
         if self._variants_writer is None or self.write_mode == 'w':
             self._variants_writer = csv.DictWriter(
                 self.variants_file, 
-                fieldnames=experiment_metrics.variants_headers
+                fieldnames=experiment_metrics.variants_metrics_fields
             )
 
             await self._loop.run_in_executor(
@@ -226,7 +275,7 @@ class CSV:
         if self._mutations_writer is None or self.write_mode == 'w':
             self._mutations_writer = csv.DictWriter(
                 self.mutations_file, 
-                fieldnames=experiment_metrics.mutations_headers
+                fieldnames=experiment_metrics.mutations_metrics_fields
             )
 
             await self._loop.run_in_executor(
@@ -586,6 +635,12 @@ class CSV:
             await self._loop.run_in_executor(
                 self._executor,
                 self.mutations_file.close
+            )
+
+        if self.streams_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.streams_file.close
             )
 
         self._executor.shutdown()
