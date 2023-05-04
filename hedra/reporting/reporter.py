@@ -3,6 +3,7 @@ import uuid
 import threading
 import os
 from typing import Any, List, TypeVar, Union, Dict
+from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from hedra.logging import HedraLogger
 from hedra.plugins.types.reporter.reporter_config import ReporterConfig
 from .experiment.experiments_collection import (
@@ -11,7 +12,6 @@ from .experiment.experiments_collection import (
 )
 from .experiment.experiment_metrics_set import ExperimentMetricsSet
 from .experiment.experiment_metrics_set_types import (
-    ExperimentSummary,
     VariantSummary,
     MutationSummary
 )
@@ -246,6 +246,14 @@ class Reporter:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted {len(experiments)} experiments')
 
+    async def submit_streams(self, stream_metrics: Dict[str, List[StreamAnalytics]]):
+        
+        streams_count = len(stream_metrics)
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting {streams_count} streams')
+        await self.selected_reporter.submit_streams(stream_metrics)
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted {streams_count} streams')
 
     async def submit_common(self, metrics: List[Any]):
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting {len(metrics)} shared metrics')

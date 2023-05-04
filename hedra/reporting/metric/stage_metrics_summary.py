@@ -7,6 +7,7 @@ from .metrics_set_types import (
     CommonMetrics
 )
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
+from .stage_streams_set import StageStreamsSet
 from .metrics_set import MetricsSet
 
 
@@ -155,6 +156,10 @@ class StageMetricsSummary:
         }
 
         self.common_metrics: Dict[str, CommonMetrics] = {}
+
+    @property
+    def streams(self):
+        return StageStreamsSet(self.stage_streamed_analytics)
 
     def calculate_action_and_task_metrics(self):
         self._group_action_and_task_metrics()

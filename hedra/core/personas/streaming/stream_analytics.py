@@ -28,3 +28,6 @@ class StreamAnalytics:
         self.interval_failed_counts.append(stream.failed)
         self.interval_timings.append(stream.timings)
         self.interval_batch_timings.append(batch_elapsed)
+
+    
+

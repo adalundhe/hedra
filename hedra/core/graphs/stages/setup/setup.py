@@ -62,7 +62,6 @@ class SetupCall:
                 await self.hook.call()
 
             except Exception as setup_exception:
-
                 self.exception = setup_exception
 
                 self.error_traceback = str(traceback.format_exc())

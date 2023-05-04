@@ -9,12 +9,14 @@ import signal
 import re
 import time
 from pathlib import Path
-from typing import List, TextIO
+from typing import List, TextIO, Dict
 from concurrent.futures import ThreadPoolExecutor
+from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
-from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric import MetricsSet
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
+from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from .json_config import JSONConfig
 
 
@@ -41,6 +43,7 @@ class JSON:
         self.events_filepath = config.events_filepath
         self.metrics_filepath = config.metrics_filepath
         self.experiments_filepath = config.experiments_filepath
+        self.streams_filepath = config.streams_filepath
         
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._loop: asyncio.AbstractEventLoop = None
@@ -53,6 +56,8 @@ class JSON:
         self.events_file: TextIO = None
         self.experiments_file: TextIO = None
         self.metrics_file: TextIO = None
+        self.streams_file: TextIO = None
+
         self.write_mode = 'w' if config.overwrite else 'a'
         self.pattern = re.compile("_copy[0-9]+")
 
@@ -117,6 +122,58 @@ class JSON:
 
     async def submit_mutations(self, experiment_metrics: ExperimentMetricsCollectionSet):
         pass
+
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        if self.streams_file is None:
+            self.streams_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.streams_filepath,
+                    self.write_mode
+                )
+            )
+
+            for signame in ('SIGINT', 'SIGTERM'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        self.streams_file
+                    )
+                )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Streams to file - {self.streams_filepath}')
+
+        streams_data ={
+            stream_name: stream_set.record for stream_name, stream_set in stream_metrics.items()
+        }
+
+        if self.metrics_file is None:
+            self.metrics_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.metrics_filepath,
+                    self.write_mode
+                )
+            )
+
+        await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                json.dump,
+                streams_data, 
+                self.streams_file, 
+                indent=4
+            )
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Streams to file - {self.streams_filepath}')
+
 
     async def submit_events(self, events: List[BaseProcessedResult]):
 
@@ -208,7 +265,7 @@ class JSON:
                 functools.partial(
                     open,
                     self.metrics_filepath,
-                    'w'
+                    self.write_mode
                 )
             )
 
@@ -243,11 +300,18 @@ class JSON:
                 self._executor,
                 self.experiments_file.close
             )
+
         if self.metrics_file:
             await self._loop.run_in_executor(
                 self._executor,
                 self.metrics_file.close
-            )        
+            )  
+
+        if self.streams_file:      
+            await self._loop.run_in_executor(
+                self._executor,
+                self.streams_file.close
+            )  
             
         self._executor.shutdown()
 

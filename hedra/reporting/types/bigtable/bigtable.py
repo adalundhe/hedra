@@ -140,14 +140,12 @@ class BigTable:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping creation of Experiments Column for Column Family - {self._experiments_column_family_id} - if not exists')
 
         rows = []
-        for experiment in experiment_metrics.experiments:
+        for experiment in experiment_metrics.experiment_summaries:
 
-            experiment_name = experiment.get('experiment_name')
-
-            row_key = f'{experiment_name}_{str(uuid.uuid4())}'
+            row_key = f'{experiment.experiment_name}_{str(uuid.uuid4())}'
             row = self._experiments_table.direct_row(row_key)
 
-            for field, value in experiment.items():
+            for field, value in experiment.record.items():
                 if not isinstance(value, bytes):
                     value = f'{value}'.encode()
 

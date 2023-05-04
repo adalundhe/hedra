@@ -107,17 +107,16 @@ class AWSTimestream:
         records = []
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments - Database: {self.database_name} - Table: {self.experiments_table_name} - if not exists')
 
-        for experiment in experiment_metrics.experiments:
+        for experiment in experiment_metrics.experiment_summaries:
 
-            experiment_name = experiment.get('experiment_name')
             experiment_id = uuid.uuid4()
 
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Experiment - {experiment_name}:{experiment_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Experiment - {experiment.experiment_name}:{experiment_id}')
 
-            for field, value in experiment.items():
+            for field, value in experiment.record.items():
                 timestream_record = AWSTimestreamRecord(
                     'experiment',
-                    experiment_name,
+                    experiment.experiment_name,
                     field,
                     value,
                     self.session_uuid

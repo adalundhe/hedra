@@ -16,5 +16,9 @@ class JSONConfig(BaseModel):
         os.getcwd(),
         'experiments.json'
     )
+    streams_filepath: str=os.path.join(
+        os.getcwd(),
+        'streams.json'
+    )
     overwrite: bool=True
     reporter_type: ReporterTypes=ReporterTypes.JSON

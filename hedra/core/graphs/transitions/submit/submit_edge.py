@@ -15,6 +15,7 @@ from hedra.reporting.metric.custom_metric import CustomMetric
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.reporting.metric.stage_metrics_summary import StageMetricsSummary
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 
 
@@ -39,7 +40,9 @@ class SubmitEdge(BaseEdge[Submit]):
             'analyze_stage_summary_metrics',
         ]
         self.provides = [
-            'submit_stage_metrics'
+            'submit_stage_metrics',
+            'submit_stage_streamed_metrics',
+            'submit_stage_experiment_metrics'
         ]
 
     async def transition(self):
@@ -95,7 +98,9 @@ class SubmitEdge(BaseEdge[Submit]):
         if self.skip_stage is False:
             self.next_history.update({
                 (self.source.name, destination.name): {
-                    'submit_stage_metrics': self.edge_data['submit_stage_metrics'] 
+                    'submit_stage_metrics': self.edge_data['submit_stage_metrics'],
+                    'submit_stage_experiment_metrics': self.edge_data['submit_stage_experiment_metrics'],
+                    'submit_stage_streamed_metrics': self.edge_data['submit_stage_streamed_metrics']
                 }
             })
 
@@ -153,6 +158,7 @@ class SubmitEdge(BaseEdge[Submit]):
         
         events: List[BaseProcessedResult] = []
         metrics: List[MetricsSet] = []
+        streamed_metrics: Dict[str, StageStreamsSet] = {}
         experiments: List[ExperimentMetricsSet] = []
         session_total: int = 0
 
@@ -185,8 +191,15 @@ class SubmitEdge(BaseEdge[Submit]):
                     experiment_metrics_sets.values()
                 ))
 
+                for stage_metrics_summary in stage_metrics_summaries.values():
+                    streams = stage_metrics_summary.stage_streamed_analytics
+
+                    if streams and len(streams) > 0:
+                        streamed_metrics[stage_metrics_summary.stage_metrics.name] = stage_metrics_summary.streams
+
         self.edge_data['submit_stage_events'] = events
         self.edge_data['submit_stage_experiment_metrics'] = experiments
+        self.edge_data['submit_stage_streamed_metrics'] = streamed_metrics
         self.edge_data['submit_stage_summary_metrics'] = metrics
         self.edge_data['submit_stage_session_total'] = session_total
 

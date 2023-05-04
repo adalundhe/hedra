@@ -392,12 +392,14 @@ class S3:
         for metrics_set in metrics_sets:
             for error in metrics_set.errors:
                 timestamp = int(datetime.now().timestamp())
+                metric_key = f'{metrics_set.name}-{timestamp}'
+
                 await self._loop.run_in_executor(
                     self._executor,
                     functools.partial(
                         self.client.put_object,
                         Bucket=errors_bucket_name,
-                        Key=f'{metrics_set.name}-{timestamp}',
+                        Key=metric_key,
                         Body=json.dumps({
                             'metrics_name': metrics_set.name,
                             'metrics_stage': metrics_set.stage,
