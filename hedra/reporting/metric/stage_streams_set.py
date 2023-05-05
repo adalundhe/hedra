@@ -27,13 +27,12 @@ class StageStreamsSet:
             self.interval_batch_timings.extend(stream.interval_batch_timings)
 
         self._stat_types: Dict[str, CalculationMethod] = {
-            'median': self._calculate_median_stats,
-            'mean': self._calculate_mean_stats,
-            'max': self._calculate_max_stats,
-            'min': self._calculate_min_stats,
-            'stdev': self._calculate_stdev_stats,
-            'variance': self._calculate_var_stats,
-            'quantiles': self._calculate_quantile_stats
+            'median': self._calculate_median,
+            'mean': self._calculate_mean,
+            'max': self._calculate_max,
+            'min': self._calculate_min,
+            'stdev': self._calculate_stdev,
+            'variance': self._calculate_var,
         }
 
         self.quantiles = [
@@ -52,6 +51,15 @@ class StageStreamsSet:
             99
         ]
 
+        self.stats: Dict[str, List[Union[int, float]]] = {
+            'completed': self.interval_completed_counts,
+            'succeeded': self.interval_succeeded_counts,
+            'failed': self.interval_failed_counts,
+            'batch_time': self.interval_batch_timings,
+            'completion_rate': self.interval_completion_rates
+        }
+
+
     @property
     def types_map(self) -> Dict[str, MetricType]:
         return {
@@ -65,25 +73,20 @@ class StageStreamsSet:
     @property
     def grouped(self) -> Dict[str, Dict[str, Union[int, float]]]:
 
-        stats: Dict[str, List[Union[int, float]]] = {
-            'completed': self.interval_completed_counts,
-            'succeeded': self.interval_succeeded_counts,
-            'failed': self.interval_failed_counts,
-            'batch_time': self.interval_batch_timings,
-            'completion_rate': self.interval_completion_rates
-        }
-
+        
         grouped: Dict[str, Dict[str, Union[int, float]]] = {}
 
-        for group_name, group_stats in stats.items():
+        for group_name, group_stats in self.stats.items():
 
-            metrics: Dict[str, Union[int, float]] = {}
-            for calculation_method in self._stat_types.values():
-                metrics.update(
-                    calculation_method({
-                        group_name: group_stats
-                    })
-                )
+            metrics: Dict[str, Union[int, float]] = {
+                stat_name: calculation_method(
+                    group_stats
+                ) for stat_name, calculation_method in self._stat_types.items()
+            }
+
+            metrics.update(
+                self._calculate_quantiles(group_stats)
+            )
 
             grouped[group_name] = metrics
 
@@ -92,113 +95,58 @@ class StageStreamsSet:
     @property
     def record(self) -> Dict[str, Union[int, float]]:
 
-        stats: Dict[str, List[Union[int, float]]] = {
-            'completed': self.interval_completed_counts,
-            'succeeded': self.interval_succeeded_counts,
-            'failed': self.interval_failed_counts,
-            'batch_time': self.interval_batch_timings,
-            'completion_rate': self.interval_completion_rates
-        }
+        record_stats: Dict[str, Dict[str, Union[int, float]]] = {}
 
-        metrics: Dict[str, Union[int, float]] = {}
+        for group_name, group_stats in self.stats.items():
+            for stat_name, calculation_method in self._stat_types.items():
+                record_key = f'{stat_name}_{group_name}'
 
-        for calculation_method in self._stat_types.values():
-            metrics.update(
-                calculation_method(stats)
-            )
+                record_stats[record_key] = calculation_method(group_stats)
 
-        median_batch_time = metrics['median_batch_time']
+
+        median_batch_time = record_stats['median_batch_time']
         if median_batch_time == 0:
             median_batch_time = 1
 
-        actions_per_second = metrics['median_completed']/median_batch_time
-        actions_per_second_succeeded = metrics['median_succeeded']/median_batch_time
-        actions_per_second_failed = metrics['median_failed']/median_batch_time
+        actions_per_second = record_stats['median_completed']/median_batch_time
+        actions_per_second_succeeded = record_stats['median_succeeded']/median_batch_time
+        actions_per_second_failed = record_stats['median_failed']/median_batch_time
 
-        metrics.update({
+        record_stats.update({
             'actions_per_second': actions_per_second,
             'actions_per_second_succeeded': actions_per_second_succeeded,
             'actions_per_second_failed': actions_per_second_failed
         })
 
-        return metrics
+        return record_stats
     
-    def _calculate_mean_stats(self, stats: Dict[str, List[Union[int, float]]]):
-        
-        mean_stats: Dict[str, Union[int, float]] = {}
+    def _calculate_mean(self, stats:  List[Union[int, float]]) -> float:
+        return statistics.mean(stats)
 
-        for stat_name, stat_values in stats.items():
-            stat_key = f'mean_{stat_name}'
+    def _calculate_median(self, stats: List[Union[int, float]]) -> Union[int, float]:
+        return statistics.median(stats)
 
-            mean_stats[stat_key] = statistics.mean(stat_values)
-
-        return mean_stats
-
-    def _calculate_median_stats(self, stats: Dict[str, List[Union[int, float]]]):
-        
-        median_stats: Dict[str, Union[int, float]] = {}
-
-        for stat_name, stat_values in stats.items():
-            stat_key = f'median_{stat_name}'
-
-            median_stats[stat_key] = statistics.median(stat_values)
-
-        return median_stats
-
-    def _calculate_min_stats(self, stats: Dict[str, List[Union[int, float]]]):
-        
-        min_stats: Dict[str, Union[int, float]] = {}
-
-        for stat_name, stat_values in stats.items():
-            stat_key = f'min_{stat_name}'
-
-            min_stats[stat_key] = min(stat_values)
-
-        return min_stats
+    def _calculate_min(self, stats:List[Union[int, float]]) -> Union[int, float]:
+        return min(stats)
     
-    def _calculate_max_stats(self, stats: Dict[str, List[Union[int, float]]]):
-        
-        max_stats: Dict[str, Union[int, float]] = {}
-
-        for stat_name, stat_values in stats.items():
-            stat_key = f'max_{stat_name}'
-
-            max_stats[stat_key] = max(stat_values)
-
-        return max_stats
+    def _calculate_max(self, stats: List[Union[int, float]]) -> Union[int ,float]:
+        return max(stats)
     
-    def _calculate_stdev_stats(self, stats: Dict[str, List[Union[int, float]]]):
-        
-        stdev_stats: Dict[str, Union[int, float]] = {}
-
-        for stat_name, stat_values in stats.items():
-            stat_key = f'stdev_{stat_name}'
-
-            stdev_stats[stat_key] = statistics.stdev(stat_values)
-
-        return stdev_stats
+    def _calculate_stdev(self, stats: List[Union[int, float]]):
+        return statistics.stdev(stats)
     
-    def _calculate_var_stats(self, stats: Dict[str, List[Union[int, float]]]):
-        
-        var_stats: Dict[str, Union[int, float]] = {}
-
-        for stat_name, stat_values in stats.items():
-            stat_key = f'var_{stat_name}'
-
-            var_stats[stat_key] = statistics.variance(stat_values)
-
-        return var_stats
+    def _calculate_var(self, stats: List[Union[int, float]]) -> Union[int, float]:
+        return statistics.variance(stats)
     
-    def _calculate_quantile_stats(self, stats: Dict[str, List[Union[int, float]]]):
+    def _calculate_quantiles(self, stats: List[Union[int, float]]) -> Dict[str, Union[int, float]]:
         
         quantile_stats: Dict[str, Union[int, float]] = {}
 
-        for stat_name, stat_values in stats.items():
-            for quantile in self.quantiles:
-                stat_key = f'${quantile}th_quantile_{stat_name}'
+        for quantile in self.quantiles:
+            stat_key = f'quantile_{quantile}th'
 
             quantile_stats[stat_key] = numpy.quantile(
-                stat_values,
+                stats,
                 round(
                     quantile/100,
                     2
