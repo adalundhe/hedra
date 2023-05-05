@@ -1,15 +1,7 @@
 from ssl import SSLContext
-from types import SimpleNamespace
-from typing import Dict, List, Optional
+from typing import List, Optional
 from pydantic import BaseModel
 from hedra.reporting.types.common.types import ReporterTypes
-
-try:
-
-    from cassandra.cqlengine import columns
-
-except Exception:
-    columns = SimpleNamespace(Column=None)
 
 
 class CassandraConfig(BaseModel):
@@ -20,6 +12,7 @@ class CassandraConfig(BaseModel):
     keyspace: str='hedra'
     events_table: str='events'
     metrics_table: str='metrics'
+    streams_table: str='streams'
     experiments_table: str='experiments'
     replication_strategy: str='SimpleStrategy'
     replication: int=3

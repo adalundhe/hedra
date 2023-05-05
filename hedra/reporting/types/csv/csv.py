@@ -6,7 +6,7 @@ import os
 import functools
 import signal
 import time
-from typing import List, TextIO, Dict
+from typing import List, TextIO, Dict, Union
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
@@ -142,12 +142,16 @@ class CSV:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Streams to file - {self.streams_filepath}')
 
-        streams_data = [
-            {
-                'stage': stream_name,
-                **stream_set.record 
-            } for stream_name, stream_set in stream_metrics.items()
-        ]
+        streams_data: List[Dict[str, Union[float, int]]] = []
+
+        for stream_name, stream in stream_metrics.items():
+
+            streams_data.extend([{
+                    'stage': stream_name,
+                    'group': group_name,
+                    **group_metrics
+            } for group_name, group_metrics in stream.grouped.items()])
+            
 
         headers = list(streams_data[0].keys())
 

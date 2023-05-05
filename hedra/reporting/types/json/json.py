@@ -75,6 +75,57 @@ class JSON:
             f'{filename}_{events_file_timestamp}.json'
         )
 
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        if self.streams_file is None:
+            self.streams_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.streams_filepath,
+                    self.write_mode
+                )
+            )
+
+            for signame in ('SIGINT', 'SIGTERM'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        self.streams_file
+                    )
+                )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Streams to file - {self.streams_filepath}')
+
+        streams_data ={
+            stream_name: stream_set.grouped for stream_name, stream_set in stream_metrics.items()
+        }
+
+        if self.metrics_file is None:
+            self.metrics_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.metrics_filepath,
+                    self.write_mode
+                )
+            )
+
+        await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                json.dump,
+                streams_data, 
+                self.streams_file, 
+                indent=4
+            )
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Streams to file - {self.streams_filepath}')
+
     async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Experiments to file - {self.experiments_filepath}')
 
@@ -115,64 +166,11 @@ class JSON:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Experiments to file - {self.experiments_filepath}')
 
-
     async def submit_variants(self, experiment_metrics: ExperimentMetricsCollectionSet):
         pass
 
     async def submit_mutations(self, experiment_metrics: ExperimentMetricsCollectionSet):
         pass
-
-    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
-
-        if self.streams_file is None:
-            self.streams_file = await self._loop.run_in_executor(
-                self._executor,
-                functools.partial(
-                    open,
-                    self.streams_filepath,
-                    self.write_mode
-                )
-            )
-
-            for signame in ('SIGINT', 'SIGTERM'):
-                self._loop.add_signal_handler(
-                    getattr(signal, signame),
-                    lambda signame=signame: handle_loop_stop(
-                        signame,
-                        self._executor,
-                        self._loop,
-                        self.streams_file
-                    )
-                )
-
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Streams to file - {self.streams_filepath}')
-
-        streams_data ={
-            stream_name: stream_set.record for stream_name, stream_set in stream_metrics.items()
-        }
-
-        if self.metrics_file is None:
-            self.metrics_file = await self._loop.run_in_executor(
-                self._executor,
-                functools.partial(
-                    open,
-                    self.metrics_filepath,
-                    self.write_mode
-                )
-            )
-
-        await self._loop.run_in_executor(
-            self._executor,
-            functools.partial(
-                json.dump,
-                streams_data, 
-                self.streams_file, 
-                indent=4
-            )
-        )
-
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Streams to file - {self.streams_filepath}')
-
 
     async def submit_events(self, events: List[BaseProcessedResult]):
 

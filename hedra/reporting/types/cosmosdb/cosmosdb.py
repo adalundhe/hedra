@@ -1,20 +1,20 @@
 import uuid
-from typing import List
+from typing import List, Dict
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
+from .cosmosdb_config import CosmosDBConfig
 
 
 try:
     from azure.cosmos.aio import CosmosClient
     from azure.cosmos import PartitionKey
-    from .cosmosdb_config import CosmosDBConfig
     has_connector = True
 except Exception:
     CosmosClient = None
     PartitionKey = None
-    CosmosDBConfig = None
     has_connector = False
 
 
@@ -27,6 +27,7 @@ class CosmosDB:
         self.database_name = config.database
         self.events_container_name = config.events_container
         self.metrics_container_name = config.metrics_container
+        self.streams_container_name = config.streams_container
 
         self.experiments_container_name = config.experiments_container
         self.variants_container_name = f'{config.experiments_container}_variants'
@@ -38,6 +39,7 @@ class CosmosDB:
 
         self.events_partition_key = config.events_partition_key
         self.metrics_partition_key = config.metrics_partition_key
+        self.streams_partition_key = config.streams_partition_key
 
         self.experiments_partition_key = config.experiments_partition_key
         self.variants_partition_key = config.variants_partition_key
@@ -53,6 +55,7 @@ class CosmosDB:
 
         self.events_container = None
         self.metrics_container = None
+        self.streams_container = None
 
         self.experiments_container = None
         self.variants_container = None
@@ -81,6 +84,33 @@ class CosmosDB:
         self.database = await self.client.create_database_if_not_exists(self.database_name)
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created or set Database - {self.database_name}')
+
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Streams container - {self.streams_container_name} with Partition Key /{self.streams_partition_key} if not exists')
+        self.streams_container = await self.database.create_container_if_not_exists(
+            self.streams_container_name,
+            PartitionKey(f'/{self.streams_partition_key}')
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created or set Streams container - {self.streams_container_name} with Partition Key /{self.streams_partition_key}')
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to container - {self.streams_container_name} with Partition Key /{self.streams_partition_key}')
+        for stage_name, stream in stream_metrics.items():
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Streams Set - {stage_name}:{stream.stream_set_id}')
+
+            for group_name, group in stream.grouped.items():
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Streams Group - {group_name}:{stream.stream_set_id}')
+
+                await self.streams_container.upsert_item({
+                    'id': str(uuid.uuid4()),
+                    'name': f'{stage_name}_stream',
+                    'stage': stage_name,
+                    'group': group_name,
+                    **group
+                })
+            
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Streams to container - {self.streams_container_name} with Partition Key /{self.streams_partition_key}')
 
     async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
 

@@ -1,5 +1,7 @@
 import statistics
 import numpy
+import uuid
+from hedra.reporting.metric.metric_types import MetricType
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from typing import List, Dict, Union, Callable
 
@@ -10,6 +12,7 @@ CalculationMethod = Callable[[Dict[str,List[Union[int, float]]]], Dict[str, Unio
 class StageStreamsSet:
 
     def __init__(self, stage_streams: List[StreamAnalytics]) -> None:
+        self.stream_set_id = uuid.uuid4()
         self.interval_completion_rates: List[float] = []
         self.interval_completed_counts: List[int] = []
         self.interval_succeeded_counts: List[int] = []
@@ -50,6 +53,43 @@ class StageStreamsSet:
         ]
 
     @property
+    def types_map(self) -> Dict[str, MetricType]:
+        return {
+            'completed': MetricType.COUNT,
+            'succeeded': MetricType.COUNT,
+            'failed': MetricType.COUNT,
+            'batch_time': MetricType.SAMPLE,
+            'completion_rate': MetricType.RATE
+        }
+
+    @property
+    def grouped(self) -> Dict[str, Dict[str, Union[int, float]]]:
+
+        stats: Dict[str, List[Union[int, float]]] = {
+            'completed': self.interval_completed_counts,
+            'succeeded': self.interval_succeeded_counts,
+            'failed': self.interval_failed_counts,
+            'batch_time': self.interval_batch_timings,
+            'completion_rate': self.interval_completion_rates
+        }
+
+        grouped: Dict[str, Dict[str, Union[int, float]]] = {}
+
+        for group_name, group_stats in stats.items():
+
+            metrics: Dict[str, Union[int, float]] = {}
+            for calculation_method in self._stat_types.values():
+                metrics.update(
+                    calculation_method({
+                        group_name: group_stats
+                    })
+                )
+
+            grouped[group_name] = metrics
+
+        return grouped
+
+    @property
     def record(self) -> Dict[str, Union[int, float]]:
 
         stats: Dict[str, List[Union[int, float]]] = {
@@ -60,7 +100,7 @@ class StageStreamsSet:
             'completion_rate': self.interval_completion_rates
         }
 
-        metrics = {}
+        metrics: Dict[str, Union[int, float]] = {}
 
         for calculation_method in self._stat_types.values():
             metrics.update(

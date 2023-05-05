@@ -2,26 +2,26 @@ import asyncio
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import List
+from typing import List, Dict
 
 import psutil
 from hedra.logging import HedraLogger
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import (
     MetricsSet
 )
+from .bigtable_config import BigTableConfig
 
 try:
     from google.cloud import bigtable
     from google.auth import load_credentials_from_file
-    from .bigtable_config import BigTableConfig
     has_connector = True
 
 except Exception:
     bigtable = None
     Credentials = None
-    BigTableConfig = None
     has_connector = False
 
 
@@ -34,6 +34,7 @@ class BigTable:
         self.instance_id = config.instance_id
         self.events_table_id = config.events_table
         self.metrics_table_id = config.metrics_table
+        self.streams_table_id = config.streams_table
 
         self.experiments_table_id = config.experiments_table
         self.variants_table_id = f'{config.experiments_table}_variants'
@@ -47,6 +48,7 @@ class BigTable:
 
         self._events_column_family_id = f'{self.events_table_id}_columns'
         self._metrics_column_family_id = f'{self.metrics_table_id}_columns'
+        self._streams_column_family_id = f'{self.streams_table_id}_columns'
 
         self._experiments_column_family_id = f'{self.experiments_table_id}_columns'
         self._variants_column_family_id = f'{self.experiments_table_id}_variants_columns'
@@ -65,6 +67,7 @@ class BigTable:
 
         self._events_table = None
         self._stage_metrics_table = None
+        self._streams_table = None
 
         self._experiments_table = None
         self._variants_table = None
@@ -80,6 +83,8 @@ class BigTable:
 
         self._events_table_columns = None
         self._stage_metrics_table_columns = None
+        self._streams_table_columns = None
+
         self._custom_metrics_table_columns = {}
         self._metrics_table_columns = None
         self._errors_table_columns = None
@@ -103,6 +108,73 @@ class BigTable:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opened connection to Google Cloud - Created Client Instance - ID:{self.instance_id}')
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opened connection to Google Cloud - Loaded account config from - {self.service_account_json_path}')
+
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to Table {self.streams_table_id}')
+        self._streams_table = self.instance.table(self.streams_table_id)
+        
+        try:
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Streams Column Family - {self._streams_column_family_id} - if not exists')
+            await self._loop.run_in_executor(
+                self._executor,
+                self._streams_table.create
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created Streams Column Family - {self._streams_column_family_id} - if not exists')
+
+        except Exception:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping creation of Streams Column Family - {self._streams_column_family_id} - if not exists')
+
+        self._streams_table_columns = self._streams_table.column_family(
+            self._streams_column_family_id
+        )
+
+        try:
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Streams Column for Column Family - {self._streams_column_family_id} - if not exists')
+            await self._loop.run_in_executor(
+                self._executor,
+                self._streams_table_columns.create
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created Streams Column for Column Family - {self._streams_column_family_id} - if not exists')
+
+        except Exception:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping creation of Streams Column for Column Family - {self._streams_column_family_id} - if not exists')
+
+        rows = []
+        for stage_name, stream  in stream_metrics.items():
+            for group_name, group in stream.grouped.items():
+                stream_record = {
+                    'name': f'{stage_name}_stream',
+                    'stage': stage_name,
+                    'group': group_name,
+                    **group
+                }
+
+                row_key = f'{stage_name}_stream_{str(uuid.uuid4())}'
+                row = self._variants_table.direct_row(row_key)
+
+                for field, value in stream_record.items():
+                    if not isinstance(value, bytes):
+                        value = f'{value}'.encode()
+
+                    row.set_cell(
+                        self._variants_column_family_id,
+                        field,
+                        value,
+                        timestamp=datetime.now()
+                    )
+
+                rows.append(row)
+
+        await self._loop.run_in_executor(
+            self._executor,
+            self._variants_table.mutate_rows,
+            rows
+        )
 
     async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
 
@@ -200,14 +272,12 @@ class BigTable:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping creation of Variants Column for Column Family - {self._variants_column_family_id} - if not exists')
 
         rows = []
-        for variant in experiment_metrics.variants:
+        for variant in experiment_metrics.variant_summaries:
 
-            variant_name = variant.get('variant_name')
-
-            row_key = f'{variant_name}_{str(uuid.uuid4())}'
+            row_key = f'{variant.variant_name}_{str(uuid.uuid4())}'
             row = self._variants_table.direct_row(row_key)
 
-            for field, value in variant.items():
+            for field, value in variant.record:
                 if not isinstance(value, bytes):
                     value = f'{value}'.encode()
 
@@ -262,14 +332,12 @@ class BigTable:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping creation of Mutations Column for Column Family - {self._mutations_column_family_id} - if not exists')
 
         rows = []
-        for mutation in experiment_metrics.mutations:
+        for mutation in experiment_metrics.mutation_summaries:
 
-            mutation_name = mutation.get('mutation_name')
-
-            row_key = f'{mutation_name}_{str(uuid.uuid4())}'
+            row_key = f'{mutation.mutation_name}_{str(uuid.uuid4())}'
             row = self._mutations_table.direct_row(row_key)
 
-            for field, value in mutation.items():
+            for field, value in mutation.record:
                 if not isinstance(value, bytes):
                     value = f'{value}'.encode()
 

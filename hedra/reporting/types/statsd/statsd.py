@@ -1,23 +1,23 @@
 import re
 import uuid
-from typing import List
+from typing import List, Dict
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import (
     MetricsSet,
     MetricType
 )
+from .statsd_config import StatsDConfig
 
 
 try:
     from aio_statsd import StatsdClient
-    from .statsd_config import StatsDConfig
     has_connector = True
 
 except Exception:
     StatsdClient = None
-    StatsDConfig = None
     has_connector = False
 
 
@@ -57,7 +57,7 @@ class StatsD:
 
         }
 
-        self.custom_types_map = {
+        self.stat_type_map = {
             MetricType.COUNT: 'count',
             MetricType.DISTRIBUTION: 'gauge',
             MetricType.RATE: 'gauge',
@@ -76,6 +76,30 @@ class StatsD:
         await self.connection.connect()
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to {self.statsd_type} at - {self.host}:{self.port}')
+
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to {self.statsd_type}')
+
+        for stage_name, stream in stream_metrics.items():
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stream - {stage_name}:{stream.stream_set_id}')
+
+            for group_name, group in stream.grouped.items():
+
+                for metric_field, metric_value in group.items():
+                    
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stream Metric - {stage_name}:{group_name}:{metric_field}')
+                    
+                    update_type = stream.types_map.get(group_name)
+                    stat_type = self.stat_type_map.get(update_type)
+                    update_function = self._update_map.get(stat_type)
+                    
+                    update_function(
+                        f'{stage_name}_stream_{group_name}_{metric_field}',
+                        metric_value
+                    )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Streams to {self.statsd_type}')
 
     async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
 
@@ -215,7 +239,7 @@ class StatsD:
             
             for custom_metric_name, custom_metric in metrics_set.custom_metrics.items():
 
-                metric_type = self.custom_types_map.get(
+                metric_type = self.stat_type_map.get(
                     custom_metric.metric_type,
                     'gauge'
                 )

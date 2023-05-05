@@ -125,7 +125,7 @@ class XML:
         streams_data = [
             {
                 'stage': stream_name,
-                **stream_set.record 
+                **stream_set.grouped 
             } for stream_name, stream_set in stream_metrics.items()
         ]
 

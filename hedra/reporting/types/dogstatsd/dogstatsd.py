@@ -48,7 +48,7 @@ class DogStatsD(StatsD):
             'quantiles': 'gauge'
         }
 
-        self.custom_types_map = {
+        self.stat_type_map = {
             MetricType.COUNT: 'count',
             MetricType.DISTRIBUTION: 'histogram',
             MetricType.RATE: 'gauge',
@@ -99,7 +99,7 @@ class DogStatsD(StatsD):
 
             for custom_metric_name, custom_metric in metrics_set.custom_metrics.items():
 
-                metric_type = self.custom_types_map.get(
+                metric_type = self.stat_type_map.get(
                     custom_metric.metric_type,
                     'gauge'
                 )

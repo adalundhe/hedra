@@ -11,6 +11,7 @@ class AWSTimestreamConfig(BaseModel):
     events_table: str='events'
     metrics_table: str='metrics'
     experiments_table: str='experiments'
+    streams_table: str='streams'
     retention_options: Dict[str, int] = {
         "MemoryStoreRetentionPeriodInHours": 1,
         "MagneticStoreRetentionPeriodInDays": 365,

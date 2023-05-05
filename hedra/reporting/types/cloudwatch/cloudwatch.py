@@ -3,23 +3,22 @@ import functools
 import datetime
 import json
 import uuid
-from typing import List
-
 import psutil
+from typing import List, Dict
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
 from concurrent.futures import ThreadPoolExecutor
+from .cloudwatch_config import CloudwatchConfig
 
 try:
     import boto3
-    from .cloudwatch_config import CloudwatchConfig
     has_connector = True
 
 except Exception:
     boto3 = None
-    CloudwatchConfig = None
     has_connector = False
 
 
@@ -38,6 +37,7 @@ class Cloudwatch:
 
         self.events_rule_name = config.events_rule
         self.metrics_rule_name = config.metrics_rule
+        self.streams_rule_name = config.streams_rule
 
         self.shared_metrics_rule_name = f'{config.metrics_rule}_shared'
         self.errors_rule_name = f'{config.metrics_rule}_errors'
@@ -74,6 +74,43 @@ class Cloudwatch:
         )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created AWS Cloudwatch client for region - {self.region_name}')
+
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to Cloudwatch rule - {self.streams_rule_name}')
+
+        streams = []
+        for stage_name, stream in stream_metrics.items():
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stream - {stage_name}:{stream.stream_set_id}')
+
+            for group_name, group in stream.grouped:
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stream Group - {group_name}:{stream.stream_set_id}')
+                
+                streams.append({
+                    'Time': datetime.datetime.now(),
+                    'Detail': json.dumps({
+                        **group,
+                        'group': group_name,
+                        'stage': stage_name,
+                        'name': f'{stage_name}_streams'
+                    }),
+                    'DetailType': self.streams_rule_name,
+                    'Resources': self.aws_resource_arns,
+                    'Source': self.streams_rule_name
+                })
+
+        await asyncio.wait_for(
+            self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.put_events,
+                    Entries=streams
+                )
+            ),
+            timeout=self.submit_timeout
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Streams to Cloudwatch rule - {self.streams_rule_name}')
 
     async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
 
@@ -182,7 +219,6 @@ class Cloudwatch:
         )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Events to Cloudwatch rule - {self.events_rule_name}')
-
     
     async def submit_common(self, metrics_sets: List[MetricsSet]):
 

@@ -10,4 +10,5 @@ class AWSLambdaConfig(BaseModel):
     events_lambda: str
     metrics_lambda: str
     experiments_lambda: Optional[str]
+    streams_lambda: Optional[str]
     reporter_type: ReporterTypes=ReporterTypes.AWSLambda

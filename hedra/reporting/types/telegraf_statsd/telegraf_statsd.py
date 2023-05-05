@@ -2,7 +2,9 @@ import uuid
 from typing import List
 from hedra.logging import HedraLogger
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
-
+from hedra.reporting.metric import (
+    MetricType
+)
 
 try:
     from hedra.reporting.types.statsd import StatsD
@@ -47,6 +49,13 @@ class TelegrafStatsD(StatsD):
             'histogram': self.connection.histogram,
             'distribution': self.connection.distribution,
             'timer': self.connection.timer
+        }
+
+        self.stat_type_map = {
+            MetricType.COUNT: 'increment',
+            MetricType.DISTRIBUTION: 'gauge',
+            MetricType.RATE: 'gauge',
+            MetricType.SAMPLE: 'gauge'
         }
 
         self.session_uuid = str(uuid.uuid4())

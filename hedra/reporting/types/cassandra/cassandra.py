@@ -3,15 +3,17 @@ import functools
 import os
 import psutil
 import uuid
-from typing import List
+from typing import List, Dict
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import (
     MetricsSet,
     MetricType
 )
+from .cassandra_config import CassandraConfig
 
 
 try:
@@ -22,13 +24,11 @@ try:
     from cassandra.cqlengine.models import Model
     from cassandra.cluster import Cluster
     from cassandra.auth import PlainTextAuthProvider
-    from .cassandra_config import CassandraConfig
     has_connector = True
 
 except Exception:
     Cluster = None
     PlainTextAuthProvider = None
-    CassandraConfig = None
     has_connector = False
 
 
@@ -47,6 +47,7 @@ class Cassandra:
         
         self.events_table_name: str = config.events_table
         self.metrics_table_name: str = config.metrics_table
+        self.streams_table_name: str = config.streams_table
 
         self.experiments_table_name: str= config.experiments_table
         self.variants_table_name: str= f'{config.experiments_table}_variants'
@@ -68,6 +69,7 @@ class Cassandra:
         self._metrics_table = None
         self._errors_table = None
         self._events_table = None
+        self._streams_table = None
 
         self._experiments_table = None
         self._variants_table = None
@@ -142,6 +144,65 @@ class Cassandra:
 
         await self.logger.filesystem.aio['hedra.repoorting'].info(f'{self.metadata_string} - Created Keyspace - {self.keyspace}')
     
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to - Keyspace: {self.keyspace} - Table: {self.streams_table_name}')
+        
+        if self._streams_table is None:
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Streams table - {self.streams_table_name} - under keyspace - {self.keyspace}')
+
+            fields = {
+                'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+                'name': columns.Text(min_length=1, index=True),
+                'stage': columns.Text(min_length=1),
+                'group': columns.Text(),
+                'median': columns.Float(),
+                'mean': columns.Float(),
+                'variance': columns.Float(),
+                'stdev': columns.Float(),
+                'minimum': columns.Float(),
+                'maximum': columns.Float(),
+                'created_at': columns.DateTime(default=datetime.now)
+            }
+
+            self._streams_table = type(
+                self.streams_table_name.capitalize(), 
+                (Model, ), 
+                fields
+            )
+
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    sync_table,
+                    self._streams_table,
+                    keyspaces=[self.keyspace]
+                )
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Streams table - {self.streams_table_name} - under keyspace - {self.keyspace}')
+
+        for stage_name, stream in stream_metrics.items():
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stream - {stage_name}:{stream.stream_set_id}')
+
+            for group_name, group in stream.grouped:
+                await self._loop.run_in_executor(
+                        self._executor,
+                        functools.partial(
+                            self._metrics_table.create,
+                            **{
+                                'name': f'{stage_name}_streams',
+                                'stage': stage_name,
+                                'group': group_name,
+                                **group
+                            }
+                        )
+                    )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics to - Keyspace: {self.keyspace} - Table: {self.streams_table_name}')
+
+
     async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments to - Keyspace: {self.keyspace} - Table: {self.experiments_table_name}')
 
