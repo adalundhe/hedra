@@ -7,12 +7,14 @@ from .validator import TransformHookValidator
 @registrar(HookType.TRANSFORM)
 def transform(
     *names, 
-    order: int=1
+    order: int=1,
+    skip: bool=False
 ):
     
     TransformHookValidator(
         names=names,
-        order=order
+        order=order,
+        skip=skip
     )
 
     def wrapper(func):

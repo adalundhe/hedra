@@ -11,12 +11,12 @@ class InternallHook(Hook):
         shortname: str, 
         call: Callable[..., Awaitable[Any]], 
         stage: str = None, 
-        hook_type=HookType.ACTION
+        hook_type: HookType=HookType.INTERNAL
     ) -> None:
         super().__init__(
             name, 
             shortname, 
             call, 
-            stage, 
-            hook_type
+            stage=stage, 
+            hook_type=hook_type
         )

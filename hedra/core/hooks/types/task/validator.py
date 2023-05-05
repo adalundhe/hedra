@@ -1,11 +1,19 @@
 from typing import Optional, Dict, Union, Tuple
-from pydantic import BaseModel, StrictStr, StrictInt, StrictFloat, validator
+from pydantic import (
+    BaseModel, 
+    StrictStr, 
+    StrictInt, 
+    StrictFloat,
+    StrictBool, 
+    validator
+)
 
 
 class TaskHookValidator(BaseModel):
     names: Tuple[StrictStr, ...]
     weight: StrictInt
     order: StrictInt
+    skip: StrictBool
     metadata: Optional[Dict[str, Union[StrictStr, StrictInt, StrictFloat]]]
 
     class Config:

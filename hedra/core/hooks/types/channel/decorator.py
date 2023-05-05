@@ -7,11 +7,16 @@ from .validator import ChannelHookValidator
 
 
 @registrar(HookType.CHANNEL)
-def channel(*names: Tuple[str, ...], order: int=1):
+def channel(
+    *names: Tuple[str, ...], 
+    order: int=1,
+    skip: bool=False
+):
     
     ChannelHookValidator(
         names=names,
-        order=order
+        order=order,
+        skip=skip
     )
     
     def wrapper(func) -> Hook:

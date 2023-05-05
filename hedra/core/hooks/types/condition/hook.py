@@ -11,22 +11,28 @@ class ConditionHook(Hook):
         shortname: str, 
         call: Callable[..., Awaitable[Any]], 
         *names: Tuple[str, ...],
-        order: int=1
+        order: int=1,
+        skip: bool=False
     ) -> None:
         super().__init__(
             name, 
             shortname, 
             call, 
+            order=order,
+            skip=skip,
             hook_type=HookType.CONDITION
         )
 
         self.names = list(set(names))
         self.pre: bool = True
         self.key: str = None
-        self.order: int = order
         self.events: Dict[str, Coroutine] = {}
 
     async def call(self, **kwargs):
+
+        if self.skip:
+            return kwargs
+
         execute = await super().call(**{name: value for name, value in kwargs.items() if name in self.params})
 
         if isinstance(execute, dict):
@@ -46,7 +52,8 @@ class ConditionHook(Hook):
             self.shortname,
             self._call,
             *self.names,
-            order=self.order
+            order=self.order,
+            skip=self.skip,
         )
 
         condition_hook.stage = self.stage

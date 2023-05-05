@@ -14,7 +14,9 @@ class Hook:
         shortname: str,
         call: Callable[..., Awaitable[Any]], 
         stage: str = None,
-        hook_type=HookType.ACTION
+        order: int=None,
+        skip: bool=False,
+        hook_type: HookType=None
     ) -> None:
         self.hook_id = str(uuid.uuid4())
         self.name = name
@@ -28,6 +30,8 @@ class Hook:
         self.args = inspect.signature(call)
         self.params = self.args.parameters
         self.context: SimpleContext = SimpleContext()
+        self.order: int = order
+        self.skip = skip
         
 
     async def call(self, **kwargs):
@@ -59,6 +63,8 @@ class Hook:
             self.name,
             self.shortname,
             self._call,
-            self.stage,
-            self.hook_type
+            stage=self.stage,
+            order=self.order,
+            skip=self.skip,
+            hook_type=self.hook_type
         )

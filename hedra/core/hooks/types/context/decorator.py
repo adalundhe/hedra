@@ -9,11 +9,13 @@ from .validator import ContextHookValidator
 @registrar(HookType.CONTEXT)
 def context(
     *names: Tuple[str], 
-    order: int=1
+    order: int=1,
+    skip: bool=False
 ):
     ContextHookValidator(
         names=names,
-        order=order
+        order=order,
+        skip=skip
     )
 
     def wrapper(func) -> Hook:

@@ -14,12 +14,15 @@ class TaskHook(Hook):
         *names: Tuple[str, ...],
         weight: int=1, 
         order: int=1, 
+        skip: bool=False,
         metadata: Dict[str, Union[str, int]]={}
     ) -> None:
         super().__init__(
             name, 
             shortname, 
             call, 
+            order=order,
+            skip=skip,
             hook_type=HookType.TASK
         )
 
@@ -48,7 +51,8 @@ class TaskHook(Hook):
             self.shortname,
             self._call,
             weight=self.metadata.weight,
-            order=self.metadata.order,
+            order=self.order,
+            skip=self.skip,
             metadata={
                 **self.metadata.copy()
             }
@@ -58,3 +62,6 @@ class TaskHook(Hook):
         task_hook.stage = self.stage
 
         return task_hook
+    
+    async def call(self, *args, **kwargs):
+        return await self._call(*args, **kwargs)

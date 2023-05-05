@@ -3,13 +3,15 @@ from pydantic import (
     BaseModel, 
     validator, 
     StrictStr, 
-    StrictInt
+    StrictInt,
+    StrictBool
 )
 
 
 class TransformHookValidator(BaseModel):
     names: Optional[Tuple[StrictStr, ...]]
     order: Optional[StrictInt]
+    skip: StrictBool
 
     @validator('names')
     def validate_names(cls, vals):

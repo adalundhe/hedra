@@ -5,12 +5,18 @@ from .validator import CheckHookValidator
 
 
 @registrar(HookType.CHECK)
-def check(*names, message: str='Did not return True.', order: int=1):
+def check(
+    *names, 
+    message: str='Did not return True.', 
+    order: int=1,
+    skip: bool=False
+):
     
     CheckHookValidator(
         names=names,
         message=message,
-        order=order
+        order=order,
+        skip=skip
     )
     
     def wrapper(func):

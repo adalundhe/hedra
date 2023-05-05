@@ -10,13 +10,15 @@ def action(
     *names: Tuple[str, ...],
     weight: int=1, 
     order: int=1, 
-    metadata: Dict[str, Union[str, int]]={}
+    metadata: Dict[str, Union[str, int]]={},
+    skip: bool=False
 ):
     ActionHookValidator(
         names=names,
         weight=weight,
         order=order,
-        metadata=metadata
+        metadata=metadata,
+        skip=skip
     )
     
     def wrapper(func):

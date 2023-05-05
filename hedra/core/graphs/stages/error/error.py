@@ -17,7 +17,7 @@ class Error(Stage):
 
         base_stage_name = self.__class__.__name__
         self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Checking internal Hooks for stage - {base_stage_name}')
-
+        
         for reserved_hook_name in self.internal_hooks:
             try:
 

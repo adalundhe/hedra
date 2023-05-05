@@ -11,6 +11,7 @@ def task(
     *names: Tuple[str, ...],
     weight: int=1, 
     order: int=1, 
+    skip: bool=False,
     metadata: Dict[str, Union[str, int]]={}
 ):
     
@@ -18,6 +19,7 @@ def task(
         names=names,
         weight=weight,
         order=order,
+        skip=skip,
         metadata=metadata
     )
 

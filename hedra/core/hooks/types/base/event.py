@@ -38,6 +38,7 @@ class BaseEvent(Generic[T]):
         self.event_type = EventType.EVENT
         self.event_name = source.name
         self.event_order = source.order
+        self.event_skip = source.skip
 
         self.source: T = source
 

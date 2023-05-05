@@ -354,9 +354,10 @@ class Setup(Stage, Generic[Unpack[T]]):
         connection_validation_retries: int=3,
         setup_stage_target_config: Config=None
     ):
-            if setup_stage_has_actions and isinstance(setup_stage_actions, ActionHook):
+            if setup_stage_has_actions and isinstance(setup_stage_actions, ActionHook) and setup_stage_actions.skip is False:
 
                 hook = setup_stage_actions
+                hook.skip = setup_stage_actions.skip
                 hook.stage_instance.client.next_name = hook.name
                 hook.stage_instance.client.intercept = True
 
@@ -481,7 +482,7 @@ class Setup(Stage, Generic[Unpack[T]]):
         setup_stage_has_tasks: bool=False,
         setup_stage_configs: Dict[str, Config] = {},
     ):
-        if setup_stage_has_tasks and isinstance(setup_stage_tasks, TaskHook):
+        if setup_stage_has_tasks and isinstance(setup_stage_tasks, TaskHook) and setup_stage_tasks.skip is False:
             hook = setup_stage_tasks
             execute_stage: Stage = hook.stage_instance
             execute_stage.client.next_name = hook.name
@@ -536,6 +537,7 @@ class Setup(Stage, Generic[Unpack[T]]):
             return {
                 'setup_stage_tasks': setup_stage_tasks
             }
+        
 
     @context('setup_task')
     async def apply_channels(

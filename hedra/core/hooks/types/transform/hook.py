@@ -17,12 +17,15 @@ class TransformHook(Hook):
         *names: Optional[Tuple[str, ...]],
         timeout: Optional[float]='1m',
         pre: bool=False,
-        order: int=1
+        order: int=1,
+        skip: bool=False
     ) -> None:
         super().__init__(
             name, 
             shortname, 
             call, 
+            order=order,
+            skip=skip,
             hook_type=HookType.TRANSFORM
         )
         
@@ -32,12 +35,15 @@ class TransformHook(Hook):
         self.names = list(set(names))
         self.pre = pre
         self.events: Dict[str, Coroutine] = {}
-        self.order = order
         self.context: Optional[SimpleContext] = None
         self.conditions: Optional[List[Callable[..., bool]]] = []
         self._timeout_as_string = timeout
         
     async def call(self, **kwargs):
+
+        if self.skip:
+            return kwargs
+        
         batchable_args: List[Dict[str, Any]] = []
         for name, arg in kwargs.items():
             if isinstance(arg, (list, tuple)):
@@ -69,7 +75,7 @@ class TransformHook(Hook):
                         else:
                             aggregated_transformm[name].append(value)
 
-                else:
+                elif data_item is not None:
                     aggregated_transformm[self.shortname].append(data_item)
 
 
@@ -101,7 +107,8 @@ class TransformHook(Hook):
             *self.names,
             timeout=self._timeout_as_string,
             pre=self.pre,
-            order=self.order
+            order=self.order,
+            skip=self.skip,
         )
         
         transform_hook.stage = self.stage

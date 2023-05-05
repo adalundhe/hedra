@@ -15,7 +15,8 @@ class ContextHook(Hook):
         store: Optional[str]=None,
         load: Optional[str]=None,
         pre: bool=False,
-        order: int=1
+        order: int=1,
+        skip: bool=False
     ) -> None:
         super().__init__(
             name, 
@@ -34,6 +35,9 @@ class ContextHook(Hook):
         self.params = self.args.parameters
 
     async def call(self, **kwargs) -> None:
+
+        if self.skip:
+            return kwargs
 
         hook_args = {name: value for name, value in kwargs.items() if name in self.params}
 
@@ -83,7 +87,8 @@ class ContextHook(Hook):
             store=self.store,
             load=self.load,
             pre=self.pre,
-            order=self.order
+            order=self.order,
+            skip=self.skip,
         )
 
         context_hook.stage = self.stage

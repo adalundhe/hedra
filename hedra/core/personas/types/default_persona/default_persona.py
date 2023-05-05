@@ -143,10 +143,14 @@ class DefaultPersona:
     def _setup(self, hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]], metadata_string: str):
         self.metadata_string = f'{metadata_string} Persona: {self.type.capitalize()}:{self.persona_id} - '
 
-        self._hooks = list([
+        actions_and_tasks = list([
             *hooks.get(HookType.ACTION),
             *hooks.get(HookType.TASK, [])
         ])
+
+        self._hooks = [
+            hook for hook in actions_and_tasks if not hook.skip
+        ]
 
         for hook in self._hooks:
             if self.stage_name is None:

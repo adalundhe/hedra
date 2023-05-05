@@ -36,12 +36,15 @@ class MetricHook(Hook):
         call: Callable[..., Awaitable[Any]], 
         metric_type: str,
         group: Optional[str] = None,
-        order: int=1
+        order: int=1,
+        skip: bool=False
     ) -> None:        
         super().__init__(
             name, 
             shortname, 
             call, 
+            order=order,
+            skip=skip,
             hook_type=HookType.METRIC
         )
         
@@ -54,6 +57,9 @@ class MetricHook(Hook):
 
     async def call(self, **kwargs):
 
+        if self.skip:
+            return kwargs
+        
         results: RawResultsSet = self.context['analyze_stage_raw_results']
         self.loop = asyncio.get_running_loop()
         for signame in ('SIGINT', 'SIGTERM'):
@@ -170,7 +176,8 @@ class MetricHook(Hook):
             self.shortname,
             self._call,
             self.group,
-            order=self.order
+            order=self.order,
+            skip=self.skip,
         )
 
         metric_hook.stage = self.stage
