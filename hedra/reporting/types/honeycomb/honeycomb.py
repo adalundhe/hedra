@@ -2,22 +2,22 @@ import asyncio
 import functools
 import psutil
 import uuid
-from typing import List
+from typing import List, Dict
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
+from .honeycomb_config import HoneycombConfig
 
 
 try:
     import libhoney
-    from .honeycomb_config import HoneycombConfig
     has_connector = True
 
 except Exception:
     libhoney = None
-    HoneycombConfig = None
     has_connector = False
 
 
@@ -48,6 +48,36 @@ class Honeycomb:
         )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to Honeycomb.IO')
+
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to Honeycomb.IO')
+
+        for stage_name, stream in stream_metrics.items():
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stream - {stage_name}:{stream.stream_set_id}')
+
+            for group_name, group in stream.grouped.items():
+
+                group_metric = {
+                    'name': f'{stage_name}_streams',
+                    'stage': stage_name,
+                    'group': group_name,
+                    **group
+                }
+
+                honeycomb_group_metric = libhoney.Event(data=group_metric)
+
+                await self._loop.run_in_executor(
+                    self._executor,
+                    honeycomb_group_metric.send
+                )
+
+        await self._loop.run_in_executor(
+            self._executor,
+            libhoney.flush
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Streams to Honeycomb.IO')
 
     async def submit_experiments(self, expoeriment_metrics: ExperimentMetricsCollectionSet):
 

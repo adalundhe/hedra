@@ -159,7 +159,10 @@ class StageMetricsSummary:
 
     @property
     def streams(self):
-        return StageStreamsSet(self.stage_streamed_analytics)
+        return StageStreamsSet(
+            self.stage_metrics.name,
+            self.stage_streamed_analytics
+        )
 
     def calculate_action_and_task_metrics(self):
         self._group_action_and_task_metrics()

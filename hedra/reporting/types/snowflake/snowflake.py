@@ -2,14 +2,16 @@ import asyncio
 import uuid
 import psutil
 from concurrent.futures import ThreadPoolExecutor
-from typing import List
+from typing import List, Dict
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import (
     MetricsSet,
     MetricType
 )
+from .snowflake_config import SnowflakeConfig
 
 
 try:
@@ -17,12 +19,11 @@ try:
     from snowflake.sqlalchemy import URL
     from sqlalchemy import create_engine
     from sqlalchemy.schema import CreateTable
-    from .snowflake_config import SnowflakeConfig
+    
     has_connector = True
 
 except Exception:
     snowflake = None
-    SnowflakeConfig = None
     has_connector = False
 
 class Snowflake:
@@ -39,6 +40,7 @@ class Snowflake:
 
         self.events_table_name = config.events_table
         self.metrics_table_name = config.metrics_table
+        self.streams_table_name = config.streams_table
 
         self.experiments_table_name = config.experiments_table
         self.variants_table_name = f'{config.experiments_table}_variants'
@@ -59,6 +61,7 @@ class Snowflake:
 
         self._events_table = None
         self._metrics_table = None
+        self._streams_table = None
 
         self._experiments_table = None
         self._variants_table = None
@@ -124,6 +127,62 @@ class Snowflake:
 
         except asyncio.TimeoutError:
             raise Exception('Err. - Connection to Snowflake timed out - check your account id, username, and password.')
+
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to Table - {self.streams_table_name}')
+
+        for stage_name, stream in stream_metrics.items():
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Streams - {stage_name}:{stream.stream_set_id}')
+
+            if self._streams_table is None:
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Streams table - {self.streams_table_name} - if not exists')
+
+                streams_table = sqlalchemy.Table(
+                    self.streams_table_name,
+                    self.metadata,
+                    sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
+                    sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
+                    sqlalchemy.Column('stage', sqlalchemy.VARCHAR(255)),
+                    sqlalchemy.Column('group', sqlalchemy.VARCHAR(255)),
+                    sqlalchemy.Column('median', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('mean', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('variance', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('stdev', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('minimum', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('maximum', sqlalchemy.FLOAT)
+                )
+
+                for quantile in stream.quantiles:
+                    streams_table.append_column(
+                        sqlalchemy.Column(f'quantile_{quantile}th', sqlalchemy.FLOAT)
+                    )
+                
+                await self._loop.run_in_executor(
+                    self._executor,
+                    self._connection.execute,
+                    CreateTable(
+                        streams_table, 
+                        if_not_exists=True
+                    )
+                )
+
+                self._streams_table = streams_table
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Streams table - {self.streams_table_name}')
+
+        for group_name, group in stream.grouped.items():
+            await self._loop.run_in_executor(
+                self._executor,
+                self._connection.execute,
+                self._streams_table.insert(values={
+                    **group,
+                    'group': group_name,
+                    'stage': stage_name,
+                    'name': f'{stage_name}_streams'
+                })
+            )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Streams to Table - {self.streams_table_name}')
 
     async def submit_experiments(self, experiments_metrics: ExperimentMetricsCollectionSet):
 
@@ -328,7 +387,7 @@ class Snowflake:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Metrics to Table - {self.metrics_table_name}')
 
         for metrics_set in metrics:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
             if self._metrics_table is None:
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Metrics table - {self.metrics_table_name} - if not exists')

@@ -1,14 +1,6 @@
-from types import SimpleNamespace
-from typing import Dict, Optional
+from typing import Optional
 from pydantic import BaseModel
 from hedra.reporting.types.common.types import ReporterTypes
-
-try:
-    import sqlalchemy
-
-except Exception:
-    sqlalchemy = SimpleNamespace(Column=None)
-
 
 class SnowflakeConfig(BaseModel):
     username: str
@@ -22,7 +14,7 @@ class SnowflakeConfig(BaseModel):
     events_table: str='events'
     metrics_table: str='metrics'
     experiments_table: str='experiments'
-    custom_fields: Dict[str, sqlalchemy.Column]={}
+    streams_table: str='streams'
     connect_timeout: int=30
     reporter_type: ReporterTypes=ReporterTypes.Snowflake
 

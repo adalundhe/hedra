@@ -6,29 +6,29 @@
 # )
 
 import uuid
-from typing import List
+from typing import List, Dict
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import (
     MetricsSet,
     MetricType
 )
-
+from .postgres_config import PostgresConfig
 
 try:
     import sqlalchemy
     from sqlalchemy.dialects.postgresql import UUID
     from sqlalchemy.schema import CreateTable
     from aiopg.sa import create_engine
-    from .postgres_config import PostgresConfig
+    
     has_connector = True
 
 except Exception:
     UUID = None
     sqlalchemy = None
     create_engine = None
-    PostgresConfig = None
     has_connector = False
 
 
@@ -42,6 +42,7 @@ class Postgres:
 
         self.events_table_name = config.events_table
         self.metrics_table_name = config.metrics_table
+        self.streams_table_name = config.streams_table
 
         self.experiments_table_name = config.experiments_table
         self.variants_table_name = f'{config.experiments_table}_variants'
@@ -57,6 +58,7 @@ class Postgres:
 
         self._events_table = None
         self._metrics_table = None
+        self._streams_table = None
 
         self._experiments_table = None
         self._variants_table = None
@@ -103,6 +105,65 @@ class Postgres:
         self._connection = await self._engine.acquire()
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to {self.sql_type} instance at - {self.host} - Database: {self.database}')
+
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to Table - {self.streams_table_name}')
+
+        async with self._connection.begin() as transaction:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Streams to Table - {self.streams_table_name} - Initiating transaction')
+        
+            for stage_name, stream in stream_metrics.items():
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Streams - {stage_name}:{stream.stream_set_id}')
+
+                if self._streams_table is None:
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Streams table - {self.streams_table_name} - if not exists')
+
+                    stream_table = sqlalchemy.Table(
+                        self.streams_table_name,
+                        self.metadata,
+                        sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
+                        sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
+                        sqlalchemy.Column('stage', sqlalchemy.VARCHAR(255)),
+                        sqlalchemy.Column('group', sqlalchemy.TEXT()),
+                        sqlalchemy.Column('median', sqlalchemy.FLOAT),
+                        sqlalchemy.Column('mean', sqlalchemy.FLOAT),
+                        sqlalchemy.Column('variance', sqlalchemy.FLOAT),
+                        sqlalchemy.Column('stdev', sqlalchemy.FLOAT),
+                        sqlalchemy.Column('minimum', sqlalchemy.FLOAT),
+                        sqlalchemy.Column('maximum', sqlalchemy.FLOAT)
+                    )
+
+                    for quantile in stream.quantiles:
+                        stream_table.append_column(
+                            sqlalchemy.Column(f'quantile_{quantile}th', sqlalchemy.FLOAT)
+                        )
+
+                    await self._connection.execute(
+                        CreateTable(
+                            stream_table, 
+                            if_not_exists=True
+                        )
+                    )
+                
+                    self._streams_table = stream_table
+
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Streams table - {self.streams_table_name}')
+
+                for group_name, group in stream.grouped.items():
+                    await self._connection.execute(
+                        self._streams_table.insert(values={
+                            'name': f'{stage_name}_streams',
+                            'stage': stage_name,
+                            'group': group_name,
+                            **group
+                        })
+                    )
+                    
+            await transaction.commit()
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Streams to Table - {self.streams_table_name} - Transaction committed')
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Streams to Table - {self.streams_table_name}')
 
     async def submit_experiments(self, experiments_metrics: ExperimentMetricsCollectionSet):
 

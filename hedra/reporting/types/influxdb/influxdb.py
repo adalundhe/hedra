@@ -1,20 +1,21 @@
 import uuid
-from typing import List
+from typing import List, Dict
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
+from .influxdb_config import InfluxDBConfig
+
 
 try:
     from influxdb_client import Point
     from influxdb_client.client.influxdb_client_async import InfluxDBClientAsync
-    from .influxdb_config import InfluxDBConfig
     has_connector = True
 
 except Exception:
     Point = None
     InfluxDBClientAsync = None
-    InfluxDBConfig = None
     has_connector = False
 
 
@@ -29,6 +30,7 @@ class InfluxDB:
 
         self.events_bucket_name = config.events_bucket
         self.metrics_bucket_name = config.metrics_bucket
+        self.streams_bucket_name = config.streams_bucket
         self.shared_metrics_bucket_name = f'{config.metrics_bucket}_shared'
 
         self.experiments_bucket_name = config.experiments_bucket
@@ -60,6 +62,40 @@ class InfluxDB:
         self.write_api = self.client.write_api()
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to InfluxDB at - {self.protocol}://{self.host} - for Organization - {self.organization}')
+
+    async def submit_streams(self, stage_metrics: Dict[str, StageStreamsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to Bucket - {self.streams_bucket_name}')
+
+        points = []
+        for stage_name, stream in stage_metrics.items():
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Streams - {stage_metrics}:{stream.stream_set_id}')
+            
+            stream_name = f'{stage_name}_streams'
+
+            for group_name, group in stream.grouped.items():
+                point = Point(stream_name)
+                tags = [
+                    ("name", stream_name),
+                    ("stage", stage_name),
+                    ("group", group_name)
+                ]
+
+                for tag_name, tag_value in tags:
+                    point.tag(tag_name, tag_value)
+
+                for field, value in group.items():
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stream - {stage_name}:{group_name}:{field}')
+                    point.field(field, value)
+
+                points.append(point)
+
+        await self.write_api.write(
+            bucket=self.streams_bucket_name,
+            record=points
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Streams to Bucket - {self.streams_bucket_name}')
 
     async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
 

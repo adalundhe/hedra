@@ -1,19 +1,19 @@
 import uuid
-from typing import List
+from typing import List, Dict
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
+from .mongodb_config import MongoDBConfig
 
 
 try:
     from motor.motor_asyncio import AsyncIOMotorClient
-    from .mongodb_config import MongoDBConfig
     has_connector = True
 
 except Exception:
     AsyncIOMotorClient = None
-    MongoDBConfig = None
     has_connector = False
 
 
@@ -28,6 +28,7 @@ class MongoDB:
 
         self.events_collection = config.events_collection
         self.metrics_collection = config.metrics_collection
+        self.streams_collection = config.streams_collection
 
         self.experiments_collection = config.experiments_collection
         self.variants_collection = f'{config.experiments_collection}_variants'
@@ -59,6 +60,24 @@ class MongoDB:
         self.database = self.connection[self.database_name]
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to MongoDB instance at - {self.host} - Database: {self.database_name}')
+
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to Bucket - {self.streams_collection}')
+
+        records = []
+        for stage_name, stream in stream_metrics.items():
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Streams - {stage_name}:{stream.stream_set_id}')
+            
+            for group_name, group in stream.grouped.items():
+                records.append({
+                    'name': f'{stage_name}_streams',
+                    'stage': stage_name,
+                    'group': group_name,
+                    **group
+                })
+
+        await self.database[self.metrics_collection].insert_many(records)
 
     async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet): 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments to Collection - {self.experiments_collection}')
@@ -105,7 +124,7 @@ class MongoDB:
 
         records = []
         for metrics_set in metrics:
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Shared Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
             
             for group_name, group in metrics_set.groups.items():
                 records.append({

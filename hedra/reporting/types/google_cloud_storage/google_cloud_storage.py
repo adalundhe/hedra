@@ -2,22 +2,22 @@ import asyncio
 import json
 import psutil
 import uuid
-from typing import List
+from typing import List, Dict
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
+from .google_cloud_storage_config import GoogleCloudStorageConfig
 
 try:
 
     from google.cloud import storage
-    from .google_cloud_storage_config import GoogleCloudStorageConfig
     has_connector = True
 
 except Exception:
     storage = None
-    GoogleCloudStorageConfig = None
     has_connector = False
 
 class GoogleCloudStorage:
@@ -28,6 +28,7 @@ class GoogleCloudStorage:
         self.bucket_namespace = config.bucket_namespace
         self.events_bucket_name = config.events_bucket
         self.metrics_bucket_name = config.metrics_bucket
+        self.streams_bucket_name = config.streams_bucket
 
         self.experiments_bucket_name = config.experiments_bucket
         self.variants_bucket_name = f'{config.experiments_bucket}_variants'
@@ -41,6 +42,7 @@ class GoogleCloudStorage:
         self.client = None
 
         self._events_bucket = None
+        self._streams_bucket = None
 
         self._experiments_bucket = None
         self._variants_bucket = None
@@ -65,6 +67,55 @@ class GoogleCloudStorage:
         self.client = storage.Client.from_service_account_json(self.service_account_json_path)
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opened connection to Google Cloud - Loaded account config from - {self.service_account_json_path}')
+
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        try:
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Streams bucket at - Namespace: {self.bucket_namespace} - Bucket: {self.streams_bucket_name} if not exists')
+
+            self._streams_bucket = await self._loop.run_in_executor(
+                self._executor,
+                self.client.get_bucket,
+                f'{self.bucket_namespace}_{self.streams_bucket_name}'
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Streams bucket at - Namespace: {self.bucket_namespace} - Bucket: {self.streams_bucket_name}')
+        
+        except Exception:
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Setting Streams bucket as - Namespace: {self.bucket_namespace} - Bucket: {self.streams_bucket_name}')
+
+            self._streams_bucket = await self._loop.run_in_executor(
+                self._executor,
+                self.client.create_bucket,
+                f'{self.bucket_namespace}_{self.streams_bucket_name}'
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Set Streams bucket as - Namespace: {self.bucket_namespace} - Bucket: {self.streams_bucket_name}')
+
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to - Namespace: {self.bucket_namespace} - Bucket: {self.streams_bucket_name}')
+        for stage_name, stream in stream_metrics.items():
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stream - {stage_name}:{stream.stream_set_id}')
+
+            for group_name, group in stream.grouped.items():
+                blob = await self._loop.run_in_executor(
+                    self._executor,
+                    self._streams_bucket.blob,
+                    f'{stage_name}_{group_name}_{self.session_uuid}'
+                )
+
+                await self._loop.run_in_executor(
+                    self._executor,
+                    blob.upload_from_string,
+                    json.dumps({
+                        'name': f'{stage_name}_streams',
+                        'stage': stage_name,
+                        'group': group_name,
+                        **group
+                    })
+                )
 
     async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
 
@@ -299,7 +350,7 @@ class GoogleCloudStorage:
 
             await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Metrics bucket at - Namespace: {self.bucket_namespace} - Bucket: {self.metrics_bucket_name} if not exists')
 
-            self.metrics_bucket = await self._loop.run_in_executor(
+            self._metrics_bucket = await self._loop.run_in_executor(
                 self._executor,
                 self.client.get_bucket,
                 f'{self.bucket_namespace}_{self.metrics_bucket_name}'
@@ -311,7 +362,7 @@ class GoogleCloudStorage:
 
             await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Setting Metrics bucket as - Namespace: {self.bucket_namespace} - Bucket: {self.metrics_bucket_name}')
 
-            self.metrics_bucket = await self._loop.run_in_executor(
+            self._metrics_bucket = await self._loop.run_in_executor(
                 self._executor,
                 self.client.create_bucket,
                 f'{self.bucket_namespace}_{self.metrics_bucket_name}'
@@ -327,7 +378,7 @@ class GoogleCloudStorage:
             for group_name, group in metrics_set.groups.items():
                 blob = await self._loop.run_in_executor(
                     self._executor,
-                    self.metrics_bucket.blob,
+                    self._metrics_bucket.blob,
                     f'{metrics_set.name}_{group_name}_{self.session_uuid}'
                 )
 

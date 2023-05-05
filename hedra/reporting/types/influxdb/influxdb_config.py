@@ -1,4 +1,3 @@
-from typing import Optional
 from hedra.reporting.types.common.types import ReporterTypes
 from pydantic import BaseModel
 
@@ -11,5 +10,6 @@ class InfluxDBConfig(BaseModel):
     events_bucket: str='events'
     metrics_bucket: str='metrics'
     experiments_bucket: str='experiments'
+    streams_bucket: str='streams'
     secure: bool=False
     reporter_type: ReporterTypes=ReporterTypes.InfluxDB

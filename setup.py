@@ -91,6 +91,7 @@ setup(
             'aiopg',
             'sqlalchemy',
             'boto3',
+            'snowflake-sqlalchemy',
             'snowflake-connector-python',
             'google-cloud-bigquery',
             'google-cloud-bigtable',
@@ -99,7 +100,8 @@ setup(
             'aioquic',
             'dicttoxml',
             'opentelemetry-api',
-            'datadog_api_client'
+            'datadog_api_client',
+            'aiokafka'
         ],
         'all-engines': [
             'grpcio',
@@ -134,7 +136,8 @@ setup(
             'google-cloud-storage',
             'dicttoxml',
             'datadog-api-client',
-            'aiosonic'
+            'aiosonic',
+            'aiokafka'
 
         ],
         'playwright': [
@@ -197,7 +200,7 @@ setup(
             'aioquic'
         ],
         'snowflake': [
-            'sqlalchemy',
+            'snowflake-sqlalchemy',
             'snowflake-connector-python'
         ],
         'google': [
