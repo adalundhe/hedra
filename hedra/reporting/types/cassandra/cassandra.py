@@ -202,7 +202,6 @@ class Cassandra:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics to - Keyspace: {self.keyspace} - Table: {self.streams_table_name}')
 
-
     async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments to - Keyspace: {self.keyspace} - Table: {self.experiments_table_name}')
 

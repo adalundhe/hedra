@@ -12,9 +12,10 @@ CalculationMethod = Callable[[Dict[str,List[Union[int, float]]]], Dict[str, Unio
 class StageStreamsSet:
 
     def __init__(self, 
-        stage_name: str,
+        stage: str,
         stage_streams: List[StreamAnalytics]
     ) -> None:
+        self.stage = stage
         self.stream_set_id = uuid.uuid4()
         self.interval_completion_rates: List[float] = []
         self.interval_completed_counts: List[int] = []

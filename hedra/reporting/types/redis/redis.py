@@ -1,21 +1,22 @@
 import json
 import uuid
-from typing import List
+from typing import List, Dict
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
+from .redis_config import RedisConfig
 
 
 try:
 
     import aioredis
-    from .redis_config import RedisConfig
+    
     has_connector = True
 
 except Exception:
     aioredis = None
-    RedisConfig = None
     has_connector = True
 
 
@@ -29,6 +30,7 @@ class Redis:
         self.database = config.database
         self.events_channel = config.events_channel
         self.metrics_channel = config.metrics_channel
+        self.streams_channel = config.streams_channel
 
         self.experiments_channel = config.experiments_channel
         self.variants_channel = f'{config.experiments_channel}_variants'
@@ -56,6 +58,40 @@ class Redis:
         )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to Redis instance at - {self.base}://{self.host} - Database: {self.database}')
+
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        for stage_name, stream in stream_metrics.items():
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Streams - {stage_name}:{stream.stream_set_id}')
+
+            for group_name, group in stream.grouped.items():
+                if self.channel_type == 'channel':
+                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to Channel - {self.streams_channel} - Group: {group_name}')
+                    await self.connection.publish(
+                        self.streams_channel,
+                        json.dumps({
+                            **group,
+                            'group': group_name,
+                            'stage': stage_name,
+                            'name': f'{stage_name}_streams'
+                        })
+                    )
+
+                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Streams to Channel - {self.streams_channel} - Group: {group_name}')
+
+                else:
+                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to Redis Set - {self.streams_channel} - Group: {group_name}')
+                    await self.connection.sadd(
+                        self.streams_channel,
+                        json.dumps({
+                            **group,
+                            'group': group_name,
+                            'stage': stage_name,
+                            'name': f'{stage_name}_streams'
+                        })
+                    )
+
+                    await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Streams to Redis Set - {self.streams_channel} - Group: {group_name}')
 
     async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
 

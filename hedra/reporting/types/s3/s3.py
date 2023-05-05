@@ -4,21 +4,21 @@ import functools
 import json
 import psutil
 from datetime import datetime
-from typing import List
+from typing import List, Dict
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
 from concurrent.futures import ThreadPoolExecutor
+from .s3_config import S3Config
 
 try:
     import boto3
-    from .s3_config import S3Config
     has_connector = True
 
 except Exception:
     boto3 = None
-    S3Config = None
     has_connector = False
 
 
@@ -32,6 +32,7 @@ class S3:
 
         self.events_bucket_name = config.events_bucket
         self.metrics_bucket_name = config.metrics_bucket
+        self.streams_bucket_name = config.streams_bucket
 
         self.experiments_bucket_name = config.experiments_bucket
         self.variants_bucket_name = f'{config.experiments_bucket}_variants'
@@ -64,6 +65,52 @@ class S3:
         )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to AWS S3 - Region: {self.region_name}')
+
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        streams_bucket_name = f'{self.buckets_namespace}-{self.streams_bucket_name}'
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to Bucket - {streams_bucket_name}')
+        
+        try:
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Streams Bucket - {streams_bucket_name} - if not exists')
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.create_bucket,
+                    Bucket=streams_bucket_name,
+                    CreateBucketConfiguration={
+                        'LocationConstraint': self.region_name
+                    }
+                )
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Streams Bucket - {streams_bucket_name}')
+
+        except Exception:
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Skipping creation of Streams Bucket - {streams_bucket_name}')
+
+        for stage_name, stream in stream_metrics.items():
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Streams Set - {stage_name}:{stream.stream_set_id}')
+
+            for group_name, group in stream.grouped.items():
+                streams_set_key = f'{stage_name}_{group_name}_{stream.stream_set_id}'
+                
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self.client.put_object,
+                        Bucket=streams_bucket_name,
+                        Key=streams_set_key,
+                        Body=json.dumps({
+                            **group.record,
+                            'group': group_name,
+                            'stage': stage_name,
+                            'name': f'{stage_name}_streams'
+                        })
+                    )
+                )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Streams to Bucket - {streams_bucket_name}')
 
     async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
 
