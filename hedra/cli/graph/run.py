@@ -171,9 +171,9 @@ def run_graph(
             logger.console.sync.critical('\n\nAborted.\n')
 
         if len(child_processes) < 1:
-            logger.console.sync.critical('\n\nAborted.\n')   
-            os._exit(1)
-
+            logger.console.sync.critical('\n\nAborted.\n')  
+            os._exit(1) 
+  
     graph.assemble()
     for signame in ('SIGINT', 'SIGTERM'):
         loop.add_signal_handler(

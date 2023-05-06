@@ -283,6 +283,10 @@ class Graph:
         for executor in self.runner.executors:
             executor.close()
 
+        for transition_group in self._transitions:
+            for executor in transition_group._executors:
+                executor.close()
+
     def _append_stage(self, stage_type: StageTypes):
 
         appended_stage = self.stage_types.get(stage_type)

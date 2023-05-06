@@ -2,6 +2,7 @@ import asyncio
 import networkx
 import threading
 import os
+import time
 from typing import List, Dict, Union, Any, Tuple, Coroutine
 from collections import defaultdict
 from hedra.core.hooks.types.base.event_graph import EventGraph
@@ -69,7 +70,7 @@ class TransitionAssembler:
         self._graph_metadata_log_string = f'Graph - {self.graph_name}:{self.graph_id} - thread:{self._thread_id} - process:{self._process_id} - '
 
     def generate_stages(self, stages: Dict[str, Stage]) -> None:
-
+    
         stages_count = len(stages)
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Generating - {stages_count} - stages')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Generating - {stages_count} - stages')
@@ -196,6 +197,8 @@ class TransitionAssembler:
                     self.executors.append(stage.executor)
 
                     stages[stage.name] = stage
+
+                batch_executor.close()
 
             for stage in stages.values():
 

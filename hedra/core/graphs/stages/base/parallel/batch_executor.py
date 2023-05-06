@@ -30,7 +30,6 @@ class BatchExecutor:
         self.shutdown_task = None
         self.batch_by_stages = False
 
-
     async def execute_batches(self, batched_stages: List[Tuple[int, List[Any]]], execution_task: FunctionType) -> List[Tuple[str, Any]]:
 
         return await asyncio.gather(*[
@@ -165,7 +164,7 @@ class BatchExecutor:
 
         return batches
     
-    def partion_prioritized_stage_batches(self, transitions: List[Any], ) -> List[Tuple[str, str, Any, int]]:
+    def partion_prioritized_stage_batches(self, transitions: List[Any], ) -> List[Tuple[str, str, str, int]]:
 
         # How many batches do we have? For example -> 5 stages over 4
         # CPUs means 2 batches. The first batch will assign one stage to

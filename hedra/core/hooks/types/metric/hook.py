@@ -62,7 +62,7 @@ class MetricHook(Hook):
         
         results: RawResultsSet = self.context['analyze_stage_raw_results']
         self.loop = asyncio.get_running_loop()
-        for signame in ('SIGINT', 'SIGTERM'):
+        for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
             self.loop.add_signal_handler(
                 getattr(signal, signame),
                 lambda signame=signame: handle_loop_stop(

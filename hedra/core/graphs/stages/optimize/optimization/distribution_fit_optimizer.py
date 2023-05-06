@@ -68,7 +68,7 @@ class DistributionFitOptimizer(Optimizer):
             except RuntimeError:
                 pass
 
-        for signame in ('SIGINT', 'SIGTERM'):
+        for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
 
             self._event_loop.add_signal_handler(
                 getattr(signal, signame),

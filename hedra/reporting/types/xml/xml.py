@@ -109,7 +109,7 @@ class XML:
                 )
             )
 
-            for signame in ('SIGINT', 'SIGTERM'):
+            for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
                 self._loop.add_signal_handler(
                     getattr(signal, signame),
                     lambda signame=signame: handle_loop_stop(
@@ -155,7 +155,7 @@ class XML:
                 )
             )
 
-            for signame in ('SIGINT', 'SIGTERM'):
+            for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
                 self._loop.add_signal_handler(
                     getattr(signal, signame),
                     lambda signame=signame: handle_loop_stop(
@@ -191,7 +191,7 @@ class XML:
                 )
             )
 
-            for signame in ('SIGINT', 'SIGTERM'):
+            for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
                 self._loop.add_signal_handler(
                     getattr(signal, signame),
                     lambda signame=signame: handle_loop_stop(
@@ -227,7 +227,7 @@ class XML:
                 )
             )
 
-            for signame in ('SIGINT', 'SIGTERM'):
+            for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
                 self._loop.add_signal_handler(
                     getattr(signal, signame),
                     lambda signame=signame: handle_loop_stop(
@@ -283,7 +283,7 @@ class XML:
                 )
             )
 
-            for signame in ('SIGINT', 'SIGTERM'):
+            for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
                 self._loop.add_signal_handler(
                     getattr(signal, signame),
                     lambda signame=signame: handle_loop_stop(
