@@ -4,6 +4,7 @@ from multiprocessing.resource_tracker import ResourceTracker
 from typing import List, Dict, Any, Tuple
 from collections import defaultdict
 from hedra.core.graphs.stages.base.stage import Stage
+from hedra.core.graphs.stages.base.parallel.stage_priority import StagePriority
 from hedra.core.graphs.stages.base.parallel.batch_executor import BatchExecutor
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from .transition import Transition
@@ -74,7 +75,45 @@ class TransitionGroup:
             list(self.transitions_by_edge.values())
         )
 
-        self._batched_transitions = batched_transitions[::-1]
+        prioritized_groups: List[Tuple[int, Transition]] = []
+        for group in batched_transitions:
+            
+            group_priorities: List[int] = []
+            for transition_config in group:
+                source, destination, _, _ = transition_config
+                
+                transition = self.transitions_by_edge.get((
+                    source,
+                    destination
+                ))
+
+                transition_priority: StagePriority = transition.edge.source.priority_level
+
+                if transition_priority == StagePriority.AUTO:
+                    group_priorities.append(0)
+
+                else:
+                    group_priorities.append(transition_priority.value)
+
+            group_priority = 0
+            if len(group_priorities) > 0:
+                group_priority = max(group_priorities)
+                
+
+            prioritized_groups.append((
+                group_priority,
+                group
+            ))
+
+        sorted_batches = list(sorted(
+            prioritized_groups,
+            key=lambda prioritized_group: prioritized_group[0],
+            reverse=True
+        ))
+
+        self._batched_transitions = [
+            group for _, group in sorted_batches
+        ]
 
         for group in self._batched_transitions:
             for source, destination, _, workers in group:
