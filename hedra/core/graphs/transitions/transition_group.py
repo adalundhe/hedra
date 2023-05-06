@@ -70,9 +70,11 @@ class TransitionGroup:
             self.transitions_by_edge[edge_key] = transition
 
         executor = BatchExecutor(max_workers=self.cpu_pool_size)
-        self._batched_transitions = executor.partion_prioritized_stage_batches(
+        batched_transitions = executor.partion_prioritized_stage_batches(
             list(self.transitions_by_edge.values())
         )
+
+        self._batched_transitions = batched_transitions[::-1]
 
         for group in self._batched_transitions:
             for source, destination, _, workers in group:
@@ -97,7 +99,6 @@ class TransitionGroup:
     async def _execute_transition(self, transition_config: Tuple[str, str, str, int]) -> Any:
 
         source, destination, _, workers = transition_config
-        loop = asyncio.get_event_loop()
 
         transition = self.transitions_by_edge.get((
             source,
