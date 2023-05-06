@@ -23,6 +23,7 @@ from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
+from hedra.core.graphs.stages.base.parallel.stage_priority import StagePriority
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from hedra.core.personas.persona_registry import (
@@ -43,6 +44,7 @@ T = TypeVarTuple('T')
 
 class Execute(Stage, Generic[Unpack[T]]):
     stage_type=StageTypes.EXECUTE
+    priority: Optional[str]=None
 
     def __init__(self) -> None:
         super().__init__()
@@ -86,6 +88,14 @@ class Execute(Stage, Generic[Unpack[T]]):
             'run_single_worker_job',
             'complete'
         ]
+
+        self.priority = self.priority
+        if self.priority is None:
+            self.priority = 'auto'
+
+        self.priority_level: StagePriority = StagePriority.map(
+            self.priority
+        )
 
     @Internal()
     async def run(self):

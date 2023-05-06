@@ -150,9 +150,11 @@ class ExecutionSummaryTable:
 
                 stage_summary = self.execution_results.get(stage_name)
 
+                graph_time_steps_count = len(self._graph_time_steps)
+
                 scatter_plot = plotille.scatter(
                     self._graph_time_steps,
-                    stage_completion_rates,
+                    stage_completion_rates[:graph_time_steps_count],
                     width=120,
                     height=10,
                     y_min=0,

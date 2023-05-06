@@ -20,3 +20,4 @@ GitPython
 hyperframe
 tabulate
 plotille
+setproctitle

@@ -4,13 +4,15 @@ from hedra.core.hooks.types.context.decorator import context
 from hedra.core.hooks.types.event.decorator import event
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.internal.decorator import Internal
+from hedra.core.graphs.stages.base.stage import Stage
+from hedra.core.graphs.stages.base.parallel.stage_priority import StagePriority
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting import Reporter
 from hedra.reporting.experiment.experiment_metrics_set import ExperimentMetricsSet
 from hedra.reporting.metric import MetricsSet
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
-from hedra.core.graphs.stages.base.stage import Stage
+from typing import Optional
 
 
 T = TypeVar('T')
@@ -20,6 +22,7 @@ class Submit(Stage, Generic[T]):
     stage_type=StageTypes.SUBMIT
     stream: bool = False
     config: T= None
+    priority: Optional[str]=None
     
     def __init__(self) -> None:
         super().__init__()
@@ -49,6 +52,13 @@ class Submit(Stage, Generic[T]):
 
         self.stream = self.stream
         self.config = self.config
+        self.priority = self.priority
+        if self.priority is None:
+            self.priority = 'auto'
+
+        self.priority_level: StagePriority = StagePriority.map(
+            self.priority
+        )
 
     @Internal()
     async def run(self):

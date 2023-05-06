@@ -1,10 +1,8 @@
-import json
 import dill
 import threading
-import traceback
 import os
-import signal
 import pickle
+import setproctitle
 from collections import defaultdict
 from typing import Any, Dict, List, Union
 from hedra.core.engines.client.config import Config
@@ -104,12 +102,16 @@ async def setup_action_channels_and_playwright(
 
 
 def optimize_stage(serialized_config: str):
+    
+    setproctitle.setproctitle('hedra')
+
     import asyncio
     import uvloop
     import warnings
     warnings.simplefilter("ignore")
 
     uvloop.install()
+
     try:
         loop = asyncio.get_event_loop()
     except Exception:

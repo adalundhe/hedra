@@ -8,9 +8,9 @@ from types import FunctionType
 from concurrent.futures.process import BrokenProcessPool
 from concurrent.futures import ProcessPoolExecutor
 from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Dict
 from .synchronization import BatchedSemaphore
-
+from .stage_priority import StagePriority
 
 
 class BatchExecutor:
@@ -162,6 +162,141 @@ class BatchExecutor:
                     stage,
                     1
                 ))
+
+        return batches
+    
+    def partion_prioritized_stage_batches(self, transitions: List[Any], ) -> List[Tuple[str, str, Any, int]]:
+
+        # How many batches do we have? For example -> 5 stages over 4
+        # CPUs means 2 batches. The first batch will assign one stage to
+        # each core. The second will assign all four cores to the remaing
+        # one stage.    
+
+        batches = []
+        seen_transitions: List[Any] = []
+
+
+        sorted_transitions = list(sorted(
+            transitions,
+            key=lambda transition: transition.edge.source.priority_level.value
+        ))
+
+
+        bypass_partition_batch: List[Any] = []
+        for transition in sorted_transitions:
+            if transition.edge.skip_stage or transition.edge.source.allow_parallel is False:
+                bypass_partition_batch.append((
+                    transition.edge.source.name,
+                    transition.edge.destination.name,
+                    transition.edge.source.priority,
+                    None
+                ))
+
+                seen_transitions.append(transition)
+
+        batches.append(bypass_partition_batch)
+
+        
+        stages = {
+            transition.edge.source.name: transition.edge.source for transition in sorted_transitions
+        }
+
+        parallel_stages_count = len([
+            stage for stage in stages.values() if stage.allow_parallel
+        ])
+
+        stages_count = len(stages)
+
+        auto_stages_count = len([
+            stage for stage in stages.values() if stage.priority_level == StagePriority.AUTO
+        ])
+
+        if parallel_stages_count == 1:
+
+            transition = sorted_transitions.pop()
+
+            batches.append([
+                (
+                    transition.edge.source.name,
+                    transition.edge.destination.name,
+                    transition.edge.source.priority,
+                    transition.edge.source.workers
+                )
+            ])
+
+
+            seen_transitions.append(transition)
+
+        elif auto_stages_count == stages_count and parallel_stages_count > 0:
+            transition_group = [
+                (
+                    transition.edge.source.name,
+                    transition.edge.destination.name,
+                    transition.edge.source.priority,
+                    transition.edge.source.workers
+                ) for transition in sorted_transitions
+            ]
+
+            return [transition_group]
+            
+        else:
+
+            min_workers_counts: Dict[str, int] = {}
+            max_workers_counts: Dict[str, int] = {}
+
+            for transition in sorted_transitions:
+
+                if transition.edge.skip_stage is False and transition.edge.source.allow_parallel:
+                    worker_allocation_range: Tuple[int, int] = StagePriority.get_worker_allocation_range(
+                        transition.edge.source.priority_level,
+                        self.max_workers
+                    )
+
+                    minimum_workers, maximum_workers = worker_allocation_range
+                    min_workers_counts[transition.edge.source.name] = minimum_workers
+                    max_workers_counts[transition.edge.source.name] = maximum_workers
+
+            for transition in sorted_transitions:
+                
+                if transition not in seen_transitions:
+
+
+                    # So for example 8 - 4 = 4 we need another stage with 4
+                    batch_workers_allocated = max_workers_counts.get(transition.edge.source.name)
+                    transition_group = [(
+                        transition.edge.source.name,
+                        transition.edge.destination.name,
+                        transition.edge.source.priority,
+                        batch_workers_allocated
+                    )]
+
+                    for other_transition in sorted_transitions:
+                        
+                        if other_transition != transition and transition not in seen_transitions:
+                            
+                            transition_workers_allocated = max_workers_counts.get(other_transition.edge.source.name)
+                            min_workers = min_workers_counts.get(other_transition.edge.source.name)
+
+                            current_allocation = batch_workers_allocated + transition_workers_allocated
+
+                            while current_allocation > self.max_workers and transition_workers_allocated >= min_workers:
+                                transition_workers_allocated -= 1
+                                current_allocation = batch_workers_allocated + transition_workers_allocated
+
+                            if current_allocation <= self.max_workers and transition_workers_allocated > 0:
+
+                                batch_workers_allocated += transition_workers_allocated
+                                transition_group.append((
+                                    other_transition.edge.source.name,
+                                    other_transition.edge.destination.name,
+                                    other_transition.edge.source.priority,
+                                    transition_workers_allocated
+                                ))
+
+                                seen_transitions.append(other_transition)
+
+                    batches.append(transition_group)
+                    seen_transitions.append(transition)
 
         return batches
 

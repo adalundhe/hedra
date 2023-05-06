@@ -112,7 +112,7 @@ class TransitionAssembler:
                     self.hooks_by_type[hook.hook_type][hook.name] = hook
                 
             self.instances_by_type[stage.stage_type].append(stage)
-    
+
         events_graph = EventGraph(self.hooks_by_type)
         events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
 
@@ -140,6 +140,7 @@ class TransitionAssembler:
         for generation in topological_generations:
 
             generation_transitions = TransitionGroup()
+            generation_transitions.cpu_pool_size = self.cpus
 
             stage_pool_size = self.cpus
 

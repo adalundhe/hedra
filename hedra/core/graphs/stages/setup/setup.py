@@ -17,6 +17,7 @@ from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.task.hook import TaskHook
+from hedra.core.graphs.stages.base.parallel.stage_priority import StagePriority
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.personas.types import PersonaTypesMap
 from hedra.logging import HedraLogger
@@ -100,6 +101,7 @@ class Setup(Stage, Generic[Unpack[T]]):
     permissions: List[str]=[]
     playwright_options: Dict[str, Any]={}
     tracing: TracingConfig=None
+    priority: Optional[str]=None
 
     
     def __init__(self) -> None:
@@ -167,6 +169,17 @@ class Setup(Stage, Generic[Unpack[T]]):
         ]
 
         self.tracing = self.tracing
+        self.priority = self.priority
+        if self.priority is None:
+            self.priority = 'auto'
+
+        self.priority = self.priority
+        if self.priority is None:
+            self.priority = 'auto'
+
+        self.priority_level: StagePriority = StagePriority.map(
+            self.priority
+        )
 
     @Internal()
     async def run(self):

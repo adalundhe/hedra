@@ -3,9 +3,9 @@ import time
 import threading
 import os
 import dill
+import setproctitle
 from collections import defaultdict
 from typing import Any, Dict, List
-from hedra.logging import HedraLogger
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
 from hedra.logging import (
@@ -19,6 +19,9 @@ from hedra.versioning.flags.types.base.flag_type import FlagTypes
 
 
 def process_results_batch(config: Dict[str, Any]):
+    
+    setproctitle.setproctitle('hedra')
+
     import warnings
     warnings.simplefilter("ignore")
 

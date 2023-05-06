@@ -7,7 +7,9 @@ import pickle
 import warnings
 import asyncio
 import gc
+import setproctitle
 from collections import defaultdict
+from multiprocessing import current_process
 from typing import Dict, Any, List, Union
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
@@ -177,6 +179,9 @@ async def start_execution(
 
 
 def execute_actions(parallel_config: str):
+    
+    setproctitle.setproctitle('hedra')
+
     import asyncio
     import uvloop
     uvloop.install()

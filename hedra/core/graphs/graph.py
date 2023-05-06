@@ -192,9 +192,7 @@ class Graph:
                         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing stage Transition - {transition.transition_id} - from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
                         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing stage - {transition.from_stage.name}:{transition.from_stage.stage_id}')
 
-                results = await asyncio.gather(*[
-                    asyncio.create_task(transition.execute()) for transition in transition_group
-                ])
+                results = await transition_group.execute_group()
                 
                 for transition in transition_group:
                     error = transition.edge.exception

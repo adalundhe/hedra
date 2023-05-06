@@ -10,6 +10,7 @@ from typing import Union, List, Dict, Any, Tuple
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.graphs.stages.base.stage import Stage
+from hedra.core.graphs.stages.base.parallel.stage_priority import StagePriority
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.hooks.types.condition.decorator import condition
 from hedra.core.hooks.types.context.decorator import context
@@ -38,7 +39,7 @@ from hedra.reporting.processed_result.types import (
 )
 from hedra.versioning.flags.types.base.active import active_flags
 from hedra.versioning.flags.types.base.flag_type import FlagTypes
-
+from typing import Optional
 from .parallel import process_results_batch
 
 dill.settings['byref'] = True
@@ -99,8 +100,9 @@ def deserialize_results(results: List[bytes]) -> List[BaseResult]:
 
 class Analyze(Stage):
     stage_type=StageTypes.ANALYZE
-    is_parallel = False
-    handler = None
+    is_parallel=False
+    handler=None
+    priority: Optional[str]=None
 
     def __init__(self) -> None:
         super().__init__()
@@ -138,6 +140,14 @@ class Analyze(Stage):
             'generate_summary',
             'complete'
         ]
+
+        self.priority = self.priority
+        if self.priority is None:
+            self.priority = 'auto'
+
+        self.priority_level: StagePriority = StagePriority.map(
+            self.priority
+        )
 
     @Internal()
     async def run(self):  
