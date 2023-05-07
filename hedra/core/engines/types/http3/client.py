@@ -29,6 +29,7 @@ from .pool import Pool
 A = TypeVar('A')
 R = TypeVar('R')
 
+
 @unstable
 class MercuryHTTP3Client(BaseEngine[Union[A, HTTP3Action], Union[R, HTTP3Result]]):
 
