@@ -102,7 +102,8 @@ setup(
             'dicttoxml',
             'opentelemetry-api',
             'datadog_api_client',
-            'aiokafka'
+            'aiokafka',
+            'haralyzer'
         ],
         'all-engines': [
             'grpcio',
