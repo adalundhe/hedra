@@ -47,6 +47,7 @@ class Config:
         self.experiment: Dict[str, Union[str, int, List[float]]] = kwargs.get('experiment', {})
         self.tracing: Union[TracingConfig, None] = kwargs.get('tracing')
         self.mutations: Union[List[Mutation], None] = kwargs.get('mutations', [])
+        self.har_filepath: Union[str, None] = kwargs.get('har_filepath')
 
     def copy(self):
 
@@ -81,5 +82,6 @@ class Config:
             'playwright_options': self.playwright_options,
             'experiment': self.experiment,
             'trace': trace,
-            'mutations': self.mutations
+            'mutations': self.mutations,
+            'har_filepath': self.har_filepath
         })
