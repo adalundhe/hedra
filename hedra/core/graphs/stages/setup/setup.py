@@ -109,6 +109,7 @@ class Setup(Stage, Generic[Unpack[T]]):
     playwright_options: Dict[str, Any]={}
     tracing: TracingConfig=None
     priority: Optional[str]=None
+    actions_filepaths: Optional[Dict[str, str]]=None
 
     
     def __init__(self) -> None:
@@ -143,7 +144,8 @@ class Setup(Stage, Generic[Unpack[T]]):
             geolocation=self.geolocation,
             permissions=self.permissions,
             playwright_options=self.playwright_options,
-            tracing=self.tracing
+            tracing=self.tracing,
+            actions_filepaths=self.actions_filepaths
         )
 
         self.client = Client(
