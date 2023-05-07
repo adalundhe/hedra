@@ -140,13 +140,13 @@ class Execute(Stage, Generic[Unpack[T]]):
 
     @event('get_stage_config')
     async def get_stage_plugins(self):
+
         engine_plugins = self.plugins_by_type.get(PluginType.ENGINE)
         for plugin in engine_plugins.values():
             registered_engines[plugin.name] = plugin
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Engine plugin - {plugin.name}')
 
         persona_plugins = self.plugins_by_type.get(PluginType.PERSONA)
-
         for plugin_name, plugin in persona_plugins.items():
             registered_personas[plugin_name] = lambda plugin_config: plugin(plugin_config)
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Persona plugin - {plugin.name}')
