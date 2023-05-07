@@ -1,5 +1,6 @@
 import os
 import re
+import uuid
 import json
 import asyncio
 import functools
@@ -19,6 +20,7 @@ from hedra.core.engines.types.http3 import (
 )
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.base.hook_type import HookType
+from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.plugins.types.extension.types import ExtensionType
 from hedra.plugins.types.extension import (
@@ -48,27 +50,28 @@ except ImportError:
 class HarConverter(ExtensionPlugin):
     extension_type = ExtensionType.GENERATOR
 
-    def __init__(
-        self,
-        filepath: str=None
-    ) -> None:
-        self.filepath: str = filepath
+    def __init__(self) -> None:
         self._loop: asyncio.AbstractEventLoop = None
         self._name_pattern = re.compile('[^0-9a-zA-Z]+')
         self._parser: HarParser = None
         self._action_data: List[ActionHook] = []
         self.name = HarConverter.__name__
-    
+        self.extension_type = self.extension_type
+        
     @prepare()
     async def load(
         self,
-        persona_config: Config=None
+        persona_config: Config=None,
+        execute_stage: Stage=None
     ) -> Dict[str, List[ActionHook]]:
 
         self._loop = asyncio.get_event_loop()
         await self._load_harfile(persona_config)
 
-        return await self._to_actions(persona_config)
+        return await self._to_actions(
+            persona_config,
+            execute_stage
+        )
     
     @execute()
     async def convert(
@@ -83,8 +86,12 @@ class HarConverter(ExtensionPlugin):
             hook.order for hook in action_hooks
         ])
 
+        sequence_order = max_existing_hook_order + 1
+
         for hook in action_data:
-            hook.order += max_existing_hook_order
+            hook.order = sequence_order
+
+            sequence_order += 1
 
         action_hooks.extend(action_data)
 
@@ -103,7 +110,7 @@ class HarConverter(ExtensionPlugin):
             None,
             functools.partial(
                 os.path.abspath,
-                config.har_filepath
+                config.actions_filepath
             )
         )
 
@@ -119,13 +126,18 @@ class HarConverter(ExtensionPlugin):
             har_data=json.loads(harfile)
         )
 
+        await self._loop.run_in_executor(
+            None,
+            harfile.close
+        )
+
     async def _to_actions(
         self,
-        config: Config
+        config: Config,
+        execute_stage: Stage=None
     ) -> List[ActionHook]:
         
         action_data: List[ActionHook] = []
-        sequence_order = 0
 
         for page in self._parser.pages:
             
@@ -138,7 +150,7 @@ class HarConverter(ExtensionPlugin):
                 action_data = page_request.text
                 
                 content_type: str = page_request.mimeType
-                if content_type.lower() == 'application/json':
+                if content_type.lower() == 'application/json' and page_request.text:
                     action_data = json.loads(action_data)
 
                 action_url: str = page_request.url
@@ -153,7 +165,7 @@ class HarConverter(ExtensionPlugin):
                     ).split('_')
                 ])
 
-                action_fullname = f'{action_method}_{action_basename}'
+                action_fullname = f'{action_method.lower()}_{action_basename}'
 
                 http_type: str = page_request.httpVersion
 
@@ -225,18 +237,19 @@ class HarConverter(ExtensionPlugin):
                 action.setup()
 
                 hook = ActionHook(
-                    f'{HarConverter.__name__}.{action_basename}',
+                    f'{execute_stage.name}.{action_basename}',
                     action_basename,
-                    None,
-                    order=sequence_order
+                    None
                 )
 
                 hook.session = session
                 hook.action = action
-                hook.stage = self.name
+                hook.stage = execute_stage.name
+                hook.stage_instance = execute_stage
+                hook.context = SimpleContext()
+                hook.hook_id = uuid.uuid4()
 
                 action_data.append(hook)
-                sequence_order += 1
 
             return {
                 'action_data': action_data
