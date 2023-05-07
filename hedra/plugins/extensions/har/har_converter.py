@@ -3,8 +3,6 @@ import re
 import json
 import asyncio
 import functools
-from haralyzer import HarParser, HarEntry
-from haralyzer.http import Request
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.http import (
@@ -29,6 +27,20 @@ from hedra.plugins.types.extension import (
 )
 from hedra.versioning.flags.types.unstable.flag import unstable
 from typing import Dict, List
+
+try:
+
+    har_extension_enabled=True
+
+    from haralyzer import HarParser, HarEntry
+    from haralyzer.http import Request
+
+except ImportError:
+    har_extension_enabled=False
+
+    HarParser=object
+    HarEntry=object
+    Request=object
 
 
 @unstable
