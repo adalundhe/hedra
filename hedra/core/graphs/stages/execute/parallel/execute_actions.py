@@ -13,7 +13,8 @@ from typing import (
     Dict, 
     Any, 
     List, 
-    Union
+    Union,
+    Type
 )
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
@@ -41,7 +42,6 @@ from hedra.logging import (
     logging_manager
 )
 
-from hedra.plugins.extensions.har.har_converter import HarConverter
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.extension.extension_plugin import ExtensionPlugin
@@ -349,13 +349,13 @@ def execute_actions(parallel_config: str):
                     source_stage_config.experiment['distribution'] = distribution
 
         stage_persona_plugins: List[str] = source_stage_plugins[PluginType.PERSONA]
-        persona_plugins: Dict[str, PersonaPlugin] = plugins_by_type[PluginType.PERSONA]
+        persona_plugins: Dict[str, Type[PersonaPlugin]] = plugins_by_type[PluginType.PERSONA]
 
         stage_engine_plugins: List[str] = source_stage_plugins[PluginType.ENGINE]
-        engine_plugins: Dict[str, EnginePlugin] = plugins_by_type[PluginType.ENGINE]
+        engine_plugins: Dict[str, Type[EnginePlugin]] = plugins_by_type[PluginType.ENGINE]
         
         stage_extension_plugins: List[str] = source_stage_plugins[PluginType.EXTENSION]
-        extension_plugins: Dict[str, ExtensionPlugin] = plugins_by_type[PluginType.EXTENSION]
+        extension_plugins: Dict[str, Type[ExtensionPlugin]] = plugins_by_type[PluginType.EXTENSION]
         
         for plugin_name in stage_persona_plugins:
             plugin = persona_plugins.get(plugin_name)
@@ -368,10 +368,9 @@ def execute_actions(parallel_config: str):
             registered_engines[plugin_name] = lambda config: plugin(config)
 
         for plugin_name in stage_extension_plugins:
-            plugin = extension_plugins.get(plugin_name)
+            plugin = extension_plugins.get(plugin_name)()
             plugin.name = plugin_name
-            registered_personas[plugin_name] = lambda: plugin()
-
+            stage_extension_plugins[plugin_name] = plugin
 
         events_graph = EventGraph(hooks_by_type)
         events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()

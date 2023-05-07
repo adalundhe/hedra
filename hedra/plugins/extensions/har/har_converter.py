@@ -44,10 +44,7 @@ class HarConverter(ExtensionPlugin):
         self._config: Config = None
         self._parser: HarParser = None
         self._action_data: List[ActionHook] = []
-
-    @property
-    def name(self):
-        return HarConverter.__name__
+        self.name = HarConverter.__name__
     
     @prepare()
     async def load(
