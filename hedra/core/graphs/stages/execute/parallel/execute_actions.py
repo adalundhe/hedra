@@ -7,7 +7,6 @@ import pickle
 import warnings
 import asyncio
 import gc
-import setproctitle
 from collections import defaultdict
 from typing import (
     Dict, 
@@ -201,8 +200,6 @@ async def start_execution(
 
 
 def execute_actions(parallel_config: str):
-
-    setproctitle.setproctitle('hedra')
 
     import asyncio
     import uvloop

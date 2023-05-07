@@ -2,7 +2,6 @@ import dill
 import threading
 import os
 import pickle
-import setproctitle
 from collections import defaultdict
 from typing import Any, Dict, List, Union
 from hedra.core.engines.client.config import Config
@@ -102,8 +101,6 @@ async def setup_action_channels_and_playwright(
 
 
 def optimize_stage(serialized_config: str):
-    
-    setproctitle.setproctitle('hedra')
 
     import asyncio
     import uvloop

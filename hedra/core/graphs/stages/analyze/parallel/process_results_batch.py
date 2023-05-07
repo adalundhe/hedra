@@ -3,7 +3,6 @@ import time
 import threading
 import os
 import dill
-import setproctitle
 from collections import defaultdict
 from typing import Any, Dict, List
 from hedra.core.engines.types.common.base_result import BaseResult
@@ -17,11 +16,8 @@ from hedra.versioning.flags.types.base.active import active_flags
 from hedra.versioning.flags.types.base.flag_type import FlagTypes
 
 
-
 def process_results_batch(config: Dict[str, Any]):
     
-    setproctitle.setproctitle('hedra')
-
     import warnings
     warnings.simplefilter("ignore")
 
