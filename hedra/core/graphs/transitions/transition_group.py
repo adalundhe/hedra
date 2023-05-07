@@ -147,7 +147,7 @@ class TransitionGroup:
             destination
         ))
     
-        if workers:
+        if workers > 0:
             transition.edge.source.workers = workers
             executor = BatchExecutor(max_workers=workers)
             transition.edge.source.executor = executor

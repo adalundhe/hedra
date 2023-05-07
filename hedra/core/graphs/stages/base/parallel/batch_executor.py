@@ -193,7 +193,7 @@ class BatchExecutor:
                     transition.edge.source.name,
                     transition.edge.destination.name,
                     transition.edge.source.priority,
-                    None
+                    0
                 ))
 
                 seen_transitions.append(transition)
