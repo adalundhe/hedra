@@ -56,7 +56,6 @@ class HarSession:
                     'url': page_request.url,
                     'method': page_request.method,
                     'headers': page_request.headers,
-                    'data': data
-                    
+                    'data': data    
                 })
         
