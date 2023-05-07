@@ -113,7 +113,12 @@ def run_graph(
 
     discovered = {}
     for name, stage_candidate in inspect.getmembers(module):
-        if inspect.isclass(stage_candidate) and issubclass(stage_candidate, Stage) and stage_candidate not in direct_decendants:
+        if inspect.isclass(
+            stage_candidate
+        ) and issubclass(
+            stage_candidate, 
+            Stage
+        ) and stage_candidate not in direct_decendants:
             discovered[name] = stage_candidate
 
 

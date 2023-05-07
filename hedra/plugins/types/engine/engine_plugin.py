@@ -49,6 +49,7 @@ class EnginePlugin(Generic[A, R], Plugin):
         self.actions: ActionsStore = None
         self.registered = {}
         self.metadata_string: str = None
+        self.name = self.name
 
         self.config = config
         

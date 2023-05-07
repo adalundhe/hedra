@@ -9,13 +9,15 @@ from typing import Dict
 
 class ExtensionPlugin(Plugin):
     type=PluginType.EXTENSION
-
+    name: str=None
+    
     def __init__(self) -> None:
         super(
             ExtensionPlugin
         ).__init__(self)
 
         self.hooks: Dict[PluginHooks, PluginHook] = {}
+        self.name = self.name
 
         methods = inspect.getmembers(self, predicate=inspect.ismethod) 
         for _, method in methods:
