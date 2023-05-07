@@ -1,4 +1,5 @@
 import threading
+import traceback
 import os
 import time
 import signal
@@ -56,15 +57,15 @@ warnings.filterwarnings("ignore")
 
 
 async def start_execution(
-    metadata_string: str,
-    persona_config: Config,
-    setup_stage: Setup,
-    workers: int,
-    source_stage_name: str,
-    source_stage_stream_configs: List[ReporterConfig],
-    logfiles_directory,
-    log_level,
-    extensions: Dict[str, ExtensionPlugin]
+    metadata_string: str=None,
+    persona_config: Config=None,
+    setup_stage: Setup=None,
+    workers: int=None,
+    source_stage_name: str=None,
+    source_stage_stream_configs: List[ReporterConfig]=[],
+    logfiles_directory: str=None,
+    log_level: str=None,
+    extensions: Dict[str, ExtensionPlugin]={}
 ) -> Dict[str, Any]:
 
     current_task = asyncio.current_task()
@@ -360,6 +361,8 @@ def execute_actions(parallel_config: str):
         
         stage_extension_plugins: List[str] = source_stage_plugins[PluginType.EXTENSION]
         extension_plugins: Dict[str, Type[ExtensionPlugin]] = get_enabled_extensions()
+
+        enabled_extensions: Dict[str, ExtensionPlugin] = {}
         
         for plugin_name in stage_persona_plugins:
             plugin = persona_plugins.get(plugin_name)
@@ -376,7 +379,7 @@ def execute_actions(parallel_config: str):
 
             if plugin:
                 enabled_plugin = plugin()
-                stage_extension_plugins[enabled_plugin.name] = enabled_plugin
+                enabled_extensions[enabled_plugin.name] = enabled_plugin
 
         events_graph = EventGraph(hooks_by_type)
         events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
@@ -398,15 +401,15 @@ def execute_actions(parallel_config: str):
 
         results = loop.run_until_complete(
             start_execution(
-                metadata_string,
-                source_stage_config,
-                setup_stage,
-                workers,
-                source_stage_name,
-                source_stage_stream_configs,
-                logfiles_directory,
-                log_level,
-                stage_extension_plugins
+                metadata_string=metadata_string,
+                persona_config=source_stage_config,
+                setup_stage=setup_stage,
+                workers=workers,
+                source_stage_name=source_stage_name,
+                source_stage_stream_configs=source_stage_stream_configs,
+                logfiles_directory=logfiles_directory,
+                log_level=log_level,
+                extensions=enabled_extensions
             )
         )
 
@@ -422,4 +425,5 @@ def execute_actions(parallel_config: str):
         raise ProcessKilledError()
 
     except Exception as e:
+        print(traceback.format_exc())
         raise e
