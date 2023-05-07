@@ -297,10 +297,14 @@ class JSONConverter(ExtensionPlugin):
     ) -> Dict[str, Stage]:
 
         action_hooks = execute_stage.hooks[HookType.ACTION]
+        
+        if len(execute_stage.hooks[HookType.ACTION]) > 0:
+            max_existing_hook_order = max([
+                hook.order for hook in action_hooks
+            ])
 
-        max_existing_hook_order = max([
-            hook.order for hook in action_hooks
-        ])
+        else:
+            max_existing_hook_order = 0
         
         sequence_order = max_existing_hook_order + 1
 

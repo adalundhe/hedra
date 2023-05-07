@@ -82,9 +82,13 @@ class HarConverter(ExtensionPlugin):
 
         action_hooks = execute_stage.hooks[HookType.ACTION]
 
-        max_existing_hook_order = max([
-            hook.order for hook in action_hooks
-        ])
+        if len(execute_stage.hooks[HookType.ACTION]) > 0:
+            max_existing_hook_order = max([
+                hook.order for hook in action_hooks
+            ])
+
+        else:
+            max_existing_hook_order = 0
 
         sequence_order = max_existing_hook_order + 1
 
