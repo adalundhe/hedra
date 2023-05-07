@@ -1,5 +1,4 @@
 import threading
-import traceback
 import os
 import time
 import signal
@@ -425,5 +424,4 @@ def execute_actions(parallel_config: str):
         raise ProcessKilledError()
 
     except Exception as e:
-        print(traceback.format_exc())
         raise e
