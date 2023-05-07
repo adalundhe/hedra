@@ -42,7 +42,8 @@ from hedra.logging import (
     logging_manager
 )
 
-from hedra.plugins.extensions.types import get_enabled_extensions
+from hedra.plugins.extensions import get_enabled_extensions
+from hedra.plugins.types.extension.types import ExtensionType
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.extension.extension_plugin import ExtensionPlugin
@@ -100,15 +101,17 @@ async def start_execution(
     actions_and_tasks: List[Union[ActionHook, TaskHook]] = setup_stage.context['execute_stage_setup_hooks'].get(source_stage_name)
 
     for extension in extensions.values():
-        results = await extension.execute(**{
-            'execute_stage': setup_execute_stage,
-            'persona_config': persona_config
-        })
 
-        execute_stage = results.get('execute_stage')
+        if extension.extension_type == ExtensionType.GENERATOR:
+            results = await extension.execute(**{
+                'execute_stage': setup_execute_stage,
+                'persona_config': persona_config
+            })
 
-        if execute_stage:
-            setup_execute_stage = results.get('execute_stage')
+            execute_stage = results.get('execute_stage')
+
+            if execute_stage:
+                setup_execute_stage = results.get('execute_stage')
 
     execution_hooks_count = len(actions_and_tasks)
     await logger.filesystem.aio['hedra.core'].info(

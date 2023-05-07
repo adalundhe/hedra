@@ -20,6 +20,7 @@ from hedra.core.engines.types.http3 import (
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.graphs.stages.base.stage import Stage
+from hedra.plugins.types.extension.types import ExtensionType
 from hedra.plugins.types.extension import (
     ExtensionPlugin,
     execute,
@@ -45,6 +46,7 @@ except ImportError:
 
 @unstable
 class HarConverter(ExtensionPlugin):
+    extension_type = ExtensionType.GENERATOR
 
     def __init__(
         self,

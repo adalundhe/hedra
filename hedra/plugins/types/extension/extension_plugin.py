@@ -6,11 +6,12 @@ from hedra.plugins.types.common.types import PluginHooks
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.common.registrar import plugin_registrar
 from typing import (
-     Dict, 
-     Any, 
-     Union, 
-     Mapping
-    )
+    Dict, 
+    Any, 
+    Union, 
+    Mapping
+)
+from .types import ExtensionType
 
 
 class ExtensionPlugin(Plugin):
@@ -40,6 +41,8 @@ class ExtensionPlugin(Plugin):
                     args = inspect.signature(hook.call)
 
                     self._args[hook.hook_type] = args.parameters
+
+        self.extension_type: ExtensionType = None
 
     async def execute(
         self,
