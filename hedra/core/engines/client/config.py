@@ -83,5 +83,5 @@ class Config:
             'experiment': self.experiment,
             'trace': trace,
             'mutations': self.mutations,
-            'har_filepath': self.har_filepath
+            'actions_filepath': self.actions_filepath
         })
