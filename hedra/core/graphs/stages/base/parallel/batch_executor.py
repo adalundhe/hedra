@@ -211,20 +211,21 @@ class BatchExecutor:
         ])
 
         if parallel_stages_count == 1:
+            
+            parallel_transitions = [
+                transition for transition in sorted_transitions if transition.edge.skip_stage is False
+            ]
+            
+            transition = parallel_transitions.pop()
 
-            transition = sorted_transitions.pop()
+            transition_group = [(
+                transition.edge.source.name,
+                transition.edge.destination.name,
+                transition.edge.source.priority,
+                transition.edge.source.workers
+            )]
 
-            batches.append([
-                (
-                    transition.edge.source.name,
-                    transition.edge.destination.name,
-                    transition.edge.source.priority,
-                    transition.edge.source.workers
-                )
-            ])
-
-
-            seen_transitions.append(transition)
+            return [transition_group]
 
         elif auto_stages_count == stages_count and parallel_stages_count > 0:
             transition_group = [
@@ -233,7 +234,7 @@ class BatchExecutor:
                     transition.edge.destination.name,
                     transition.edge.source.priority,
                     transition.edge.source.workers
-                ) for transition in sorted_transitions
+                ) for transition in sorted_transitions if transition.edge.skip_stage is False
             ]
 
             return [transition_group]
