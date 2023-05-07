@@ -41,7 +41,6 @@ class HarConverter(ExtensionPlugin):
         self.filepath: str = filepath
         self._loop: asyncio.AbstractEventLoop = None
         self._name_pattern = re.compile('[^0-9a-zA-Z]+')
-        self._config: Config = None
         self._parser: HarParser = None
         self._action_data: List[ActionHook] = []
         self.name = HarConverter.__name__
@@ -52,9 +51,6 @@ class HarConverter(ExtensionPlugin):
         filepath: str=None,
         persona_config: Config=None
     ) -> Dict[str, List[ActionHook]]:
-        
-        if persona_config:
-            self._config = persona_config
 
         self._loop = asyncio.get_event_loop()
 
@@ -62,7 +58,7 @@ class HarConverter(ExtensionPlugin):
             filepath=filepath
         )
 
-        return await self._to_actions()
+        return await self._to_actions(persona_config)
     
     @execute()
     async def convert(
@@ -116,7 +112,10 @@ class HarConverter(ExtensionPlugin):
             har_data=json.loads(harfile)
         )
 
-    async def _to_actions(self) -> List[ActionHook]:
+    async def _to_actions(
+        self,
+        config: Config
+    ) -> List[ActionHook]:
         
         action_data: List[ActionHook] = []
         sequence_order = 0
@@ -164,13 +163,13 @@ class HarConverter(ExtensionPlugin):
                     )
                     
                     session = MercuryHTTP3Client(
-                        concurrency=self.config.batch_size,
+                        concurrency=config.batch_size,
                         timeouts=Timeouts(
-                            connect_timeout=self.config.connect_timeout,
-                            total_timeout=self.config.request_timeout
+                            connect_timeout=config.connect_timeout,
+                            total_timeout=config.request_timeout
                         ),
-                        reset_connections=self.config.reset_connections,
-                        tracing_session=self.config.tracing
+                        reset_connections=config.reset_connections,
+                        tracing_session=config.tracing
                     )
 
                 elif http_type == "http/2.0":
@@ -185,13 +184,13 @@ class HarConverter(ExtensionPlugin):
                     )
 
                     session = MercuryHTTP2Client(
-                        concurrency=self.config.batch_size,
+                        concurrency=config.batch_size,
                         timeouts=Timeouts(
-                            connect_timeout=self.config.connect_timeout,
-                            total_timeout=self.config.request_timeout
+                            connect_timeout=config.connect_timeout,
+                            total_timeout=config.request_timeout
                         ),
-                        reset_connections=self.config.reset_connections,
-                        tracing_session=self.config.tracing
+                        reset_connections=config.reset_connections,
+                        tracing_session=config.tracing
                     )
 
                 else:
@@ -206,13 +205,13 @@ class HarConverter(ExtensionPlugin):
                     )
 
                     session = MercuryHTTPClient(
-                        concurrency=self.config.batch_size,
+                        concurrency=config.batch_size,
                         timeouts=Timeouts(
-                            connect_timeout=self.config.connect_timeout,
-                            total_timeout=self.config.request_timeout
+                            connect_timeout=config.connect_timeout,
+                            total_timeout=config.request_timeout
                         ),
-                        reset_connections=self.config.reset_connections,
-                        tracing_session=self.config.tracing
+                        reset_connections=config.reset_connections,
+                        tracing_session=config.tracing
                     )
 
                 await action.url.lookup()
