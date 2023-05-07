@@ -214,6 +214,9 @@ setup(
         ],
         'opentelemetry': [
             'opentelemetry-api'
+        ],
+        'har': [
+            'haralyzer'
         ]
     },
     python_requires='>=3.8'
