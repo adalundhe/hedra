@@ -20,60 +20,84 @@ from hedra.core.engines.types.http3 import (
     MercuryHTTP3Client
 )
 from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.base.hook_type import HookType
+from hedra.core.graphs.stages.base.stage import Stage
 from hedra.plugins.types.extension import (
     ExtensionPlugin,
-    execute
+    execute,
+    prepare
 )
 from hedra.versioning.flags.types.unstable.flag import unstable
-from typing import (
-    Dict, 
-    List,
-    Union
-)
+from typing import Dict, List
 
 
 @unstable
 class HarConverter(ExtensionPlugin):
 
-    def __init__(self) -> None:
-        self.filepath: str = None
-        self._har_data: HarParser = None
+    def __init__(
+        self,
+        filepath: str=None
+    ) -> None:
+        self.filepath: str = filepath
         self._loop: asyncio.AbstractEventLoop = None
         self._name_pattern = re.compile('[^0-9a-zA-Z]+')
         self._config: Config = None
+        self._parser: HarParser = None
+        self._action_data: List[ActionHook] = []
 
     @property
     def name(self):
         return HarConverter.__name__
     
-    @property
-    def config(self) -> Union[Config, None]:
-        return self._config
-    
-    @config.setter
-    def config(self, updated_config: Config):
-        self._config = updated_config
-
-    @execute()
-    async def convert(
+    @prepare()
+    async def load(
         self,
-        filepath: str = None
-    ) -> List[ActionHook]:
+        filepath: str=None,
+        persona_config: Config=None
+    ) -> Dict[str, List[ActionHook]]:
+        
+        if persona_config:
+            self._config = persona_config
+
         self._loop = asyncio.get_event_loop()
 
-        har_parser = await self._load_harfile(
+        await self._load_harfile(
             filepath=filepath
         )
 
-        return await self._to_actions(har_parser)
+        return await self._to_actions()
+    
+    @execute()
+    async def convert(
+        self,
+        action_data: List[ActionHook]=[],
+        execute_stage: Stage=None
+    ) -> Dict[str, Stage]:
+
+        action_hooks = execute_stage.hooks[HookType.ACTION]
+
+        max_existing_hook_order = max([
+            hook.order for hook in action_hooks
+        ])
+
+        for hook in action_data:
+            hook.order += max_existing_hook_order
+
+        action_hooks.extend(action_data)
+
+        execute_stage.hooks[HookType.ACTION] = action_hooks
+
+        return {
+            'execute_stage': execute_stage
+        }
 
     async def _load_harfile(
         self,
         filepath: str=None
-    ) -> HarParser:
+    ) -> None:
         
         if filepath is None:
-            filepath = self.config.har_filepath
+            filepath = self.filepath
 
         har_filepath = await self._loop.run_in_executor(
             None,
@@ -91,19 +115,16 @@ class HarConverter(ExtensionPlugin):
             )
         )
 
-        return HarParser(
+        self._parser = HarParser(
             har_data=json.loads(harfile)
         )
 
-    async def _to_actions(
-        self,
-        har_parser: HarParser
-    ) -> List[ActionHook]:
+    async def _to_actions(self) -> List[ActionHook]:
         
         action_data: List[ActionHook] = []
         sequence_order = 0
 
-        for page in har_parser.pages:
+        for page in self._parser.pages:
             
             page_entries: List[HarEntry] = page.entries
 
@@ -214,5 +235,7 @@ class HarConverter(ExtensionPlugin):
                 action_data.append(hook)
                 sequence_order += 1
 
-            return action_data
+            return {
+                'action_data': action_data
+            }
         

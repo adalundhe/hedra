@@ -1,7 +1,11 @@
 import uuid
 import inspect
-from typing import List, Callable, Any
-from typing import Any, Callable, Awaitable
+from typing import (
+    List, 
+    Callable, 
+    Any, 
+    Awaitable
+)
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.hooks.types.base.hook_type import HookType
 

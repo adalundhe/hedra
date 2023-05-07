@@ -1,4 +1,5 @@
 from .extension_plugin import ExtensionPlugin
 from .hooks.types import (
-    execute
+    execute,
+    prepare
 )

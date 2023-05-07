@@ -136,11 +136,24 @@ class DefaultPersona:
         self.pending: List[asyncio.Task] = []
         self.bypass_cleanup: bool = False
 
-    def setup(self, hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]], metadata_string: str):
-        self._setup(hooks, metadata_string)
+    def setup(
+            self, 
+            hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]], 
+            metadata_string: str
+        ):
+
+        self._setup(
+            hooks, 
+            metadata_string
+        )
+
         self.actions_count = len(self._hooks)
 
-    def _setup(self, hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]], metadata_string: str):
+    def _setup(
+            self, 
+            hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]], 
+            metadata_string: str
+        ):
         self.metadata_string = f'{metadata_string} Persona: {self.type.capitalize()}:{self.persona_id} - '
 
         actions_and_tasks = list([

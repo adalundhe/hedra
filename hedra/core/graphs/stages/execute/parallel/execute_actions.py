@@ -62,7 +62,7 @@ async def start_execution(
     source_stage_stream_configs: List[ReporterConfig],
     logfiles_directory,
     log_level,
-    exensions: Dict[str, ExtensionPlugin]
+    extensions: Dict[str, ExtensionPlugin]
 ) -> Dict[str, Any]:
 
     current_task = asyncio.current_task()
@@ -98,26 +98,16 @@ async def start_execution(
 
     actions_and_tasks: List[Union[ActionHook, TaskHook]] = setup_stage.context['execute_stage_setup_hooks'].get(source_stage_name)
 
-    har_converter: HarConverter = exensions.get(
-        HarConverter.__name__
-    )
+    for extension in extensions.values():
+        results = await extension.execute(**{
+            'execute_stage': setup_execute_stage,
+            'persona_config': persona_config
+        })
 
-    if har_converter:
-        har_converter.config = persona_config
+        execute_stage = results.get('execute_stage')
 
-        har_hooks: List[ActionHook] = await har_converter.convert(
-            filepath=persona_config.har_filepath
-        )
-
-        max_existing_hook_order = max([
-            hook.order for hook in actions_and_tasks
-        ])
-
-        for hook in har_hooks:
-            hook.order += max_existing_hook_order
-
-        actions_and_tasks.extend(har_hooks)
-
+        if execute_stage:
+            setup_execute_stage = results.get('execute_stage')
 
     execution_hooks_count = len(actions_and_tasks)
     await logger.filesystem.aio['hedra.core'].info(
