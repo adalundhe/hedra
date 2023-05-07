@@ -1,7 +1,6 @@
 import asyncio
 import time
 import uuid
-import traceback
 from collections import deque
 from typing import Dict, Any, Union, Coroutine, TypeVar, Optional
 from hedra.core.engines.types.common.base_engine import BaseEngine

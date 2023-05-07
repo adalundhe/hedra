@@ -1,5 +1,13 @@
 from __future__ import annotations
-from typing import Any, Generic, TypeVar, Dict, List, Union, Optional
+from typing import (
+    Any, 
+    Generic, 
+    TypeVar, 
+    Dict, 
+    List, 
+    Union, 
+    Optional
+)
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 

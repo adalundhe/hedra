@@ -1,4 +1,12 @@
-from typing import Coroutine, Dict, Any, Callable, Awaitable, Optional, Tuple
+from typing import (
+    Coroutine, 
+    Dict, 
+    Any, 
+    Callable, 
+    Awaitable, 
+    Optional, 
+    Tuple
+)
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
 

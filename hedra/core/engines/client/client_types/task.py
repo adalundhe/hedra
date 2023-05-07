@@ -1,4 +1,10 @@
-from typing import Coroutine, Dict, List, Tuple, Union
+from typing import (
+    Coroutine, 
+    Dict, 
+    List, 
+    Tuple, 
+    Union
+)
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.task import MercuryTaskRunner, Task, TaskResult
 from hedra.core.engines.types.common.types import RequestTypes

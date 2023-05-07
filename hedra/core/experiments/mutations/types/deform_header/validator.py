@@ -1,4 +1,8 @@
-from pydantic import BaseModel, StrictStr, StrictInt
+from pydantic import (
+    BaseModel, 
+    StrictStr, 
+    StrictInt
+)
 from typing import Optional, List
 
 

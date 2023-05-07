@@ -1,6 +1,15 @@
 import asyncio
 from collections import defaultdict
-from typing import Dict, Coroutine, List, Tuple, Optional, Callable, Awaitable, Any
+from typing import (
+    Dict, 
+    Coroutine, 
+    List, 
+    Tuple, 
+    Optional, 
+    Callable, 
+    Awaitable, 
+    Any
+)
 from hedra.core.engines.client.time_parser import TimeParser
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook

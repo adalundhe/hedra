@@ -4,10 +4,15 @@ import psutil
 from hedra.core.personas.types.default_persona.default_persona import DefaultPersona
 from hedra.core.personas.batching.param_type import ParamType
 from hedra.core.engines.client.config import Config
-from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.core.personas.batching.batch import Batch
 from hedra.core.graphs.stages.optimize.optimization.parameters.parameter import Parameter
-from typing import Dict, List, Tuple, Union, Optional
+from typing import (
+    Dict, 
+    List, 
+    Tuple, 
+    Union, 
+    Optional
+)
 
 
 class BaseAlgorithm:

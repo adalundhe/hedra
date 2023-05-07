@@ -3,7 +3,14 @@ import dill
 import time
 import statistics
 from collections import defaultdict
-from typing import Generic, List, Union, Any, Dict, Optional
+from typing import (
+    Generic, 
+    List, 
+    Union, 
+    Any, 
+    Dict, 
+    Optional
+)
 from typing_extensions import TypeVarTuple, Unpack
 from hedra.core.engines.client import Client
 from hedra.core.engines.client.config import Config

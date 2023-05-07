@@ -1,4 +1,10 @@
-from pydantic import BaseModel, StrictBool, StrictFloat, StrictInt, StrictStr
+from pydantic import (
+    BaseModel, 
+    StrictBool, 
+    StrictFloat, 
+    StrictInt, 
+    StrictStr
+)
 from typing import List, Dict, Union
 from .experiment_metrics_set_types import (
     ExperimentSummary,

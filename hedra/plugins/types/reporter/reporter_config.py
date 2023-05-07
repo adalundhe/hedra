@@ -2,8 +2,8 @@
 from __future__ import annotations
 import inspect
 from typing import Any, Generic, Optional, TypeVar
-
 from pydantic import create_model
+
 
 T = TypeVar('T')
 

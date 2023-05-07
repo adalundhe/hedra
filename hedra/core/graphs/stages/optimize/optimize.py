@@ -2,7 +2,13 @@ import asyncio
 import dill
 import time
 from collections import defaultdict
-from typing import Dict, List, Tuple, Any, Union
+from typing import (
+    Dict, 
+    List, 
+    Tuple, 
+    Any, 
+    Union
+)
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.client.time_parser import TimeParser
 from hedra.core.graphs.stages.execute import Execute

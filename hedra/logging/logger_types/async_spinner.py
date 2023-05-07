@@ -7,7 +7,13 @@ import functools
 import inspect
 from enum import Enum
 from os import get_terminal_size
-from typing import List, Mapping, Any, Dict, Coroutine
+from typing import (
+    List, 
+    Mapping, 
+    Any, 
+    Dict, 
+    Coroutine
+)
 from asyncio import Task
 from yaspin.core import Yaspin
 from yaspin.spinners import Spinners

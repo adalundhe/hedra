@@ -8,8 +8,14 @@ from hedra.core.personas.batching.param_type import ParamType
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.versioning.flags.types.unstable.flag import unstable
 from statistics import mean
-from typing import Dict, Any, List, Union, Tuple
-from .algorithms import PointOptimizer
+from typing import (
+    Dict, 
+    Any, 
+    List, 
+    Union, 
+    Tuple
+)
+from .algorithms.types.point_optimizer import PointOptimizer
 from .optimizer import Optimizer
 
 

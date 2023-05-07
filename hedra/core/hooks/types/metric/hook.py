@@ -5,7 +5,14 @@ import signal
 import psutil
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, Awaitable, Any, Optional, Dict, List
+from typing import (
+    Callable, 
+    Awaitable, 
+    Any, 
+    Optional, 
+    Dict, 
+    List
+)
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.engines.types.common.base_result import BaseResult

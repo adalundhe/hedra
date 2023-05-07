@@ -4,9 +4,16 @@ from collections import (
     defaultdict
 )
 from tabulate import tabulate
-from typing import List, Union, Dict
+from typing import (
+    List, 
+    Union, 
+    Dict, 
+    Tuple
+)
 from .table_types import ExecutionResults
 from hedra.logging import HedraLogger
+
+CompletionRateSet = Tuple[str, List[Union[int, float]]]
 
 
 class ExecutionSummaryTable:
@@ -145,8 +152,13 @@ class ExecutionSummaryTable:
         self.logger.console.sync.info('')
 
         if self._has_streamed and self.enabled_tables.get('stages'):
-            completion_rates = self.stage_streamed_data.get('completion_rates')
-            for stage_name, stage_completion_rates in completion_rates.items():
+            completion_rates: List[CompletionRateSet] = list(sorted(
+                self.stage_streamed_data.get(
+                    'completion_rates'
+                ).items(),
+                key=lambda completion_rate: completion_rate[0]
+            ))
+            for stage_name, stage_completion_rates in completion_rates:
 
                 stage_summary = self.execution_results.get(stage_name)
 

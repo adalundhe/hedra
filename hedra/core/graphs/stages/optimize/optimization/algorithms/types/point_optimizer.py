@@ -1,10 +1,15 @@
 from collections import defaultdict
-from hedra.core.experiments.distributions.types.normal import NormalDistribution
 from hedra.core.personas.batching.param_type import ParamType
 from hedra.versioning.flags.types.unstable.flag import unstable
 from numpy.random import normal
-from statistics import mean, median
-from typing import Dict, List, Tuple, Union, Optional
+from statistics import mean
+from typing import (
+    Dict, 
+    List, 
+    Tuple, 
+    Union, 
+    Optional
+)
 from .base_algorithm import BaseAlgorithm
 
 

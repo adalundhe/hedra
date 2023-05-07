@@ -9,7 +9,12 @@ import asyncio
 import gc
 import setproctitle
 from collections import defaultdict
-from typing import Dict, Any, List, Union
+from typing import (
+    Dict, 
+    Any, 
+    List, 
+    Union
+)
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.registry import RequestTypes

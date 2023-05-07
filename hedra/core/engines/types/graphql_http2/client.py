@@ -1,7 +1,12 @@
 import asyncio
 import time
 import uuid
-from typing import Coroutine, Any, Optional, Union
+from typing import (
+    Coroutine, 
+    Any, 
+    Optional, 
+    Union
+)
 from hedra.core.engines.types.http2.client import MercuryHTTP2Client
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.tracing.trace_session import (

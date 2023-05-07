@@ -8,7 +8,12 @@ from types import FunctionType
 from concurrent.futures.process import BrokenProcessPool
 from concurrent.futures import ProcessPoolExecutor
 from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
-from typing import Any, List, Tuple, Dict
+from typing import (
+    Any, 
+    List, 
+    Tuple, 
+    Dict
+)
 from .synchronization import BatchedSemaphore
 from .stage_priority import StagePriority
 
@@ -215,7 +220,7 @@ class BatchExecutor:
             parallel_transitions = [
                 transition for transition in sorted_transitions if transition.edge.skip_stage is False
             ]
-            
+
             transition = parallel_transitions.pop()
 
             transition_group = [(

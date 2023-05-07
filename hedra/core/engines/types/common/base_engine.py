@@ -1,5 +1,12 @@
 import asyncio
-from typing import TypeVar, List, Dict, Any, Generic, Coroutine, Callable
+from typing import (
+    TypeVar, 
+    List, 
+    Dict, 
+    Any, 
+    Generic, 
+    Coroutine
+)
 
 
 A = TypeVar('A')

@@ -4,7 +4,15 @@ import re
 import functools
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, Awaitable, Any, Dict, Union, List, Tuple
+from typing import (
+    Callable, 
+    Awaitable, 
+    Any, 
+    Dict, 
+    Union, 
+    List, 
+    Tuple
+)
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.engines.types.common.results_set import ResultsSet

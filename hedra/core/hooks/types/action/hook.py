@@ -1,4 +1,12 @@
-from typing import List, Union, Dict, Any, Callable, Awaitable, Tuple
+from typing import (
+    List, 
+    Union, 
+    Dict, 
+    Any, 
+    Callable, 
+    Awaitable, 
+    Tuple
+)
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.hook_metadata import HookMetadata

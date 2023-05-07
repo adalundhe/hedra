@@ -1,8 +1,14 @@
 import asyncio
 import time
 import uuid
-import traceback
-from typing import Dict, Any, Union, Coroutine, TypeVar, Optional
+from typing import (
+    Dict, 
+    Any, 
+    Union, 
+    Coroutine, 
+    TypeVar, 
+    Optional
+)
 from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
 from hedra.core.engines.types.common.timeouts import Timeouts

@@ -1,5 +1,11 @@
 import uuid
-from typing import Any, Dict, List, Any, TypeVar, Generic
+from typing import (
+    Any, 
+    Dict, 
+    List, 
+    TypeVar, 
+    Generic
+)
 from .metadata import Metadata
 from .hooks import Hooks
 from .types import ProtocolMap

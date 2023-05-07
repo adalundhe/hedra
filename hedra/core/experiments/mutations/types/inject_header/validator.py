@@ -1,4 +1,8 @@
-from pydantic import BaseModel, StrictStr, StrictBytes
+from pydantic import (
+    BaseModel, 
+    StrictStr, 
+    StrictBytes
+)
 from typing import Union
 
 

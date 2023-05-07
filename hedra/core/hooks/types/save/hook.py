@@ -2,7 +2,13 @@ import psutil
 import asyncio
 import functools
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, Awaitable, Any, Tuple, Dict
+from typing import (
+    Callable, 
+    Awaitable, 
+    Any, 
+    Tuple, 
+    Dict
+)
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.engines.types.common.results_set import ResultsSet

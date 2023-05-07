@@ -1,6 +1,12 @@
 import click
 import os
-from typing import List, Union, Optional, Callable, Any
+from typing import (
+    List, 
+    Union, 
+    Optional, 
+    Callable, 
+    Any
+)
 from importlib.metadata import version
 from art import text2art
 from hedra.logging import HedraLogger

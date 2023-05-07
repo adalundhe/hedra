@@ -2,7 +2,13 @@ import uuid
 import threading
 import os
 from asyncio import Future
-from typing import Dict, Generic, Iterable, Union, Optional
+from typing import (
+    Dict, 
+    Generic, 
+    Iterable, 
+    Union, 
+    Optional
+)
 from typing_extensions import TypeVarTuple, Unpack
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.experiments.mutations.types.base.mutation import Mutation
