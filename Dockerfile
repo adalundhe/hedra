@@ -5,7 +5,7 @@ ARG KUBE_CONFIG_PATH
 ARG KUBE_CONFIG_FILE
 
 #################################################################
-FROM python:3.9.5-slim AS build-python
+FROM python:3.11-slim AS build-python
 ENV PYTHONUNBUFFERED=0
 ENV GRPC_DNS_RESOLVER=native
 
@@ -23,7 +23,7 @@ RUN pip install setuptools wheel ddtrace
 RUN pip install -r /requirements.txt
 
 ################################################################
-FROM python:3.9.5-slim-buster AS run
+FROM python:3.11-slim-buster AS run
 ARG REPO_SLUG
 ARG REPO_URL
 ARG REPO_BRANCH

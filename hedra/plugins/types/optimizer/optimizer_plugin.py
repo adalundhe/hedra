@@ -33,6 +33,7 @@ class OptimizerPlugin(BaseAlgorithm, Plugin):
         on_get_params = self.hooks.get(PluginHooks.ON_OPTIMIZER_GET_PARAMS)
         on_update_params = self.hooks.get(PluginHooks.ON_OPTIMIZER_UPDATE_PARAMS)
         on_optimize = self.hooks.get(PluginHooks.ON_OPTIMIZE)
+        self.name = self.name
 
         if on_get_params:
             self.get_params = on_get_params.call

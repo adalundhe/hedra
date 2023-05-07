@@ -2,7 +2,13 @@ import psutil
 import asyncio
 import functools
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, Awaitable, Any, Tuple, Dict
+from typing import (
+    Callable, 
+    Awaitable, 
+    Any, 
+    Tuple, 
+    Dict
+)
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.engines.types.common.results_set import ResultsSet
@@ -21,12 +27,15 @@ class SaveHook(Hook):
         call: Callable[..., Awaitable[Any]], 
         *names: Tuple[str, ...],
         save_path: str=None,
-        order: int=1
+        order: int=1,
+        skip: bool=False
     ) -> None:
         super().__init__(
             name, 
             shortname, 
             call, 
+            order=order,
+            skip=skip,
             hook_type=HookType.SAVE
         )
 
@@ -35,10 +44,14 @@ class SaveHook(Hook):
         self.executor = ThreadPoolExecutor(
             max_workers=psutil.cpu_count(logical=False)
         )
-        self.order: int = order
+
         self.loop = None
 
     async def call(self, **kwargs) -> None:
+
+        if self.skip:
+            return kwargs
+        
         self.loop = asyncio.get_event_loop()
 
         return await self.loop.run_in_executor(
@@ -112,7 +125,8 @@ class SaveHook(Hook):
             self.shortname,
             self._call,
             self.save_path,
-            order=self.order
+            order=self.order,
+            skip=self.skip,
         )
 
         save_hook.stage = self.stage

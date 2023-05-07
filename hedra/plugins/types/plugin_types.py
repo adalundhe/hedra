@@ -6,3 +6,4 @@ class PluginType(Enum):
     PERSONA='PERSONA'
     ENGINE='ENGINE'
     REPORTER='REPORTER'
+    EXTENSION='EXTENSION'

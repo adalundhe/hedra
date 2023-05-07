@@ -66,6 +66,10 @@ class MetricsGroup:
 
         self.custom_fields: Dict[str, CustomMetric] = data.get('custom_metrics', {})
 
+    def get(self, field_name: str):
+        return self._raw_data.get(field_name)
+            
+
     @property
     def custom(self):
         return {

@@ -1,25 +1,26 @@
 import uuid
-from typing import List
-from numpy import float32, float64, int16, int32, int64
+from typing import List, Dict
 from hedra.logging import HedraLogger
+from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import (
     MetricsSet,
     MetricType
 )
+from .sqlite_config import SQLiteConfig
 
 
 try:
     import sqlalchemy
     from sqlalchemy.schema import CreateTable
     from sqlalchemy.ext.asyncio import create_async_engine
-    from .sqlite_config import SQLiteConfig
+    
     has_connector = True
 
 except Exception:
     ASYNCIO_STRATEGY = None
     sqlalchemy = None
-    SQLiteConfig = None
     CreateTable = None
     OperationalError = None
     has_connector = False
@@ -32,6 +33,13 @@ class SQLite:
         self.path = f'sqlite+aiosqlite:///{config.path}'
         self.events_table_name = config.events_table
         self.metrics_table_name = config.metrics_table
+
+
+        self.experiments_table_name = config.experiments_table
+        self.streams_table_name = config.streams_table
+        self.variants_table_name = f'{config.experiments_table}_variants'
+        self.mutations_table_name = f'{config.experiments_table}_mutations'
+
         self.shared_metrics_table_name = f'{config.metrics_table}_shared'
         self.errors_table_name = f'{config.metrics_table}_errors'
         self.custom_metrics_table_name = f'{config.metrics_table}_custom'
@@ -43,6 +51,12 @@ class SQLite:
 
         self._events_table = None
         self._metrics_table = None
+        self._streams_table = None
+
+        self._experiments_table = None
+        self._variants_table = None
+        self._mutations_table = None
+
         self._shared_metrics_table = None
         self._custom_metrics_table = None
         self._errors_table = None
@@ -77,7 +91,184 @@ class SQLite:
         self._engine = create_async_engine(self.path)
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to SQLite at - {self.path} - Database: {self.database}')
-    
+
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to Table - {self.streams_table_name}')
+
+        async with self._connection.begin() as transaction:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Streams to Table - {self.streams_table_name} - Initiating transaction')
+        
+            for stage_name, stream in stream_metrics.items():
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Streams - {stage_name}:{stream.stream_set_id}')
+
+                if self._streams_table is None:
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Streams table - {self.streams_table_name} - if not exists')
+
+                    stream_table = sqlalchemy.Table(
+                        self.streams_table_name,
+                        self.metadata,
+                        sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
+                        sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
+                        sqlalchemy.Column('stage', sqlalchemy.VARCHAR(255)),
+                        sqlalchemy.Column('group', sqlalchemy.TEXT()),
+                        sqlalchemy.Column('median', sqlalchemy.FLOAT),
+                        sqlalchemy.Column('mean', sqlalchemy.FLOAT),
+                        sqlalchemy.Column('variance', sqlalchemy.FLOAT),
+                        sqlalchemy.Column('stdev', sqlalchemy.FLOAT),
+                        sqlalchemy.Column('minimum', sqlalchemy.FLOAT),
+                        sqlalchemy.Column('maximum', sqlalchemy.FLOAT)
+                    )
+
+                    for quantile in stream.quantiles:
+                        stream_table.append_column(
+                            sqlalchemy.Column(f'quantile_{quantile}th', sqlalchemy.FLOAT)
+                        )
+
+                    await self._connection.execute(
+                        CreateTable(
+                            stream_table, 
+                            if_not_exists=True
+                        )
+                    )
+                
+                    self._streams_table = stream_table
+
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Streams table - {self.streams_table_name}')
+
+                for group_name, group in stream.grouped.items():
+                    await self._connection.execute(
+                        self._streams_table.insert(values={
+                            'name': f'{stage_name}_streams',
+                            'stage': stage_name,
+                            'group': group_name,
+                            **group
+                        })
+                    )
+                    
+            await transaction.commit()
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Streams to Table - {self.streams_table_name} - Transaction committed')
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Streams to Table - {self.streams_table_name}')
+
+    async def submit_experiments(self, experiments_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments to Table - {self.experiments_table_name}')
+        
+        async with self._connection.begin() as transaction:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Experiments to Table - {self.experiments_table_name} - Initiating transaction')
+        
+            for experiment in experiments_metrics.experiment_summaries:
+
+                if self._experiments_table is None:
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Experiments table - {self.experiments_table_name} - if not exists')
+
+                    experiments_table = sqlalchemy.Table(
+                        self.experiments_table_name,
+                        self.metadata,
+                        sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
+                        sqlalchemy.Column('experiment_name', sqlalchemy.VARCHAR(255)),
+                        sqlalchemy.Column('experiment_randomized', sqlalchemy.BOOLEAN),
+                        sqlalchemy.Column('experiment_completed', sqlalchemy.BIGINT),
+                        sqlalchemy.Column('experiment_succeeded', sqlalchemy.BIGINT),
+                        sqlalchemy.Column('experiment_failed', sqlalchemy.BIGINT),
+                        sqlalchemy.Column('experiment_median_aps', sqlalchemy.FLOAT),
+                    )
+
+                    await self._connection.execute(CreateTable(experiments_table, if_not_exists=True))
+
+                    self._experiments_table = experiments_table
+
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Experiments table - {self.experiments_table_name}')
+                
+                await self._connection.execute(self._experiments_table.insert().values(**experiment.record))
+                    
+            await transaction.commit()
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Experiments to Table - {self.experiments_table_name} - Transaction committed')
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Experiments to Table - {self.experiments_table_name}')
+
+    async def submit_variants(self, experiments_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Variants to Table - {self.variants_table_name}')
+        
+        async with self._connection.begin() as transaction:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Variants to Table - {self.variants_table_name} - Initiating transaction')
+        
+            for variant in experiments_metrics.variant_summaries:
+
+                if self._variants_table is None:
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Variants table - {self.variants_table_name} - if not exists')
+
+                    variants_table = sqlalchemy.Table(
+                        self.variants_table_name,
+                        self.metadata,
+                        sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
+                        sqlalchemy.Column('variant_name', sqlalchemy.VARCHAR(255)),
+                        sqlalchemy.Column('variant_experiment', sqlalchemy.VARCHAR(255)),
+                        sqlalchemy.Column('variant_weight', sqlalchemy.FLOAT),
+                        sqlalchemy.Column('variant_distribution', sqlalchemy.VARCHAR(255)),
+                        sqlalchemy.Column('variant_distribution_interval', sqlalchemy.FLOAT),
+                        sqlalchemy.Column('variant_completed', sqlalchemy.BIGINT),
+                        sqlalchemy.Column('variant_succeeded', sqlalchemy.BIGINT),
+                        sqlalchemy.Column('variant_failed', sqlalchemy.BIGINT),
+                        sqlalchemy.Column('variant_actions_per_second', sqlalchemy.FLOAT),
+                        sqlalchemy.Column('variant_ratio_completed', sqlalchemy.FLOAT),
+                        sqlalchemy.Column('variant_ratio_succeeded', sqlalchemy.FLOAT),
+                        sqlalchemy.Column('variant_ratio_failed', sqlalchemy.FLOAT),
+                        sqlalchemy.Column('variant_ratio_aps', sqlalchemy.FLOAT),
+                    )
+
+                    await self._connection.execute(CreateTable(variants_table, if_not_exists=True))
+
+                    self._variants_table = variants_table
+
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Variants table - {self.variants_table_name}')
+                
+                await self._connection.execute(self._variants_table.insert().values(**variant.record))
+                    
+            await transaction.commit()
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Variants to Table - {self.variants_table_name} - Transaction committed')
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Variants to Table - {self.variants_table_name}')
+
+    async def submit_mutations(self, experiments_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Mutations to Table - {self.mutations_table_name}')
+        
+        async with self._connection.begin() as transaction:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Mutations to Table - {self.mutations_table_name} - Initiating transaction')
+        
+            for mutation in experiments_metrics.mutation_summaries:
+
+                if self._mutations_table is None:
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Mutations table - {self.mutations_table_name} - if not exists')
+
+                    mutations_table = sqlalchemy.Table(
+                        self.mutations_table_name,
+                        self.metadata,
+                        sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
+                        sqlalchemy.Column('mutation_name', sqlalchemy.VARCHAR(255)),
+                        sqlalchemy.Column('mutation_experiment_name', sqlalchemy.VARCHAR(255)),
+                        sqlalchemy.Column('mutation_variant_name', sqlalchemy.VARCHAR(255)),
+                        sqlalchemy.Column('mutation_chance', sqlalchemy.FLOAT),
+                        sqlalchemy.Column('mutation_targets', sqlalchemy.VARCHAR(8192)),
+                        sqlalchemy.Column('mutation_type', sqlalchemy.VARCHAR(255)),
+                    )
+
+                    await self._connection.execute(CreateTable(mutations_table, if_not_exists=True))
+
+                    self._mutations_table = mutations_table
+
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Mutations table - {self.mutations_table_name}')
+                
+                await self._connection.execute(self._mutations_table.insert().values(**mutation.record))
+                    
+            await transaction.commit()
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Mutations to Table - {self.mutations_table_name} - Transaction committed')
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Mutations to Table - {self.mutations_table_name}')
+
     async def submit_events(self, events: List[BaseProcessedResult]):
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Events to Table - {self.events_table_name}')

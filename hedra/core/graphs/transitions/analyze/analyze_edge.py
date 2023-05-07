@@ -1,7 +1,6 @@
 from __future__ import annotations
 import asyncio
 import inspect
-import traceback
 from collections import defaultdict
 from typing import Dict, List, Any
 from hedra.core.hooks.types.base.hook import Hook
@@ -117,7 +116,6 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             })
 
         if self.skip_stage is False:
-
             self.next_history.update({
                 (self.source.name, destination.name): {
                     'analyze_stage_summary_metrics': self.edge_data.get(

@@ -3,7 +3,14 @@ import psutil
 import traceback
 from collections import defaultdict
 from typing_extensions import TypeVarTuple, Unpack
-from typing import Dict, Generic, List, Any, Optional, Union
+from typing import (
+    Dict, 
+    Generic, 
+    List, 
+    Any, 
+    Optional, 
+    Union
+)
 from hedra.core.experiments.experiment import Experiment
 from hedra.core.engines.client.client import Client
 from hedra.core.engines.client.config import Config
@@ -17,6 +24,7 @@ from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.task.hook import TaskHook
+from hedra.core.graphs.stages.base.parallel.stage_priority import StagePriority
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.personas.types import PersonaTypesMap
 from hedra.logging import HedraLogger
@@ -62,7 +70,6 @@ class SetupCall:
                 await self.hook.call()
 
             except Exception as setup_exception:
-
                 self.exception = setup_exception
 
                 self.error_traceback = str(traceback.format_exc())
@@ -101,6 +108,8 @@ class Setup(Stage, Generic[Unpack[T]]):
     permissions: List[str]=[]
     playwright_options: Dict[str, Any]={}
     tracing: TracingConfig=None
+    priority: Optional[str]=None
+    actions_filepaths: Optional[Dict[str, str]]=None
 
     
     def __init__(self) -> None:
@@ -135,7 +144,8 @@ class Setup(Stage, Generic[Unpack[T]]):
             geolocation=self.geolocation,
             permissions=self.permissions,
             playwright_options=self.playwright_options,
-            tracing=self.tracing
+            tracing=self.tracing,
+            actions_filepaths=self.actions_filepaths
         )
 
         self.client = Client(
@@ -168,10 +178,22 @@ class Setup(Stage, Generic[Unpack[T]]):
         ]
 
         self.tracing = self.tracing
+        self.priority = self.priority
+        if self.priority is None:
+            self.priority = 'auto'
+
+        self.priority = self.priority
+        if self.priority is None:
+            self.priority = 'auto'
+
+        self.priority_level: StagePriority = StagePriority.map(
+            self.priority
+        )
 
     @Internal()
     async def run(self):
         await self.setup_events()
+        self.dispatcher.assemble_execution_graph()
         await self.dispatcher.dispatch_events(self.name)
 
     @Internal()
@@ -179,12 +201,12 @@ class Setup(Stage, Generic[Unpack[T]]):
         await self.setup_events()
         
         initial_events = dict(**self.dispatcher.initial_events)
-        for stage in self.dispatcher.initial_events:
-            self.dispatcher.initial_events[stage] = [
-                initial_event for initial_event in self.dispatcher.initial_events[stage] if initial_event.source.shortname in self.source_internal_events
-            ]
+        self.dispatcher.skip_list.extend([
+            stage_event.event_name for stage_event in self.dispatcher.events_by_name.values() if stage_event.source.shortname not in self.internal_events
+        ])
 
         self.dispatcher.initial_events = initial_events
+        self.dispatcher.assemble_execution_graph()
         await self.dispatcher.dispatch_events(self.name)
     
     @context()
@@ -276,7 +298,8 @@ class Setup(Stage, Generic[Unpack[T]]):
 
                 experiment = {
                     'experiment_name': self.experiment.experiment_name,
-                    'weight': variant.weight,
+                    'random': self.experiment.random,
+                    'weight': variant.weight
                 }
 
                 if setup_stage_is_primary_thread:
@@ -297,8 +320,7 @@ class Setup(Stage, Generic[Unpack[T]]):
                             'distribution': distribution,
                             'intervals': variant.intervals,
                             'interval_duration': round(
-                                config_copy.total_time/(variant.intervals - 1)
-                                , 
+                                config_copy.total_time/(variant.intervals - 1), 
                                 2
                             )
                         })
@@ -354,9 +376,10 @@ class Setup(Stage, Generic[Unpack[T]]):
         connection_validation_retries: int=3,
         setup_stage_target_config: Config=None
     ):
-            if setup_stage_has_actions and isinstance(setup_stage_actions, ActionHook):
+            if setup_stage_has_actions and isinstance(setup_stage_actions, ActionHook) and setup_stage_actions.skip is False:
 
                 hook = setup_stage_actions
+                hook.skip = setup_stage_actions.skip
                 hook.stage_instance.client.next_name = hook.name
                 hook.stage_instance.client.intercept = True
 
@@ -481,7 +504,7 @@ class Setup(Stage, Generic[Unpack[T]]):
         setup_stage_has_tasks: bool=False,
         setup_stage_configs: Dict[str, Config] = {},
     ):
-        if setup_stage_has_tasks and isinstance(setup_stage_tasks, TaskHook):
+        if setup_stage_has_tasks and isinstance(setup_stage_tasks, TaskHook) and setup_stage_tasks.skip is False:
             hook = setup_stage_tasks
             execute_stage: Stage = hook.stage_instance
             execute_stage.client.next_name = hook.name
@@ -536,6 +559,7 @@ class Setup(Stage, Generic[Unpack[T]]):
             return {
                 'setup_stage_tasks': setup_stage_tasks
             }
+        
 
     @context('setup_task')
     async def apply_channels(

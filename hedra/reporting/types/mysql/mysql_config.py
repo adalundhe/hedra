@@ -1,14 +1,6 @@
-from types import SimpleNamespace
-from typing import Dict
 from pydantic import BaseModel
-
 from hedra.reporting.types.common.types import ReporterTypes
 
-
-try:
-    import sqlalchemy
-except Exception:
-    sqlalchemy = SimpleNamespace(Column=None)
 
 
 class MySQLConfig(BaseModel):
@@ -18,7 +10,8 @@ class MySQLConfig(BaseModel):
     password: str
     events_table: str='events'
     metrics_table: str='metrics'
-    custom_fields: Dict[str, sqlalchemy.Column]={}
+    experiments_table: str='experiments'
+    streams_table: str='streams'
     reporter_type: ReporterTypes=ReporterTypes.MySQL
 
     class Config:

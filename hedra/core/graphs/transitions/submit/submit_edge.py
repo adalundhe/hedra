@@ -1,22 +1,26 @@
 from __future__  import annotations
 import inspect
 import asyncio
+import traceback
 from collections import defaultdict
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 from hedra.core.graphs.transitions.common.base_edge import BaseEdge
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.submit.submit import Submit
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.registrar import registrar
+from hedra.reporting.experiment.experiment_metrics_set import ExperimentMetricsSet
 from hedra.reporting.metric import MetricsSet
 from hedra.reporting.metric.custom_metric import CustomMetric
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.stages.types.stage_states import StageStates
+from hedra.reporting.metric.stage_metrics_summary import StageMetricsSummary
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 
 
 CustomMetricSet = Dict[str, Dict[str, CustomMetric]]
-MetricsSetGroup = Dict[str, Dict[str, Dict[str, Dict[str, MetricsSet]]]]
+MetricsSetGroup = Dict[str, Union[str, Dict[str, StageMetricsSummary]]]
 
 
 class SubmitEdge(BaseEdge[Submit]):
@@ -33,10 +37,12 @@ class SubmitEdge(BaseEdge[Submit]):
         self.requires = [
             'analyze_stage_session_total',
             'analyze_stage_events',
-            'analyze_stage_summary_metrics'
+            'analyze_stage_summary_metrics',
         ]
         self.provides = [
-            'analyze_stage_summary_metrics'
+            'submit_stage_metrics',
+            'submit_stage_streamed_metrics',
+            'submit_stage_experiment_metrics'
         ]
 
     async def transition(self):
@@ -91,7 +97,9 @@ class SubmitEdge(BaseEdge[Submit]):
         if self.skip_stage is False:
             self.next_history.update({
                 (self.source.name, destination.name): {
-                    'analyze_stage_summary_metrics': self.edge_data['analyze_stage_summary_metrics'] 
+                    'submit_stage_metrics': self.edge_data['submit_stage_metrics'],
+                    'submit_stage_experiment_metrics': self.edge_data['submit_stage_experiment_metrics'],
+                    'submit_stage_streamed_metrics': self.edge_data['submit_stage_streamed_metrics']
                 }
             })
 
@@ -149,12 +157,14 @@ class SubmitEdge(BaseEdge[Submit]):
         
         events: List[BaseProcessedResult] = []
         metrics: List[MetricsSet] = []
-        session_totals: Dict[str, int] = {}
+        streamed_metrics: Dict[str, StageStreamsSet] = {}
+        experiments: List[ExperimentMetricsSet] = []
+        session_total: int = 0
 
         for source_stage, destination_stage in self.history:
             if destination_stage == self.source.name:
 
-                previous_history = self.history[(source_stage, self.source.name)]
+                previous_history: Dict[str, Any] = self.history[(source_stage, self.source.name)]
             
                 analyze_stage_summary_metrics: MetricsSetGroup = previous_history.get(
                     'analyze_stage_summary_metrics'
@@ -166,26 +176,31 @@ class SubmitEdge(BaseEdge[Submit]):
 
                 events.extend(analyze_stage_events)
 
-                stage_totals: Dict[str, int] = analyze_stage_summary_metrics.get(
-                    'stage_totals', 
-                    {}
-                )
 
-                for stage_name, stage_total in stage_totals.items():
-
-                    if session_totals.get(stage_name) is None:   
-                        session_totals[stage_name] = stage_total
-
-
-                stage_summaries = analyze_stage_summary_metrics.get('stages', {})
-                for stage in stage_summaries.values():
+                stage_metrics_summaries = analyze_stage_summary_metrics.get('stages', {})
+                for stage_metrics_summary in stage_metrics_summaries.values():
                     metrics.extend(list(
-                        stage.get('actions', {}).values()
+                        stage_metrics_summary.metrics_sets.values()
                     ))
 
-        self.edge_data['analyze_stage_events'] = events
-        self.edge_data['analyze_stage_summary_metrics'] = metrics
-        self.edge_data['analyze_stage_session_total'] = sum(session_totals.values())
+                    session_total += stage_metrics_summary.stage_metrics.total
+
+                experiment_metrics_sets = analyze_stage_summary_metrics.get('experiment_metrics_sets', {})
+                experiments.extend(list(
+                    experiment_metrics_sets.values()
+                ))
+
+                for stage_metrics_summary in stage_metrics_summaries.values():
+                    streams = stage_metrics_summary.stage_streamed_analytics
+
+                    if streams and len(streams) > 0:
+                        streamed_metrics[stage_metrics_summary.stage_metrics.name] = stage_metrics_summary.streams
+
+        self.edge_data['submit_stage_events'] = events
+        self.edge_data['submit_stage_experiment_metrics'] = experiments
+        self.edge_data['submit_stage_streamed_metrics'] = streamed_metrics
+        self.edge_data['submit_stage_summary_metrics'] = metrics
+        self.edge_data['submit_stage_session_total'] = session_total
 
 
 

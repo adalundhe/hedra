@@ -1,4 +1,13 @@
-from typing import List, Union, Dict, Any, Type, Callable, Awaitable, Tuple
+from typing import (
+    List, 
+    Union, 
+    Dict, 
+    Any, 
+    Type, 
+    Callable, 
+    Awaitable, 
+    Tuple
+)
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.hook_metadata import HookMetadata
@@ -14,12 +23,15 @@ class TaskHook(Hook):
         *names: Tuple[str, ...],
         weight: int=1, 
         order: int=1, 
+        skip: bool=False,
         metadata: Dict[str, Union[str, int]]={}
     ) -> None:
         super().__init__(
             name, 
             shortname, 
             call, 
+            order=order,
+            skip=skip,
             hook_type=HookType.TASK
         )
 
@@ -48,7 +60,8 @@ class TaskHook(Hook):
             self.shortname,
             self._call,
             weight=self.metadata.weight,
-            order=self.metadata.order,
+            order=self.order,
+            skip=self.skip,
             metadata={
                 **self.metadata.copy()
             }
@@ -58,3 +71,6 @@ class TaskHook(Hook):
         task_hook.stage = self.stage
 
         return task_hook
+    
+    async def call(self, *args, **kwargs):
+        return await self._call(*args, **kwargs)

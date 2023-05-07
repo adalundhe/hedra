@@ -11,6 +11,7 @@ from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.transitions.transition_group import TransitionGroup
 from hedra.logging import HedraLogger
+from hedra.logging.table.table_types import GraphExecutionResults
 from .transitions import TransitionAssembler, local_transitions
 from .status import GraphStatus
 
@@ -34,6 +35,7 @@ class Graph:
         self.graph_path = config.get('graph_path')
         self.graph_id = str(uuid.uuid4())
         self.graph_skipped_stages = config.get('graph_skipped_stages', [])
+
         self.status = GraphStatus.INITIALIZING
         self.graph = networkx.DiGraph()
         self.logger = HedraLogger()
@@ -150,7 +152,7 @@ class Graph:
         self.logger.hedra.sync.debug(f'{self.metadata_string} - Assembly complete')
         self.logger.filesystem.sync['hedra.core'].debug(f'{self.metadata_string} - Assembly complete')
 
-    async def run(self):
+    async def run(self) -> GraphExecutionResults:
 
         execution_start = time.monotonic()
 
@@ -160,6 +162,8 @@ class Graph:
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Changed status to - {GraphStatus.RUNNING.name} - from - {GraphStatus.ASSEMBLING.name}')
         
         self.status = GraphStatus.RUNNING
+
+        summary_output: GraphExecutionResults = {}
 
         for transition_group in self._transitions:
 
@@ -188,9 +192,7 @@ class Graph:
                         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing stage Transition - {transition.transition_id} - from stage - {transition.from_stage.name} - to stage - {transition.to_stage.name}')
                         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing stage - {transition.from_stage.name}:{transition.from_stage.stage_id}')
 
-                results = await asyncio.gather(*[
-                    asyncio.create_task(transition.execute()) for transition in transition_group
-                ])
+                results = await transition_group.execute_group()
                 
                 for transition in transition_group:
                     error = transition.edge.exception
@@ -217,6 +219,15 @@ class Graph:
                         )
 
                         await error_transtiton.execute() 
+ 
+                    if transition.edge.source.stage_type == StageTypes.ANALYZE:
+                        stage_name = transition.edge.source.name
+                        submit_stage_context = transition.edge.source.context
+
+                        analyze_stage_summary_metrics = submit_stage_context.get('analyze_stage_summary_metrics')
+
+                        if analyze_stage_summary_metrics:
+                            summary_output[stage_name] = analyze_stage_summary_metrics
 
                 if self.status == GraphStatus.FAILED:
                     status_spinner.finalize()
@@ -246,8 +257,10 @@ class Graph:
 
         self.execution_time = execution_start - time.monotonic()
 
+
         for transition_group in self._transitions:
             for transition in transition_group:
+
                 transition.edge.source.context = None
                 transition.edge.destination.context = None
                 transition.edge.history = None
@@ -264,9 +277,15 @@ class Graph:
             if task != run_task and task.cancelled() is False:
                 task.cancel()
 
+        return summary_output
+
     def cleanup(self):
         for executor in self.runner.executors:
             executor.close()
+
+        for transition_group in self._transitions:
+            for executor in transition_group._executors:
+                executor.close()
 
     def _append_stage(self, stage_type: StageTypes):
 

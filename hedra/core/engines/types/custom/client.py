@@ -1,7 +1,12 @@
 import asyncio
 import time
 import uuid
-from typing import Any, Coroutine, Dict, TypeVar, Union
+from typing import (
+    Any, 
+    Coroutine, 
+    Dict, 
+    TypeVar
+)
 from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.concurrency import Semaphore
@@ -150,7 +155,7 @@ class MercuryCustomClient(BaseEngine[A, R]):
                 self.pool.connections.append(connection)
 
                 if action.hooks.after:
-                    response: Result[R] = await self.execute_after(action, response)
+                    result: Result[R] = await self.execute_after(action, result)
                     action.setup()
 
                 if action.hooks.notify:

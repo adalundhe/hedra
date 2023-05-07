@@ -2,7 +2,14 @@ import asyncio
 import networkx
 import threading
 import os
-from typing import List, Dict, Union, Any, Tuple, Coroutine
+from typing import (
+    List, 
+    Dict, 
+    Union, 
+    Any, 
+    Tuple, 
+    Coroutine
+)
 from collections import defaultdict
 from hedra.core.hooks.types.base.event_graph import EventGraph
 from hedra.core.graphs.stages.base.import_tools import set_stage_hooks
@@ -69,7 +76,7 @@ class TransitionAssembler:
         self._graph_metadata_log_string = f'Graph - {self.graph_name}:{self.graph_id} - thread:{self._thread_id} - process:{self._process_id} - '
 
     def generate_stages(self, stages: Dict[str, Stage]) -> None:
-
+    
         stages_count = len(stages)
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Generating - {stages_count} - stages')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Generating - {stages_count} - stages')
@@ -112,7 +119,7 @@ class TransitionAssembler:
                     self.hooks_by_type[hook.hook_type][hook.name] = hook
                 
             self.instances_by_type[stage.stage_type].append(stage)
-    
+
         events_graph = EventGraph(self.hooks_by_type)
         events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
 
@@ -140,6 +147,7 @@ class TransitionAssembler:
         for generation in topological_generations:
 
             generation_transitions = TransitionGroup()
+            generation_transitions.cpu_pool_size = self.cpus
 
             stage_pool_size = self.cpus
 
@@ -157,6 +165,8 @@ class TransitionAssembler:
             self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Provisioning workers- {stages_count} - stages')
 
             for stage in stages.values():
+
+                stage.total_pool_cpus = self.cpus
 
                 for plugin_name, plugin in stage.plugins.items():
                     plugins[plugin.type][plugin_name] = plugin
@@ -193,6 +203,8 @@ class TransitionAssembler:
                     self.executors.append(stage.executor)
 
                     stages[stage.name] = stage
+
+                batch_executor.close()
 
             for stage in stages.values():
 

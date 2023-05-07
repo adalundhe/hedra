@@ -5,7 +5,14 @@ import signal
 import psutil
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, Awaitable, Any, Optional, Dict, List
+from typing import (
+    Callable, 
+    Awaitable, 
+    Any, 
+    Optional, 
+    Dict, 
+    List
+)
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.engines.types.common.base_result import BaseResult
@@ -36,12 +43,15 @@ class MetricHook(Hook):
         call: Callable[..., Awaitable[Any]], 
         metric_type: str,
         group: Optional[str] = None,
-        order: int=1
+        order: int=1,
+        skip: bool=False
     ) -> None:        
         super().__init__(
             name, 
             shortname, 
             call, 
+            order=order,
+            skip=skip,
             hook_type=HookType.METRIC
         )
         
@@ -54,9 +64,12 @@ class MetricHook(Hook):
 
     async def call(self, **kwargs):
 
+        if self.skip:
+            return kwargs
+        
         results: RawResultsSet = self.context['analyze_stage_raw_results']
         self.loop = asyncio.get_running_loop()
-        for signame in ('SIGINT', 'SIGTERM'):
+        for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
             self.loop.add_signal_handler(
                 getattr(signal, signame),
                 lambda signame=signame: handle_loop_stop(
@@ -170,7 +183,8 @@ class MetricHook(Hook):
             self.shortname,
             self._call,
             self.group,
-            order=self.order
+            order=self.order,
+            skip=self.skip,
         )
 
         metric_hook.stage = self.stage

@@ -1,5 +1,12 @@
 from typing import Optional, Dict, Union, Tuple
-from pydantic import BaseModel, StrictStr, StrictInt, StrictFloat, validator
+from pydantic import (
+    BaseModel, 
+    StrictStr, 
+    StrictInt, 
+    StrictFloat, 
+    StrictBool, 
+    validator
+)
 
 
 class ActionHookValidator(BaseModel):
@@ -7,6 +14,7 @@ class ActionHookValidator(BaseModel):
     weight: StrictInt
     order: StrictInt
     metadata: Optional[Dict[str, Union[StrictStr, StrictInt, StrictFloat]]]
+    skip: StrictBool
 
     class Config:
         arbitrary_types_allowed = True

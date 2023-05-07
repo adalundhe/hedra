@@ -2,18 +2,19 @@ import uuid
 import json
 from typing import List, Dict, Any
 from hedra.logging import HedraLogger
+from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
+from .kafka_config import KafkaConfig
 
 try:
 
     from aiokafka import AIOKafkaProducer
-    from .kafka_config import KafkaConfig
     has_connector = True
 
 except Exception:
     AIOKafkaProducer = None
-    KafkaConfig = None
     has_connector = False
 
 
@@ -25,15 +26,24 @@ class Kafka:
 
         self.events_topic = config.events_topic
         self.metrics_topic = config.metrics_topic
+        self.streams_topic = config.streams_topic
+
         self.custom_metrics_topic = f'{config.metrics_topic}_custom' 
         self.shared_metrics_topic = f'{config.metrics_topic}_shared'
         self.errors_topic = f'{config.metrics_topic}_errors'
 
+        self.experiments_topic = config.experiments_topic
+        self.variants_topic = f'{config.experiments_topic}_variants'
+        self.mutations_topic = f'{config.experiments_topic}_metrics'
+
         self.events_partition = config.events_partition
         self.metrics_partition = config.metrics_partition
-        self.shared_metrics_partition = f'{config.metrics_partition}_shared'
-        self.errors_partition = f'{config.metrics_partition}_errors'
-        self.custom_metrics_partition = f'{config.metrics_partition}_custom'
+        self.experiments_partition = config.experiments_partition
+        self.streams_partition = config.streams_partition
+
+        self.shared_metrics_partition = config.metrics_partition
+        self.errors_partition = config.metrics_partition
+        self.custom_metrics_partition = config.metrics_partition
 
         self.compression_type = config.compression_type
         self.timeout = config.timeout
@@ -70,6 +80,105 @@ class Kafka:
         await self._producer.start()
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to Kafka at - {self.host}')
+
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to Topic - {self.streams_topic} - Partition - {self.streams_partition}')
+        
+        batch = self._producer.create_batch()
+        for stage_name, stream in stream_metrics.items():
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Streams - {stage_name}:{stream.stream_set_id}')
+
+            for group_name, group in stream.grouped.items():
+                batch.append(
+                    value=json.dumps(
+                        {
+                            **group,
+                            'name': f'{stage_name}_streams',
+                            'stage': stage_name,
+                            'group': group_name
+                        }
+                    ).encode('utf-8'),
+                    timestamp=None, 
+                    key=bytes(f'{stage_name}_{group_name}', 'utf')
+                )
+
+        await self._producer.send_batch(
+            batch,
+            self.streams_topic,
+            partition=self.streams_partition
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Streams to Topic - {self.streams_topic} - Partition - {self.streams_partition}')
+
+    async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments to Topic - {self.experiments_topic} - Partition - {self.experiments_partition}')
+
+        batch = self._producer.create_batch()
+        for experiment in experiment_metrics.experiment_summaries:
+
+            batch.append(
+                value=json.dumps(
+                    experiment.record
+                ).encode('utf-8'),
+                timestamp=None, 
+                key=bytes(experiment.experiment_name, 'utf')
+            )
+
+        await self._producer.send_batch(
+            batch,
+            self.experiments_topic,
+            partition=self.experiments_partition
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Experiments to Topic - {self.experiments_topic} - Partition - {self.experiments_partition}')
+
+    async def submit_variants(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Variants to Topic - {self.variants_topic} - Partition - {self.experiments_partition}')
+
+        batch = self._producer.create_batch()
+        for variant in experiment_metrics.variant_summaries:
+
+            batch.append(
+                value=json.dumps(
+                    variant.record
+                ).encode('utf-8'),
+                timestamp=None, 
+                key=bytes(variant.variant_name, 'utf')
+            )
+
+        await self._producer.send_batch(
+            batch,
+            self.variants_topic,
+            partition=self.experiments_partition
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Variants to Topic - {self.variants_topic} - Partition - {self.experiments_partition}')
+
+    async def submit_mutations(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Mutations to Topic - {self.mutations_topic} - Partition - {self.experiments_partition}')
+
+        batch = self._producer.create_batch()
+        for mutation in experiment_metrics.mutation_summaries:
+
+            batch.append(
+                value=json.dumps(
+                    mutation.record
+                ).encode('utf-8'),
+                timestamp=None, 
+                key=bytes(mutation.mutation_name, 'utf')
+            )
+
+        await self._producer.send_batch(
+            batch,
+            self.mutations_topic,
+            partition=self.events_partition
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Mutations to Topic - {self.mutations_topic} - Partition - {self.experiments_partition}')
 
     async def submit_events(self, events: List[BaseProcessedResult]):
 

@@ -1,4 +1,10 @@
-from typing import Dict, List, Tuple, Union, Optional
+from typing import (
+    Dict, 
+    List, 
+    Tuple, 
+    Union, 
+    Optional
+)
 from scipy.optimize import dual_annealing
 from .base_algorithm import BaseAlgorithm
 

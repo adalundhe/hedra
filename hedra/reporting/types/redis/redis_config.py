@@ -10,6 +10,8 @@ class RedisConfig(BaseModel):
     database: int=0
     events_channel: str='events'
     metrics_channel: str='metrics'
+    experiments_channel: str='experiments'
+    streams_channel: str='streams'
     channel_type: str='pipeline'
     secure: bool=False
     reporter_type: ReporterTypes=ReporterTypes.Redis

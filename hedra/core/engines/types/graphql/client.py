@@ -1,7 +1,12 @@
 import time
 import uuid
 import asyncio
-from typing import Coroutine, Any, Optional, Union
+from typing import (
+    Coroutine, 
+    Any, 
+    Optional, 
+    Union
+)
 from hedra.core.engines.types.http import MercuryHTTPClient
 from hedra.core.engines.types.http.connection import HTTPConnection
 from hedra.core.engines.types.common import Timeouts
@@ -9,7 +14,6 @@ from hedra.core.engines.types.tracing.trace_session import (
     TraceSession, 
     Trace
 )
-
 from .action import GraphQLAction
 from .result import GraphQLResult
 

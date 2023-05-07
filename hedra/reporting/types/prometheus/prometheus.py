@@ -2,9 +2,10 @@ import asyncio
 import uuid
 import functools
 from typing import List, Dict
-from numpy import float32, float64, int16, int32, int64
 from hedra.logging import HedraLogger
+from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import (
     MetricsSet,
     MetricType
@@ -57,14 +58,23 @@ class Prometheus:
             'maximum': 'gauge'
         }
 
-        self._events = {}
-        self._metrics = {}
-        self._shared_metrics = {}
+        self._events: Dict[str, PrometheusMetric] = {}
+        self._metrics: Dict[str, Dict[str, Dict[str, PrometheusMetric]]] = {}
+        self._streams: Dict[str, Dict[str, PrometheusMetric]] = {}
+
+        self._experiments: Dict[str, Dict[str, PrometheusMetric]] = {}
+        self._variants: Dict[str, Dict[str, PrometheusMetric]] = {}
+        self._mutations: Dict[str, Dict[str, PrometheusMetric]] = {}
+
+        self._shared_metrics: Dict[str, Dict[str, PrometheusMetric]]  = {}
         self._custom_metrics: Dict[str, PrometheusMetric] = {}
-        self._errors = {}
+        self._errors: Dict[str, PrometheusMetric] = {}
 
         self.metric_types_map = {
-
+            MetricType.COUNT: 'count',
+            MetricType.RATE: 'gauge',
+            MetricType.DISTRIBUTION: 'histogram',
+            MetricType.SAMPLE: 'gauge'
         }
 
         self.session_uuid = str(uuid.uuid4())
@@ -127,6 +137,214 @@ class Prometheus:
             )
 
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Pushed to Prometheus Pushgateway via HTTP')
+
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to Prometheus - Namespace: {self.namespace}')
+
+        for stage_name, stream in stream_metrics.items():
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stream - {stage_name}:{stream.stream_set_id}')
+
+            stream_metric_name = f'{stage_name}_streams'
+
+            stream_metric_set = self._streams.get(stage_name)
+            if stream_metric_set is None:
+                stream_metric_set = {}
+
+                for group_name, group in stream.grouped.items():
+                    group_metrics = stream_metric_set.get(group_name)
+
+                    tags = [
+                        f'name:{stage_name}_streams',
+                        f'stage:{stage_name}',
+                        f'group:{group_name}'
+                    ]
+
+                    if group_metrics is None:
+                        group_metrics = {}
+
+                        for quantile in stream.quantiles:
+                            quantile_key = f'quantile_{quantile}th'
+                            self.types_map[quantile_key] = 'gauge'
+
+                        fields = {}
+
+                        for metric_field in group.keys():
+                            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stream Group - {stage_name}:{group_name}:{metric_field}')
+                            metric_type = self.types_map.get(metric_field)
+                            metric_name = f'{stage_name}_{group_name}_{metric_field}'.replace('.', '_')
+
+                            prometheus_metric = PrometheusMetric(
+                                metric_name,
+                                metric_type,
+                                metric_description=f'{stream_metric_name} {metric_field}',
+                                metric_labels=tags,
+                                metric_namespace=self.namespace,
+                                registry=self.registry
+                            )
+                            prometheus_metric.create_metric()
+
+                            fields[metric_field] = prometheus_metric
+
+                        group_metrics[group_name] = fields
+
+                stream_metric_set.update(group_metrics)
+
+            self._streams[stage_name] = stream_metric_set
+
+            for group_name, group in stream.grouped.items():
+                group_metrics = stream_metric_set.get(group_name)
+
+                for field in group_metrics[group_name]:
+                    metric_value = group.get(field)
+                    group_metrics.update(metric_value)
+
+        await self._submit_to_pushgateway()
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Streams to Prometheus - Namespace: {self.namespace}')
+
+    async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments to Prometheus - Namespace: {self.namespace}')
+        
+        for experiment in experiment_metrics.experiment_summaries:
+            
+            experiment_id = uuid.uuid4()
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Experiments Set - {experiment.experiment_name}:{experiment_id}')
+
+            tags = [
+                f'{tag.name}:{tag.value}' for tag in experiment.tags
+            ]
+            
+            experiment_stats = self._experiments.get(experiment.experiment_name)
+            if experiment_stats is None:
+                experiment_stats = {}
+
+                for field in experiment.stats.keys():
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Experiment- {experiment.experiment_name}:{field}')
+
+                    metric_name = f'{experiment.experiment_name}_{field}'.replace('.', '_')
+                    metric_type = self.types_map.get(field)
+
+                    prometheus_metric = PrometheusMetric(
+                        metric_name,
+                        metric_type,
+                        metric_description=f'{experiment.experiment_name} {field}',
+                        metric_labels=[
+                            *tags
+                        ],
+                        metric_namespace=self.namespace,
+                        registry=self.registry
+                    )
+                    prometheus_metric.create_metric()
+                    
+                    experiment_stats[field] = prometheus_metric
+                
+                self._experiments[experiment.experiment_name] = experiment_stats
+
+            self._experiments[experiment.experiment_name] = experiment_stats
+            for field, value in experiment.stats.items():
+                metric = experiment_stats.get(field)
+                metric.update(value)
+
+        await self._submit_to_pushgateway()
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Experiments to Prometheus - Namespace: {self.namespace}')
+
+    async def submit_variants(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Variants to Prometheus - Namespace: {self.namespace}')
+        
+        for variant in experiment_metrics.variant_summaries:
+            
+            variant_id = uuid.uuid4()
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Variants Set - {variant.variant_name}:{variant_id}')
+
+            tags = [
+                f'{tag.name}:{tag.value}' for tag in variant.tags
+            ]
+            
+            variant_stats = self._variants.get(variant.variant_name)
+            if variant_stats is None:
+                variant_stats = {}
+
+                for field in variant.stats.keys():
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Variants- {variant.variant_name}:{field}')
+
+                    metric_name = f'{variant.variant_name}_{field}'.replace('.', '_')
+                    metric_type = self.types_map.get(field)
+
+                    prometheus_metric = PrometheusMetric(
+                        metric_name,
+                        metric_type,
+                        metric_description=f'{variant.variant_name} {field}',
+                        metric_labels=[
+                            *tags
+                        ],
+                        metric_namespace=self.namespace,
+                        registry=self.registry
+                    )
+                    prometheus_metric.create_metric()
+                    
+                    variant_stats[field] = prometheus_metric
+                
+                self._variants[variant.variant_name] = variant_stats
+
+            self._variants[variant.variant_name] = variant_stats
+            for field, value in variant.stats.items():
+                metric = variant_stats.get(field)
+                metric.update(value)
+
+        await self._submit_to_pushgateway()
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Variants to Prometheus - Namespace: {self.namespace}')
+
+    async def submit_mutations(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Mutations to Prometheus - Namespace: {self.namespace}')
+        
+        for mutation in experiment_metrics.mutation_summaries:
+            
+            mutation_id = uuid.uuid4()
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Mutations Set - {mutation.mutation_name}:{mutation_id}')
+
+            tags = [
+                f'{tag.name}:{tag.value}' for tag in mutation.tags
+            ]
+            
+            mutation_stats = self._mutations.get(mutation.mutation_name)
+            if mutation_stats is None:
+                mutation_stats = {}
+
+                for field in mutation.stats.keys():
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Mutations- {mutation.mutation_name}:{field}')
+
+                    metric_name = f'{mutation.mutation_name}_{field}'.replace('.', '_')
+                    metric_type = self.types_map.get(field)
+
+                    prometheus_metric = PrometheusMetric(
+                        metric_name,
+                        metric_type,
+                        metric_description=f'{mutation.mutation_name} {field}',
+                        metric_labels=[
+                            *tags
+                        ],
+                        metric_namespace=self.namespace,
+                        registry=self.registry
+                    )
+                    prometheus_metric.create_metric()
+                    
+                    mutation_stats[field] = prometheus_metric
+                
+                self._mutations[mutation.mutation_name] = mutation_stats
+
+            self._mutations[mutation.mutation_name] = mutation_stats
+            for field, value in mutation.stats.items():
+                metric = mutation_stats.get(field)
+                metric.update(value)
+
+        await self._submit_to_pushgateway()
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Mutations to Prometheus - Namespace: {self.namespace}')
 
     async def submit_events(self, events: List[BaseProcessedResult]):
 
@@ -206,8 +424,6 @@ class Prometheus:
                     prometheus_metric.create_metric()
                     
                     shared_metrics[field] = prometheus_metric
-                
-                self._shared_metrics[metrics_set.name] = shared_metrics
 
             self._shared_metrics[metrics_set.name] = shared_metrics
             for field, value in metrics_set.common_stats.items():
@@ -290,12 +506,7 @@ class Prometheus:
 
             custom_metrics = self._custom_metrics.get(metrics_set.name)
             if custom_metrics is None:
-                custom_metrics = {
-                    MetricType.COUNT: 'count',
-                    MetricType.RATE: 'gauge',
-                    MetricType.DISTRIBUTION: 'histogram',
-                    MetricType.SAMPLE: 'gauge'
-                }
+                custom_metrics = {}
 
                 for custom_metric_name, custom_metric in metrics_set.custom_metrics.items():
                     # group_metrics = custom_metrics.get(custom_group_name)

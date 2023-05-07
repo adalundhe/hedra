@@ -2,11 +2,18 @@ import asyncio
 import dill
 import time
 from collections import defaultdict
-from typing import Dict, List, Tuple, Any, Union
+from typing import (
+    Dict, 
+    List, 
+    Tuple, 
+    Any, 
+    Union
+)
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.client.time_parser import TimeParser
 from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.base.stage import Stage
+from hedra.core.graphs.stages.base.parallel.stage_priority import StagePriority
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.context.decorator import context
@@ -16,6 +23,7 @@ from hedra.logging import logging_manager
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from hedra.versioning.flags.types.base.active import active_flags
 from hedra.versioning.flags.types.base.flag_type import FlagTypes
+from typing import Optional
 from .optimization.parameters import Parameter
 from .parallel import optimize_stage
 
@@ -36,6 +44,7 @@ class Optimize(Stage):
             feed_forward=True
         )
     ]
+    priority: Optional[str]=None
     
     def __init__(self) -> None:
         super().__init__()
@@ -62,10 +71,19 @@ class Optimize(Stage):
         self.time_limit = self.time_limit
         self.optimize_params = self.optimize_params
 
+        self.priority = self.priority
+        if self.priority is None:
+            self.priority = 'auto'
+
+        self.priority_level: StagePriority = StagePriority.map(
+            self.priority
+        )
+
     @Internal()
     async def run(self):
 
         await self.setup_events()
+        self.dispatcher.assemble_execution_graph()
         await self.dispatcher.dispatch_events(self.name)
 
     @context()

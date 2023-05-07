@@ -12,20 +12,26 @@ class CheckHook(Hook):
         call: Callable[..., Awaitable[Any]], 
         *names: List[str],
         message: str='Did not return True.',
-        order: int=1
+        order: int=1,
+        skip: bool=False
     ) -> None:
         super().__init__(
             name, 
             shortname, 
             call, 
+            order=order,
+            skip=skip,
             hook_type=HookType.CHECK
         )
 
         self.message = message
         self.names = list(set(names))
-        self.order = order
 
     async def call(self, **kwargs):
+
+        if self.skip:
+            return kwargs
+
         passed = await self._call(**{
             name: value for name, value in kwargs.items() if name in self.params
         })
@@ -52,7 +58,8 @@ class CheckHook(Hook):
             self.shortname,
             self._call,
             *self.names,
-            oreder=self.order
+            order=self.order,
+            skip=self.skip,
         )
 
         check_hook.stage = self.stage

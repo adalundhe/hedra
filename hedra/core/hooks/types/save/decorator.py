@@ -9,12 +9,14 @@ from .validator import SaveHookValidator
 def save(
     *names: Tuple[str, ...], 
     save_path: str=None,
-    order: int = 1
+    order: int=1,
+    skip: bool=False
 ):
     SaveHookValidator(
         names=names,
         save_path=save_path,
-        order=order
+        order=order,
+        skip=skip
     )
     
     def wrapper(func):

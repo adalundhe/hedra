@@ -1,5 +1,12 @@
 import json
-from typing import Dict, Iterator, Union, List, Any, Tuple
+from typing import (
+    Dict, 
+    Iterator, 
+    Union, 
+    List, 
+    Any, 
+    Tuple
+)
 from urllib.parse import urlencode
 from hedra.core.engines.types.common.base_action import BaseAction
 from hedra.core.engines.types.common.constants import NEW_LINE

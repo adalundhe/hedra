@@ -7,7 +7,16 @@ from datetime import datetime
 
 class AWSTimestreamRecord:
 
-    def __init__(self, record_type: str, record_name: str, record_stage: str, group_name: str, field_name: str, value: Any, session_uuid: str) -> None:
+    def __init__(
+        self, 
+        record_type: str=None, 
+        record_name: str=None,
+        record_stage: str=None,
+        group_name: str=None, 
+        field_name: str=None, 
+        value: Any=None, 
+        session_uuid: str=None
+    ) -> None:
 
         measure_value_type = None
 
@@ -43,14 +52,6 @@ class AWSTimestreamRecord:
                 "Value": record_name
             },
             {
-                "Name": "stage",
-                "Value": record_stage
-            },
-            {
-                "Name": "group",
-                "Value": group_name
-            },
-            {
                 "Name": "field_name", 
                 "Value": field_name
             },
@@ -62,6 +63,18 @@ class AWSTimestreamRecord:
         self.measure_name = f'{record_name}_{field_name}_{session_uuid}'
         self.measure_value = str(value)
         self.measure_value_type = measure_value_type
+
+        if record_stage:
+            self.dimensions.append({
+                "Name": "stage",
+                "Value": record_stage
+            })
+
+        if group_name:
+            self.dimensions.append({
+                "Name": "group",
+                "Value": group_name
+            })
 
     def to_dict(self):
         return  {

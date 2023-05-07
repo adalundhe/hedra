@@ -43,7 +43,12 @@ def import_stages(path: str) -> Dict[str, Stage]:
 
     discovered = {}
     for name, stage_candidate in inspect.getmembers(module):
-        if inspect.isclass(stage_candidate) and issubclass(stage_candidate, Stage) and stage_candidate not in direct_decendants:
+        if inspect.isclass(
+            stage_candidate
+        ) and issubclass(
+            stage_candidate, 
+            Stage
+        ) and stage_candidate not in direct_decendants:
             discovered[name] = stage_candidate
 
     return discovered
@@ -55,7 +60,12 @@ def import_plugins(path: str) -> Dict[PluginType, Dict[str, Plugin]]:
 
     plugins_by_type = defaultdict(dict)
     for name, plugin_candidate in inspect.getmembers(module):
-        if inspect.isclass(plugin_candidate) and issubclass(plugin_candidate, Plugin) and plugin_candidate not in direct_decendants:
+        if inspect.isclass(
+            plugin_candidate
+        ) and issubclass(
+            plugin_candidate, 
+            Plugin
+        ) and plugin_candidate not in direct_decendants:
             plugins_by_type[plugin_candidate.type][plugin_candidate.name] = plugin_candidate
 
     return plugins_by_type

@@ -1,4 +1,12 @@
-from typing import List, Union, Dict, Any, Callable, Awaitable, Tuple
+from typing import (
+    List, 
+    Union, 
+    Dict, 
+    Any, 
+    Callable, 
+    Awaitable, 
+    Tuple
+)
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.hook_metadata import HookMetadata
@@ -13,13 +21,16 @@ class ActionHook(Hook):
         *names: Tuple[str, ...],
         weight: int=1, 
         order: int=1, 
+        skip: bool=False,
         metadata: Dict[str, Union[str, int]]={}
     ) -> None:
         super().__init__(
             name, 
             shortname, 
             call, 
-            hook_type=HookType.ACTION
+            skip=skip,
+            order=order,
+            hook_type=HookType.ACTION,
         )
         
         self.names = list(set(names))
@@ -33,7 +44,6 @@ class ActionHook(Hook):
         self.channels: List[Any] = []
         self.notifiers: List[Any] = []
         self.listeners: List[Any] = []
-        self.order = order
         self.metadata = HookMetadata(
             weight=weight,
             order=order,
@@ -46,7 +56,8 @@ class ActionHook(Hook):
             self.shortname,
             self._call,
             weight=self.metadata.weight,
-            order=self.metadata.order,
+            order=self.order,
+            skip=self.skip,
             metadata={
                 **self.metadata.copy()
             }

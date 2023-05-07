@@ -11,22 +11,30 @@ class ChannelHook(Hook):
         shortname: str, 
         call: Callable[..., Awaitable[Any]],
         *names: Tuple[str, ...],
-        order: int=1
+        order: int=1,
+        skip: bool=False
     ) -> None:
         super().__init__(
             name, 
             shortname, 
             call, 
-            hook_type=HookType.CHANNEL
+            skip=skip,
+            order=order,
+            hook_type=HookType.CHANNEL,
         )
 
         self.notifiers: List[Any] = []
         self.listeners: List[Any] = []
         self.names = list(set(names))
-        self.order = order
 
     async def call(self, **kwargs):
-        result = await super().call(**{name: value for name, value in kwargs.items() if name in self.params})
+
+        if self.skip:
+            return kwargs
+
+        result = await super().call(**{
+            name: value for name, value in kwargs.items() if name in self.params
+        })
 
         if isinstance(result, dict):
             return {
@@ -45,7 +53,8 @@ class ChannelHook(Hook):
             self.shortname,
             self._call,
             *self.names,
-            order=self.order
+            order=self.order,
+            skip=self.skip,
         )
 
         channel_hook.stage = self.stage

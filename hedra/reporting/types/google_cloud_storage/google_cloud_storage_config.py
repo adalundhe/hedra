@@ -7,4 +7,6 @@ class GoogleCloudStorageConfig(BaseModel):
     bucket_namespace: str
     events_bucket: str='events'
     metrics_bucket: str='metrics'
+    experiments_bucket: str='experiments'
+    streams_bucket: str='stages'
     reporter_type: ReporterTypes=ReporterTypes.GCS

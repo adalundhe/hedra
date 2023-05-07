@@ -7,11 +7,13 @@ from .validator import EventHookValidator
 @registrar(HookType.EVENT)
 def event(
     *names, 
-    order: int=1
+    order: int=1,
+    skip: bool=False
 ):
     EventHookValidator(
         names=names,
-        order=order
+        order=order,
+        skip=skip
     )
 
     def wrapper(func):

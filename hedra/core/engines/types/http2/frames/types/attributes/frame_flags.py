@@ -6,7 +6,12 @@ hyperframe/flags
 Defines basic Flag and Flags data structures.
 """
 from collections.abc import MutableSet
-from typing import NamedTuple, Iterable, Set, Iterator
+from typing import (
+    NamedTuple, 
+    Iterable, 
+    Set, 
+    Iterator
+)
 
 
 class Flag(NamedTuple):

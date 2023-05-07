@@ -1,4 +1,10 @@
-from typing import Dict, List, Tuple, Union, Optional
+from typing import (
+    Dict, 
+    List, 
+    Tuple, 
+    Union, 
+    Optional
+)
 from scipy.optimize import shgo
 from .base_algorithm import BaseAlgorithm
 

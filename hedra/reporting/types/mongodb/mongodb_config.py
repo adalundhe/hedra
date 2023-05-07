@@ -10,4 +10,6 @@ class MongoDBConfig(BaseModel):
     database: str='hedra'
     events_collection: str='events'
     metrics_collection: str='metrics'
+    experiments_collection: str='experiment'
+    streams_collection: str='streams'
     reporter_type: ReporterTypes=ReporterTypes.MongoDB

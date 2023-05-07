@@ -1,9 +1,6 @@
-import json
 import dill
 import threading
-import traceback
 import os
-import signal
 import pickle
 from collections import defaultdict
 from typing import Any, Dict, List, Union
@@ -104,12 +101,14 @@ async def setup_action_channels_and_playwright(
 
 
 def optimize_stage(serialized_config: str):
+
     import asyncio
     import uvloop
     import warnings
     warnings.simplefilter("ignore")
 
     uvloop.install()
+
     try:
         loop = asyncio.get_event_loop()
     except Exception:
@@ -269,8 +268,7 @@ def optimize_stage(serialized_config: str):
 
         logger.filesystem.sync['hedra.optimize'].info(f'{metadata_string} - Setting up Optimization')
 
-        optimization_experiment_config = setup_stage_experiment_config.get(execute_stage_name)
-        if optimization_experiment_config and execute_stage_config.experiment.get('distribution'):
+        if execute_stage_config.experiment and execute_stage_config.experiment.get('distribution'):
 
             execute_stage_config.experiment['distribution'] = [
                 int(distribution_value/optimize_stage_workers) for distribution_value in execute_stage_config.experiment.get('distribution')
@@ -289,7 +287,6 @@ def optimize_stage(serialized_config: str):
                 'iterations': optimizer_iterations,
                 'algorithm': optimizer_algorithm,
                 'time_limit': time_limit,
-                'distributions': optimization_experiment_config,
                 'stream_analytics': execute_stage_streamed_analytics
             })
 
@@ -307,14 +304,13 @@ def optimize_stage(serialized_config: str):
                 'iterations': optimizer_iterations,
                 'algorithm': optimizer_algorithm,
                 'time_limit': time_limit,
-                'distributions': setup_stage_experiment_config,
                 'stream_analytics': execute_stage_streamed_analytics
             })
 
 
         results = optimizer.optimize()
 
-        if optimization_experiment_config:
+        if execute_stage_config.experiment and results.get('optimized_distribution'):
             execute_stage_config.experiment['distribution'] = results.get('optimized_distribution')
 
         execute_stage_config.batch_size = results.get('optimized_batch_size', execute_stage_config.batch_size)
@@ -364,5 +360,4 @@ def optimize_stage(serialized_config: str):
         raise ProcessKilledError()
     
     except Exception as e:
-        print(traceback.format_exc())
         raise e

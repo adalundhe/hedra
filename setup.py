@@ -58,7 +58,9 @@ setup(
         'uvloop',
         'tdigest',
         'pydantic',
-        'GitPython'
+        'GitPython',
+        'tabulate',
+        'plotille'
     ],
     entry_points = {
         'console_scripts': [
@@ -89,6 +91,7 @@ setup(
             'aiopg',
             'sqlalchemy',
             'boto3',
+            'snowflake-sqlalchemy',
             'snowflake-connector-python',
             'google-cloud-bigquery',
             'google-cloud-bigtable',
@@ -96,7 +99,10 @@ setup(
             'cryptography==38.0.4',
             'aioquic',
             'dicttoxml',
-            'opentelemetry-api'
+            'opentelemetry-api',
+            'datadog_api_client',
+            'aiokafka',
+            'haralyzer'
         ],
         'all-engines': [
             'grpcio',
@@ -130,6 +136,9 @@ setup(
             'google-cloud-bigtable',
             'google-cloud-storage',
             'dicttoxml',
+            'datadog-api-client',
+            'aiosonic',
+            'aiokafka'
 
         ],
         'playwright': [
@@ -158,7 +167,8 @@ setup(
             'cassandra-driver'
         ],
         'datadog': [
-            'datadog'
+            'datadog-api-client',
+            'aiosonic'
         ],
         'mongodb': [
             'motor'
@@ -191,7 +201,7 @@ setup(
             'aioquic'
         ],
         'snowflake': [
-            'sqlalchemy',
+            'snowflake-sqlalchemy',
             'snowflake-connector-python'
         ],
         'google': [
@@ -204,6 +214,9 @@ setup(
         ],
         'opentelemetry': [
             'opentelemetry-api'
+        ],
+        'har': [
+            'haralyzer'
         ]
     },
     python_requires='>=3.8'

@@ -27,7 +27,10 @@ class ReporterPlugin(Generic[T], Plugin):
         ).__init__()
 
         self.loop = asyncio.get_event_loop()
-        self.executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
+        self.executor = ThreadPoolExecutor(
+             max_workers=psutil.cpu_count(logical=False)
+        )
+        self.name = self.name
 
         self.hooks: Dict[PluginHooks, PluginHook] = {}
     

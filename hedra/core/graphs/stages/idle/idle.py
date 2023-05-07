@@ -1,3 +1,4 @@
+from hedra.core.graphs.stages.base.parallel.stage_priority import StagePriority
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.graphs.stages.base.stage import Stage
@@ -9,6 +10,10 @@ class Idle(Stage):
     def __init__(self) -> None:
         super().__init__()
         self.name = self.__class__.__name__
+        self.priority = None
+        self.priority_level: StagePriority = StagePriority.map(
+            self.priority
+        )
 
     @Internal()
     async def run(self):

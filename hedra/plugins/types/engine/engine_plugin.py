@@ -1,8 +1,12 @@
 from __future__ import annotations
 import asyncio
-from ctypes import Union
 import inspect
-from typing import Any, Awaitable, Generic, Optional, TypeVar
+from typing import (
+    Any, 
+    Awaitable, 
+    Generic, 
+    TypeVar
+)
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.custom.client import MercuryCustomClient as CustomSession
 from hedra.core.engines.types.common import Timeouts
@@ -45,6 +49,7 @@ class EnginePlugin(Generic[A, R], Plugin):
         self.actions: ActionsStore = None
         self.registered = {}
         self.metadata_string: str = None
+        self.name = self.name
 
         self.config = config
         

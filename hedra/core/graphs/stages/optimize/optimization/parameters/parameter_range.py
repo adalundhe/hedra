@@ -1,5 +1,10 @@
 from typing import Union
-from pydantic import BaseModel, StrictInt, StrictFloat, validator
+from pydantic import (
+    BaseModel, 
+    StrictInt, 
+    StrictFloat, 
+    validator
+)
 
 
 class ParameterRange(BaseModel):

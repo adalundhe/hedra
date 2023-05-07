@@ -40,6 +40,8 @@ class PersonaPlugin(DefaultPersona, Generic[T], Plugin):
 
                     self.hooks[hook.hook_type] = hook
 
+        self.name = self.name
+
     async def execute(self):
 
         setup_hook = self.hooks.get(PluginHooks.ON_PERSONA_SETUP)

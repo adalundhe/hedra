@@ -2,9 +2,19 @@ from __future__ import annotations
 import uuid
 import threading
 import os
-from typing import Any, List, TypeVar, Union
+from typing import Any, List, TypeVar, Union, Dict
+from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from hedra.logging import HedraLogger
 from hedra.plugins.types.reporter.reporter_config import ReporterConfig
+from .experiment.experiments_collection import (
+    ExperimentMetricsCollectionSet,
+    ExperimentMetricsCollection
+)
+from .experiment.experiment_metrics_set import ExperimentMetricsSet
+from .experiment.experiment_metrics_set_types import (
+    VariantSummary,
+    MutationSummary
+)
 from .types import ReporterTypes
 from .types import (
     AWSLambda,
@@ -187,6 +197,63 @@ class Reporter:
         await self.selected_reporter.connect()
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected')
+
+    async def submit_experiments(self, experiment_metrics_sets: List[ExperimentMetricsSet]):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting {len(experiment_metrics_sets)} experiments')
+
+        experiment_metrics: List[ExperimentMetricsCollection] = [
+            experiment.split_experiments_metrics() for experiment in experiment_metrics_sets
+        ]
+
+        experiments: List[Dict[str, str]] = [
+            metrics_collection.experiment for metrics_collection in experiment_metrics
+        ]
+
+        variants: List[Dict[str, str]] = []
+        variants_summaries: List[VariantSummary] = []
+        for metrics_collection in experiment_metrics:
+            variants.extend(metrics_collection.variants)
+            variants_summaries.extend(metrics_collection.variant_summaries)
+
+        mutations: List[MutationSummary] = []
+        mutations_summaries: List[MutationSummary] = []
+        for metrics_collection in experiment_metrics:
+            mutations.extend(metrics_collection.mutations)
+            mutations_summaries.extend(metrics_collection.mutation_summaries)
+
+        experiment_metrics_collection_set = ExperimentMetricsCollectionSet(
+            experiments_metrics_fields=ExperimentMetricsSet.experiments_fields(),
+            variants_metrics_fields=ExperimentMetricsSet.variants_fields(),
+            mutations_metrics_fields=ExperimentMetricsSet.mutations_fields(),
+            experiments=experiments,
+            variants=variants,
+            mutations=mutations,
+            experiment_summaries=[
+                experiment.experiments_summary for experiment in experiment_metrics_sets
+            ],
+            variant_summaries=variants_summaries,
+            mutation_summaries=mutations_summaries
+        )
+        
+
+        await self.selected_reporter.submit_experiments(experiment_metrics_collection_set)
+
+        await self.selected_reporter.submit_variants(experiment_metrics_collection_set)
+
+        if len(mutations) > 0:
+            await self.selected_reporter.submit_mutations(experiment_metrics_collection_set)
+
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted {len(experiments)} experiments')
+
+    async def submit_streams(self, stream_metrics: Dict[str, List[StreamAnalytics]]):
+        
+        streams_count = len(stream_metrics)
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting {streams_count} streams')
+        await self.selected_reporter.submit_streams(stream_metrics)
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted {streams_count} streams')
 
     async def submit_common(self, metrics: List[Any]):
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting {len(metrics)} shared metrics')

@@ -8,7 +8,13 @@ import warnings
 import asyncio
 import gc
 from collections import defaultdict
-from typing import Dict, Any, List, Union
+from typing import (
+    Dict, 
+    Any, 
+    List, 
+    Union,
+    Type
+)
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.registry import RequestTypes
@@ -35,8 +41,11 @@ from hedra.logging import (
     logging_manager
 )
 
+from hedra.plugins.extensions import get_enabled_extensions
+from hedra.plugins.types.extension.types import ExtensionType
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
+from hedra.plugins.types.extension.extension_plugin import ExtensionPlugin
 from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
 from hedra.reporting.reporter import ReporterConfig
 from hedra.versioning.flags.types.base.active import active_flags
@@ -46,15 +55,16 @@ warnings.filterwarnings("ignore")
 
 
 async def start_execution(
-    metadata_string: str,
-    persona_config: Config,
-    setup_stage: Setup,
-    workers: int,
-    source_stage_name: str,
-    source_stage_stream_configs: List[ReporterConfig],
-    logfiles_directory,
-    log_level
-):
+    metadata_string: str=None,
+    persona_config: Config=None,
+    setup_stage: Setup=None,
+    workers: int=None,
+    source_stage_name: str=None,
+    source_stage_stream_configs: List[ReporterConfig]=[],
+    logfiles_directory: str=None,
+    log_level: str=None,
+    extensions: Dict[str, ExtensionPlugin]={}
+) -> Dict[str, Any]:
 
     current_task = asyncio.current_task()
 
@@ -89,11 +99,23 @@ async def start_execution(
 
     actions_and_tasks: List[Union[ActionHook, TaskHook]] = setup_stage.context['execute_stage_setup_hooks'].get(source_stage_name)
 
+    for extension in extensions.values():
+
+        if extension.extension_type == ExtensionType.GENERATOR:
+            results = await extension.execute(**{
+                'execute_stage': setup_execute_stage,
+                'persona_config': persona_config
+            })
+
+            execute_stage = results.get('execute_stage')
+
+            if execute_stage:
+                setup_execute_stage = results.get('execute_stage')
+
     execution_hooks_count = len(actions_and_tasks)
     await logger.filesystem.aio['hedra.core'].info(
         f'{metadata_string} - Executing {execution_hooks_count} actions with a batch size of {persona_config.batch_size} for {persona_config.total_time} seconds using Persona - {persona.type.capitalize()}'
     )
-
 
     for hook in actions_and_tasks:
 
@@ -178,6 +200,7 @@ async def start_execution(
 
 
 def execute_actions(parallel_config: str):
+
     import asyncio
     import uvloop
     uvloop.install()
@@ -327,10 +350,15 @@ def execute_actions(parallel_config: str):
                     source_stage_config.experiment['distribution'] = distribution
 
         stage_persona_plugins: List[str] = source_stage_plugins[PluginType.PERSONA]
-        persona_plugins: Dict[str, PersonaPlugin] = plugins_by_type[PluginType.PERSONA]
+        persona_plugins: Dict[str, Type[PersonaPlugin]] = plugins_by_type[PluginType.PERSONA]
 
         stage_engine_plugins: List[str] = source_stage_plugins[PluginType.ENGINE]
-        engine_plugins: Dict[str, EnginePlugin] = plugins_by_type[PluginType.ENGINE]
+        engine_plugins: Dict[str, Type[EnginePlugin]] = plugins_by_type[PluginType.ENGINE]
+        
+        stage_extension_plugins: List[str] = source_stage_plugins[PluginType.EXTENSION]
+        extension_plugins: Dict[str, Type[ExtensionPlugin]] = get_enabled_extensions()
+
+        enabled_extensions: Dict[str, ExtensionPlugin] = {}
         
         for plugin_name in stage_persona_plugins:
             plugin = persona_plugins.get(plugin_name)
@@ -341,6 +369,13 @@ def execute_actions(parallel_config: str):
             plugin = engine_plugins.get(plugin_name)
             plugin.name = plugin_name
             registered_engines[plugin_name] = lambda config: plugin(config)
+
+        for plugin_name in stage_extension_plugins:
+            plugin = extension_plugins.get(plugin_name)
+
+            if plugin:
+                enabled_plugin = plugin()
+                enabled_extensions[enabled_plugin.name] = enabled_plugin
 
         events_graph = EventGraph(hooks_by_type)
         events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()
@@ -360,23 +395,24 @@ def execute_actions(parallel_config: str):
             execute_stage.name: execute_stage
         }
 
-        result = loop.run_until_complete(
+        results = loop.run_until_complete(
             start_execution(
-                metadata_string,
-                source_stage_config,
-                setup_stage,
-                workers,
-                source_stage_name,
-                source_stage_stream_configs,
-                logfiles_directory,
-                log_level
+                metadata_string=metadata_string,
+                persona_config=source_stage_config,
+                setup_stage=setup_stage,
+                workers=workers,
+                source_stage_name=source_stage_name,
+                source_stage_stream_configs=source_stage_stream_configs,
+                logfiles_directory=logfiles_directory,
+                log_level=log_level,
+                extensions=enabled_extensions
             )
         )
 
         loop.close()
         gc.collect()
 
-        return result
+        return results
 
     except BrokenPipeError:
         raise ProcessKilledError()

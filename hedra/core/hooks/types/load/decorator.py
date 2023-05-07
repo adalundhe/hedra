@@ -6,12 +6,18 @@ from .validator import LoadHookValidator
 
 
 @registrar(HookType.LOAD)
-def load(*names: Tuple[str, ...], load_path: str=None, order: int=1):
+def load(
+    *names: Tuple[str, ...], 
+    load_path: str=None, 
+    order: int=1,
+    skip: bool=False
+):
     
     LoadHookValidator(
         names=names,
         load_path=load_path,
-        order=order
+        order=order,
+        skip=skip
     )
     
     def wrapper(func):

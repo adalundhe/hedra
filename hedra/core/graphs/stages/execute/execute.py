@@ -3,7 +3,14 @@ import dill
 import time
 import statistics
 from collections import defaultdict
-from typing import Generic, List, Union, Any, Dict
+from typing import (
+    Generic, 
+    List, 
+    Union, 
+    Any, 
+    Dict, 
+    Optional
+)
 from typing_extensions import TypeVarTuple, Unpack
 from hedra.core.engines.client import Client
 from hedra.core.engines.client.config import Config
@@ -21,10 +28,11 @@ from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.task.hook import TaskHook
-from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
+from hedra.core.graphs.stages.base.parallel.stage_priority import StagePriority
 from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from hedra.core.personas.persona_registry import (
     get_persona, 
     registered_personas, 
@@ -43,6 +51,7 @@ T = TypeVarTuple('T')
 
 class Execute(Stage, Generic[Unpack[T]]):
     stage_type=StageTypes.EXECUTE
+    priority: Optional[str]=None
 
     def __init__(self) -> None:
         super().__init__()
@@ -87,9 +96,18 @@ class Execute(Stage, Generic[Unpack[T]]):
             'complete'
         ]
 
+        self.priority = self.priority
+        if self.priority is None:
+            self.priority = 'auto'
+
+        self.priority_level: StagePriority = StagePriority.map(
+            self.priority
+        )
+
     @Internal()
     async def run(self):
         await self.setup_events()
+        self.dispatcher.assemble_execution_graph()
         await self.dispatcher.dispatch_events(self.name)
 
     @context()
@@ -106,7 +124,9 @@ class Execute(Stage, Generic[Unpack[T]]):
             'execute_stage_results',
             'execute_stage_streamed_analytics'
         ]
-        persona_type_name = execute_stage_setup_config.persona_type.capitalize()
+        persona_type_name = '-'.join([
+            segment.capitalize() for segment in execute_stage_setup_config.persona_type.split('-')
+        ])
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing - {execute_stage_setup_config.batch_size} - VUs over {self.workers} threads for {execute_stage_setup_config.total_time_string} using - {persona_type_name} - persona')
         await self.logger.spinner.append_message(f'Stage {self.name} executing - {execute_stage_setup_config.batch_size} - VUs over {self.workers} threads for {execute_stage_setup_config.total_time_string} using - {persona_type_name} - persona')
@@ -120,13 +140,13 @@ class Execute(Stage, Generic[Unpack[T]]):
 
     @event('get_stage_config')
     async def get_stage_plugins(self):
+
         engine_plugins = self.plugins_by_type.get(PluginType.ENGINE)
         for plugin in engine_plugins.values():
             registered_engines[plugin.name] = plugin
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Engine plugin - {plugin.name}')
 
         persona_plugins = self.plugins_by_type.get(PluginType.PERSONA)
-
         for plugin_name, plugin in persona_plugins.items():
             registered_personas[plugin_name] = lambda plugin_config: plugin(plugin_config)
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Persona plugin - {plugin.name}')
@@ -138,11 +158,53 @@ class Execute(Stage, Generic[Unpack[T]]):
         return {
             'execute_stage_plugins': source_stage_plugins
         }
+    
+    @event('get_stage_config')
+    async def get_stage_experiment(
+        self,
+        execute_stage_setup_config: Config=None,
+    ):
 
-    @condition('get_stage_plugins')
+        experiment = execute_stage_setup_config.experiment
+
+        if experiment:
+
+            mutations = []
+
+            if execute_stage_setup_config.mutations:
+                mutations = [
+                    {
+                        'mutation_name': mutation.name,
+                        'mutation_chance': mutation.chance,
+                        'mutation_targets': mutation.targets,
+                        'mutation_type': mutation.mutation_type.name.lower()
+                    } for mutation in execute_stage_setup_config.mutations
+                ]
+
+
+            return {
+                'execute_stage_experiment': {
+                    'experiment_name': experiment.get('experiment_name'),
+                    'experiment_randomized': experiment.get('random'),
+                    'experiment_variant': {
+                        'variant_stage': self.name,
+                        'variant_weight': experiment.get('weight'),
+                        'variant_distribution_intervals': experiment.get('intervals'),
+                        'variant_distribution': experiment.get('distribution'),
+                        'variant_distribution_type': experiment.get('distribution_type'),
+                        'variant_distribution_interval_duration': experiment.get('interval_duration'),
+                        'variant_mutations': mutations
+                    }
+                }
+            }
+
+    @condition(
+        'get_stage_plugins',
+        'get_stage_experiment'
+    )
     async def check_has_multiple_workers(self):
         return {
-            'execute_stage_has_multiple_workers': self.workers > 1
+            'execute_stage_has_multiple_workers': self.total_pool_cpus > 1
         }
 
     @event('check_has_multiple_workers')
@@ -196,10 +258,12 @@ class Execute(Stage, Generic[Unpack[T]]):
     async def aggregate_multiple_worker_results(
         self,
         execute_stage_has_multiple_workers: bool = False,
-        execute_stage_results: List[List[Any]]=[]
+        execute_stage_results: List[List[Any]]=[],
+        execute_stage_experiment: Optional[Dict[str, Any]]=None,
+        execute_stage_setup_config: Config=None,
     ):
         if execute_stage_has_multiple_workers:
-            execute_stage_streamed_analytics = []
+            execute_stage_streamed_analytics: List[StreamAnalytics] = []
             aggregate_results = []
             elapsed_times = []
             stage_contexts = defaultdict(list)
@@ -230,9 +294,15 @@ class Execute(Stage, Generic[Unpack[T]]):
                 'execute_stage_streamed_analytics': execute_stage_streamed_analytics,
                 'execute_stage_results':  ResultsSet({
                     'stage': self.name,
+                    'streamed_analytics': execute_stage_streamed_analytics,
+                    'stage_batch_size': execute_stage_setup_config.batch_size,
+                    'stage_persona_type': execute_stage_setup_config.persona_type,
+                    'stage_workers': self.workers,
+                    'stage_optimized': self.optimized,
                     'stage_results': aggregate_results,
                     'total_results': total_results,
-                    'total_elapsed': total_elapsed
+                    'total_elapsed': total_elapsed,
+                    'experiment': execute_stage_experiment
                 })
             }
 
@@ -285,11 +355,15 @@ class Execute(Stage, Generic[Unpack[T]]):
     async def run_single_worker_job(
         self,
         execute_stage_has_multiple_workers: bool = False,
-        execute_stage_persona: DefaultPersona=None
+        execute_stage_persona: DefaultPersona=None,
+        execute_stage_experiment: Optional[Dict[str, Any]]=None,
+        execute_stage_setup_config: Config=None,
     ):
         if execute_stage_has_multiple_workers is False:
 
             start = time.monotonic()
+
+            execution_results = {}
 
             results = await execute_stage_persona.execute()
 
@@ -299,32 +373,36 @@ class Execute(Stage, Generic[Unpack[T]]):
                 f'{self.metadata_string} - Execution complete - Time (including addtional setup) took: {round(elapsed, 2)} seconds'
             )  
 
-            stage_contexts = defaultdict(list)
-            pipeline_context = results.get('context', {})
-            for context_key, context_value in pipeline_context.items():
-                stage_contexts[context_key].append(context_value)
-            
-            self.context[self.name] = stage_contexts
-
             total_results = len(results)
             total_elapsed = execute_stage_persona.total_elapsed
 
             await self.logger.filesystem.aio['hedra.core'].info( f'{self.metadata_string} - Completed - {total_results} actions at  {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
             await self.logger.spinner.set_default_message(f'Stage - {self.name} completed {total_results} actions at {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
 
-            self.executor.shutdown()
-            
-            return {
+            if self.executor:
+                self.executor.shutdown()
+
+            execution_results.update({
                 'execute_stage_streamed_analytics': [
-                    results.get('streamed_analytics')
+                    execute_stage_persona.streamed_analytics
                 ],
                 'execute_stage_results': ResultsSet({
                     'stage': self.name,
+                    'streamed_analytics': [
+                        execute_stage_persona.streamed_analytics
+                    ],
+                    'stage_batch_size': execute_stage_setup_config.batch_size,
+                    'stage_persona_type': execute_stage_setup_config.persona_type,
+                    'stage_workers': self.workers,
+                    'stage_optimized': self.optimized,
                     'stage_results': results,
                     'total_results': total_results,
-                    'total_elapsed': total_elapsed
+                    'total_elapsed': total_elapsed,
+                    'experiment': execute_stage_experiment
                 })
-            }
+            })
+            
+            return execution_results
 
     @event('aggregate_multiple_worker_results', 'setup_single_worker_job')
     async def complete(self):

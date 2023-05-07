@@ -87,9 +87,7 @@ class MetricsSet:
 
         self.stats_fields = list(self.groups.get(
             'total'
-        ).stats.keys())
-
-        
+        ).stats.keys())  
 
     def serialize(self):
         return {

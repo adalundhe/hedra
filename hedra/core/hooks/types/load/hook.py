@@ -4,7 +4,15 @@ import re
 import functools
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, Awaitable, Any, Dict, Union, List, Tuple
+from typing import (
+    Callable, 
+    Awaitable, 
+    Any, 
+    Dict, 
+    Union, 
+    List, 
+    Tuple
+)
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.engines.types.common.results_set import ResultsSet
@@ -23,12 +31,15 @@ class LoadHook(Hook):
         call: Callable[..., Awaitable[Any]], 
         *names: Tuple[str, ...],
         load_path: str=None,
-        order: int=1
+        order: int=1,
+        skip: bool=False
     ) -> None:
         super().__init__(
             name, 
             shortname, 
             call, 
+            order=order,
+            skip=skip,
             hook_type=HookType.LOAD
         )
 
@@ -38,11 +49,13 @@ class LoadHook(Hook):
             max_workers=psutil.cpu_count(logical=False)
         )
         self.loop = None
-        self.order = order
         self._strip_pattern = re.compile('[^a-z]+'); 
 
     async def call(self, **kwargs) -> None:
 
+        if self.skip:
+            return kwargs
+        
         execute = await self._execute_call(**kwargs)
 
         if execute:
@@ -109,7 +122,8 @@ class LoadHook(Hook):
             self.shortname,
             self._call,
             self.load_path,
-            order=self.order
+            order=self.order,
+            skip=self.skip,
         )
 
         load_hook.stage = self.stage

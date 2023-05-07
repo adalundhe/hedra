@@ -53,7 +53,7 @@ class BaseProcessedResult:
 
     @property
     def fields(self):
-        return ['name', 'stage', 'time', 'succeeded']
+        return ['id', 'name', 'stage', 'time', 'succeeded']
 
     @property
     def values(self):

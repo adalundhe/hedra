@@ -2,6 +2,7 @@ import inspect
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.registrar import registrar
+from hedra.core.graphs.stages.base.parallel.stage_priority import StagePriority
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.graphs.stages.base.exceptions.reserved_method_error import ReservedMethodError
@@ -15,9 +16,14 @@ class Error(Stage):
         super().__init__()
         self.error = None
 
+        self.priority = None
+        self.priority_level: StagePriority = StagePriority.map(
+            self.priority
+        )
+
         base_stage_name = self.__class__.__name__
         self.logger.filesystem.sync['hedra.core'].info(f'{self.metadata_string} - Checking internal Hooks for stage - {base_stage_name}')
-
+        
         for reserved_hook_name in self.internal_hooks:
             try:
 

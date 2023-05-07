@@ -3,18 +3,20 @@ import functools
 import os
 import psutil
 import uuid
-from typing import List
+from typing import List, Dict
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
+from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import (
     MetricsSet,
     MetricType
 )
+from .cassandra_config import CassandraConfig
 
 
 try:
-    import uuid
     from cassandra.cqlengine import columns
     from cassandra.cqlengine import connection
     from datetime import datetime
@@ -22,13 +24,11 @@ try:
     from cassandra.cqlengine.models import Model
     from cassandra.cluster import Cluster
     from cassandra.auth import PlainTextAuthProvider
-    from .cassandra_config import CassandraConfig
     has_connector = True
 
 except Exception:
     Cluster = None
     PlainTextAuthProvider = None
-    CassandraConfig = None
     has_connector = False
 
 
@@ -40,15 +40,23 @@ class Cassandra:
 
         self.hosts = config.hosts
         self.port = config.port or 9042
+
         self.username = config.username
         self.password = config.password
         self.keyspace = config.keyspace
-        self.custom_fields = config.custom_fields
+        
         self.events_table_name: str = config.events_table
         self.metrics_table_name: str = config.metrics_table
+        self.streams_table_name: str = config.streams_table
+
+        self.experiments_table_name: str= config.experiments_table
+        self.variants_table_name: str= f'{config.experiments_table}_variants'
+        self.mutations_table_name: str= f'{config.experiments_table}_mutations'
+
         self.shared_metrics_table_name = f'{config.metrics_table}_shared'
         self.custom_metrics_table_name = f'{config.metrics_table}_custom'
         self.errors_table_name = f'{config.metrics_table}_errors'
+        
         self.replication_strategy = config.replication_strategy
         self.replication = config.replication       
         self.ssl = config.ssl
@@ -61,6 +69,12 @@ class Cassandra:
         self._metrics_table = None
         self._errors_table = None
         self._events_table = None
+        self._streams_table = None
+
+        self._experiments_table = None
+        self._variants_table = None
+        self._mutations_table = None
+
         self._shared_metrics_table = None
         self._custom_metrics_table = None
 
@@ -129,6 +143,209 @@ class Cassandra:
         )
 
         await self.logger.filesystem.aio['hedra.repoorting'].info(f'{self.metadata_string} - Created Keyspace - {self.keyspace}')
+    
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to - Keyspace: {self.keyspace} - Table: {self.streams_table_name}')
+        
+        if self._streams_table is None:
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Streams table - {self.streams_table_name} - under keyspace - {self.keyspace}')
+
+            fields = {
+                'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+                'name': columns.Text(min_length=1, index=True),
+                'stage': columns.Text(min_length=1),
+                'group': columns.Text(),
+                'median': columns.Float(),
+                'mean': columns.Float(),
+                'variance': columns.Float(),
+                'stdev': columns.Float(),
+                'minimum': columns.Float(),
+                'maximum': columns.Float(),
+                'created_at': columns.DateTime(default=datetime.now)
+            }
+
+            self._streams_table = type(
+                self.streams_table_name.capitalize(), 
+                (Model, ), 
+                fields
+            )
+
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    sync_table,
+                    self._streams_table,
+                    keyspaces=[self.keyspace]
+                )
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Streams table - {self.streams_table_name} - under keyspace - {self.keyspace}')
+
+        for stage_name, stream in stream_metrics.items():
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stream - {stage_name}:{stream.stream_set_id}')
+
+            for group_name, group in stream.grouped:
+                await self._loop.run_in_executor(
+                        self._executor,
+                        functools.partial(
+                            self._metrics_table.create,
+                            **{
+                                'name': f'{stage_name}_streams',
+                                'stage': stage_name,
+                                'group': group_name,
+                                **group
+                            }
+                        )
+                    )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics to - Keyspace: {self.keyspace} - Table: {self.streams_table_name}')
+
+    async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments to - Keyspace: {self.keyspace} - Table: {self.experiments_table_name}')
+
+        if self._experiments_table is None:
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Experiments table - {self.experiments_table_name} - under keyspace - {self.keyspace}')
+
+            self._experiments_table = type(
+                self.experiments_table_name.capitalize(), 
+                (Model, ), 
+                {
+                    'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+                    'experiment_name': columns.Text(min_length=1, index=True),
+                    'experiment_randomized': columns.Boolean(),
+                    'experiment_completed': columns.Integer(),
+                    'experiment_succeeded': columns.Integer(),
+                    'experiment_failed': columns.Integer(),
+                    'experiment_median_aps': columns.Float(),
+                    'created_at': columns.DateTime(default=datetime.now)
+                }
+            )
+
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    sync_table,
+                    self._experiments_table,
+                    keyspaces=[self.keyspace]
+                )
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Experiments table - {self.experiments_table_name} - under keyspace - {self.keyspace}')
+
+        for experiment in experiment_metrics.experiments:
+            
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self._metrics_table.create,
+                    **experiment
+                )
+            )
+
+        
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Experiments to - Keyspace: {self.keyspace} - Table: {self.experiments_table_name}')
+    
+    async def submit_variants(self, experiment_metrics: ExperimentMetricsCollectionSet):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Variants to - Keyspace: {self.keyspace} - Table: {self.variants_table_name}')
+
+        if self._variants_table is None:
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Variants table - {self.variants_table_name} - under keyspace - {self.keyspace}')
+
+            self._variants_table = type(
+                self.variants_table_name.capitalize(), 
+                (Model, ), 
+                {
+                    'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+                    'variant_name': columns.Text(min_length=1, index=True),
+                    'variant_experiment': columns.Text(min_length=1),
+                    'variant_weight': columns.Float(),
+                    'variant_distribution': columns.Text(min_length=1),
+                    'variant_distribution_interval': columns.Float(),
+                    'variant_ratio_completed': columns.Float(),
+                    'variant_ratio_succeeded': columns.Float(),
+                    'variant_ratio_failed': columns.Float(),
+                    'variant_ratio_aps': columns.Float(),
+                    'variant_completed': columns.Integer(),
+                    'variant_succeeded': columns.Integer(),
+                    'variant_failed': columns.Integer(),
+                    'variant_actions_per_second': columns.Float(),
+                    'created_at': columns.DateTime(default=datetime.now)
+                }
+            )
+
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    sync_table,
+                    self._variants_table,
+                    keyspaces=[self.keyspace]
+                )
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Variants table - {self.variants_table_name} - under keyspace - {self.keyspace}')
+
+        for variant in experiment_metrics.variants:
+            
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self._metrics_table.create,
+                    **variant
+                )
+            )
+
+        
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Variants to - Keyspace: {self.keyspace} - Table: {self.variants_table_name}')
+    
+    async def submit_mutations(self, experiment_metrics: ExperimentMetricsCollectionSet):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Mutations to - Keyspace: {self.keyspace} - Table: {self.mutations_table_name}')
+
+        if self._mutations_table is None:
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Mutations table - {self.mutations_table_name} - under keyspace - {self.keyspace}')
+
+            self._mutations_table = type(
+                self.mutations_table_name.capitalize(), 
+                (Model, ), 
+                {
+                    'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+                    'mutation_name': columns.Text(min_length=1, index=True),
+                    'mutation_experiment_name': columns.Text(min_length=1),
+                    'mutation_variant_name': columns.Text(min_length=1),
+                    'mutation_chance': columns.Float(),
+                    'mutation_targets': columns.Text(min_length=1),
+                    'mutation_type': columns.Text(min_length=1),
+                    'created_at': columns.DateTime(default=datetime.now)
+                }
+            )
+
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    sync_table,
+                    self._mutations_table,
+                    keyspaces=[self.keyspace]
+                )
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Mutations table - {self.mutations_table_name} - under keyspace - {self.keyspace}')
+
+        for mutation in experiment_metrics.mutations:
+            
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self._metrics_table.create,
+                    **mutation
+                )
+            )
+
+        
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Mutations to - Keyspace: {self.keyspace} - Table: {self.mutations_table_name}')
 
     async def submit_events(self, events: List[BaseProcessedResult]):
 

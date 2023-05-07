@@ -18,3 +18,5 @@ tdigest
 pydantic
 GitPython
 hyperframe
+tabulate
+plotille

@@ -5,8 +5,10 @@ import psutil
 from typing import List, Dict
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
+from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
-from hedra.reporting.metric import MetricsSet, MetricsGroup
+from hedra.reporting.metric.stage_streams_set import StageStreamsSet
+from hedra.reporting.metric import MetricsSet
 from .aws_timestream_config import AWSTimestreamConfig
 from .aws_timestream_record import AWSTimestreamRecord
 from .aws_timestream_error_record import AWSTimestreamErrorRecord
@@ -28,9 +30,15 @@ class AWSTimestream:
 
         self.database_name = config.database_name
         self.events_table_name = config.events_table
+        self.streams_table_name = config.streams_table
+
         self.metrics_table_name = config.metrics_table
-        self.stage_metrics_table_name = 'stage_metrics'
-        self.errors_table_name = 'stage_errors'
+        self.stage_metrics_table_name = f'{config.metrics_table}_stage'
+        self.errors_table_name = f'{config.metrics_table}_errors'
+
+        self.experiments_table_name = config.experiments_table
+        self.variants_table_name = f'{config.experiments_table}_variants'
+        self.mutations_table_name = f'{config.experiments_table}_mutations'
 
         self.retention_options = config.retention_options
         self.session_uuid = str(uuid.uuid4())
@@ -77,6 +85,234 @@ class AWSTimestream:
             await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Skipping creation of table - Database: {self.database_name} - if not exists')
         
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Successfully opened connection to AWS - Region: {self.region_name}')
+    
+    async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Streams to table - {self.streams_table_name}')
+
+        try:
+            
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating table - Database: {self.database_name} - Table: {self.streams_table_name} - if not exists')
+
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.create_table,
+                    DatabaseName=self.database_name,
+                    TableName=self.streams_table_name,
+                    RetentionProperties=self.retention_options
+                )
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created table - Database: {self.database_name} - Table: {self.streams_table_name} - if not exists')
+
+        except Exception:
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Skipping creation of table - Database: {self.database_name} - Table: {self.streams_table_name} - if not exists')
+        
+        records = []
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams - Database: {self.database_name} - Table: {self.streams_table_name} - if not exists')
+
+
+        for stage_name, stream in stream_metrics.items():
+
+            stream_id = uuid.uuid4()
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stream - {stage_name}:{stream_id}')
+
+            for group_name, group_stats in stream.grouped.items():
+                for field, value in group_stats.items():
+                    timestream_record = AWSTimestreamRecord(
+                        'stream',
+                        record_name=f'{stage_name}_stream',
+                        record_stage=stage_name,
+                        group_name=group_name,
+                        field_name=field,
+                        value=value,
+                        session_uuid=self.session_uuid
+                    )
+
+                    records.append(timestream_record.to_dict())
+
+        await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                self.client.write_records,
+                DatabaseName=self.database_name,
+                TableName=self.events_table_name,
+                Records=records,
+                CommonAttributes={}
+            )
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Stream - Database: {self.database_name} - Table: {self.streams_table_name} - if not exists')
+
+    async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Experiments to table - {self.experiments_table_name}')
+
+        try:
+            
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating table - Database: {self.database_name} - Table: {self.experiments_table_name} - if not exists')
+
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.create_table,
+                    DatabaseName=self.database_name,
+                    TableName=self.experiments_table_name,
+                    RetentionProperties=self.retention_options
+                )
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created table - Database: {self.database_name} - Table: {self.experiments_table_name} - if not exists')
+
+        except Exception:
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Skipping creation of table - Database: {self.database_name} - Table: {self.experiments_table_name} - if not exists')
+        
+        records = []
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Experiments - Database: {self.database_name} - Table: {self.experiments_table_name} - if not exists')
+
+        for experiment in experiment_metrics.experiment_summaries:
+
+            experiment_id = uuid.uuid4()
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Experiment - {experiment.experiment_name}:{experiment_id}')
+
+            for field, value in experiment.record.items():
+                timestream_record = AWSTimestreamRecord(
+                    record_type='experiment',
+                    record_name=experiment.experiment_name,
+                    field_name=field,
+                    value=value,
+                    session_uuid=self.session_uuid
+                )
+
+                records.append(timestream_record.to_dict())
+
+        await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                self.client.write_records,
+                DatabaseName=self.database_name,
+                TableName=self.events_table_name,
+                Records=records,
+                CommonAttributes={}
+            )
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Experiments - Database: {self.database_name} - Table: {self.experiments_table_name} - if not exists')
+
+    async def submit_variants(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Variants to table - {self.variants_table_name}')
+
+        try:
+            
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating table - Database: {self.database_name} - Table: {self.variants_table_name} - if not exists')
+
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.create_table,
+                    DatabaseName=self.database_name,
+                    TableName=self.variants_table_name,
+                    RetentionProperties=self.retention_options
+                )
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created table - Database: {self.database_name} - Table: {self.variants_table_name} - if not exists')
+
+        except Exception:
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Skipping creation of table - Database: {self.database_name} - Table: {self.variants_table_name} - if not exists')
+        
+        records = []
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Variants - Database: {self.database_name} - Table: {self.variants_table_name} - if not exists')
+
+        for variant in experiment_metrics.variant_summaries:
+
+            variant_id = uuid.uuid4()
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Variant - {variant.variant_name}:{variant_id}')
+
+            for field, value in variant.record.items():
+                timestream_record = AWSTimestreamRecord(
+                    record_type='variant',
+                    record_name=variant.variant_name,
+                    group_name=variant.variant_experiment,
+                    field_name=field,
+                    value=value,
+                    session_uuid=self.session_uuid
+                )
+
+                records.append(timestream_record.to_dict())
+
+        await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                self.client.write_records,
+                DatabaseName=self.database_name,
+                TableName=self.events_table_name,
+                Records=records,
+                CommonAttributes={}
+            )
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Variants - Database: {self.database_name} - Table: {self.variants_table_name} - if not exists')
+
+    async def submit_mutations(self, experiment_metrics: ExperimentMetricsCollectionSet):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Mutations to table - {self.mutations_table_name}')
+
+        try:
+            
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating table - Database: {self.database_name} - Table: {self.mutations_table_name} - if not exists')
+
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.create_table,
+                    DatabaseName=self.database_name,
+                    TableName=self.mutations_table_name,
+                    RetentionProperties=self.retention_options
+                )
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created table - Database: {self.database_name} - Table: {self.mutations_table_name} - if not exists')
+
+        except Exception:
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Skipping creation of table - Database: {self.database_name} - Table: {self.mutations_table_name} - if not exists')
+        
+        records = []
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Mutations - Database: {self.database_name} - Table: {self.mutations_table_name} - if not exists')
+
+        for mutation in experiment_metrics.mutation_summaries:
+
+            mutation_id = uuid.uuid4()
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Mutations - {mutation.mutation_name}:{mutation_id}')
+
+            for field, value in mutation.record.items():
+                timestream_record = AWSTimestreamRecord(
+                    record_type='mutation',
+                    record_name=mutation.mutation_name,
+                    group_name=mutation.mutation_variant_name,
+                    field_name=field,
+                    value=value,
+                    session_uuid=self.session_uuid
+                )
+
+                records.append(timestream_record.to_dict())
+
+        await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                self.client.write_records,
+                DatabaseName=self.database_name,
+                TableName=self.events_table_name,
+                Records=records,
+                CommonAttributes={}
+            )
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Mutations - Database: {self.database_name} - Table: {self.mutations_table_name} - if not exists')
 
     async def submit_events(self, events: List[BaseProcessedResult]):
 
@@ -108,11 +344,12 @@ class AWSTimestream:
 
             for field, value in event.record.items():
                 timestream_record = AWSTimestreamRecord(
-                    'event',
-                    event.name,
-                    field,
-                    value,
-                    self.session_uuid
+                    record_type='event',
+                    record_name=event.name,
+                    record_stage=event.stage,
+                    field_name=field,
+                    value=value,
+                    session_uuid=self.session_uuid
                 )
 
                 records.append(timestream_record.to_dict())
@@ -159,13 +396,13 @@ class AWSTimestream:
  
             for field, value in metrics_set.common_stats.items():
                 timestream_record = AWSTimestreamRecord(
-                    'stage_metrics',
-                    metrics_set.name,
-                    metrics_set.stage,
-                    'common',
-                    field,
-                    value,
-                    self.session_uuid,
+                    record_type='stage_metrics',
+                    record_name=metrics_set.name,
+                    record_stage=metrics_set.stage,
+                    group_name='common',
+                    field_name=field,
+                    value=value,
+                    session_uuid=self.session_uuid,
                 )
 
                 records.append(timestream_record.to_dict())
@@ -219,13 +456,13 @@ class AWSTimestream:
 
                 for field, value in metric_result.items():
                     timestream_record = AWSTimestreamRecord(
-                        'metric',
-                        metrics_set.name,
-                        metrics_set.stage,
-                        group_name,
-                        field,
-                        value,
-                        self.session_uuid,
+                        record_type='metric',
+                        record_name=metrics_set.name,
+                        record_stage=metrics_set.stage,
+                        group_name=group_name,
+                        field_name=field,
+                        value=value,
+                        session_uuid=self.session_uuid
                     )
 
                     records.append(timestream_record.to_dict())
@@ -271,18 +508,18 @@ class AWSTimestream:
 
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Set - {metrics_set.name}:{metrics_set.metrics_set_id}')
 
-            for metric_name, custom_metric in metrics_set.custom_metrics.items():
+            for custom_metric in metrics_set.custom_metrics.values():
 
                 await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Metrics Group - Custom')
 
                 timestream_record = AWSTimestreamRecord(
-                    'metric',
-                    metrics_set.name,
-                    metrics_set.stage,
-                    'custom',
-                    metric_name,
-                    custom_metric.metric_value,
-                    self.session_uuid,
+                    record_type='metric',
+                    record_name=metrics_set.name,
+                    record_stage=metrics_set.stage,
+                    group_name='custom',
+                    field_name=custom_metric.metric_name,
+                    value=custom_metric.metric_value,
+                    session_uuid=self.session_uuid
                 )
 
                 records.append(timestream_record.to_dict())
@@ -330,11 +567,11 @@ class AWSTimestream:
 
             for error in metrics_set.errors:
                 timestream_record = AWSTimestreamErrorRecord(
-                    metrics_set.name,
-                    metrics_set.stage,
-                    error.get('message'),
-                    error.get('count'),
-                    self.session_uuid
+                    record_name=metrics_set.name,
+                    record_stage=metrics_set.stage,
+                    error_message=error.get('message'),
+                    count=error.get('count'),
+                    session_uuid=self.session_uuid
                 )
 
                 error_records.append(timestream_record.to_dict())
