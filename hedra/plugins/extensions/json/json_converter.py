@@ -282,7 +282,10 @@ class JSONConverter(ExtensionPlugin):
     ) -> Dict[str, List[ActionHook]]:
 
         self._loop = asyncio.get_event_loop()
-        await self._load_json_file(persona_config)
+        await self._load_json_file(
+            persona_config,
+            execute_stage
+        )
 
         return await self._to_actions(
             persona_config,
@@ -323,14 +326,15 @@ class JSONConverter(ExtensionPlugin):
 
     async def _load_json_file(
         self,
-        config: Config
+        config: Config,
+        execute_stage: Stage
     ) -> None:
 
         actions_filepath = await self._loop.run_in_executor(
             None,
             functools.partial(
                 os.path.abspath,
-                config.actions_filepath
+                config.actions_filepaths.get(execute_stage.name)
             )
         )
 

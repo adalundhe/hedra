@@ -66,7 +66,10 @@ class HarConverter(ExtensionPlugin):
     ) -> Dict[str, List[ActionHook]]:
 
         self._loop = asyncio.get_event_loop()
-        await self._load_harfile(persona_config)
+        await self._load_harfile(
+            persona_config,
+            execute_stage
+        )
 
         return await self._to_actions(
             persona_config,
@@ -107,14 +110,15 @@ class HarConverter(ExtensionPlugin):
 
     async def _load_harfile(
         self,
-        config: Config
+        config: Config,
+        execute_stage: Stage
     ) -> None:
 
         har_filepath = await self._loop.run_in_executor(
             None,
             functools.partial(
                 os.path.abspath,
-                config.actions_filepath
+                config.actions_filepaths.get(execute_stage.name)
             )
         )
 
