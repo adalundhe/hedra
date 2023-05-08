@@ -274,6 +274,7 @@ class Analyze(Stage):
     ):
         stage_total_times = {}
         stage_batch_sizes = {}
+        stage_system_analytics = {}
         stage_streamed_analytics: Dict[str, List[StreamAnalytics]] = {}
         analyze_stage_batch_configs = {}
         stage_personas = {}
@@ -288,6 +289,7 @@ class Analyze(Stage):
             
             stage_total_times[stage_name] = stage_total_time
             stage_streamed_analytics[stage_name] = stage_results.stage_streamed_analytics
+            stage_system_analytics[stage_name] = stage_results.monitors
 
             results_count = len(results)
             
@@ -316,6 +318,7 @@ class Analyze(Stage):
             'analyze_stage_total_times': stage_total_times,
             'analyze_stage_batch_sizes': stage_batch_sizes,
             'analyze_stage_personas': stage_personas,
+            'stage_system_analytics': stage_system_analytics,
             'analyze_stage_streamed_analytics': stage_streamed_analytics
         }
 

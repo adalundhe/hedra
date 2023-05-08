@@ -16,10 +16,6 @@ from hedra.core.personas.streaming import (
     Stream,
     StreamAnalytics
 )
-from hedra.monitoring import (
-    CPUMonitor,
-    MemoryMonitor
-)
 from hedra.reporting.processed_result.results import results_types
 from hedra.reporting.reporter import (
     Reporter,
@@ -321,7 +317,7 @@ class DefaultPersona:
         stream_monitor_name = f'{self.stage_name}_stream'
 
         stream_analytics.memory_monitor.start_profile(stream_monitor_name)
-        stream_analytics.cpu_monitor.sample_current_cpu_usage(stream_monitor_name)
+        stream_analytics.cpu_monitor.update_monitor(stream_monitor_name)
 
         start = time.time()
         batch_start = time.time()
@@ -332,7 +328,7 @@ class DefaultPersona:
 
             batch_elapsed = time.time() - batch_start
             stream_analytics.memory_monitor.stop_profile(stream_monitor_name)
-            stream_analytics.cpu_monitor.sample_current_cpu_usage(stream_monitor_name)
+            stream_analytics.cpu_monitor.update_monitor(stream_monitor_name)
 
             stream_analytics.add(
                 self.stream,
@@ -364,6 +360,9 @@ class DefaultPersona:
         stream_analytics.memory_monitor.stop_profile(stream_monitor_name)
         stream_analytics.cpu_monitor.store_monitor(stream_monitor_name)
         self.stream.completed = []
+
+        print(stream_analytics.cpu_monitor.collected_initial_usage)
+        print(stream_analytics.cpu_monitor.collected)
 
         if self._stream:
             await asyncio.gather(*stream_submission_tasks)
