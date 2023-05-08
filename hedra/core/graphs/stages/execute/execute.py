@@ -9,7 +9,8 @@ from typing import (
     Union, 
     Any, 
     Dict, 
-    Optional
+    Optional,
+    Type
 )
 from typing_extensions import TypeVarTuple, Unpack
 from hedra.core.engines.client import Client
@@ -39,10 +40,14 @@ from hedra.core.personas.persona_registry import (
     DefaultPersona
 )
 from hedra.logging import logging_manager
+from hedra.monitoring import MemoryMonitor
 from hedra.plugins.types.plugin_types import PluginType
+from hedra.plugins.types.extension.types import ExtensionType
+from hedra.plugins.types.extension.extension_plugin import ExtensionPlugin
 from hedra.reporting.reporter import ReporterConfig
 from hedra.versioning.flags.types.base.active import active_flags
 from hedra.versioning.flags.types.base.flag_type import FlagTypes
+from hedra.plugins.extensions import get_enabled_extensions
 from .parallel import execute_actions
 
 
@@ -142,21 +147,36 @@ class Execute(Stage, Generic[Unpack[T]]):
     async def get_stage_plugins(self):
 
         engine_plugins = self.plugins_by_type.get(PluginType.ENGINE)
-        for plugin in engine_plugins.values():
-            registered_engines[plugin.name] = plugin
+        for plugin_name, plugin in engine_plugins.items():
+            registered_engines[plugin_name] = plugin
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Engine plugin - {plugin.name}')
 
         persona_plugins = self.plugins_by_type.get(PluginType.PERSONA)
         for plugin_name, plugin in persona_plugins.items():
             registered_personas[plugin_name] = lambda plugin_config: plugin(plugin_config)
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Persona plugin - {plugin.name}')
+        
+        execute_stage_extensions: Dict[str, ExtensionPlugin] = {}
+
+        stage_extension_plugins: List[str] = self.plugins_by_type.get(
+            PluginType.EXTENSION, {}
+        )
+
+        extension_plugins: Dict[str, Type[ExtensionPlugin]] = get_enabled_extensions()
+        for plugin_name in stage_extension_plugins:
+            plugin = extension_plugins.get(plugin_name)
+
+            if plugin:
+                enabled_plugin = plugin()
+                execute_stage_extensions[enabled_plugin.name] = enabled_plugin
 
         source_stage_plugins = defaultdict(list)
         for plugin in self.plugins.values():
             source_stage_plugins[plugin.type].append(plugin.name)
 
         return {
-            'execute_stage_plugins': source_stage_plugins
+            'execute_stage_plugins': source_stage_plugins,
+            'execute_stage_extensions': execute_stage_extensions
         }
     
     @event('get_stage_config')
@@ -267,6 +287,7 @@ class Execute(Stage, Generic[Unpack[T]]):
             aggregate_results = []
             elapsed_times = []
             stage_contexts = defaultdict(list)
+            stage_memory_monitor = MemoryMonitor()
 
             for result_set in execute_stage_results:
 
@@ -280,6 +301,12 @@ class Execute(Stage, Generic[Unpack[T]]):
                 pipeline_context: Dict[str, Any] = result_set.get('context', {})
                 for context_key, context_value in pipeline_context.items():
                     stage_contexts[context_key].append(context_value)
+
+                monitors: Dict[str, MemoryMonitor] = result_set.get('monitoring', {})
+                memory_monitor = monitors.get('memory')
+
+                for monitor_name, collection_stats in memory_monitor.collected.items():
+                    stage_memory_monitor.collected[monitor_name].extend(collection_stats)
 
             total_results = len(aggregate_results)
             total_elapsed = statistics.median(elapsed_times)
@@ -303,7 +330,10 @@ class Execute(Stage, Generic[Unpack[T]]):
                     'total_results': total_results,
                     'total_elapsed': total_elapsed,
                     'experiment': execute_stage_experiment
-                })
+                }),
+                'execute_stage_monitors': {
+                    'memory': stage_memory_monitor
+                }
             }
 
     @event('check_has_multiple_workers')
@@ -311,9 +341,24 @@ class Execute(Stage, Generic[Unpack[T]]):
         self,
         execute_stage_has_multiple_workers: bool = False,
         execute_stage_setup_config: Config=None,
+        execute_stage_extensions: Dict[str, ExtensionPlugin]={}
     ):
 
         if execute_stage_has_multiple_workers is False:
+
+            for extension in execute_stage_extensions.values():
+
+                if extension.extension_type == ExtensionType.GENERATOR:
+                    results = await extension.execute(**{
+                        'execute_stage_name': self.name,
+                        'execute_stage_hooks': self.hooks,
+                        'persona_config': execute_stage_setup_config
+                    })
+
+                    execute_stage = results.get('execute_stage')
+
+                    if execute_stage:
+                        self.hooks = results.get('execute_stage_hooks')
 
             persona_config = execute_stage_setup_config
             persona = get_persona(persona_config)
@@ -346,6 +391,7 @@ class Execute(Stage, Generic[Unpack[T]]):
                         color_scheme=persona_config.color_scheme,
                         options=persona_config.playwright_options
                     ))
+
             return {
                 'execute_stage_persona': persona
             }
@@ -357,9 +403,12 @@ class Execute(Stage, Generic[Unpack[T]]):
         execute_stage_has_multiple_workers: bool = False,
         execute_stage_persona: DefaultPersona=None,
         execute_stage_experiment: Optional[Dict[str, Any]]=None,
-        execute_stage_setup_config: Config=None,
+        execute_stage_setup_config: Config=None
     ):
         if execute_stage_has_multiple_workers is False:
+
+            stage_memory_monitor = MemoryMonitor()
+            stage_memory_monitor.start_profile(self.name)
 
             start = time.monotonic()
 
@@ -382,6 +431,8 @@ class Execute(Stage, Generic[Unpack[T]]):
             if self.executor:
                 self.executor.shutdown()
 
+            stage_memory_monitor.stop_profile(self.name)
+
             execution_results.update({
                 'execute_stage_streamed_analytics': [
                     execute_stage_persona.streamed_analytics
@@ -398,7 +449,10 @@ class Execute(Stage, Generic[Unpack[T]]):
                     'stage_results': results,
                     'total_results': total_results,
                     'total_elapsed': total_elapsed,
-                    'experiment': execute_stage_experiment
+                    'experiment': execute_stage_experiment,
+                    'monitors': {
+                        'memory': stage_memory_monitor
+                    }
                 })
             })
             

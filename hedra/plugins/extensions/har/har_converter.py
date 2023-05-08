@@ -19,6 +19,7 @@ from hedra.core.engines.types.http3 import (
     MercuryHTTP3Client
 )
 from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.stages.base.stage import Stage
@@ -29,7 +30,7 @@ from hedra.plugins.types.extension import (
     prepare
 )
 from hedra.versioning.flags.types.unstable.flag import unstable
-from typing import Dict, List
+from typing import Dict, List, Union
 
 try:
 
@@ -62,30 +63,31 @@ class HarConverter(ExtensionPlugin):
     async def load(
         self,
         persona_config: Config=None,
-        execute_stage: Stage=None
+        execute_stage_name: str=None
     ) -> Dict[str, List[ActionHook]]:
 
         self._loop = asyncio.get_event_loop()
         await self._load_harfile(
             persona_config,
-            execute_stage
+            execute_stage_name
         )
 
         return await self._to_actions(
             persona_config,
-            execute_stage
+            execute_stage_name
         )
     
     @execute()
     async def convert(
         self,
         action_data: List[ActionHook]=[],
-        execute_stage: Stage=None
+        execute_stage_hooks: Dict[HookType, List[Union[ActionHook, TaskHook]]]={}
+
     ) -> Dict[str, Stage]:
 
-        action_hooks = execute_stage.hooks[HookType.ACTION]
+        action_hooks = execute_stage_hooks[HookType.ACTION]
 
-        if len(execute_stage.hooks[HookType.ACTION]) > 0:
+        if len(action_hooks) > 0:
             max_existing_hook_order = max([
                 hook.order for hook in action_hooks
             ])
@@ -102,23 +104,23 @@ class HarConverter(ExtensionPlugin):
 
         action_hooks.extend(action_data)
 
-        execute_stage.hooks[HookType.ACTION] = action_hooks
+        execute_stage_hooks[HookType.ACTION] = action_hooks
 
         return {
-            'execute_stage': execute_stage
+            'execute_stage_hooks': execute_stage_hooks
         }
 
     async def _load_harfile(
         self,
         config: Config,
-        execute_stage: Stage
+        execute_stage_name: str
     ) -> None:
 
         har_filepath = await self._loop.run_in_executor(
             None,
             functools.partial(
                 os.path.abspath,
-                config.actions_filepaths.get(execute_stage.name)
+                config.actions_filepaths.get(execute_stage_name)
             )
         )
 
@@ -142,7 +144,7 @@ class HarConverter(ExtensionPlugin):
     async def _to_actions(
         self,
         config: Config,
-        execute_stage: Stage=None
+        execute_stage_name: str=None
     ) -> List[ActionHook]:
         
         action_data: List[ActionHook] = []
@@ -245,15 +247,14 @@ class HarConverter(ExtensionPlugin):
                 action.setup()
 
                 hook = ActionHook(
-                    f'{execute_stage.name}.{action_basename}',
+                    f'{execute_stage_name}.{action_basename}',
                     action_basename,
                     None
                 )
 
                 hook.session = session
                 hook.action = action
-                hook.stage = execute_stage.name
-                hook.stage_instance = execute_stage
+                hook.stage = execute_stage_name
                 hook.context = SimpleContext()
                 hook.hook_id = uuid.uuid4()
 

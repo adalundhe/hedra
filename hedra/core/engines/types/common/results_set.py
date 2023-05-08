@@ -13,6 +13,7 @@ from hedra.core.engines.types.task import TaskResult
 from hedra.core.engines.types.udp import UDPResult
 from hedra.core.engines.types.websocket import WebsocketResult
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
+from hedra.monitoring.memory import MemoryMonitor
 
 
 ResultsBatch = Dict[str, Union[List[BaseResult], float]]
@@ -22,6 +23,10 @@ MutationConfig = Dict[str, Union[str, float, List[str]]]
 VariantConfig = Dict[str, Union[int, str, float, List[float], MutationConfig]]
 
 ExperimentConfig = Dict[str, Union[str, bool, VariantConfig]]
+
+MemoryMonitorGroup = Dict[str, MemoryMonitor]
+
+MonitorGroup = Dict[str, MemoryMonitorGroup]
 
 
 class ResultsSet:
@@ -49,6 +54,7 @@ class ResultsSet:
 
         self.serialized_results: List[Dict[str, Any]] = execution_results.get('serialized_results', [])
         self.experiment = execution_results.get('experiment')
+        self.monitors: MonitorGroup = execution_results.get('monitors')
 
         self.types = {
             RequestTypes.GRAPHQL: GraphQLResult,

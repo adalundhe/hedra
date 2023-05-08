@@ -128,7 +128,7 @@ def run_graph(
     hedra_config['logging'] = {
         'logfiles_directory': logfiles_directory,
         'log_level': log_level
-    }    
+    }  
     
     with open(hedra_config_filepath, 'w') as hedra_config_file:
         hedra_config['graphs'] = hedra_graphs
@@ -188,6 +188,7 @@ def run_graph(
     graph_execution_results: Union[GraphExecutionResults, None] = None
 
     try:
+        
         graph_execution_results = loop.run_until_complete(graph.run())
         
     except BrokenPipeError:

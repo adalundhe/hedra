@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import inspect
+import traceback
 from collections import defaultdict
 from typing import Dict, List, Any, Union
 from hedra.core.engines.client.config import Config

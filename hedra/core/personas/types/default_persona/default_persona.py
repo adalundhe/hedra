@@ -4,7 +4,6 @@ import psutil
 import uuid
 import math
 from typing import Dict, List, Union
-from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from asyncio import Task
 from hedra.core.hooks.types.base.hook_type import HookType
@@ -16,6 +15,10 @@ from hedra.core.personas.types.types import PersonaTypes
 from hedra.core.personas.streaming import (
     Stream,
     StreamAnalytics
+)
+from hedra.monitoring import (
+    CPUMonitor,
+    MemoryMonitor
 )
 from hedra.reporting.processed_result.results import results_types
 from hedra.reporting.reporter import (
@@ -88,7 +91,7 @@ class DefaultPersona:
         'pending',
         'collect_analytics',
         'collection_interval',
-        'bypass_cleanup'
+        'bypass_cleanup',
     )    
 
     def __init__(self, config: Config):
@@ -312,16 +315,24 @@ class DefaultPersona:
 
         stream_analytics = StreamAnalytics()
         
-        start = time.time()
-        batch_start = time.time()
         stream_submission_tasks = []
         collection_stop_time = self.total_time - 1
+
+        stream_monitor_name = f'{self.stage_name}_stream'
+
+        stream_analytics.memory_monitor.start_profile(stream_monitor_name)
+        stream_analytics.cpu_monitor.sample_current_cpu_usage(stream_monitor_name)
+
+        start = time.time()
+        batch_start = time.time()
 
         while self.completed_time < collection_stop_time and self.run_timer:
             self.completed_time = time.time() - start
             await asyncio.sleep(self.collection_interval)
 
             batch_elapsed = time.time() - batch_start
+            stream_analytics.memory_monitor.stop_profile(stream_monitor_name)
+            stream_analytics.cpu_monitor.sample_current_cpu_usage(stream_monitor_name)
 
             stream_analytics.add(
                 self.stream,
@@ -348,6 +359,9 @@ class DefaultPersona:
             batch_start = time.time()
             self.stream.completed = []
 
+            stream_analytics.memory_monitor.start_profile(stream_monitor_name)
+
+        stream_analytics.memory_monitor.stop_profile(stream_monitor_name)
         self.stream.completed = []
 
         if self._stream:

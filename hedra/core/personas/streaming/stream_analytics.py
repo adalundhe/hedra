@@ -1,8 +1,23 @@
+from hedra.monitoring import (
+    CPUMonitor,
+    MemoryMonitor
+)
 from typing import List, Dict
 from .stream import Stream
 
 
 class StreamAnalytics:
+
+    __slots__ = (
+        'interval_completion_rates',
+        'interval_timings',
+        'interval_completed_counts',
+        'interval_succeeded_counts',
+        'interval_failed_counts',
+        'interval_batch_timings',
+        'cpu_monitor',
+        'memory_monitor'
+    )
 
     def __init__(self) -> None:    
         self.interval_completion_rates: List[float] = []
@@ -11,6 +26,8 @@ class StreamAnalytics:
         self.interval_succeeded_counts: List[int] = []
         self.interval_failed_counts: List[int] = []
         self.interval_batch_timings: List[float] = []
+        self.cpu_monitor = CPUMonitor()
+        self.memory_monitor = MemoryMonitor()
 
     def add(
             self, 

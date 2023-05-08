@@ -274,7 +274,7 @@ class Setup(Stage, Generic[Unpack[T]]):
                 execute_stage.client.plugin[plugin_name] = plugin(setup_stage_target_config)
                 plugin.name = plugin_name
                 execute_stage.plugins[plugin_name] = plugin
-                self.plugins_by_type[plugin_name] = plugin
+                self.plugins_by_type[plugin.type][plugin_name] = plugin
 
                 await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Engine plugin - {plugin.name} - for Execute stage - {execute_stage_name}')
 
