@@ -361,9 +361,6 @@ class DefaultPersona:
         stream_analytics.cpu_monitor.store_monitor(stream_monitor_name)
         self.stream.completed = []
 
-        print(stream_analytics.cpu_monitor.collected_initial_usage)
-        print(stream_analytics.cpu_monitor.collected)
-
         if self._stream:
             await asyncio.gather(*stream_submission_tasks)
    
