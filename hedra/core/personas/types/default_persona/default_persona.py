@@ -362,6 +362,7 @@ class DefaultPersona:
             stream_analytics.memory_monitor.start_profile(stream_monitor_name)
 
         stream_analytics.memory_monitor.stop_profile(stream_monitor_name)
+        stream_analytics.cpu_monitor.store_monitor(stream_monitor_name)
         self.stream.completed = []
 
         if self._stream:
