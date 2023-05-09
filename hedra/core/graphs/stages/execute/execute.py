@@ -2,6 +2,7 @@
 import dill
 import time
 import statistics
+import itertools
 from collections import defaultdict
 from typing import (
     Generic, 
@@ -10,7 +11,8 @@ from typing import (
     Any, 
     Dict, 
     Optional,
-    Type
+    Type,
+    Tuple
 )
 from typing_extensions import TypeVarTuple, Unpack
 from hedra.core.engines.client import Client
@@ -297,6 +299,8 @@ class Execute(Stage, Generic[Unpack[T]]):
             stage_cpu_monitor = CPUMonitor()
             stage_memory_monitor = MemoryMonitor()
 
+            memory_stats: Dict[str, List[Tuple[Union[int, float]]]] = defaultdict(list)
+            
             for result_set in execute_stage_results:
 
                 aggregate_results.extend(result_set.get('results'))
@@ -313,13 +317,20 @@ class Execute(Stage, Generic[Unpack[T]]):
                 monitors: Dict[str, MonitorResults] = result_set.get('monitoring', {})
                 cpu_monitor = monitors.get('cpu', {})
                 memory_monitor = monitors.get('memory', {})
-
-
+                
                 for monitor_name, collection_stats in cpu_monitor.items():
                     stage_cpu_monitor.collected[monitor_name].extend(collection_stats)
 
                 for monitor_name, collection_stats in memory_monitor.items():
-                    stage_memory_monitor.collected[monitor_name].extend(collection_stats)
+                    memory_stats[monitor_name].append(collection_stats)
+                
+            for monitor_name, collection_stats in memory_stats.items():
+                stage_memory_monitor.collected[monitor_name] = [
+                    sum(memory_usage) for memory_usage in itertools.zip_longest(
+                        *collection_stats,
+                        fillvalue=0
+                    )
+                ]
 
             total_results = len(aggregate_results)
             total_elapsed = statistics.median(elapsed_times)

@@ -6,9 +6,7 @@ from collections import (
 from tabulate import tabulate
 from typing import (
     List, 
-    Union, 
-    Dict, 
-    Tuple
+    Union
 )
 from hedra.reporting.system.system_metrics_set import SystemMetricsSet
 from hedra.logging import HedraLogger
@@ -38,31 +36,29 @@ class SystemSummaryTable:
             self.logger.console.sync.info('\n-- System Metrics --')
 
         if self.enabled_tables.get('system'):
-            self.logger.console.sync.info('\nCPU:\n')
+            self.logger.console.sync.info('\nCPU (% per core):\n')
             self.logger.console.sync.info(f'''{self.cpu_table}\n''')
 
-            self.logger.console.sync.info('\nMemory:\n')
+            self.logger.console.sync.info('\nMemory (gb):\n')
             self.logger.console.sync.info(f'''{self.memory_table}\n''')
 
     def _to_cpu_table(self):
             table_rows: List[OrderedDict] = []
 
             for metrics_set in self.system_metrics_summaries:
-                for stage_metrics in metrics_set.cpu.metrics.values():
-                    for metric_group in stage_metrics.values():
+                for metric_group in metrics_set.cpu:
 
-                        table_row = OrderedDict()
+                    table_row = OrderedDict()
 
-                        for row_name in SystemMetricsSet.metrics_header_keys:
-                             table_row[row_name] = metric_group.record.get(row_name)
+                    for row_name in SystemMetricsSet.metrics_table_keys:
+                            table_row[row_name] = metric_group.record.get(row_name)
 
-                        print(table_row)
-                        table_rows.append(table_row)
+                    table_rows.append(table_row)
 
             return tabulate(
                 list(sorted(
                     table_rows,
-                    key=lambda row: row['name']
+                    key=lambda row: row['stage']
                 )),
                 headers='keys',
                 missingval='None',
@@ -79,7 +75,7 @@ class SystemSummaryTable:
 
                         table_row = OrderedDict()
 
-                        for row_name in SystemMetricsSet.metrics_header_keys:
+                        for row_name in SystemMetricsSet.metrics_table_keys:
                              table_row[row_name] = metric_group.record.get(row_name)
 
                         table_rows.append(table_row)
@@ -87,7 +83,7 @@ class SystemSummaryTable:
             return tabulate(
                 list(sorted(
                     table_rows,
-                    key=lambda row: row['name']
+                    key=lambda row: row['stage']
                 )),
                 headers='keys',
                 missingval='None',

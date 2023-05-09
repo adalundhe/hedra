@@ -16,6 +16,16 @@ from .system_metrics_set_types import (
 
 class SystemMetricsSet:
 
+    metrics_table_keys = [
+        'stage',
+        'mean',
+        'median',
+        'max',
+        'min',
+        'stdev',
+        'variance'
+    ]
+
     metrics_header_keys = [
         'stage',
         'name',
@@ -106,7 +116,7 @@ class SystemMetricsSet:
                 self.system_memory_metrics[monitor_name].extend(monitor_metrics)
 
         for monitor_name, monitor_metrics in self.system_cpu_metrics.items():
-            self.session_cpu_metrics[monitor_name] = SystemMetricsCollection(**{
+            self.session_cpu_metrics[monitor_name] = SessionMetricsCollection(**{
                 'name': monitor_name,
                 'group': SystemMetricGroupType.CPU.value,
                 'mean': statistics.mean(monitor_metrics),
@@ -127,7 +137,7 @@ class SystemMetricsSet:
             })
 
         for monitor_name, monitor_metrics in self.system_memory_metrics.items():
-            self.session_memory_metrics[monitor_name] = SystemMetricsCollection(**{
+            self.session_memory_metrics[monitor_name] = SessionMetricsCollection(**{
                 'name': monitor_name,
                 'group': SystemMetricGroupType.MEMORY.value,
                 'mean': statistics.mean(monitor_metrics),

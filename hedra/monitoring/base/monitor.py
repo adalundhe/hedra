@@ -26,7 +26,7 @@ def handle_loop_stop(
 class BaseMonitor:
 
     def __init__(self) -> None:
-        self.active: Dict[str, int] = {}
+        self.active: Dict[str, List[int]] = defaultdict(list)
         self.collected: Dict[str, List[int]] = defaultdict(list)
         self.cpu_count = psutil.cpu_count()
 
@@ -68,6 +68,22 @@ class BaseMonitor:
             )
         )
 
+    def update_monitor(str, monitor_name: str) -> Union[int, float]:
+        raise NotImplementedError('Monitor background update method must be implemented in non-base Monitor class.')
+
+    def store_monitor(self, monitor_name: str):
+        self.collected[monitor_name] = list(self.active[monitor_name])
+        del self.active[monitor_name]
+        
+    async def _update_background_monitor(
+        self,
+        monitor_name: str,
+        interval_sec: Union[int, float]=1
+    ):
+        while self._running_monitors.get(monitor_name):
+            self.update_monitor(monitor_name)
+            await asyncio.sleep(interval_sec)
+
     def _monitor_at_interval(
         self, 
         monitor_name: str,
@@ -76,19 +92,14 @@ class BaseMonitor:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
+        self._running_monitors[monitor_name] = True
+
         loop.run_until_complete(
             self._update_background_monitor(
                 monitor_name,
                 interval_sec=interval_sec
             )
         )
-        
-    async def _update_background_monitor(
-        self,
-        monitor_name: str,
-        interval_sec: Union[int, float]=1
-    ):
-        raise NotImplementedError('Monitor background update method must be implemented in non-base Monitor class.')
 
     async def stop_background_monitor(
         self,
@@ -103,8 +114,6 @@ class BaseMonitor:
                 list(self.active[monitor_name])
             )
 
-            del self.active[monitor_name]
-
     async def stop_all_background_monitors(self):
 
         for monitor_name in self._running_monitors.keys():
@@ -114,8 +123,6 @@ class BaseMonitor:
 
         for monitor_name in self._running_monitors.keys():
             self.collected[monitor_name] = list(self.active[monitor_name])
-            del self.active[monitor_name]
-
 
     def close(self):
         if self._executor:

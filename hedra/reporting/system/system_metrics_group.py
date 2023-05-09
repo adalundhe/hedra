@@ -36,6 +36,11 @@ class SystemMetricsGroup:
             99
         ]
 
+    def __iter__(self):
+        for stage_metrics in self.metrics.values():
+            for monitor_metrics in stage_metrics.values():
+                yield monitor_metrics
+
     def aggregate(self):
 
         for stage_name, metrics in self.raw_metrics.items():

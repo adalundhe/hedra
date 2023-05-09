@@ -90,7 +90,7 @@ class SummaryTable:
             self.experiment_summary_table.enabled_tables.update({
                 table_name: enabled for table_name, enabled in summaries_visibility_config.items() if table_name in self.experiment_summary_table.enabled_tables
             })
-
+        
     def generate_tables(self):
         self.execution_summary_table.generate_tables()
         self.system_summary_table.generate_tables()
