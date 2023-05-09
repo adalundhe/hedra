@@ -5,6 +5,7 @@ import signal
 import dill
 import pickle
 import warnings
+import traceback
 import asyncio
 import gc
 from collections import defaultdict
@@ -40,7 +41,10 @@ from hedra.logging import (
     LoggerTypes,
     logging_manager
 )
-from hedra.monitoring import MemoryMonitor
+from hedra.monitoring import (
+    CPUMonitor,
+    MemoryMonitor
+)
 from hedra.plugins.extensions import get_enabled_extensions
 from hedra.plugins.types.extension.types import ExtensionType
 from hedra.plugins.types.plugin_types import PluginType
@@ -65,6 +69,12 @@ async def start_execution(
     log_level: str=None,
     extensions: Dict[str, ExtensionPlugin]={}
 ) -> Dict[str, Any]:
+    
+    cpu_monitor = CPUMonitor()
+    await cpu_monitor.start_background_monitor(source_stage_name)
+
+    memory_monitor = MemoryMonitor()
+    await memory_monitor.start_background_monitor(source_stage_name)
 
     current_task = asyncio.current_task()
 
@@ -181,12 +191,21 @@ async def start_execution(
     for idx, result in enumerate(results):
         results[idx] = dill.dumps(result)  
 
+    await cpu_monitor.stop_background_monitor(source_stage_name)
+    await memory_monitor.stop_background_monitor(source_stage_name)
+    cpu_monitor.close()
+    memory_monitor.close()
+
     results_dict =  {
         'streamed_analytics': persona.streamed_analytics,
         'results': results,
         'total_results': len(results),
         'total_elapsed': persona.total_elapsed,
-        'context': context
+        'context': context,
+        'monitoring': {
+            'memory': memory_monitor.collected,
+            'cpu': cpu_monitor.collected
+        }
     }
 
     pending_tasks = [
@@ -265,9 +284,6 @@ def execute_actions(parallel_config: str):
         partition_method = parallel_config.get('partition_method')
         worker_id = parallel_config.get('worker_id')
         workers = parallel_config.get('workers')
-
-        memory_monitor = MemoryMonitor()
-        memory_monitor.start_profile(source_stage_name)
 
         thread_id = threading.current_thread().ident
         process_id = os.getpid()
@@ -413,17 +429,11 @@ def execute_actions(parallel_config: str):
             )
         )
 
-        memory_monitor.stop_profile(source_stage_name)
 
         loop.close()
         gc.collect()
 
-        return {
-            **results,
-            'monitoring': {
-                'memory': memory_monitor
-            }
-        }
+        return results
 
     except BrokenPipeError:
         raise ProcessKilledError()

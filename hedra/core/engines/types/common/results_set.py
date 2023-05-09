@@ -28,6 +28,7 @@ VariantConfig = Dict[str, Union[int, str, float, List[float], MutationConfig]]
 ExperimentConfig = Dict[str, Union[str, bool, VariantConfig]]
 
 MemoryMonitorGroup = Dict[str, MemoryMonitor]
+
 CPUMonitorGroup = Dict[str, CPUMonitor]
 
 MonitorGroup = Dict[str, Union[CPUMonitorGroup, MemoryMonitorGroup]]
@@ -58,7 +59,6 @@ class ResultsSet:
 
         self.serialized_results: List[Dict[str, Any]] = execution_results.get('serialized_results', [])
         self.experiment = execution_results.get('experiment')
-        self.monitors: MonitorGroup = execution_results.get('monitors')
 
         self.types = {
             RequestTypes.GRAPHQL: GraphQLResult,

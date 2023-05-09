@@ -314,11 +314,6 @@ class DefaultPersona:
         stream_submission_tasks = []
         collection_stop_time = self.total_time - 1
 
-        stream_monitor_name = f'{self.stage_name}_stream'
-
-        stream_analytics.memory_monitor.start_profile(stream_monitor_name)
-        stream_analytics.cpu_monitor.update_monitor(stream_monitor_name)
-
         start = time.time()
         batch_start = time.time()
 
@@ -327,8 +322,6 @@ class DefaultPersona:
             await asyncio.sleep(self.collection_interval)
 
             batch_elapsed = time.time() - batch_start
-            stream_analytics.memory_monitor.stop_profile(stream_monitor_name)
-            stream_analytics.cpu_monitor.update_monitor(stream_monitor_name)
 
             stream_analytics.add(
                 self.stream,
@@ -355,10 +348,6 @@ class DefaultPersona:
             batch_start = time.time()
             self.stream.completed = []
 
-            stream_analytics.memory_monitor.start_profile(stream_monitor_name)
-
-        stream_analytics.memory_monitor.stop_profile(stream_monitor_name)
-        stream_analytics.cpu_monitor.store_monitor(stream_monitor_name)
         self.stream.completed = []
 
         if self._stream:

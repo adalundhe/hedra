@@ -1,8 +1,11 @@
-
-import psutil
+import asyncio
 import os
+import psutil
 from hedra.monitoring.base.monitor import BaseMonitor
 from typing import Union
+
+
+
 
 
 class MemoryMonitor(BaseMonitor):
@@ -45,4 +48,15 @@ class MemoryMonitor(BaseMonitor):
     def rename_stored_profile(self, monitor_name: str, new_monitor_name: str):
         self.collected[new_monitor_name] = list(self.collected[monitor_name])
         del self.collected[monitor_name]
+        
+    async def _update_background_monitor(
+        self,
+        monitor_name: str,
+        interval_sec: Union[int, float]=1
+    ):
+        while self._running_monitors.get(monitor_name):
+            self.start_profile(monitor_name)
+            await asyncio.sleep(interval_sec)
+            self.stop_profile(monitor_name)
+
     

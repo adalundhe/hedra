@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import inspect
+import traceback
 from collections import defaultdict
 from typing import Dict, List, Any
 from hedra.core.hooks.types.base.hook import Hook
@@ -12,6 +13,7 @@ from hedra.core.graphs.stages.submit.submit import Submit
 from hedra.core.graphs.stages.analyze.analyze import Analyze
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.reporting.system.system_metrics_set_types import MonitorGroup
 
 
 class AnalyzeEdge(BaseEdge[Analyze]):
@@ -28,12 +30,14 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         self.requires = [
             'setup_stage_experiment_config',
             'execute_stage_streamed_analytics',
-            'execute_stage_results'
+            'execute_stage_results',
+            'execute_stage_monitors'
         ]
         self.provides = [
             'setup_stage_experiment_config',
             'execute_stage_streamed_analytics',
-            'analyze_stage_summary_metrics'
+            'analyze_stage_summary_metrics',
+            'execute_stage_monitors'
         ]
 
         self.valid_states = [
@@ -206,13 +210,22 @@ class AnalyzeEdge(BaseEdge[Analyze]):
     def setup(self) -> None:
 
         raw_results = {}
+        stage_monitors: MonitorGroup = {}
+
         for source_stage, destination_stage in self.history:
             stage_results = {}
             if destination_stage == self.source.name:
-                stage_results = self.history[(
+
+                source_history: Dict[str, Any] = self.history[(
                     source_stage, 
                     self.source.name
-                )].get('execute_stage_results', {})
+                )]
+
+                stage_results = source_history.get('execute_stage_results', {})
+                execute_stage_monitors = source_history.get('execute_stage_monitors')
+
+                if execute_stage_monitors:
+                    stage_monitors[source_stage] = execute_stage_monitors
 
             raw_results.update(stage_results)
 
@@ -232,6 +245,7 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                 target_stages[stage_name] = stage
         
         self.edge_data = {
+            'analyze_stage_monitor_results': stage_monitors,
             'analyze_stage_raw_results': results_to_calculate,
             'analyze_stage_target_stages': target_stages,
             'analyze_stage_has_results': len(results_to_calculate) > 0

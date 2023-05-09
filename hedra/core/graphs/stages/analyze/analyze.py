@@ -37,6 +37,8 @@ from hedra.reporting.processed_result.types import (
     UDPProcessedResult,
     WebsocketProcessedResult,
 )
+from hedra.reporting.system import SystemMetricsSet
+from hedra.reporting.system.system_metrics_set_types import MonitorGroup
 from hedra.versioning.flags.types.base.active import active_flags
 from hedra.versioning.flags.types.base.flag_type import FlagTypes
 from typing import Optional
@@ -66,10 +68,10 @@ RawResultsPairs = List[Tuple[Dict[str,  List[Tuple[str, Any]]]]]
 ProcessedResults = Dict[str, Union[Dict[str, Union[int, float, int]], int]]
 
 ProcessedMetricsSet = Dict[str, MetricsSet]
+
 ProcessedStageMetricsSet = Dict[str, Union[int, float, Dict[str, ProcessedMetricsSet]]]
 
 ProcessedResultsSet = List[Tuple[str, StageMetricsSummary]]
-
 
 CustomMetricsSet = Dict[str, Dict[str, Dict[str, Union[int, float, Any]]]]
 
@@ -160,8 +162,10 @@ class Analyze(Stage):
     @context()
     async def initialize_results_analysis(
         self,
-        analyze_stage_raw_results: RawResultsSet={}
+        analyze_stage_raw_results: RawResultsSet={},
+        analyze_stage_monitor_results: MonitorGroup={}
     ):
+
         await self.logger.filesystem.aio.create_logfile('hedra.reporting.log')
         self.logger.filesystem.create_filelogger('hedra.reporting.log')
         
@@ -179,7 +183,8 @@ class Analyze(Stage):
             'analyze_stage_all_results',
             'analyze_stage_raw_results',
             'analyze_stage_target_stages',
-            'analyze_stage_deserialized_results'
+            'analyze_stage_deserialized_results',
+            'analyze_stage_monitor_results'
         ]
 
         all_results = list(analyze_stage_raw_results.items())
@@ -193,6 +198,7 @@ class Analyze(Stage):
             'analyze_stage_all_results': all_results,
             'analyze_stage_stages_count': len(analyze_stage_raw_results),
             'analyze_stage_total_group_results': total_group_results,
+            'analyze_stage_monitor_results': analyze_stage_monitor_results
         }
     
     @event('initialize_results_analysis')
@@ -274,7 +280,6 @@ class Analyze(Stage):
     ):
         stage_total_times = {}
         stage_batch_sizes = {}
-        stage_system_analytics = {}
         stage_streamed_analytics: Dict[str, List[StreamAnalytics]] = {}
         analyze_stage_batch_configs = {}
         stage_personas = {}
@@ -289,7 +294,6 @@ class Analyze(Stage):
             
             stage_total_times[stage_name] = stage_total_time
             stage_streamed_analytics[stage_name] = stage_results.stage_streamed_analytics
-            stage_system_analytics[stage_name] = stage_results.monitors
 
             results_count = len(results)
             
@@ -318,7 +322,6 @@ class Analyze(Stage):
             'analyze_stage_total_times': stage_total_times,
             'analyze_stage_batch_sizes': stage_batch_sizes,
             'analyze_stage_personas': stage_personas,
-            'stage_system_analytics': stage_system_analytics,
             'analyze_stage_streamed_analytics': stage_streamed_analytics
         }
 
@@ -608,15 +611,31 @@ class Analyze(Stage):
         return {
             'experiment_metrics_sets': experiment_metrics_sets
         }
+    
+    @event('generate_metrics_sets')
+    async def generate_system_metrics(
+        self,
+        analyze_stage_monitor_results: MonitorGroup={}
+    ):
+        system_metrics_set = SystemMetricsSet(analyze_stage_monitor_results)
+        system_metrics_set.generate_system_summaries()
 
-    @context('generate_experiment_metrics')
+        return {
+            'analyze_stage_system_metrics': system_metrics_set
+        }
+
+    @context(
+        'generate_experiment_metrics',
+        'generate_system_metrics'
+    )
     async def generate_summary(
         self,
         analyze_stage_stages_count: int=0,
         analyze_stage_total_group_results: int=0,
         analyze_stage_processed_results: ProcessedResultsSet=[],
         analyze_stage_contexts: Dict[str, Any]={},
-        experiment_metrics_sets: Dict[str, ExperimentMetricsSet]={}
+        experiment_metrics_sets: Dict[str, ExperimentMetricsSet]={},
+        analyze_stage_system_metrics: SystemMetricsSet=None
     ):
 
         self.context[self.name] = analyze_stage_contexts
@@ -624,7 +643,8 @@ class Analyze(Stage):
         summaries: Dict[str, Union[int, Dict[str, MetricsSet]]] = {
             'stages': {},
             'source': self.name,
-            'experiment_metrics_sets': experiment_metrics_sets
+            'experiment_metrics_sets': experiment_metrics_sets,
+            'system_metrics': analyze_stage_system_metrics
         }
 
         for stage_name, stage_metrics in analyze_stage_processed_results:

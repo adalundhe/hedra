@@ -55,7 +55,8 @@ class ExecuteEdge(BaseEdge[Execute]):
             'execute_stage_setup_by',
             'setup_stage_ready_stages',
             'execute_stage_skipped',
-            'execute_stage_streamed_analytics'
+            'execute_stage_streamed_analytics',
+            'execute_stage_monitors'
         ]
 
         self.valid_states = [
@@ -149,6 +150,7 @@ class ExecuteEdge(BaseEdge[Execute]):
                 'execute_stage_results': {
                     self.source.name: self.edge_data['execute_stage_results']
                 },
+                'execute_stage_monitors': self.edge_data['execute_stage_monitors'],
                 'execute_stage_streamed_analytics': self.edge_data['execute_stage_streamed_analytics'],
                 'execute_stage_setup_config': self.edge_data['execute_stage_setup_config'],
                 'execute_stage_setup_hooks': self.edge_data['execute_stage_setup_hooks'],

@@ -40,7 +40,10 @@ from hedra.core.personas.persona_registry import (
     DefaultPersona
 )
 from hedra.logging import logging_manager
-from hedra.monitoring import MemoryMonitor
+from hedra.monitoring import (
+    CPUMonitor,
+    MemoryMonitor
+)
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.extension.types import ExtensionType
 from hedra.plugins.types.extension.extension_plugin import ExtensionPlugin
@@ -49,6 +52,9 @@ from hedra.versioning.flags.types.base.active import active_flags
 from hedra.versioning.flags.types.base.flag_type import FlagTypes
 from hedra.plugins.extensions import get_enabled_extensions
 from .parallel import execute_actions
+
+
+MonitorResults = Dict[str, List[Union[int, float]]]
 
 
 T = TypeVarTuple('T')
@@ -287,6 +293,8 @@ class Execute(Stage, Generic[Unpack[T]]):
             aggregate_results = []
             elapsed_times = []
             stage_contexts = defaultdict(list)
+
+            stage_cpu_monitor = CPUMonitor()
             stage_memory_monitor = MemoryMonitor()
 
             for result_set in execute_stage_results:
@@ -302,10 +310,15 @@ class Execute(Stage, Generic[Unpack[T]]):
                 for context_key, context_value in pipeline_context.items():
                     stage_contexts[context_key].append(context_value)
 
-                monitors: Dict[str, MemoryMonitor] = result_set.get('monitoring', {})
-                memory_monitor = monitors.get('memory')
+                monitors: Dict[str, MonitorResults] = result_set.get('monitoring', {})
+                cpu_monitor = monitors.get('cpu', {})
+                memory_monitor = monitors.get('memory', {})
 
-                for monitor_name, collection_stats in memory_monitor.collected.items():
+
+                for monitor_name, collection_stats in cpu_monitor.items():
+                    stage_cpu_monitor.collected[monitor_name].extend(collection_stats)
+
+                for monitor_name, collection_stats in memory_monitor.items():
                     stage_memory_monitor.collected[monitor_name].extend(collection_stats)
 
             total_results = len(aggregate_results)
@@ -332,6 +345,7 @@ class Execute(Stage, Generic[Unpack[T]]):
                     'experiment': execute_stage_experiment
                 }),
                 'execute_stage_monitors': {
+                    'cpu': stage_cpu_monitor,
                     'memory': stage_memory_monitor
                 }
             }
@@ -407,16 +421,25 @@ class Execute(Stage, Generic[Unpack[T]]):
     ):
         if execute_stage_has_multiple_workers is False:
 
+            execution_results = {}
+
+            stage_cpu_monitor = CPUMonitor()
+            await stage_cpu_monitor.stop_background_monitor(self.name)
+
             stage_memory_monitor = MemoryMonitor()
-            stage_memory_monitor.start_profile(self.name)
+            await stage_memory_monitor.start_background_monitor(self.name)
 
             start = time.monotonic()
-
-            execution_results = {}
 
             results = await execute_stage_persona.execute()
 
             elapsed = time.monotonic() - start
+
+            await stage_cpu_monitor.stop_background_monitor(self.name)
+            await stage_memory_monitor.stop_background_monitor(self.name)
+
+            stage_cpu_monitor.close()
+            stage_memory_monitor.close()
 
             await self.logger.filesystem.aio['hedra.core'].info(
                 f'{self.metadata_string} - Execution complete - Time (including addtional setup) took: {round(elapsed, 2)} seconds'
@@ -449,11 +472,12 @@ class Execute(Stage, Generic[Unpack[T]]):
                     'stage_results': results,
                     'total_results': total_results,
                     'total_elapsed': total_elapsed,
-                    'experiment': execute_stage_experiment,
-                    'monitors': {
-                        'memory': stage_memory_monitor
-                    }
-                })
+                    'experiment': execute_stage_experiment
+                }),
+                'execute_stage_monitors': {
+                    'cpu': stage_cpu_monitor.collected,
+                    'memory': stage_memory_monitor.collected
+                }
             })
             
             return execution_results

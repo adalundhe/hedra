@@ -17,6 +17,7 @@ from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.reporting.metric.stage_metrics_summary import StageMetricsSummary
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.system.system_metrics_set import SystemMetricsSet
 
 
 CustomMetricSet = Dict[str, Dict[str, CustomMetric]]
@@ -158,6 +159,7 @@ class SubmitEdge(BaseEdge[Submit]):
         events: List[BaseProcessedResult] = []
         metrics: List[MetricsSet] = []
         streamed_metrics: Dict[str, StageStreamsSet] = {}
+        system_metrics: List[SystemMetricsSet] = []
         experiments: List[ExperimentMetricsSet] = []
         session_total: int = 0
 
@@ -196,9 +198,14 @@ class SubmitEdge(BaseEdge[Submit]):
                     if streams and len(streams) > 0:
                         streamed_metrics[stage_metrics_summary.stage_metrics.name] = stage_metrics_summary.streams
 
+                analyze_stage_system_metrics = analyze_stage_summary_metrics.get('system_metrics')
+                if analyze_stage_system_metrics:
+                    system_metrics.append(analyze_stage_system_metrics)
+
         self.edge_data['submit_stage_events'] = events
         self.edge_data['submit_stage_experiment_metrics'] = experiments
         self.edge_data['submit_stage_streamed_metrics'] = streamed_metrics
+        self.edge_data['submit_stage_system_metrics'] = system_metrics
         self.edge_data['submit_stage_summary_metrics'] = metrics
         self.edge_data['submit_stage_session_total'] = session_total
 
