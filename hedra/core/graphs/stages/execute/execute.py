@@ -135,7 +135,8 @@ class Execute(Stage, Generic[Unpack[T]]):
             'execute_stage_setup_hooks',
             'setup_stage_ready_stages',
             'execute_stage_results',
-            'execute_stage_streamed_analytics'
+            'execute_stage_streamed_analytics',
+            'execute_stage_monitors'
         ]
         persona_type_name = '-'.join([
             segment.capitalize() for segment in execute_stage_setup_config.persona_type.split('-')
@@ -144,11 +145,29 @@ class Execute(Stage, Generic[Unpack[T]]):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing - {execute_stage_setup_config.batch_size} - VUs over {self.workers} threads for {execute_stage_setup_config.total_time_string} using - {persona_type_name} - persona')
         await self.logger.spinner.append_message(f'Stage {self.name} executing - {execute_stage_setup_config.batch_size} - VUs over {self.workers} threads for {execute_stage_setup_config.total_time_string} using - {persona_type_name} - persona')
 
+        main_monitor_name = f'{self.name}.main'
+
+        cpu_monitor = CPUMonitor()
+        memory_monitor = MemoryMonitor()
+
+        cpu_monitor.show_as_plot = True
+        memory_monitor.show_as_plot = True
+
+        cpu_monitor.stage_type = StageTypes.EXECUTE
+        memory_monitor.stage_type = StageTypes.EXECUTE
+
+        await cpu_monitor.start_background_monitor(main_monitor_name)
+        await memory_monitor.start_background_monitor(main_monitor_name)
+
         return {
             'execute_stage_stream_configs': execute_stage_stream_configs,
             'execute_stage_setup_hooks': execute_stage_setup_hooks,
             'execute_stage_setup_by': execute_stage_setup_by,
-            'execute_stage_setup_config': execute_stage_setup_config
+            'execute_stage_setup_config': execute_stage_setup_config,
+            'execute_stage_monitors': {
+                'cpu': cpu_monitor,
+                'memory': memory_monitor
+            }
         }
 
     @event('get_stage_config')
@@ -289,6 +308,7 @@ class Execute(Stage, Generic[Unpack[T]]):
         execute_stage_results: List[List[Any]]=[],
         execute_stage_experiment: Optional[Dict[str, Any]]=None,
         execute_stage_setup_config: Config=None,
+        execute_stage_monitors: Dict[str, Union[CPUMonitor, MemoryMonitor]]={}
     ):
         if execute_stage_has_multiple_workers:
             execute_stage_streamed_analytics: List[StreamAnalytics] = []
@@ -296,8 +316,8 @@ class Execute(Stage, Generic[Unpack[T]]):
             elapsed_times = []
             stage_contexts = defaultdict(list)
 
-            stage_cpu_monitor = CPUMonitor()
-            stage_memory_monitor = MemoryMonitor()
+            stage_cpu_monitor: CPUMonitor = execute_stage_monitors.get('cpu')
+            stage_memory_monitor: MemoryMonitor = execute_stage_monitors.get('memory')
 
             cpu_stats: Dict[str, List[Tuple[Union[int, float]]]] = defaultdict(list)
             memory_stats: Dict[str, List[Tuple[Union[int, float]]]] = defaultdict(list)
@@ -344,6 +364,17 @@ class Execute(Stage, Generic[Unpack[T]]):
                 ]
 
                 stage_memory_monitor.stage_metrics[monitor_name] = stage_memory_monitor.collected[monitor_name]
+
+            main_monitor_name = f'{self.name}.main'
+
+            await stage_cpu_monitor.stop_background_monitor(main_monitor_name)
+            await stage_memory_monitor.stop_background_monitor(main_monitor_name)
+
+            stage_cpu_monitor.close()
+            stage_memory_monitor.close()
+
+            stage_cpu_monitor.stage_metrics[main_monitor_name] = stage_cpu_monitor.collected[main_monitor_name]
+            stage_memory_monitor.stage_metrics[main_monitor_name] = stage_memory_monitor.collected[main_monitor_name]
 
             total_results = len(aggregate_results)
             total_elapsed = statistics.mean(elapsed_times)
@@ -441,17 +472,15 @@ class Execute(Stage, Generic[Unpack[T]]):
         execute_stage_has_multiple_workers: bool = False,
         execute_stage_persona: DefaultPersona=None,
         execute_stage_experiment: Optional[Dict[str, Any]]=None,
-        execute_stage_setup_config: Config=None
+        execute_stage_setup_config: Config=None,
+        execute_stage_monitors: Dict[str, Union[CPUMonitor, MemoryMonitor]]={}
     ):
         if execute_stage_has_multiple_workers is False:
 
             execution_results = {}
 
-            stage_cpu_monitor = CPUMonitor()
-            await stage_cpu_monitor.stop_background_monitor(self.name)
-
-            stage_memory_monitor = MemoryMonitor()
-            await stage_memory_monitor.start_background_monitor(self.name)
+            stage_cpu_monitor: CPUMonitor = execute_stage_monitors.get('cpu')
+            stage_memory_monitor: MemoryMonitor = execute_stage_monitors.get('memory')
 
             start = time.monotonic()
 
@@ -462,6 +491,7 @@ class Execute(Stage, Generic[Unpack[T]]):
             await stage_cpu_monitor.stop_background_monitor(self.name)
             await stage_memory_monitor.stop_background_monitor(self.name)
 
+    
             stage_cpu_monitor.close()
             stage_memory_monitor.close()
 
@@ -471,6 +501,27 @@ class Execute(Stage, Generic[Unpack[T]]):
 
             total_results = len(results)
             total_elapsed = execute_stage_persona.total_elapsed
+
+            main_monitor_name = f'{self.name}.main'
+
+            await stage_cpu_monitor.stop_background_monitor(main_monitor_name)
+            await stage_memory_monitor.stop_background_monitor(main_monitor_name)
+
+            stage_cpu_monitor.close()
+            stage_memory_monitor.close()
+
+            stage_cpu_monitor.collected.update(
+                execute_stage_persona.cpu_monitor.collected
+            )
+
+            stage_memory_monitor.collected.update(
+                execute_stage_persona.memory_monitor.collected
+            )
+
+
+            stage_cpu_monitor.stage_metrics[main_monitor_name] = stage_cpu_monitor.collected[main_monitor_name]
+            stage_memory_monitor.stage_metrics[main_monitor_name] = stage_memory_monitor.collected[main_monitor_name]
+
 
             await self.logger.filesystem.aio['hedra.core'].info( f'{self.metadata_string} - Completed - {total_results} actions at  {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
             await self.logger.spinner.set_default_message(f'Stage - {self.name} completed {total_results} actions at {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
@@ -499,8 +550,8 @@ class Execute(Stage, Generic[Unpack[T]]):
                     'experiment': execute_stage_experiment
                 }),
                 'execute_stage_monitors': {
-                    'cpu': stage_cpu_monitor.collected,
-                    'memory': stage_memory_monitor.collected
+                    'cpu': stage_cpu_monitor,
+                    'memory': stage_memory_monitor
                 }
             })
             

@@ -39,6 +39,8 @@ class SystemMetricsGroup:
             99
         ]
 
+        self.visibility_filters: Dict[str, Dict[str, bool]] = defaultdict(dict)
+
     def __iter__(self):
         for stage_metrics in self.metrics.values():
             for monitor_metrics in stage_metrics.values():
@@ -48,6 +50,8 @@ class SystemMetricsGroup:
 
         for stage_name, metrics in self.raw_metrics.items():
              for monitor_name, monitor_metrics in metrics.collected.items():
+
+                self.visibility_filters[stage_name][monitor_name] = metrics.show_as_plot
 
                 if self.metrics_group == SystemMetricGroupType.MEMORY:
                     metrics_data = [

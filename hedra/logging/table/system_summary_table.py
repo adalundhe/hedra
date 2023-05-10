@@ -43,57 +43,67 @@ class SystemSummaryTable:
         if self.enabled_tables.get('system'):
 
             for metrics_set in self.system_metrics_summaries:
-                for monitor in metrics_set.cpu.stage_metrics.values():
+                for stage_name, monitor in metrics_set.cpu.stage_metrics.items():
                     for monitor_name, metrics in monitor.items():
-                        scatter_plot = plotille.scatter(
-                            [idx for idx in range(
-                                1, 
-                                len(metrics) + 1
-                            )],
-                            metrics,
-                            width=120,
-                            height=10,
-                            y_min=0,
-                            x_min=0,
-                            x_max=len(metrics) + 1,
-                            linesep='\n',
-                            X_label='time (sec)',
-                            Y_label='pct. used (per worker)',
-                            lc='cyan',
-                            marker='⨯'
-                        )
 
-                    self.logger.console.sync.info(f'''\n{monitor_name} % CPU Usage (Per Worker)\n''')
-                    self.logger.console.sync.info(f'''{scatter_plot}\n''')
+                        show_plot = metrics_set.cpu.visibility_filters[stage_name][monitor_name]
+
+                        print(stage_name, monitor_name, show_plot)
+
+                        if show_plot:
+                            scatter_plot = plotille.scatter(
+                                [idx for idx in range(
+                                    1, 
+                                    len(metrics) + 1
+                                )],
+                                metrics,
+                                width=120,
+                                height=10,
+                                y_min=0,
+                                x_min=0,
+                                x_max=len(metrics) + 1,
+                                linesep='\n',
+                                X_label='time (sec)',
+                                Y_label='pct. utilization per thread',
+                                lc='cyan',
+                                marker='⨯'
+                            )
+
+                            self.logger.console.sync.info(f'''\n{monitor_name} % CPU Usage (Per Worker)\n''')
+                            self.logger.console.sync.info(f'''{scatter_plot}\n''')
 
             for metrics_set in self.system_metrics_summaries:
-                for monitor in metrics_set.memory.stage_metrics.values():
+                for stage_name, monitor in metrics_set.memory.stage_metrics.items():
                     for monitor_name, metrics in monitor.items():
-                        scatter_plot = plotille.scatter(
-                            [idx for idx in range(
-                                1, 
-                                len(metrics) + 1
-                            )],
-                            [
-                                round(
-                                    metric_value/(1024**3),
-                                    2
-                                ) for metric_value in metrics
-                            ],
-                            width=120,
-                            height=10,
-                            y_min=0,
-                            x_min=0,
-                            x_max=len(metrics) + 1,
-                            linesep='\n',
-                            X_label='time (sec)',
-                            Y_label='memory used (GB)',
-                            lc='cyan',
-                            marker='⨯'
-                        )
 
-                        self.logger.console.sync.info(f'''\n{monitor_name} % Memory Usage (GB)\n''')
-                        self.logger.console.sync.info(f'''{scatter_plot}\n''')
+                        show_plot = metrics_set.cpu.visibility_filters[stage_name][monitor_name]
+
+                        if show_plot:
+                            scatter_plot = plotille.scatter(
+                                [idx for idx in range(
+                                    1, 
+                                    len(metrics) + 1
+                                )],
+                                [
+                                    round(
+                                        metric_value/(1024**3),
+                                        2
+                                    ) for metric_value in metrics
+                                ],
+                                width=120,
+                                height=10,
+                                y_min=0,
+                                x_min=0,
+                                x_max=len(metrics) + 1,
+                                linesep='\n',
+                                X_label='time (sec)',
+                                Y_label='memory used (gb)',
+                                lc='cyan',
+                                marker='⨯'
+                            )
+
+                            self.logger.console.sync.info(f'''\n{monitor_name} % Memory Usage (gb)\n''')
+                            self.logger.console.sync.info(f'''{scatter_plot}\n''')
 
             self.logger.console.sync.info('\nCPU (% per worker):\n')
             self.logger.console.sync.info(f'''{self.cpu_table}\n''')
@@ -120,7 +130,7 @@ class SystemSummaryTable:
         return tabulate(
             list(sorted(
                 table_rows,
-                key=lambda row: row['stage']
+                key=lambda row: row['name']
             )),
             headers='keys',
             missingval='None',
@@ -145,7 +155,7 @@ class SystemSummaryTable:
         return tabulate(
             list(sorted(
                 table_rows,
-                key=lambda row: row['stage']
+                key=lambda row: row['name']
             )),
             headers='keys',
             missingval='None',
@@ -169,7 +179,7 @@ class SystemSummaryTable:
         return tabulate(
             list(sorted(
                 table_rows,
-                key=lambda row: row['stage']
+                key=lambda row: row['name']
             )),
             headers='keys',
             missingval='None',

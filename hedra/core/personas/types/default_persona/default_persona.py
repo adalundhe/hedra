@@ -204,6 +204,8 @@ class DefaultPersona:
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing {self.actions_count} Hooks: {hook_names}')
 
         total_time = self.total_time
+        
+        monitor_name = f'{self.stage_name}.persona'
 
         await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Executing for a total of - {total_time} - seconds')
         loop = asyncio.get_running_loop()
@@ -215,8 +217,8 @@ class DefaultPersona:
                 await reporter.connect()
 
             
-            await self.cpu_monitor.start_background_monitor(self.stage_name)
-            await self.memory_monitor.start_background_monitor(self.stage_name)
+            await self.cpu_monitor.start_background_monitor(monitor_name)
+            await self.memory_monitor.start_background_monitor(monitor_name)
 
             await self.start_stream()
 
@@ -233,8 +235,8 @@ class DefaultPersona:
 
             self.streamed_analytics = await self.stop_stream()
 
-            await self.cpu_monitor.stop_background_monitor(self.stage_name)
-            await self.memory_monitor.stop_background_monitor(self.stage_name)
+            await self.cpu_monitor.stop_background_monitor(monitor_name)
+            await self.memory_monitor.stop_background_monitor(monitor_name)
 
             self.cpu_monitor.close()
             self.memory_monitor.close()
@@ -245,8 +247,8 @@ class DefaultPersona:
 
         else:
 
-            await self.cpu_monitor.start_background_monitor(self.stage_name)
-            await self.memory_monitor.start_background_monitor(self.stage_name)
+            await self.cpu_monitor.start_background_monitor(monitor_name)
+            await self.memory_monitor.start_background_monitor(monitor_name)
 
             self.start = time.monotonic()
             completed, pending = await asyncio.wait([
@@ -259,8 +261,9 @@ class DefaultPersona:
 
             self.end = time.monotonic()
 
-            await self.cpu_monitor.stop_background_monitor(self.stage_name)
-            await self.memory_monitor.stop_background_monitor(self.stage_name)
+            await self.cpu_monitor.stop_background_monitor(monitor_name)
+            await self.memory_monitor.stop_background_monitor(monitor_name)
+            
             self.cpu_monitor.close()
             self.memory_monitor.close()
 

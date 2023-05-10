@@ -6,12 +6,17 @@ import dill
 from collections import defaultdict
 from typing import Any, Dict, List
 from hedra.core.engines.types.common.base_result import BaseResult
-from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
 from hedra.logging import (
     HedraLogger,
     LoggerTypes
 )
+from hedra.monitoring import (
+    CPUMonitor,
+    MemoryMonitor
+)
 from hedra.reporting.processed_result.processed_results_group import ProcessedResultsGroup
+from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
 from hedra.versioning.flags.types.base.active import active_flags
 from hedra.versioning.flags.types.base.flag_type import FlagTypes
 
@@ -32,6 +37,16 @@ def process_results_batch(config: Dict[str, Any]):
     source_stage_name = config.get('source_stage_name')
     source_stage_id = config.get('source_stage_id')
     enable_unstable_features = config.get('enable_unstable_features', False)
+
+    cpu_monitor = CPUMonitor()
+    memory_monitor = MemoryMonitor()
+
+    cpu_monitor.stage_type = StageTypes.ANALYZE
+    memory_monitor.stage_type = StageTypes.ANALYZE
+
+    monitor_name = f'{source_stage_name}.worker'
+    cpu_monitor.start_background_monitor_sync(monitor_name)
+    memory_monitor.start_background_monitor_sync(monitor_name)
 
     active_flags[FlagTypes.UNSTABLE_FEATURE] = enable_unstable_features
 
@@ -84,13 +99,32 @@ def process_results_batch(config: Dict[str, Any]):
 
         logger.filesystem.sync['hedra.core'].info(f'{metadata_string} - Results aggregation complete - Took: {round(elapsed, 2)} seconds')
 
-        return events
+
+        cpu_monitor.stop_background_monitor_sync(monitor_name)
+        memory_monitor.stop_background_monitor_sync(monitor_name)
+
+        return {
+            'events': events,
+            'monitoring': {
+                'cpu': cpu_monitor.collected,
+                'memory': memory_monitor.collected
+            }
+        }
 
     except BrokenPipeError:
+        cpu_monitor.stop_background_monitor_sync(monitor_name)
+        memory_monitor.stop_background_monitor_sync(monitor_name)
+
         raise ProcessKilledError()
     
     except RuntimeError:
+        cpu_monitor.stop_background_monitor_sync(monitor_name)
+        memory_monitor.stop_background_monitor_sync(monitor_name)
+
         raise ProcessKilledError()
 
     except Exception as e:
+        cpu_monitor.stop_background_monitor_sync(monitor_name)
+        memory_monitor.stop_background_monitor_sync(monitor_name)
+
         raise e

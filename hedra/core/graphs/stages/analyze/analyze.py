@@ -1,9 +1,12 @@
-import dill
-import time
-import statistics
+
+
 import asyncio
-import signal
+import dill
 import functools
+import itertools
+import statistics
+import signal
+import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from typing import Union, List, Dict, Any, Tuple
@@ -20,6 +23,10 @@ from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.event_types import EventType
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from hedra.logging import logging_manager
+from hedra.monitoring import (
+    CPUMonitor,
+    MemoryMonitor
+)
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.reporting.experiment.experiment_metrics_set import ExperimentMetricsSet
 from hedra.reporting.metric import MetricsSet
@@ -76,6 +83,8 @@ ProcessedResultsSet = List[Tuple[str, StageMetricsSummary]]
 CustomMetricsSet = Dict[str, Dict[str, Dict[str, Union[int, float, Any]]]]
 
 EventsSet = Dict[str, Dict[str, ProcessedResultsGroup]]
+
+MonitorResults = Dict[str, List[Union[int, float]]]
 
 
 def handle_loop_stop(
@@ -184,7 +193,8 @@ class Analyze(Stage):
             'analyze_stage_raw_results',
             'analyze_stage_target_stages',
             'analyze_stage_deserialized_results',
-            'analyze_stage_monitor_results'
+            'analyze_stage_monitor_results',
+            'analyze_stage_monitors'
         ]
 
         all_results = list(analyze_stage_raw_results.items())
@@ -228,6 +238,13 @@ class Analyze(Stage):
         analyze_stage_has_multiple_workers: bool=False
     ):
         deserialized_results = dict(analyze_stage_raw_results)
+        cpu_monitor = CPUMonitor()
+        memory_monitor = MemoryMonitor()
+
+        main_monitor_name = f'{self.name}.main'
+
+        await cpu_monitor.start_background_monitor(main_monitor_name)
+        await memory_monitor.start_background_monitor(main_monitor_name)
 
         if analyze_stage_has_multiple_workers:
             for results_set_name, results_set in analyze_stage_raw_results.items():
@@ -243,8 +260,11 @@ class Analyze(Stage):
 
                 deserialized_results[results_set_name] = results_set_copy
 
-
         return {
+            'analyze_stage_monitors': {
+                'cpu': cpu_monitor,
+                'memory': memory_monitor
+            },
             'analyze_stage_raw_results': analyze_stage_raw_results,
             'analyze_stage_deserialized_results': deserialized_results
         }    
@@ -440,23 +460,81 @@ class Analyze(Stage):
     @event('execute_batched_analysis')
     async def merge_events_groups(
         self,
-        analyze_stage_batch_results: List[Tuple[str, List[Any]]]=[],
+        analyze_stage_monitors: Dict[str, Union[CPUMonitor, MemoryMonitor]]={},
+        analyze_stage_batch_results: List[Tuple[str, List[Dict[str, Any]]]]=[],
         multiple_stages_to_process: bool=False
     ):
 
         stage_events_set = {}
 
+        stage_cpu_monitor: CPUMonitor = analyze_stage_monitors.get('cpu')
+        stage_memory_monitor: MemoryMonitor = analyze_stage_monitors.get('memory')
+
         if multiple_stages_to_process:
+
+            stage_cpu_monitor.stage_type = StageTypes.ANALYZE
+            stage_memory_monitor.stage_type = StageTypes.ANALYZE
+
+            cpu_stats: Dict[str, List[Tuple[Union[int, float]]]] = defaultdict(list)
+            memory_stats: Dict[str, List[Tuple[Union[int, float]]]] = defaultdict(list)
+
             for stage_name, stage_results in analyze_stage_batch_results:
-                stage_events_set[stage_name] = stage_results.pop()
+                results = stage_results.pop()
+
+                monitors: Dict[str, MonitorResults] = results.get('monitoring', {})
+                cpu_monitor = monitors.get('cpu', {})
+                memory_monitor = monitors.get('memory', {})
+                
+                for monitor_name, collection_stats in cpu_monitor.items():
+                    cpu_stats[monitor_name].append(collection_stats)
+                    stage_cpu_monitor.collected[monitor_name].extend(collection_stats)
+
+                for monitor_name, collection_stats in memory_monitor.items():
+                    memory_stats[monitor_name].append(collection_stats)
+            
+
+            for monitor_name, collection_stats in cpu_stats.items():
+                stage_cpu_monitor.stage_metrics[monitor_name] = [
+                    statistics.median(cpu_usage) for cpu_usage in itertools.zip_longest(
+                        *collection_stats,
+                        fillvalue=0
+                    )
+                ]
+                
+            for monitor_name, collection_stats in memory_stats.items():
+                stage_memory_monitor.collected[monitor_name] = [
+                    sum(memory_usage) for memory_usage in itertools.zip_longest(
+                        *collection_stats,
+                        fillvalue=0
+                    )
+                ]
+
+                stage_memory_monitor.stage_metrics[monitor_name] = stage_memory_monitor.collected[monitor_name]
+
+                stage_events_set[stage_name] = results.get('events')
 
         else:
 
             for stage_name, stage_results in analyze_stage_batch_results:
                 stage_events_set[stage_name] = stage_results
 
+        main_monitor_name = f'{self.name}.main'
+
+        await stage_cpu_monitor.stop_background_monitor(main_monitor_name)
+        await stage_memory_monitor.stop_background_monitor(main_monitor_name)
+
+        stage_cpu_monitor.stage_metrics[main_monitor_name] = stage_cpu_monitor.collected[main_monitor_name]
+        stage_memory_monitor.stage_metrics[main_monitor_name] = stage_memory_monitor.collected[main_monitor_name]
+
+        stage_cpu_monitor.close()
+        stage_memory_monitor.close()
+
         return {
-            'analyze_stage_events_set': stage_events_set
+            'analyze_stage_events_set': stage_events_set,
+            'analyze_stage_monitors': {
+                'cpu': stage_cpu_monitor,
+                'memory': stage_memory_monitor
+            }
         }
 
     @event('merge_events_groups')
@@ -615,9 +693,17 @@ class Analyze(Stage):
     @event('generate_metrics_sets')
     async def generate_system_metrics(
         self,
+        analyze_stage_monitors: MonitorGroup={},
         analyze_stage_monitor_results: MonitorGroup={},
         analyze_stage_batch_sizes: Dict[str, int]={},
     ):
+        
+        analyze_stage_monitor_results.update({
+            self.name: {
+                **analyze_stage_monitors
+            }
+        })
+
         system_metrics_set = SystemMetricsSet(
             analyze_stage_monitor_results,
             analyze_stage_batch_sizes

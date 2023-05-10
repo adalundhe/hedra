@@ -4,7 +4,12 @@ import psutil
 import signal
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Union
+from typing import (
+    Dict, 
+    List, 
+    Union,
+    Any
+)
 
 
 def handle_loop_stop(
@@ -30,12 +35,45 @@ class BaseMonitor:
         self.collected: Dict[str, List[int]] = defaultdict(list)
         self.cpu_count = psutil.cpu_count()
         self.stage_metrics: Dict[str, List[Union[int, float]]] = {}
+        self.show_as_plot: bool = False
+        self.stage_type: Union[Any, None] = None
 
         self._background_monitors: Dict[str, asyncio.Task] = {}
+        self._sync_background_monitors: Dict[str, asyncio.Task] = {}
         self._running_monitors: Dict[str, bool] = {}
 
         self._loop: Union[asyncio.AbstractEventLoop, None] = None
         self._executor: Union[ThreadPoolExecutor, None] = None
+
+    def start_background_monitor_sync(
+        self,
+        monitor_name: str,
+        interval_sec: Union[int, float]=1
+    ):
+        if self._executor is None:
+            self._executor = ThreadPoolExecutor(
+                max_workers=psutil.cpu_count(logical=False)
+            )
+
+            for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
+                signal_type: signal = getattr(signal, signame)
+
+                signal.signal(
+                    signal_type, 
+                    lambda signame: handle_loop_stop(
+                        signame,
+                        self._loop,
+                        self._executor
+                    )
+                )
+        
+        self._sync_background_monitors[monitor_name] = self._executor.submit(
+            functools.partial(
+                self._monitor_at_interval,
+                monitor_name,
+                interval_sec=interval_sec
+            )
+        )
 
     async def start_background_monitor(
         self,
@@ -110,6 +148,19 @@ class BaseMonitor:
             )
         )
 
+    def stop_background_monitor_sync(
+        self,
+        monitor_name: str
+    ):
+        
+        self._running_monitors[monitor_name] = False
+        self._sync_background_monitors[monitor_name].result()
+
+        if self.active.get(monitor_name):
+            self.collected[monitor_name].extend(
+                list(self.active[monitor_name])
+            )
+
     async def stop_background_monitor(
         self,
         monitor_name: str
@@ -122,6 +173,17 @@ class BaseMonitor:
             self.collected[monitor_name].extend(
                 list(self.active[monitor_name])
             )
+
+    def stop_all_background_monitors_sync(self):
+
+        for monitor_name in self._running_monitors.keys():
+            self._running_monitors[monitor_name] = False
+
+        for monitor in self._sync_background_monitors.values():
+            monitor.result()
+
+        for monitor_name in self._running_monitors.keys():
+            self.collected[monitor_name] = list(self.active[monitor_name])
 
     async def stop_all_background_monitors(self):
 

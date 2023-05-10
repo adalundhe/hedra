@@ -29,6 +29,7 @@ from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
 from hedra.core.graphs.stages.base.stage import Stage
+from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
 from hedra.core.graphs.stages.base.import_tools import (
     import_stages, 
@@ -150,6 +151,9 @@ async def start_execution(
     }
                 
     persona.setup(setup_execute_stage.hooks, metadata_string)
+
+    persona.cpu_monitor.stage_type = StageTypes.EXECUTE
+    persona.memory_monitor.stage_type = StageTypes.EXECUTE
 
     await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Starting execution')
 

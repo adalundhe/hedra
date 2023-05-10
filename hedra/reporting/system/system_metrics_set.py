@@ -2,6 +2,7 @@ import uuid
 import numpy
 import statistics
 from collections import defaultdict
+from hedra.core.graphs.stages.types.stage_types import StageTypes
 from typing import Dict, List, Union
 from .system_metrics_group import SystemMetricsGroup
 from .system_metrics_set_types import (
@@ -17,7 +18,7 @@ from .system_metrics_set_types import (
 class SystemMetricsSet:
 
     metrics_table_keys = [
-        'stage',
+        'name',
         'mean',
         'median',
         'max',
@@ -52,7 +53,8 @@ class SystemMetricsSet:
     ]
 
     def __init__(
-            self, metrics: MonitorGroup,
+            self, 
+            metrics: MonitorGroup,
             batch_sizes: Dict[str, int]
         ) -> None:
         self.system_metrics_set_id = uuid.uuid4()
@@ -120,7 +122,9 @@ class SystemMetricsSet:
             for monitor_name, monitor_metrics in memory_metrics_group.collected.items():
                 self.system_memory_metrics[monitor_name].extend(monitor_metrics)
 
-                if monitor_name == stage_name:
+                stage_type: StageTypes = memory_metrics_group.stage_type
+
+                if monitor_name == stage_name and stage_type == StageTypes.EXECUTE:
 
                     stage_batch_size = self.batch_sizes.get(stage_name)
 
