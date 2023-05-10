@@ -50,12 +50,7 @@ class SystemSummaryTable:
                                 1, 
                                 len(metrics) + 1
                             )],
-                            [
-                                round(
-                                    metric_value/(1024**3),
-                                    2
-                                ) for metric_value in metrics
-                            ],
+                            metrics,
                             width=120,
                             height=10,
                             y_min=0,
@@ -79,7 +74,12 @@ class SystemSummaryTable:
                                 1, 
                                 len(metrics) + 1
                             )],
-                            metrics,
+                            [
+                                round(
+                                    metric_value/(1024**3),
+                                    2
+                                ) for metric_value in metrics
+                            ],
                             width=120,
                             height=10,
                             y_min=0,
