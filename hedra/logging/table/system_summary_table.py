@@ -162,7 +162,7 @@ class SystemSummaryTable:
                 table_row = OrderedDict()
 
                 for row_name in SystemMetricsSet.metrics_table_keys:
-                        table_row[row_name] = stage_metrics.record.get(row_name)
+                    table_row[row_name] = stage_metrics.record.get(row_name)
 
                 table_rows.append(table_row)
 
