@@ -51,13 +51,18 @@ class SystemMetricsSet:
         'quantile_99th',
     ]
 
-    def __init__(self, metrics: MonitorGroup) -> None:
+    def __init__(
+            self, metrics: MonitorGroup,
+            batch_sizes: Dict[str, int]
+        ) -> None:
         self.system_metrics_set_id = uuid.uuid4()
         self.system_cpu_metrics: Dict[str, List[Union[int, float]]] = defaultdict(list)
         self.system_memory_metrics: Dict[str, List[Union[int, float]]] = defaultdict(list)
 
         self.session_cpu_metrics: Dict[str, SystemMetricsCollection] = {}
         self.session_memory_metrics: Dict[str, SystemMetricsCollection] = {}
+        self.mb_per_vu: Dict[str, SystemMetricsCollection] = {}
+        self.batch_sizes = batch_sizes
 
         self._quantiles = [
             10,
@@ -108,12 +113,42 @@ class SystemMetricsSet:
 
             for monitor_name, monitor_metrics in cpu_metrics_group.collected.items():
                 self.system_cpu_metrics[monitor_name].extend(monitor_metrics)
-
-        for stage_metrics in self.metrics.values():
+        
+        for stage_name, stage_metrics in self.metrics.items():
             memory_metrics_group = stage_metrics.get('memory')
 
             for monitor_name, monitor_metrics in memory_metrics_group.collected.items():
                 self.system_memory_metrics[monitor_name].extend(monitor_metrics)
+
+                if monitor_name == stage_name:
+                    mb_per_vu = [
+                        round(
+                            memory_used/(1024**2),
+                            2
+                        ) for memory_used in monitor_metrics
+                    ]
+
+                    self.mb_per_vu[stage_name] = SystemMetricsCollection(**{
+                        'stage': stage_name,
+                        'name': monitor_name,
+                        'group': SystemMetricGroupType.MEMORY.value,
+                        'mean': statistics.mean(mb_per_vu),
+                        'median': statistics.median(mb_per_vu),
+                        'max': max(mb_per_vu),
+                        'min': min(mb_per_vu),
+                        'stdev': statistics.stdev(mb_per_vu),
+                        'variance': statistics.variance(mb_per_vu),
+                        **{
+                            f'quantile_{quantile}th':  numpy.quantile(
+                                mb_per_vu,
+                                round(
+                                    quantile/100,
+                                    2
+                                )
+                            ) for quantile in self._quantiles
+                        }
+                    })
+
 
         for monitor_name, monitor_metrics in self.system_cpu_metrics.items():
             self.session_cpu_metrics[monitor_name] = SessionMetricsCollection(**{

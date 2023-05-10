@@ -22,6 +22,7 @@ class SystemSummaryTable:
 
         self.cpu_table: Union[str, None] = None
         self.memory_table: Union[str, None] = None
+        self.mb_per_vu_table: Union[str, None] = None
         self.cpu_plot_rows: Dict[str, List[Union[int, float]]] = defaultdict(list)
         self.memory_plot_rows: Dict[str, List[Union[int, float]]] = defaultdict(list)
 
@@ -32,6 +33,7 @@ class SystemSummaryTable:
     def generate_tables(self):
         self.cpu_table = self._to_cpu_table()
         self.memory_table = self._to_memory_table()
+        self.mb_per_vu_table = self._to_mb_per_vu_table()
 
     def show_tables(self):
         
@@ -58,7 +60,7 @@ class SystemSummaryTable:
                             X_label='time (sec)',
                             Y_label='pct. used (per worker)',
                             lc='cyan',
-                            marker='•'
+                            marker='⨯'
                         )
 
                     self.logger.console.sync.info(f'''\n{monitor_name} % CPU Usage (Per Worker)\n''')
@@ -82,7 +84,7 @@ class SystemSummaryTable:
                             X_label='time (sec)',
                             Y_label='memory used (GB)',
                             lc='cyan',
-                            marker='•'
+                            marker='⨯'
                         )
 
                         self.logger.console.sync.info(f'''\n{monitor_name} % Memory Usage (GB)\n''')
@@ -94,11 +96,39 @@ class SystemSummaryTable:
             self.logger.console.sync.info('\nMemory (gb):\n')
             self.logger.console.sync.info(f'''{self.memory_table}\n''')
 
-    def _to_cpu_table(self):
-            table_rows: List[OrderedDict] = []
+            self.logger.console.sync.info('\nMemory per VU (mb):\n')
+            self.logger.console.sync.info(f'''{self.memory_table}\n''')
 
-            for metrics_set in self.system_metrics_summaries:
-                for metric_group in metrics_set.cpu:
+    def _to_cpu_table(self):
+        table_rows: List[OrderedDict] = []
+
+        for metrics_set in self.system_metrics_summaries:
+            for metric_group in metrics_set.cpu:
+
+                table_row = OrderedDict()
+
+                for row_name in SystemMetricsSet.metrics_table_keys:
+                        table_row[row_name] = metric_group.record.get(row_name)
+
+                table_rows.append(table_row)
+
+        return tabulate(
+            list(sorted(
+                table_rows,
+                key=lambda row: row['stage']
+            )),
+            headers='keys',
+            missingval='None',
+            tablefmt="simple",
+            floatfmt='.2f'
+        )
+    
+    def _to_memory_table(self):
+        table_rows: List[OrderedDict] = []
+
+        for metrics_set in self.system_metrics_summaries:
+            for stage_metrics in metrics_set.memory.metrics.values():
+                for metric_group in stage_metrics.values():
 
                     table_row = OrderedDict()
 
@@ -107,39 +137,38 @@ class SystemSummaryTable:
 
                     table_rows.append(table_row)
 
-            return tabulate(
-                list(sorted(
-                    table_rows,
-                    key=lambda row: row['stage']
-                )),
-                headers='keys',
-                missingval='None',
-                tablefmt="simple",
-                floatfmt='.2f'
-            )
+        return tabulate(
+            list(sorted(
+                table_rows,
+                key=lambda row: row['stage']
+            )),
+            headers='keys',
+            missingval='None',
+            tablefmt="simple",
+            floatfmt='.2f'
+        )
     
-    def _to_memory_table(self):
-            table_rows: List[OrderedDict] = []
+    def _to_mb_per_vu_table(self):
+        table_rows: List[OrderedDict] = []
 
-            for metrics_set in self.system_metrics_summaries:
-                for stage_metrics in metrics_set.memory.metrics.values():
-                    for metric_group in stage_metrics.values():
+        for metrics_set in self.system_metrics_summaries:
+            for stage_metrics in metrics_set.mb_per_vu.values():
 
-                        table_row = OrderedDict()
+                table_row = OrderedDict()
 
-                        for row_name in SystemMetricsSet.metrics_table_keys:
-                             table_row[row_name] = metric_group.record.get(row_name)
+                for row_name in SystemMetricsSet.metrics_table_keys:
+                        table_row[row_name] = stage_metrics.record.get(row_name)
 
-                        table_rows.append(table_row)
+                table_rows.append(table_row)
 
-            return tabulate(
-                list(sorted(
-                    table_rows,
-                    key=lambda row: row['stage']
-                )),
-                headers='keys',
-                missingval='None',
-                tablefmt="simple",
-                floatfmt='.2f'
-            )
+        return tabulate(
+            list(sorted(
+                table_rows,
+                key=lambda row: row['stage']
+            )),
+            headers='keys',
+            missingval='None',
+            tablefmt="simple",
+            floatfmt='.2f'
+        )
 

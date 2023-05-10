@@ -615,9 +615,13 @@ class Analyze(Stage):
     @event('generate_metrics_sets')
     async def generate_system_metrics(
         self,
-        analyze_stage_monitor_results: MonitorGroup={}
+        analyze_stage_monitor_results: MonitorGroup={},
+        analyze_stage_batch_sizes: Dict[str, int]={},
     ):
-        system_metrics_set = SystemMetricsSet(analyze_stage_monitor_results)
+        system_metrics_set = SystemMetricsSet(
+            analyze_stage_monitor_results,
+            analyze_stage_batch_sizes
+        )
         system_metrics_set.generate_system_summaries()
 
         return {

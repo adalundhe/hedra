@@ -1,7 +1,7 @@
 import statistics
 import numpy
 from collections import defaultdict
-from typing import List, Dict, Union
+from typing import Dict, Union
 from .system_metrics_set_types import (
     CPUMonitorGroup,
     MemoryMonitorGroup,
@@ -49,21 +49,32 @@ class SystemMetricsGroup:
         for stage_name, metrics in self.raw_metrics.items():
              for monitor_name, monitor_metrics in metrics.collected.items():
 
+                if self.metrics_group == SystemMetricGroupType.MEMORY:
+                    metrics_data = [
+                        round(
+                            metric_value/(1024**3),
+                            2
+                        ) for metric_value in monitor_metrics
+                    ]
+
+                else:
+                    metrics_data = monitor_metrics
+
                 self.stage_metrics[stage_name][monitor_name] = metrics.stage_metrics[monitor_name]
 
                 self.metrics[stage_name][monitor_name] = SystemMetricsCollection(**{
                     'stage': stage_name,
                     'name': monitor_name,
                     'group': self.metrics_group.value,
-                    'mean': statistics.mean(monitor_metrics),
-                    'median': statistics.median(monitor_metrics),
-                    'max': max(monitor_metrics),
-                    'min': min(monitor_metrics),
-                    'stdev': statistics.stdev(monitor_metrics),
-                    'variance': statistics.variance(monitor_metrics),
+                    'mean': statistics.mean(metrics_data),
+                    'median': statistics.median(metrics_data),
+                    'max': max(metrics_data),
+                    'min': min(metrics_data),
+                    'stdev': statistics.stdev(metrics_data),
+                    'variance': statistics.variance(metrics_data),
                     **{
                         f'quantile_{quantile}th':  numpy.quantile(
-                            monitor_metrics,
+                            metrics_data,
                             round(
                                 quantile/100,
                                 2

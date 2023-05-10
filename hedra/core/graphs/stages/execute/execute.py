@@ -346,7 +346,7 @@ class Execute(Stage, Generic[Unpack[T]]):
                 stage_memory_monitor.stage_metrics[monitor_name] = stage_memory_monitor.collected[monitor_name]
 
             total_results = len(aggregate_results)
-            total_elapsed = statistics.median(elapsed_times)
+            total_elapsed = statistics.mean(elapsed_times)
 
             await self.logger.filesystem.aio['hedra.core'].info( f'{self.metadata_string} - Completed - {total_results} actions at  {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
             await self.logger.spinner.set_default_message(f'Stage - {self.name} completed {total_results} actions at {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')

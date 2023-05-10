@@ -16,9 +16,4 @@ class MemoryMonitor(BaseMonitor):
         process = psutil.Process(os.getpid())
         mem_info = process.memory_info()
 
-        self.active[monitor_name].append(
-            round(
-                mem_info.rss/(1024**3),
-                2
-            )
-        )
+        self.active[monitor_name].append(mem_info.rss)
