@@ -80,7 +80,7 @@ class SystemSummaryTable:
                             x_max=len(metrics) + 1,
                             linesep='\n',
                             X_label='time (sec)',
-                            Y_label='memory used (gb)',
+                            Y_label='memory used (GB)',
                             lc='cyan',
                             marker='•'
                         )
