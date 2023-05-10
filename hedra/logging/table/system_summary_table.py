@@ -44,12 +44,16 @@ class SystemSummaryTable:
                 for monitor in metrics_set.cpu.stage_metrics.values():
                     for monitor_name, metrics in monitor.items():
                         scatter_plot = plotille.scatter(
-                            [idx for idx in range(0, len(metrics))],
+                            [idx for idx in range(
+                                1, 
+                                len(metrics) + 1
+                            )],
                             metrics,
                             width=120,
                             height=10,
                             y_min=0,
                             x_min=0,
+                            x_max=len(metrics) + 1,
                             linesep='\n',
                             X_label='time (sec)',
                             Y_label='pct. used (per worker)',
@@ -64,12 +68,16 @@ class SystemSummaryTable:
                 for monitor in metrics_set.memory.stage_metrics.values():
                     for monitor_name, metrics in monitor.items():
                         scatter_plot = plotille.scatter(
-                            [idx for idx in range(0, len(metrics))],
+                            [idx for idx in range(
+                                1, 
+                                len(metrics) + 1
+                            )],
                             metrics,
                             width=120,
                             height=10,
                             y_min=0,
                             x_min=0,
+                            x_max=len(metrics) + 1,
                             linesep='\n',
                             X_label='time (sec)',
                             Y_label='memory used (gb)',

@@ -75,6 +75,14 @@ class BaseMonitor:
     def store_monitor(self, monitor_name: str):
         self.collected[monitor_name] = list(self.active[monitor_name])
         del self.active[monitor_name]
+
+    def trim_monitor_samples(
+        self,
+        monitor_name: str,
+        trim_length: int
+    ):
+        if self.collected.get(monitor_name):
+            self.collected[monitor_name][:trim_length]
         
     async def _update_background_monitor(
         self,
@@ -82,8 +90,8 @@ class BaseMonitor:
         interval_sec: Union[int, float]=1
     ):
         while self._running_monitors.get(monitor_name):
-            self.update_monitor(monitor_name)
             await asyncio.sleep(interval_sec)
+            self.update_monitor(monitor_name)
 
     def _monitor_at_interval(
         self, 

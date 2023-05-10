@@ -235,6 +235,7 @@ class DefaultPersona:
 
             await self.cpu_monitor.stop_background_monitor(self.stage_name)
             await self.memory_monitor.stop_background_monitor(self.stage_name)
+
             self.cpu_monitor.close()
             self.memory_monitor.close()
 
