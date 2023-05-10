@@ -121,9 +121,12 @@ class SystemMetricsSet:
                 self.system_memory_metrics[monitor_name].extend(monitor_metrics)
 
                 if monitor_name == stage_name:
+
+                    stage_batch_size = stage_metrics.get(stage_name)
+
                     mb_per_vu = [
                         round(
-                            memory_used/(1024**2),
+                            memory_used/(1024**2 * stage_batch_size),
                             2
                         ) for memory_used in monitor_metrics
                     ]
