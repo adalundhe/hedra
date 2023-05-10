@@ -122,7 +122,7 @@ class SystemMetricsSet:
 
                 if monitor_name == stage_name:
 
-                    stage_batch_size = stage_metrics.get(stage_name)
+                    stage_batch_size = self.batch_sizes.get(stage_name)
 
                     mb_per_vu = [
                         round(
