@@ -48,8 +48,6 @@ class SystemSummaryTable:
 
                         show_plot = metrics_set.cpu.visibility_filters[stage_name][monitor_name]
 
-                        print(stage_name, monitor_name, show_plot)
-
                         if show_plot:
                             scatter_plot = plotille.scatter(
                                 [idx for idx in range(

@@ -15,6 +15,7 @@ from hedra.core.graphs.stages.execute import Execute
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.reporting.system.system_metrics_set_types import MonitorGroup
 
 
 class SetupEdge(BaseEdge[Setup]):
@@ -35,7 +36,8 @@ class SetupEdge(BaseEdge[Setup]):
 
         self.requires = [
             'execute_stage_streamed_analytics',
-            'execute_stage_results'
+            'execute_stage_results',
+            'session_stage_monitors'
         ]
 
         self.provides = [
@@ -47,7 +49,9 @@ class SetupEdge(BaseEdge[Setup]):
             'setup_stage_ready_stages',
             'setup_stage_candidates',
             'setup_stage_configs',
-            'execute_stage_results'
+            'execute_stage_results',
+            'session_stage_monitors',
+            'setup_stage_monitors'
         ]
 
         self.assigned_candidates = []
@@ -157,6 +161,12 @@ class SetupEdge(BaseEdge[Setup]):
 
             self.stages_by_type[StageTypes.EXECUTE].update(ready_stages)
 
+            session_stage_monitors = self.edge_data['session_stage_monitors']
+
+            session_stage_monitors.update(
+                self.edge_data['setup_stage_monitors']
+            )
+
             self.next_history[(self.source.name, destination.name)].update({
                 'setup_stage_experiment_config': setup_stage_experiment_config,
                 'setup_stage_configs': setup_stage_configs,
@@ -164,7 +174,8 @@ class SetupEdge(BaseEdge[Setup]):
                 'setup_stage_ready_stages': ready_stages,
                 'setup_stage_candidates': list(setup_candidates.keys()),
                 'execute_stage_setup_config': setup_config,
-                'execute_stage_setup_by': self.source.name   
+                'execute_stage_setup_by': self.source.name,
+                'session_stage_monitors': session_stage_monitors
             })
             
 
@@ -283,3 +294,19 @@ class SetupEdge(BaseEdge[Setup]):
                     selected_optimize_candidates[stage_name] = optimize_candidates.get(stage_name)
 
         return selected_optimize_candidates
+    
+    def setup(self) -> None:
+
+        session_stage_monitors: MonitorGroup = {}
+
+        for source_stage, destination_stage in self.history:
+            
+            previous_history: Dict[str, Any] = self.history[(source_stage, destination_stage)]
+            
+            stage_monitors = previous_history.get('session_stage_monitors')
+            if stage_monitors:
+                session_stage_monitors.update(stage_monitors)
+
+        self.edge_data = {
+            'session_stage_monitors': session_stage_monitors
+        }

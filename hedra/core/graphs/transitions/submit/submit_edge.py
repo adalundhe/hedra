@@ -18,6 +18,7 @@ from hedra.reporting.metric.stage_metrics_summary import StageMetricsSummary
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.system.system_metrics_set import SystemMetricsSet
+from hedra.reporting.system.system_metrics_set_types import MonitorGroup
 
 
 CustomMetricSet = Dict[str, Dict[str, CustomMetric]]
@@ -39,11 +40,14 @@ class SubmitEdge(BaseEdge[Submit]):
             'analyze_stage_session_total',
             'analyze_stage_events',
             'analyze_stage_summary_metrics',
+            'session_stage_monitors'
         ]
         self.provides = [
             'submit_stage_metrics',
             'submit_stage_streamed_metrics',
-            'submit_stage_experiment_metrics'
+            'submit_stage_experiment_metrics',
+            'submit_stage_monitors',
+            'session_stage_monitors'
         ]
 
     async def transition(self):
@@ -95,9 +99,15 @@ class SubmitEdge(BaseEdge[Submit]):
 
             self.next_history[edge_name].update(history)
 
+        session_stage_monitors: MonitorGroup = self.edge_data['session_stage_monitors']
+        session_stage_monitors.update(
+            self.edge_data['submit_stage_monitors']
+        )
+
         if self.skip_stage is False:
             self.next_history.update({
                 (self.source.name, destination.name): {
+                    'session_stage_monitors': session_stage_monitors,
                     'submit_stage_metrics': self.edge_data['submit_stage_metrics'],
                     'submit_stage_experiment_metrics': self.edge_data['submit_stage_experiment_metrics'],
                     'submit_stage_streamed_metrics': self.edge_data['submit_stage_streamed_metrics']
@@ -162,6 +172,7 @@ class SubmitEdge(BaseEdge[Submit]):
         system_metrics: List[SystemMetricsSet] = []
         experiments: List[ExperimentMetricsSet] = []
         session_total: int = 0
+        session_stage_monitors: MonitorGroup = {}
 
         for source_stage, destination_stage in self.history:
             if destination_stage == self.source.name:
@@ -202,14 +213,16 @@ class SubmitEdge(BaseEdge[Submit]):
                 if analyze_stage_system_metrics:
                     system_metrics.append(analyze_stage_system_metrics)
 
-        self.edge_data['submit_stage_events'] = events
-        self.edge_data['submit_stage_experiment_metrics'] = experiments
-        self.edge_data['submit_stage_streamed_metrics'] = streamed_metrics
-        self.edge_data['submit_stage_system_metrics'] = system_metrics
-        self.edge_data['submit_stage_summary_metrics'] = metrics
-        self.edge_data['submit_stage_session_total'] = session_total
+                stage_monitors = previous_history.get('session_stage_monitors')
+                if stage_monitors:
+                    session_stage_monitors.update(stage_monitors)
 
-
-
-
-
+        self.edge_data = {
+            'session_stage_monitors': session_stage_monitors,
+            'submit_stage_events': events,
+            'submit_stage_experiment_metrics': experiments,
+            'submit_stage_streamed_metrics': streamed_metrics,
+            'submit_stage_system_metrics': system_metrics,
+            'submit_stage_summary_metrics': metrics,
+            'session_total': session_total
+        }

@@ -31,13 +31,14 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             'setup_stage_experiment_config',
             'execute_stage_streamed_analytics',
             'execute_stage_results',
-            'execute_stage_monitors'
+            'session_stage_monitors'
         ]
         self.provides = [
             'setup_stage_experiment_config',
             'execute_stage_streamed_analytics',
             'analyze_stage_summary_metrics',
-            'execute_stage_monitors'
+            'session_stage_monitors',
+            'analyze_stage_monitors'
         ]
 
         self.valid_states = [
@@ -61,8 +62,7 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                 event.context.update(self.edge_data)
                 
                 if event.source.context:
-                    event.source.context.update(self.edge_data)
-            
+                    event.source.context.update(self.edge_data)   
 
             if self.edge_data['analyze_stage_has_results']:
 
@@ -103,7 +103,6 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             self.visited.append(self.source.name)
 
         except Exception as edge_exception:
-            print(traceback.format_exc())
             self.exception = edge_exception
 
         return None, self.destination.stage_type
@@ -121,12 +120,19 @@ class AnalyzeEdge(BaseEdge[Analyze]):
             })
 
         if self.skip_stage is False:
+
+            session_stage_monitors: MonitorGroup = self.edge_data['session_stage_monitors']
+            session_stage_monitors.update(
+                self.edge_data['analyze_stage_monitors']
+            )
+
             self.next_history.update({
                 (self.source.name, destination.name): {
                     'analyze_stage_summary_metrics': self.edge_data.get(
                         'analyze_stage_summary_metrics', 
                         {}
-                    )
+                    ),
+                    'session_stage_monitors': session_stage_monitors
                 }
             })
 
@@ -211,7 +217,7 @@ class AnalyzeEdge(BaseEdge[Analyze]):
     def setup(self) -> None:
 
         raw_results = {}
-        stage_monitors: MonitorGroup = {}
+        session_stage_monitors: MonitorGroup = {}
 
         for source_stage, destination_stage in self.history:
             stage_results = {}
@@ -223,10 +229,10 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                 )]
 
                 stage_results = source_history.get('execute_stage_results', {})
-                execute_stage_monitors = source_history.get('execute_stage_monitors')
 
-                if execute_stage_monitors:
-                    stage_monitors[source_stage] = execute_stage_monitors
+                stage_monitors = source_history.get('session_stage_monitors')
+                if stage_monitors:
+                    session_stage_monitors.update(stage_monitors)
 
             raw_results.update(stage_results)
 
@@ -244,9 +250,9 @@ class AnalyzeEdge(BaseEdge[Analyze]):
                 stage.state = StageStates.ANALYZING
                 results_to_calculate[stage_name] = raw_results.get(stage_name)
                 target_stages[stage_name] = stage
-        
+
         self.edge_data = {
-            'analyze_stage_monitor_results': stage_monitors,
+            'session_stage_monitors': session_stage_monitors,
             'analyze_stage_raw_results': results_to_calculate,
             'analyze_stage_target_stages': target_stages,
             'analyze_stage_has_results': len(results_to_calculate) > 0

@@ -123,8 +123,9 @@ class SystemMetricsSet:
                 self.system_memory_metrics[monitor_name].extend(monitor_metrics)
 
                 stage_type: StageTypes = memory_metrics_group.stage_type
+                is_visible = memory_metrics_group.visibility_filters[monitor_name]
 
-                if monitor_name == stage_name and stage_type == StageTypes.EXECUTE:
+                if stage_type == StageTypes.EXECUTE and is_visible:
 
                     stage_batch_size = self.batch_sizes.get(stage_name)
 

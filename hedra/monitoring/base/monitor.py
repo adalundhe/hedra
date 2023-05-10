@@ -14,18 +14,33 @@ from typing import (
 
 def handle_loop_stop(
     signame,
-    loop: asyncio.AbstractEventLoop,
+    loop: Union[asyncio.AbstractEventLoop, None],
+    running_monitors: Dict[str, bool],
+    monitors: Dict[str, asyncio.Future],
     executor: ThreadPoolExecutor
 ):
     try:
+
+        for monitor_name in running_monitors:
+            running_monitors[monitor_name] = False
+            monitors[monitor_name].cancel()
+
         executor.shutdown()
-        loop.close()
+        
+        if loop:
+            loop.close()
 
-    except BrokenPipeError:
-        pass
+    except BrokenPipeError as e:
+        executor.shutdown()
+        raise e
 
-    except RuntimeError:
-        pass
+    except RuntimeError as e:
+        executor.shutdown()
+        raise e
+
+    except Exception as e:
+        executor.shutdown()
+        raise e
 
 
 class BaseMonitor:
@@ -35,11 +50,11 @@ class BaseMonitor:
         self.collected: Dict[str, List[int]] = defaultdict(list)
         self.cpu_count = psutil.cpu_count()
         self.stage_metrics: Dict[str, List[Union[int, float]]] = {}
-        self.show_as_plot: bool = False
+        self.visibility_filters: Dict[str, bool] = defaultdict(lambda: False)
         self.stage_type: Union[Any, None] = None
 
         self._background_monitors: Dict[str, asyncio.Task] = {}
-        self._sync_background_monitors: Dict[str, asyncio.Task] = {}
+        self._sync_background_monitors: Dict[str, asyncio.Future] = {}
         self._running_monitors: Dict[str, bool] = {}
 
         self._loop: Union[asyncio.AbstractEventLoop, None] = None
@@ -63,6 +78,8 @@ class BaseMonitor:
                     lambda signame: handle_loop_stop(
                         signame,
                         self._loop,
+                        self._running_monitors,
+                        self._sync_background_monitors,
                         self._executor
                     )
                 )
@@ -94,6 +111,8 @@ class BaseMonitor:
                     lambda signame=signame: handle_loop_stop(
                         signame,
                         self._loop,
+                        self._running_monitors,
+                        self._background_monitors,
                         self._executor
                     )
                 )

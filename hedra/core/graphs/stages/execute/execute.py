@@ -136,7 +136,8 @@ class Execute(Stage, Generic[Unpack[T]]):
             'setup_stage_ready_stages',
             'execute_stage_results',
             'execute_stage_streamed_analytics',
-            'execute_stage_monitors'
+            'execute_stage_monitors',
+            'session_stage_monitors',
         ]
         persona_type_name = '-'.join([
             segment.capitalize() for segment in execute_stage_setup_config.persona_type.split('-')
@@ -150,8 +151,8 @@ class Execute(Stage, Generic[Unpack[T]]):
         cpu_monitor = CPUMonitor()
         memory_monitor = MemoryMonitor()
 
-        cpu_monitor.show_as_plot = True
-        memory_monitor.show_as_plot = True
+        cpu_monitor.visibility_filters[main_monitor_name] = False
+        memory_monitor.visibility_filters[main_monitor_name] = False
 
         cpu_monitor.stage_type = StageTypes.EXECUTE
         memory_monitor.stage_type = StageTypes.EXECUTE
@@ -354,6 +355,8 @@ class Execute(Stage, Generic[Unpack[T]]):
                         fillvalue=0
                     )
                 ]
+
+                stage_cpu_monitor.visibility_filters[monitor_name] = True
                 
             for monitor_name, collection_stats in memory_stats.items():
                 stage_memory_monitor.collected[monitor_name] = [
@@ -363,6 +366,7 @@ class Execute(Stage, Generic[Unpack[T]]):
                     )
                 ]
 
+                stage_memory_monitor.visibility_filters[monitor_name] = True
                 stage_memory_monitor.stage_metrics[monitor_name] = stage_memory_monitor.collected[monitor_name]
 
             main_monitor_name = f'{self.name}.main'
@@ -400,8 +404,10 @@ class Execute(Stage, Generic[Unpack[T]]):
                     'experiment': execute_stage_experiment
                 }),
                 'execute_stage_monitors': {
-                    'cpu': stage_cpu_monitor,
-                    'memory': stage_memory_monitor
+                    self.name: {
+                        'cpu': stage_cpu_monitor,
+                        'memory': stage_memory_monitor
+                    }
                 }
             }
 
@@ -482,18 +488,31 @@ class Execute(Stage, Generic[Unpack[T]]):
             stage_cpu_monitor: CPUMonitor = execute_stage_monitors.get('cpu')
             stage_memory_monitor: MemoryMonitor = execute_stage_monitors.get('memory')
 
+            main_monitor_name = f'{self.name}.main'
+
             start = time.monotonic()
 
             results = await execute_stage_persona.execute()
 
             elapsed = time.monotonic() - start
 
-            await stage_cpu_monitor.stop_background_monitor(self.name)
-            await stage_memory_monitor.stop_background_monitor(self.name)
+            await stage_cpu_monitor.stop_background_monitor(main_monitor_name)
+            await stage_memory_monitor.stop_background_monitor(main_monitor_name)
 
-    
             stage_cpu_monitor.close()
             stage_memory_monitor.close()
+
+            elapsed_idx = int(elapsed)
+
+            stage_cpu_monitor.trim_monitor_samples(
+                main_monitor_name,
+                elapsed_idx
+            )
+
+            stage_memory_monitor.trim_monitor_samples(
+                main_monitor_name,
+                elapsed_idx
+            )
 
             await self.logger.filesystem.aio['hedra.core'].info(
                 f'{self.metadata_string} - Execution complete - Time (including addtional setup) took: {round(elapsed, 2)} seconds'
@@ -501,8 +520,6 @@ class Execute(Stage, Generic[Unpack[T]]):
 
             total_results = len(results)
             total_elapsed = execute_stage_persona.total_elapsed
-
-            main_monitor_name = f'{self.name}.main'
 
             await stage_cpu_monitor.stop_background_monitor(main_monitor_name)
             await stage_memory_monitor.stop_background_monitor(main_monitor_name)
@@ -518,7 +535,6 @@ class Execute(Stage, Generic[Unpack[T]]):
                 execute_stage_persona.memory_monitor.collected
             )
 
-
             stage_cpu_monitor.stage_metrics[main_monitor_name] = stage_cpu_monitor.collected[main_monitor_name]
             stage_memory_monitor.stage_metrics[main_monitor_name] = stage_memory_monitor.collected[main_monitor_name]
 
@@ -528,8 +544,6 @@ class Execute(Stage, Generic[Unpack[T]]):
 
             if self.executor:
                 self.executor.shutdown()
-
-            stage_memory_monitor.stop_profile(self.name)
 
             execution_results.update({
                 'execute_stage_streamed_analytics': [
@@ -550,8 +564,10 @@ class Execute(Stage, Generic[Unpack[T]]):
                     'experiment': execute_stage_experiment
                 }),
                 'execute_stage_monitors': {
-                    'cpu': stage_cpu_monitor,
-                    'memory': stage_memory_monitor
+                    self.name: {   
+                        'cpu': stage_cpu_monitor,
+                        'memory': stage_memory_monitor
+                    }
                 }
             })
             

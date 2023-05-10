@@ -26,8 +26,12 @@ from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.stages.base.parallel.stage_priority import StagePriority
 from hedra.core.graphs.stages.types.stage_types import StageTypes
-from hedra.core.personas.types import PersonaTypesMap
 from hedra.logging import HedraLogger
+from hedra.monitoring import (
+    CPUMonitor,
+    MemoryMonitor
+)
+from hedra.core.personas.types import PersonaTypesMap
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
 from hedra.plugins.types.plugin_types import PluginType
@@ -220,13 +224,31 @@ class Setup(Stage, Generic[Unpack[T]]):
         bypass_connection_validation = self.core_config.get('bypass_connection_validation', False)
         connection_validation_retries = self.core_config.get('connection_validation_retries', 3)
 
+        self.context.ignore_serialization_filters = [
+            'session_stage_monitors'
+        ]
+
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting setup')
+
+        cpu_monitor = CPUMonitor()
+        memory_monitor = MemoryMonitor()
+
+        main_monitor_name = f'{self.name}.main'
+
+        if setup_stage_is_primary_thread:
+            await cpu_monitor.start_background_monitor(main_monitor_name)
+            await memory_monitor.start_background_monitor(main_monitor_name)
+
         
         return {
             'setup_stage_experiment_config': {},
             'setup_stage_target_stages_count': len(setup_stage_target_stages),
             'setup_stage_target_config': setup_stage_target_config,
             'setup_stage_target_stages': setup_stage_target_stages,
+            'setup_stage_monitors': {
+                'cpu': cpu_monitor,
+                'memory': memory_monitor
+            },
             'bypass_connection_validation': bypass_connection_validation,
             'connection_validation_retries': connection_validation_retries,
             'setup_stage_is_primary_thread': setup_stage_is_primary_thread
@@ -570,7 +592,25 @@ class Setup(Stage, Generic[Unpack[T]]):
         setup_stage_tasks: List[TaskHook]=[],
         setup_stage_target_config: Config=None,
         setup_stage_experiment_config: Dict[str, Union[str, int, List[float]]]={},
+        setup_stage_monitors: Dict[str, Union[CPUMonitor, MemoryMonitor]]={},
+        setup_stage_is_primary_thread: bool = True
     ):
+        
+        stage_cpu_monitor: CPUMonitor = setup_stage_monitors.get('cpu')
+        stage_memory_monitor: MemoryMonitor = setup_stage_monitors.get('memory')
+
+        if setup_stage_is_primary_thread:
+            main_monitor_name = f'{self.name}.main'
+    
+            await stage_cpu_monitor.stop_background_monitor(main_monitor_name)
+            await stage_memory_monitor.stop_background_monitor(main_monitor_name)
+
+            stage_cpu_monitor.close()
+            stage_memory_monitor.close()
+
+            stage_cpu_monitor.stage_metrics[main_monitor_name] = stage_cpu_monitor.collected[main_monitor_name]
+            stage_memory_monitor.stage_metrics[main_monitor_name] = stage_memory_monitor.collected[main_monitor_name]      
+
         actions_by_stage = defaultdict(list)
         tasks_by_stage = defaultdict(list)
 
@@ -614,7 +654,13 @@ class Setup(Stage, Generic[Unpack[T]]):
             'execute_stage_setup_hooks': execute_stage_setup_hooks,
             'execute_stage_setup_config': setup_stage_target_config,
             'setup_stage_ready_stages': setup_stage_target_stages,
-            'setup_stage_target_stages': setup_stage_target_stages
+            'setup_stage_target_stages': setup_stage_target_stages,
+            'setup_stage_monitors': {
+                self.name: {
+                    'cpu': stage_cpu_monitor,
+                    'memory': stage_memory_monitor
+                }
+            },
         }
 
     @event('apply_channels')

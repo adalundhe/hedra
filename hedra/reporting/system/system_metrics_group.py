@@ -51,7 +51,7 @@ class SystemMetricsGroup:
         for stage_name, metrics in self.raw_metrics.items():
              for monitor_name, monitor_metrics in metrics.collected.items():
 
-                self.visibility_filters[stage_name][monitor_name] = metrics.show_as_plot
+                self.visibility_filters[stage_name][monitor_name] = metrics.visibility_filters[monitor_name]
 
                 if self.metrics_group == SystemMetricGroupType.MEMORY:
                     metrics_data = [

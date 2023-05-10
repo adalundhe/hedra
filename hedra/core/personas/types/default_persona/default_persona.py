@@ -238,10 +238,6 @@ class DefaultPersona:
             await self.cpu_monitor.stop_background_monitor(monitor_name)
             await self.memory_monitor.stop_background_monitor(monitor_name)
 
-            self.cpu_monitor.close()
-            self.memory_monitor.close()
-
-
             for reporter in self.stream_reporters:
                 await reporter.close()
 
@@ -263,9 +259,21 @@ class DefaultPersona:
 
             await self.cpu_monitor.stop_background_monitor(monitor_name)
             await self.memory_monitor.stop_background_monitor(monitor_name)
-            
-            self.cpu_monitor.close()
-            self.memory_monitor.close()
+
+        self.cpu_monitor.close()
+        self.memory_monitor.close() 
+
+        execution_elapsed = int(self.end - self.start)
+
+        self.cpu_monitor.trim_monitor_samples(
+            monitor_name,
+            execution_elapsed
+        )
+
+        self.memory_monitor.trim_monitor_samples(
+            monitor_name,
+            execution_elapsed
+        )
 
         self.pending_actions = len(pending)
         await self.logger.filesystem.aio['hedra.core'].debug(

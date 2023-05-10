@@ -172,7 +172,7 @@ class Analyze(Stage):
     async def initialize_results_analysis(
         self,
         analyze_stage_raw_results: RawResultsSet={},
-        analyze_stage_monitor_results: MonitorGroup={}
+        session_stage_monitors: MonitorGroup={}
     ):
 
         await self.logger.filesystem.aio.create_logfile('hedra.reporting.log')
@@ -193,7 +193,7 @@ class Analyze(Stage):
             'analyze_stage_raw_results',
             'analyze_stage_target_stages',
             'analyze_stage_deserialized_results',
-            'analyze_stage_monitor_results',
+            'session_stage_monitors',
             'analyze_stage_monitors'
         ]
 
@@ -208,7 +208,7 @@ class Analyze(Stage):
             'analyze_stage_all_results': all_results,
             'analyze_stage_stages_count': len(analyze_stage_raw_results),
             'analyze_stage_total_group_results': total_group_results,
-            'analyze_stage_monitor_results': analyze_stage_monitor_results
+            'session_stage_monitors': session_stage_monitors
         }
     
     @event('initialize_results_analysis')
@@ -481,6 +481,8 @@ class Analyze(Stage):
             for stage_name, stage_results in analyze_stage_batch_results:
                 results = stage_results.pop()
 
+                stage_events_set[stage_name] = results.get('events')
+
                 monitors: Dict[str, MonitorResults] = results.get('monitoring', {})
                 cpu_monitor = monitors.get('cpu', {})
                 memory_monitor = monitors.get('memory', {})
@@ -510,8 +512,6 @@ class Analyze(Stage):
                 ]
 
                 stage_memory_monitor.stage_metrics[monitor_name] = stage_memory_monitor.collected[monitor_name]
-
-                stage_events_set[stage_name] = results.get('events')
 
         else:
 
@@ -694,18 +694,18 @@ class Analyze(Stage):
     async def generate_system_metrics(
         self,
         analyze_stage_monitors: MonitorGroup={},
-        analyze_stage_monitor_results: MonitorGroup={},
+        session_stage_monitors: MonitorGroup={},
         analyze_stage_batch_sizes: Dict[str, int]={},
     ):
         
-        analyze_stage_monitor_results.update({
+        session_stage_monitors.update({
             self.name: {
                 **analyze_stage_monitors
             }
         })
 
         system_metrics_set = SystemMetricsSet(
-            analyze_stage_monitor_results,
+            session_stage_monitors,
             analyze_stage_batch_sizes
         )
         system_metrics_set.generate_system_summaries()
@@ -725,7 +725,8 @@ class Analyze(Stage):
         analyze_stage_processed_results: ProcessedResultsSet=[],
         analyze_stage_contexts: Dict[str, Any]={},
         experiment_metrics_sets: Dict[str, ExperimentMetricsSet]={},
-        analyze_stage_system_metrics: SystemMetricsSet=None
+        analyze_stage_system_metrics: SystemMetricsSet=None,
+        analyze_stage_monitors: Dict[str, Union[CPUMonitor, MemoryMonitor]] = {}
     ):
 
         self.context[self.name] = analyze_stage_contexts
@@ -750,7 +751,12 @@ class Analyze(Stage):
         self.executor.shutdown()
         
         return {
-            'analyze_stage_summary_metrics': summaries
+            'analyze_stage_summary_metrics': summaries,
+            'analyze_stage_monitors': {
+                self.name: {
+                    **analyze_stage_monitors
+                }
+            }
         }
 
     @event('generate_summary')

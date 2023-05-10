@@ -1,6 +1,8 @@
 import asyncio
 import dill
 import time
+import statistics
+import itertools
 from collections import defaultdict
 from typing import (
     Dict, 
@@ -19,8 +21,12 @@ from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.context.decorator import context
 from hedra.core.hooks.types.event.decorator import event
 from hedra.core.hooks.types.internal.decorator import Internal
-from hedra.logging import logging_manager
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
+from hedra.logging import logging_manager
+from hedra.monitoring import (
+    CPUMonitor,
+    MemoryMonitor
+)
 from hedra.versioning.flags.types.base.active import active_flags
 from hedra.versioning.flags.types.base.flag_type import FlagTypes
 from typing import Optional
@@ -29,7 +35,11 @@ from .parallel import optimize_stage
 
 
 BatchedOptimzationCandidates = List[Tuple[str, Execute, int]] 
+
 OptimizeParameterPair = Tuple[Union[int, float], Union[int, float]]
+
+MonitorResults = Dict[str, List[Union[int, float]]]
+
 
 class Optimize(Stage):
     stage_type=StageTypes.OPTIMIZE
@@ -95,15 +105,28 @@ class Optimize(Stage):
         execute_stage_streamed_analytics: Dict[str, List[StreamAnalytics]]={}
 
     ):
+        main_monitor_name = f'{self.name}.main'
+
+        cpu_monitor = CPUMonitor()
+        memory_monitor = MemoryMonitor()
+
+        cpu_monitor.stage_type = StageTypes.OPTIMIZE
+        memory_monitor.stage_type = StageTypes.OPTIMIZE
+
+        await cpu_monitor.start_background_monitor(main_monitor_name)
+        await memory_monitor.start_background_monitor(main_monitor_name)
+
         self.optimization_execution_time_start = time.monotonic()
 
         self.context.ignore_serialization_filters = [
             'optimize_stage_workers_map',
             'optimize_stage_batched_stages',
             'optimize_stage_candidates',
+            'optimize_stage_monitors',
             'setup_stage_ready_stages',
             'execute_stage_setup_hooks',
-            'execute_stage_results'
+            'execute_stage_results',
+            'session_stage_monitors'
         ]
 
         stage_names = ', '.join(list(optimize_stage_candidates.keys()))
@@ -135,7 +158,11 @@ class Optimize(Stage):
             'optimize_stage_stage_names': stage_names,
             'optimize_stage_stages_count': stages_count,
             'optimize_stage_workers_map': stage_workers_map,
-            'optimize_stage_batched_stages': batched_stages
+            'optimize_stage_batched_stages': batched_stages,
+            'optimize_stage_monitors': {
+                'cpu': cpu_monitor,
+                'memory': memory_monitor
+            }
         }
 
     @event('collect_optimization_stages')
@@ -244,7 +271,15 @@ class Optimize(Stage):
     async def collect_optimized_batch_sizes(
         self,
         optimize_stage_results: List[Any]=[],
+        optimize_stage_monitors: Dict[str, Union[CPUMonitor, MemoryMonitor]] = {}
     ):
+        
+        stage_cpu_monitor: CPUMonitor = optimize_stage_monitors.get('cpu')
+        stage_memory_monitor: MemoryMonitor = optimize_stage_monitors.get('memory')
+
+        cpu_stats: Dict[str, List[Tuple[Union[int, float]]]] = defaultdict(list)
+        memory_stats: Dict[str, List[Tuple[Union[int, float]]]] = defaultdict(list)
+
         optimized_batch_sizes = []
         for optimization_result in optimize_stage_results:
 
@@ -253,10 +288,58 @@ class Optimize(Stage):
                 optimized_config.batch_size
             )
 
+            monitors: Dict[str, MonitorResults] = optimization_result.get('monitoring', {})
+            cpu_monitor = monitors.get('cpu', {})
+            memory_monitor = monitors.get('memory', {})
+            
+            for monitor_name, collection_stats in cpu_monitor.items():
+                cpu_stats[monitor_name].append(collection_stats)
+                stage_cpu_monitor.collected[monitor_name].extend(collection_stats)
+
+            for monitor_name, collection_stats in memory_monitor.items():
+                memory_stats[monitor_name].append(collection_stats)
+        
+
+        for monitor_name, collection_stats in cpu_stats.items():
+            stage_cpu_monitor.stage_metrics[monitor_name] = [
+                statistics.median(cpu_usage) for cpu_usage in itertools.zip_longest(
+                    *collection_stats,
+                    fillvalue=0
+                )
+            ]
+
+            stage_cpu_monitor.stage_metrics[monitor_name] = stage_cpu_monitor.collected[monitor_name]
+
+            
+        for monitor_name, collection_stats in memory_stats.items():
+            stage_memory_monitor.collected[monitor_name] = [
+                sum(memory_usage) for memory_usage in itertools.zip_longest(
+                    *collection_stats,
+                    fillvalue=0
+                )
+            ]
+
+            stage_memory_monitor.stage_metrics[monitor_name] = stage_memory_monitor.collected[monitor_name]
+
+        main_monitor_name = f'{self.name}.main'
+
+        await stage_cpu_monitor.stop_background_monitor(main_monitor_name)
+        await stage_memory_monitor.stop_background_monitor(main_monitor_name)
+
+        stage_cpu_monitor.close()
+        stage_memory_monitor.close()
+
+        stage_cpu_monitor.stage_metrics[main_monitor_name] = stage_cpu_monitor.collected[main_monitor_name]
+        stage_memory_monitor.stage_metrics[main_monitor_name] = stage_memory_monitor.collected[main_monitor_name]
+
         optimized_batch_size = sum(optimized_batch_sizes)
 
         return {
-            'optimize_stage_batch_size': optimized_batch_size
+            'optimize_stage_batch_size': optimized_batch_size,
+            'optimize_stage_monitors': {
+                'cpu': stage_cpu_monitor,
+                'memory': stage_memory_monitor
+            }
         }
 
     @context('collect_optimized_batch_sizes')
@@ -323,7 +406,8 @@ class Optimize(Stage):
         optimize_stage_workers_map: Dict[str, Execute]={},
         optimize_stage_candidates: Dict[str, Execute]={},
         optimize_stage_optimzations: Dict[str, Union[int, float]]={},
-        optimize_stage_context: Dict[str, Any]={}
+        optimize_stage_context: Dict[str, Any]={},
+        optimize_stage_monitors: Dict[str, Union[CPUMonitor, MemoryMonitor]]={}
     ):
         self.context[self.name] = optimize_stage_context
 
@@ -342,7 +426,12 @@ class Optimize(Stage):
         return {
             'optimize_stage_optimized_params': [
                 result.get('params') for result in optimize_stage_results
-            ]
+            ],
+            'optimize_stage_monitors': {
+                self.name: {
+                    **optimize_stage_monitors
+                }
+            }
         }
 
     @event('complete_optimization')
