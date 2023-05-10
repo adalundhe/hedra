@@ -102,7 +102,7 @@ class SystemSummaryTable:
             self.logger.console.sync.info(f'''{self.memory_table}\n''')
 
             self.logger.console.sync.info('\nMemory per VU (mb):\n')
-            self.logger.console.sync.info(f'''{self.memory_table}\n''')
+            self.logger.console.sync.info(f'''{self.mb_per_vu_table}\n''')
 
     def _to_cpu_table(self):
         table_rows: List[OrderedDict] = []
