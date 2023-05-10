@@ -41,8 +41,8 @@ class SystemSummaryTable:
         if self.enabled_tables.get('system'):
 
             for metrics_set in self.system_metrics_summaries:
-                for monitor in metrics_set.cpu.raw_metrics.values():
-                    for monitor_name, metrics in monitor.collected.items():
+                for monitor in metrics_set.cpu.stage_metrics.values():
+                    for monitor_name, metrics in monitor.items():
                         scatter_plot = plotille.scatter(
                             [idx for idx in range(0, len(metrics))],
                             metrics,
@@ -61,11 +61,11 @@ class SystemSummaryTable:
                     self.logger.console.sync.info(f'''{scatter_plot}\n''')
 
             for metrics_set in self.system_metrics_summaries:
-                for monitor in metrics_set.memory.raw_metrics.values():
-                    for monitor_name, metrics in monitor.collected.items():
+                for monitor in metrics_set.memory.stage_metrics.values():
+                    for monitor_name, metrics in monitor.items():
                         scatter_plot = plotille.scatter(
-                            [idx for idx in range(0, len(metrics.collected))],
-                            metrics.collected,
+                            [idx for idx in range(0, len(metrics))],
+                            metrics,
                             width=120,
                             height=10,
                             y_min=0,

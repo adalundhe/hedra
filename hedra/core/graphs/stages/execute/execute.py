@@ -299,6 +299,7 @@ class Execute(Stage, Generic[Unpack[T]]):
             stage_cpu_monitor = CPUMonitor()
             stage_memory_monitor = MemoryMonitor()
 
+            cpu_stats: Dict[str, List[Tuple[Union[int, float]]]] = defaultdict(list)
             memory_stats: Dict[str, List[Tuple[Union[int, float]]]] = defaultdict(list)
             
             for result_set in execute_stage_results:
@@ -319,10 +320,20 @@ class Execute(Stage, Generic[Unpack[T]]):
                 memory_monitor = monitors.get('memory', {})
                 
                 for monitor_name, collection_stats in cpu_monitor.items():
+                    cpu_stats[monitor_name].append(collection_stats)
                     stage_cpu_monitor.collected[monitor_name].extend(collection_stats)
 
                 for monitor_name, collection_stats in memory_monitor.items():
                     memory_stats[monitor_name].append(collection_stats)
+            
+
+            for monitor_name, collection_stats in cpu_stats.items():
+                stage_cpu_monitor.stage_metrics[monitor_name] = [
+                    statistics.median(cpu_usage) for cpu_usage in itertools.zip_longest(
+                        *collection_stats,
+                        fillvalue=0
+                    )
+                ]
                 
             for monitor_name, collection_stats in memory_stats.items():
                 stage_memory_monitor.collected[monitor_name] = [
@@ -331,6 +342,8 @@ class Execute(Stage, Generic[Unpack[T]]):
                         fillvalue=0
                     )
                 ]
+
+                stage_memory_monitor.stage_metrics[monitor_name] = stage_memory_monitor.collected[monitor_name]
 
             total_results = len(aggregate_results)
             total_elapsed = statistics.median(elapsed_times)

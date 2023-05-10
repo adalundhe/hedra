@@ -13,6 +13,7 @@ from pydantic import (
 )
 from typing import (
     Dict,
+    List,
     Union
 )
 
@@ -22,6 +23,8 @@ MemoryMonitorGroup = Dict[str, MemoryMonitor]
 CPUMonitorGroup = Dict[str, CPUMonitor]
 
 MonitorGroup = Dict[str, Union[CPUMonitorGroup, MemoryMonitorGroup]]
+
+StageSystemMetricsGroup = Dict[str, Dict[str, List[Union[int, float]]]]
 
 
 class SystemMetricGroupType(Enum):

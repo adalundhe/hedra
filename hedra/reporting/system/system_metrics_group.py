@@ -5,6 +5,7 @@ from typing import List, Dict, Union
 from .system_metrics_set_types import (
     CPUMonitorGroup,
     MemoryMonitorGroup,
+    StageSystemMetricsGroup,
     SystemMetricsCollection,
     SystemMetricGroupType
 )
@@ -17,6 +18,8 @@ class SystemMetricsGroup:
             metrics: Union[CPUMonitorGroup, MemoryMonitorGroup],
             metric_group: SystemMetricGroupType
         ) -> None:
+        self.stage_metrics: StageSystemMetricsGroup = defaultdict(dict)
+
         self.raw_metrics: Union[CPUMonitorGroup, MemoryMonitorGroup] = metrics
         self.metrics_group = metric_group
         self.metrics: Dict[str, Dict[str, SystemMetricsCollection]] = defaultdict(dict)
@@ -45,6 +48,9 @@ class SystemMetricsGroup:
 
         for stage_name, metrics in self.raw_metrics.items():
              for monitor_name, monitor_metrics in metrics.collected.items():
+
+                self.stage_metrics[stage_name][monitor_name] = metrics.stage_metrics[monitor_name]
+
                 self.metrics[stage_name][monitor_name] = SystemMetricsCollection(**{
                     'stage': stage_name,
                     'name': monitor_name,

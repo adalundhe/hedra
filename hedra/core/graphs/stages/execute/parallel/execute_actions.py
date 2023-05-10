@@ -69,12 +69,6 @@ async def start_execution(
     log_level: str=None,
     extensions: Dict[str, ExtensionPlugin]={}
 ) -> Dict[str, Any]:
-    
-    cpu_monitor = CPUMonitor()
-    await cpu_monitor.start_background_monitor(source_stage_name)
-
-    memory_monitor = MemoryMonitor()
-    await memory_monitor.start_background_monitor(source_stage_name)
 
     current_task = asyncio.current_task()
 
@@ -191,10 +185,6 @@ async def start_execution(
     for idx, result in enumerate(results):
         results[idx] = dill.dumps(result)  
 
-    await cpu_monitor.stop_background_monitor(source_stage_name)
-    await memory_monitor.stop_background_monitor(source_stage_name)
-    cpu_monitor.close()
-    memory_monitor.close()
 
     results_dict =  {
         'streamed_analytics': persona.streamed_analytics,
@@ -203,8 +193,8 @@ async def start_execution(
         'total_elapsed': persona.total_elapsed,
         'context': context,
         'monitoring': {
-            'memory': memory_monitor.collected,
-            'cpu': cpu_monitor.collected
+            'memory': persona.memory_monitor.collected,
+            'cpu': persona.cpu_monitor.collected
         }
     }
 

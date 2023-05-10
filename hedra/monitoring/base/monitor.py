@@ -29,6 +29,7 @@ class BaseMonitor:
         self.active: Dict[str, List[int]] = defaultdict(list)
         self.collected: Dict[str, List[int]] = defaultdict(list)
         self.cpu_count = psutil.cpu_count()
+        self.stage_metrics: Dict[str, List[Union[int, float]]] = {}
 
         self._background_monitors: Dict[str, asyncio.Task] = {}
         self._running_monitors: Dict[str, bool] = {}
