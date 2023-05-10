@@ -47,7 +47,8 @@ class SubmitEdge(BaseEdge[Submit]):
             'submit_stage_streamed_metrics',
             'submit_stage_experiment_metrics',
             'submit_stage_monitors',
-            'session_stage_monitors'
+            'session_stage_monitors',
+            'submit_stage_system_metrics'
         ]
 
     async def transition(self):
@@ -110,7 +111,8 @@ class SubmitEdge(BaseEdge[Submit]):
                     'session_stage_monitors': session_stage_monitors,
                     'submit_stage_metrics': self.edge_data['submit_stage_metrics'],
                     'submit_stage_experiment_metrics': self.edge_data['submit_stage_experiment_metrics'],
-                    'submit_stage_streamed_metrics': self.edge_data['submit_stage_streamed_metrics']
+                    'submit_stage_streamed_metrics': self.edge_data['submit_stage_streamed_metrics'],
+                    'submit_stage_system_metrics': self.edge_data['submit_stage_system_metrics']
                 }
             })
 

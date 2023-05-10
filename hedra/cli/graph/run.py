@@ -20,11 +20,10 @@ from hedra.logging import (
     logging_manager
 )
 from hedra.logging.table.summary_table import SummaryTable
-from hedra.logging.table.table_types import GraphExecutionResults
+from hedra.logging.table.table_types import GraphResults
 from typing import Dict, Union
-
-
 uvloop.install()
+
 
 def run_graph(
     path: str, 
@@ -185,7 +184,7 @@ def run_graph(
         )
 
 
-    graph_execution_results: Union[GraphExecutionResults, None] = None
+    graph_execution_results: GraphResults = None
 
     try:
         

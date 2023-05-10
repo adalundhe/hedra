@@ -5,16 +5,23 @@ import networkx
 import threading
 import os
 import time
-from typing import Dict, List, Any
+from typing import (
+    Dict, 
+    List, 
+    Any
+)
 from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.transitions.transition_group import TransitionGroup
 from hedra.logging import HedraLogger
-from hedra.logging.table.table_types import GraphExecutionResults
+from hedra.logging.table.table_types import (
+    GraphExecutionResults,
+    SubmitStageSystemMetrics,
+    GraphResults
+)
 from .transitions import TransitionAssembler, local_transitions
 from .status import GraphStatus
-
 
 
 class Graph:
@@ -152,7 +159,7 @@ class Graph:
         self.logger.hedra.sync.debug(f'{self.metadata_string} - Assembly complete')
         self.logger.filesystem.sync['hedra.core'].debug(f'{self.metadata_string} - Assembly complete')
 
-    async def run(self) -> GraphExecutionResults:
+    async def run(self) -> GraphResults:
 
         execution_start = time.monotonic()
 
@@ -164,6 +171,7 @@ class Graph:
         self.status = GraphStatus.RUNNING
 
         summary_output: GraphExecutionResults = {}
+        submit_stage_system_metrics: SubmitStageSystemMetrics = {}
 
         for transition_group in self._transitions:
 
@@ -229,6 +237,14 @@ class Graph:
                         if analyze_stage_summary_metrics:
                             summary_output[stage_name] = analyze_stage_summary_metrics
 
+                    if transition.edge.source.stage_type == StageTypes.SUBMIT:
+                        stage_name = transition.edge.source.name
+                        submit_stage_context = transition.edge.source.context
+
+                        submit_stage_system_metrics_set = submit_stage_context.get('submit_stage_system_metrics')
+                        if submit_stage_system_metrics_set:
+                            submit_stage_system_metrics[stage_name] = submit_stage_system_metrics_set
+
                 if self.status == GraphStatus.FAILED:
                     status_spinner.finalize()
                     await status_spinner.fail('Error')
@@ -277,7 +293,10 @@ class Graph:
             if task != run_task and task.cancelled() is False:
                 task.cancel()
 
-        return summary_output
+        return {
+            'metrics': summary_output,
+            'submit_stage_system_metrics': submit_stage_system_metrics
+        }
 
     def cleanup(self):
         for executor in self.runner.executors:
