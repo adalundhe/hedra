@@ -10,6 +10,7 @@ import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from typing import Union, List, Dict, Any, Tuple
+from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.common.base_result import BaseResult
 from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.graphs.stages.base.stage import Stage
@@ -172,7 +173,8 @@ class Analyze(Stage):
     async def initialize_results_analysis(
         self,
         analyze_stage_raw_results: RawResultsSet={},
-        session_stage_monitors: MonitorGroup={}
+        session_stage_monitors: MonitorGroup={},
+        session_setup_stage_configs: Dict[str, Config]={}
     ):
 
         await self.logger.filesystem.aio.create_logfile('hedra.reporting.log')
@@ -208,6 +210,7 @@ class Analyze(Stage):
             'analyze_stage_all_results': all_results,
             'analyze_stage_stages_count': len(analyze_stage_raw_results),
             'analyze_stage_total_group_results': total_group_results,
+            'session_setup_stage_configs': session_setup_stage_configs,
             'session_stage_monitors': session_stage_monitors
         }
     
@@ -296,7 +299,8 @@ class Analyze(Stage):
     async def create_stage_batches(
         self,
         analyze_stage_raw_results: RawResultsSet=[],
-        analyze_stage_batches: List[Tuple[str, Any, int]]=[]
+        analyze_stage_batches: List[Tuple[str, Any, int]]=[],
+        session_setup_stage_configs: Dict[str, Config]={}
     ):
         stage_total_times = {}
         stage_batch_sizes = {}
@@ -748,7 +752,7 @@ class Analyze(Stage):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed results analysis for - {analyze_stage_stages_count} - stages in - {self.analysis_execution_time} seconds')
         await self.logger.spinner.set_default_message(f'Completed results analysis for {analyze_stage_total_group_results} actions and {analyze_stage_stages_count} stages over {self.analysis_execution_time} seconds')
 
-        self.executor.shutdown(wait=False, cancel_futures=True)
+        self.executor.shutdown()
         
         return {
             'analyze_stage_summary_metrics': summaries,

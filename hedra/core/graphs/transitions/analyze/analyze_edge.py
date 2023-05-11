@@ -4,6 +4,7 @@ import inspect
 import traceback
 from collections import defaultdict
 from typing import Dict, List, Any
+from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.registrar import registrar
 from hedra.core.hooks.types.base.simple_context import SimpleContext
@@ -220,13 +221,15 @@ class AnalyzeEdge(BaseEdge[Analyze]):
         session_stage_monitors: MonitorGroup = {}
 
         for source_stage, destination_stage in self.history:
+            
             stage_results = {}
-            if destination_stage == self.source.name:
 
-                source_history: Dict[str, Any] = self.history[(
-                    source_stage, 
-                    self.source.name
-                )]
+            source_history: Dict[str, Any] = self.history.get((
+                source_stage, 
+                self.source.name
+            ), {})
+
+            if destination_stage == self.source.name:
 
                 stage_results = source_history.get('execute_stage_results', {})
 
