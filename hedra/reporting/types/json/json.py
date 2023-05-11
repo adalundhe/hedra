@@ -30,7 +30,7 @@ def handle_loop_stop(
 ): 
     try:
         events_file.close()
-        executor.shutdown() 
+        executor.shutdown(wait=False, cancel_futures=True) 
         loop.stop()
     except Exception:
         pass
@@ -310,6 +310,6 @@ class JSON:
                 self.streams_file.close
             )  
             
-        self._executor.shutdown()
+        self._executor.shutdown(wait=False, cancel_futures=True)
 
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')

@@ -4,6 +4,7 @@ import psutil
 import signal
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
+from .exceptions import MonitorKilledError
 from typing import (
     Dict, 
     List, 
@@ -11,37 +12,54 @@ from typing import (
     Any
 )
 
-
 def handle_loop_stop(
-    signame,
-    loop: Union[asyncio.AbstractEventLoop, None],
-    running_monitors: Dict[str, bool],
-    monitors: Dict[str, asyncio.Future],
-    executor: ThreadPoolExecutor
+    signame
+):
+    pass
+
+def handle_thread_loop_stop(
+    loop: asyncio.AbstractEventLoop,
+    monitor_name: str,
+    running_monitors: Dict[str, bool]=None,
+
+):
+    running_monitors[monitor_name] = False
+    loop.stop()
+    loop.close()
+
+
+def handle_monitor_stop(
+    loop: asyncio.AbstractEventLoop=None,
+    running_monitors: Dict[str, bool]=None,
+    executor: ThreadPoolExecutor=None
 ):
     try:
 
         for monitor_name in running_monitors:
             running_monitors[monitor_name] = False
-            monitors[monitor_name].cancel()
 
-        executor.shutdown()
-        
-        if loop:
-            loop.close()
+        executor.shutdown(wait=False, cancel_futures=True)
 
-    except BrokenPipeError as e:
-        executor.shutdown()
-        raise e
+        if loop and loop.is_running():
+            loop.stop()
 
-    except RuntimeError as e:
-        executor.shutdown()
-        raise e
+        raise MonitorKilledError()
+    
+    except MonitorKilledError:
+        executor.shutdown(wait=False, cancel_futures=True)
+        pass
 
-    except Exception as e:
-        executor.shutdown()
-        raise e
+    except BrokenPipeError:
+        executor.shutdown(wait=False, cancel_futures=True)
+        raise MonitorKilledError()
 
+    except RuntimeError:
+        executor.shutdown(wait=False, cancel_futures=True)
+        raise MonitorKilledError()
+    
+    finally:
+        pass
+    
 
 class BaseMonitor:
 
@@ -75,12 +93,9 @@ class BaseMonitor:
 
                 signal.signal(
                     signal_type, 
-                    lambda signame: handle_loop_stop(
-                        signame,
-                        self._loop,
-                        self._running_monitors,
-                        self._sync_background_monitors,
-                        self._executor
+                    lambda sig, frame: handle_monitor_stop(  
+                        running_monitors=self._running_monitors,
+                        executor=self._executor
                     )
                 )
         
@@ -105,17 +120,17 @@ class BaseMonitor:
                 max_workers=psutil.cpu_count(logical=False)
             )
 
-            for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
-                self._loop.add_signal_handler(
-                    getattr(signal, signame),
-                    lambda signame=signame: handle_loop_stop(
-                        signame,
-                        self._loop,
-                        self._running_monitors,
-                        self._background_monitors,
-                        self._executor
-                    )
+        for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
+            signal_type: signal = getattr(signal, signame)
+
+            signal.signal(
+                signal_type, 
+                lambda sig, frame: handle_monitor_stop(  
+                    loop=self._loop,
+                    running_monitors=self._running_monitors,
+                    executor=self._executor
                 )
+            )
 
         self._background_monitors[monitor_name] = self._loop.run_in_executor(
             self._executor,
@@ -154,24 +169,29 @@ class BaseMonitor:
         self, 
         monitor_name: str,
         interval_sec: Union[int, float]=1
-    ):
+):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-
+        
         self._running_monitors[monitor_name] = True
 
-        loop.run_until_complete(
-            self._update_background_monitor(
-                monitor_name,
-                interval_sec=interval_sec
+        try:
+            loop.run_until_complete(
+                self._update_background_monitor(
+                    monitor_name,
+                    interval_sec=interval_sec
+                )
             )
-        )
 
+        except Exception:
+            self._running_monitors[monitor_name] = False
+            raise RuntimeError()
+        
     def stop_background_monitor_sync(
         self,
         monitor_name: str
     ):
-        
+
         self._running_monitors[monitor_name] = False
         self._sync_background_monitors[monitor_name].result()
 
@@ -186,7 +206,8 @@ class BaseMonitor:
     ):
         self._running_monitors[monitor_name] = False
 
-        await self._background_monitors[monitor_name]
+        if not self._background_monitors[monitor_name].cancelled():
+            await self._background_monitors[monitor_name]
 
         if self.active.get(monitor_name):
             self.collected[monitor_name].extend(
@@ -216,4 +237,4 @@ class BaseMonitor:
 
     def close(self):
         if self._executor:
-            self._executor.shutdown()
+            self._executor.shutdown(wait=False, cancel_futures=True)

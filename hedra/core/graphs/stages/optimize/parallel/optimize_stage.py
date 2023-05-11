@@ -36,6 +36,7 @@ from hedra.monitoring import (
     CPUMonitor,
     MemoryMonitor
 )
+from hedra.monitoring.base.exceptions import MonitorKilledError
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
@@ -378,11 +379,26 @@ def optimize_stage(serialized_config: str):
                 'memory': memory_monitor.collected
             }
         })
+    
+    except KeyError:
 
+        cpu_monitor.stop_background_monitor_sync(monitor_name)
+        memory_monitor.stop_background_monitor_sync(monitor_name)
+
+        raise ProcessKilledError()
+    
     except BrokenPipeError:
+
+        cpu_monitor.stop_background_monitor_sync(monitor_name)
+        memory_monitor.stop_background_monitor_sync(monitor_name)
+
         raise ProcessKilledError()
     
     except RuntimeError:
+
+        cpu_monitor.stop_background_monitor_sync(monitor_name)
+        memory_monitor.stop_background_monitor_sync(monitor_name)
+
         raise ProcessKilledError()
     
     except Exception as e:

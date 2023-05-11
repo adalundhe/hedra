@@ -128,6 +128,7 @@ class SetupEdge(BaseEdge[Setup]):
             self.visited.append(self.source.name)
 
         except Exception as edge_exception:
+
             self.exception = edge_exception
 
         return None, self.destination.stage_type

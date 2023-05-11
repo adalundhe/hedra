@@ -505,7 +505,7 @@ class GoogleCloudStorage:
             self.client.close
         )
 
-        self._executor.shutdown()
+        self._executor.shutdown(wait=False, cancel_futures=True)
 
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Session Closed - {self.session_uuid}')
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closed Google Cloud connection')

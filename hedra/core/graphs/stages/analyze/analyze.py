@@ -93,7 +93,7 @@ def handle_loop_stop(
     executor: ThreadPoolExecutor
 ):
     try:
-        executor.shutdown()
+        executor.shutdown(wait=False, cancel_futures=True)
         loop.close()
 
     except BrokenPipeError:
@@ -748,7 +748,7 @@ class Analyze(Stage):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Completed results analysis for - {analyze_stage_stages_count} - stages in - {self.analysis_execution_time} seconds')
         await self.logger.spinner.set_default_message(f'Completed results analysis for {analyze_stage_total_group_results} actions and {analyze_stage_stages_count} stages over {self.analysis_execution_time} seconds')
 
-        self.executor.shutdown()
+        self.executor.shutdown(wait=False, cancel_futures=True)
         
         return {
             'analyze_stage_summary_metrics': summaries,

@@ -167,15 +167,11 @@ def run_graph(
                     pass
 
         except BrokenPipeError:
-            logger.console.sync.critical('\n\nAborted.\n')   
+            pass 
 
         except RuntimeError:
-            logger.console.sync.critical('\n\nAborted.\n')
+            pass
 
-        if len(child_processes) < 1:
-            logger.console.sync.critical('\n\nAborted.\n')  
-            os._exit(1) 
-  
     graph.assemble()
     for signame in ('SIGINT', 'SIGTERM'):
         loop.add_signal_handler(
@@ -189,13 +185,13 @@ def run_graph(
     try:
         
         graph_execution_results = loop.run_until_complete(graph.run())
-        
+
     except BrokenPipeError:
-        pass
+        graph.status = GraphStatus.CANCELLED
 
     except RuntimeError:
-        pass
-    
+        graph.status = GraphStatus.CANCELLED
+
     exit_code = 0
 
     if graph.status == GraphStatus.FAILED:
@@ -204,7 +200,7 @@ def run_graph(
         exit_code = 1
 
     elif graph.status == GraphStatus.CANCELLED:
-        logger.console.sync.critical('\nAborted.\n') 
+        logger.console.sync.critical('\n\nAborted.\n') 
         exit_code = 1  
 
     else:

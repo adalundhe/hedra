@@ -543,7 +543,7 @@ class Execute(Stage, Generic[Unpack[T]]):
             await self.logger.spinner.set_default_message(f'Stage - {self.name} completed {total_results} actions at {round(total_results/total_elapsed)} actions/second over {round(total_elapsed)} seconds')
 
             if self.executor:
-                self.executor.shutdown()
+                self.executor.shutdown(wait=False, cancel_futures=True)
 
             execution_results.update({
                 'execute_stage_streamed_analytics': [

@@ -26,7 +26,7 @@ def handle_loop_stop(
         executor: ThreadPoolExecutor
     ):
     try:
-        executor.shutdown()
+        executor.shutdown(wait=False, cancel_futures=True)
 
     except BrokenPipeError:
         pass
@@ -110,7 +110,7 @@ class MetricHook(Hook):
         for custom_metric in custom_metric_results:
             metric_results.update(custom_metric)
 
-        self.executor.shutdown()
+        self.executor.shutdown(wait=False, cancel_futures=True)
 
         return {
             **kwargs,

@@ -252,7 +252,7 @@ def execute_actions(parallel_config: str):
         except RuntimeError:
             pass
 
-    for signame in ('SIGINT', 'SIGTERM'):
+    for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
         loop.add_signal_handler(
             getattr(signal, signame),
             lambda signame=signame: handle_loop_stop(signame)

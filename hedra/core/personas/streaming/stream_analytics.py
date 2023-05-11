@@ -1,7 +1,3 @@
-from hedra.monitoring import (
-    CPUMonitor,
-    MemoryMonitor
-)
 from typing import List, Dict
 from .stream import Stream
 

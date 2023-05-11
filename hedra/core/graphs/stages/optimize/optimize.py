@@ -436,5 +436,5 @@ class Optimize(Stage):
 
     @event('complete_optimization')
     async def complete(self):
-        self.executor.shutdown()
+        self.executor.shutdown(wait=False, cancel_futures=True)
 
