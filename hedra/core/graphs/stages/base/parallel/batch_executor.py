@@ -311,7 +311,7 @@ class BatchExecutor:
 
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
-            self.pool.shutdown()
+            self.pool.shutdown(cancel_futures=True)
 
             child_processes = active_children()
             for child in child_processes:
