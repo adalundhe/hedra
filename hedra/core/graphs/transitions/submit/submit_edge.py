@@ -117,7 +117,7 @@ class SubmitEdge(BaseEdge[Submit]):
             })
 
     def split(self, edges: List[SubmitEdge]) -> None:
-
+        
         submit_stage_config: Dict[str, Any] = self.source.to_copy_dict()
         submit_stage_copy: Submit = type(self.source.name, (Submit, ), self.source.__dict__)()
         

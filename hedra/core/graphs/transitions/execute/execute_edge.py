@@ -154,6 +154,8 @@ class ExecuteEdge(BaseEdge[Execute]):
                 self.edge_data['execute_stage_monitors']
             )
 
+            execute_hooks: Dict[str, Hook] = self.edge_data['execute_stage_setup_hooks']
+
             next_results.update({
                 'execute_stage_results': {
                     self.source.name: self.edge_data['execute_stage_results']
@@ -161,10 +163,11 @@ class ExecuteEdge(BaseEdge[Execute]):
                 'session_stage_monitors': session_stage_monitors,
                 'execute_stage_streamed_analytics': self.edge_data['execute_stage_streamed_analytics'],
                 'execute_stage_setup_config': self.edge_data['execute_stage_setup_config'],
-                'execute_stage_setup_hooks': self.edge_data['execute_stage_setup_hooks'],
+                'execute_stage_setup_hooks': list(execute_hooks.values()),
                 'execute_stage_setup_by': self.edge_data['execute_stage_setup_by'],
                 'setup_stage_ready_stages': self.edge_data['setup_stage_ready_stages'],
-                'setup_stage_candidates': self.edge_data['setup_stage_candidates']
+                'setup_stage_candidates': self.edge_data['setup_stage_candidates'],
+                'setup_stage_configs': self.edge_data['session_setup_stage_configs']
             })
 
             self.next_history.update({
@@ -261,14 +264,19 @@ class ExecuteEdge(BaseEdge[Execute]):
         setup_stage_ready_stages: List[Stage] = []
         setup_stage_candidates: List[Stage] = []
         session_stage_monitors: MonitorGroup = {}
+        session_setup_stage_configs: Dict[str, Config] = {}
         execute_stage_streamed_analytics: Dict[str, List[StreamAnalytics]] = defaultdict(list)
 
         for source_stage, destination_stage in self.history:
             
             previous_history: Dict[str, Any]  = self.history[(source_stage, destination_stage)]
+            configs = previous_history.get('setup_stage_configs', {})
+            execute_config: Config = configs.get(
+                self.source.name
+            )
 
-            if destination_stage == self.source.name:
-
+            if destination_stage == self.source.name and execute_config:
+                
                 setup_stage_configs: Dict[str, Config] = previous_history['setup_stage_configs']
 
                 execute_config: Config = setup_stage_configs.get(
@@ -309,13 +317,17 @@ class ExecuteEdge(BaseEdge[Execute]):
             streamed_analytics = previous_history.get('execute_stage_streamed_analytics')
             if streamed_analytics:
                 execute_stage_streamed_analytics[source_stage].extend(streamed_analytics)
+   
+            stage_configs = previous_history.get('setup_stage_configs')
+            if stage_configs:
+                session_setup_stage_configs.update(stage_configs)
 
         stream_configs = self.source.context.get('execute_stage_stream_configs')
         if stream_configs:
             self.execute_stage_stream_configs.extend([
                 config for config in stream_configs if config not in self.execute_stage_stream_configs
             ])
-            
+        
         self.edge_data = {
             'execute_stage_stream_configs': self.execute_stage_stream_configs, 
             'execute_stage_streamed_analytics': execute_stage_streamed_analytics,
@@ -324,5 +336,6 @@ class ExecuteEdge(BaseEdge[Execute]):
             'execute_stage_setup_by': execute_stage_setup_by,
             'session_stage_monitors': session_stage_monitors,
             'setup_stage_ready_stages': setup_stage_ready_stages,
-            'setup_stage_candidates': setup_stage_candidates
+            'setup_stage_candidates': setup_stage_candidates,
+            'session_setup_stage_configs': session_setup_stage_configs
         }
