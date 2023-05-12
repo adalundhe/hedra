@@ -6,6 +6,10 @@ from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.base.parallel.stage_priority import StagePriority
 from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.monitoring import (
+    CPUMonitor,
+    MemoryMonitor
+)
 from typing import Optional
 
 
@@ -51,4 +55,34 @@ class Act(Stage, Generic[Unpack[T]]):
     async def run(self):
         await self.setup_events()
         self.dispatcher.assemble_execution_graph()
+
+        cpu_monitor = CPUMonitor()
+        memory_monitor = MemoryMonitor()
+
+        main_monitor_name = f'{self.name}.main'
+
+        await cpu_monitor.start_background_monitor(main_monitor_name)
+        await memory_monitor.start_background_monitor(main_monitor_name)
+
         await self.dispatcher.dispatch_events(self.name)
+
+        await cpu_monitor.stop_background_monitor(main_monitor_name)
+        await memory_monitor.stop_background_monitor(main_monitor_name)
+
+        cpu_monitor.close()
+        memory_monitor.close()
+
+        cpu_monitor.stage_metrics[main_monitor_name] = cpu_monitor.collected[main_monitor_name]
+        memory_monitor.stage_metrics[main_monitor_name] = memory_monitor.collected[main_monitor_name]
+
+        self.context.update({
+            'act_stage_monitors': {
+                self.name: {
+                    'cpu': cpu_monitor,
+                    'memory': memory_monitor
+                }
+            }
+        })
+
+
+

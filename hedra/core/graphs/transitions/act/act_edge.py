@@ -16,6 +16,7 @@ from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
+from hedra.reporting.system.system_metrics_set_types import MonitorGroup
 
 
 ExecuteHooks = List[Union[ActionHook , TaskHook]]
@@ -43,6 +44,7 @@ class ActEdge(BaseEdge[Act]):
             'setup_stage_experiment_config',
             'setup_stage_ready_stages',
             'setup_stage_candidates',
+            'session_stage_monitors'
         ]
 
         self.provides = [
@@ -55,6 +57,8 @@ class ActEdge(BaseEdge[Act]):
             'setup_stage_configs',
             'setup_stage_ready_stages',
             'setup_stage_experiment_config',
+            'act_stage_monitors',
+            'session_stage_monitors'
         ]
 
         self.valid_states = [
@@ -140,7 +144,15 @@ class ActEdge(BaseEdge[Act]):
 
         if self.skip_stage is False:
 
-            next_results.update(self.edge_data)
+            session_stage_monitors: MonitorGroup = self.edge_data['session_stage_monitors']
+            session_stage_monitors.update(
+                self.edge_data['act_stage_monitors']
+            )
+
+            next_results.update({
+                **self.edge_data,
+                'session_stage_monitors': session_stage_monitors
+            })
 
             self.next_history.update({
                 (self.source.name, destination.name): next_results
