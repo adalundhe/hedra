@@ -20,6 +20,11 @@ from hedra.logging.table.table_types import (
     SubmitStageSystemMetrics,
     GraphResults
 )
+from hedra.monitoring import(
+    CPUMonitor,
+    MemoryMonitor
+)
+from hedra.reporting.system.system_metrics_set import SystemMetricsSet
 from .transitions import TransitionAssembler, local_transitions
 from .status import GraphStatus
 
@@ -161,6 +166,12 @@ class Graph:
 
     async def run(self) -> GraphResults:
 
+        cpu_monitor = CPUMonitor()
+        memory_monitor = MemoryMonitor()
+
+        await cpu_monitor.start_background_monitor(self.graph_name)
+        await memory_monitor.start_background_monitor(self.graph_name)
+
         execution_start = time.monotonic()
 
         run_task = asyncio.current_task()
@@ -293,9 +304,39 @@ class Graph:
             if task != run_task and task.cancelled() is False:
                 task.cancel()
 
+        await cpu_monitor.stop_background_monitor(self.graph_name)
+        await memory_monitor.stop_background_monitor(self.graph_name)
+
+        cpu_monitor.close()
+        memory_monitor.close()
+
+        cpu_monitor.aggregate_worker_stats()
+        memory_monitor.aggregate_worker_stats()
+
+        cpu_monitor.stage_metrics[self.graph_name] = cpu_monitor.collected[self.graph_name]
+        memory_monitor.stage_metrics[self.graph_name] = memory_monitor.collected[self.graph_name]
+
+        cpu_monitor.visibility_filters[self.graph_name] = True
+        memory_monitor.visibility_filters[self.graph_name] = True
+
+        graph_system_metrics = {
+            self.graph_name: {
+                'cpu': cpu_monitor,
+                'memory': memory_monitor
+            }
+        }
+
+        system_metrics = SystemMetricsSet(
+            graph_system_metrics,
+            {}
+        )
+
+        system_metrics.generate_system_summaries()
+
         return {
             'metrics': summary_output,
-            'submit_stage_system_metrics': submit_stage_system_metrics
+            'submit_stage_system_metrics': submit_stage_system_metrics,
+            'graph_system_metrics': system_metrics
         }
 
     def cleanup(self):

@@ -64,25 +64,27 @@ class SystemMetricsGroup:
                 else:
                     metrics_data = monitor_metrics
 
-                self.stage_metrics[stage_name][monitor_name] = metrics.stage_metrics[monitor_name]
+                if len(metrics_data) > 0:
 
-                self.metrics[stage_name][monitor_name] = SystemMetricsCollection(**{
-                    'stage': stage_name,
-                    'name': monitor_name,
-                    'group': self.metrics_group.value,
-                    'mean': statistics.mean(metrics_data),
-                    'median': statistics.median(metrics_data),
-                    'max': max(metrics_data),
-                    'min': min(metrics_data),
-                    'stdev': statistics.stdev(metrics_data),
-                    'variance': statistics.variance(metrics_data),
-                    **{
-                        f'quantile_{quantile}th':  numpy.quantile(
-                            metrics_data,
-                            round(
-                                quantile/100,
-                                2
-                            )
-                        ) for quantile in self._quantiles
-                    }
-                })
+                    self.stage_metrics[stage_name][monitor_name] = metrics.stage_metrics[monitor_name]
+
+                    self.metrics[stage_name][monitor_name] = SystemMetricsCollection(**{
+                        'stage': stage_name,
+                        'name': monitor_name,
+                        'group': self.metrics_group.value,
+                        'mean': statistics.mean(metrics_data),
+                        'median': statistics.median(metrics_data),
+                        'max': max(metrics_data),
+                        'min': min(metrics_data),
+                        'stdev': statistics.stdev(metrics_data),
+                        'variance': statistics.variance(metrics_data),
+                        **{
+                            f'quantile_{quantile}th':  numpy.quantile(
+                                metrics_data,
+                                round(
+                                    quantile/100,
+                                    2
+                                )
+                            ) for quantile in self._quantiles
+                        }
+                    })

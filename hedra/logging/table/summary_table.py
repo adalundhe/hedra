@@ -33,6 +33,9 @@ class SummaryTable:
 
         graph_execution_results: GraphExecutionResults = graph_results.get('metrics')
         submit_stage_system_metrics: SubmitStageSystemMetrics = graph_results.get('submit_stage_system_metrics', {})
+        graph_system_metrics: SystemMetricsSet = graph_results.get('graph_system_metrics')
+
+        self.system_summary_table.graph_metrics_summary = graph_system_metrics
 
         for system_metrics in submit_stage_system_metrics.values():
             self.system_summary_table.system_metrics_summaries.append(system_metrics)
