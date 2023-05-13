@@ -108,7 +108,6 @@ class SubmitEdge(BaseEdge[Submit]):
         if self.skip_stage is False:
             self.next_history.update({
                 (self.source.name, destination.name): {
-                    'session_stage_monitors': session_stage_monitors,
                     'submit_stage_metrics': self.edge_data['submit_stage_metrics'],
                     'submit_stage_experiment_metrics': self.edge_data['submit_stage_experiment_metrics'],
                     'submit_stage_streamed_metrics': self.edge_data['submit_stage_streamed_metrics'],

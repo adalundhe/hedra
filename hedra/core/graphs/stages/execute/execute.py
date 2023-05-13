@@ -2,7 +2,6 @@
 import dill
 import time
 import statistics
-import itertools
 from collections import defaultdict
 from typing import (
     Generic, 
@@ -11,8 +10,7 @@ from typing import (
     Any, 
     Dict, 
     Optional,
-    Type,
-    Tuple
+    Type
 )
 from typing_extensions import TypeVarTuple, Unpack
 from hedra.core.engines.client import Client
@@ -306,7 +304,7 @@ class Execute(Stage, Generic[Unpack[T]]):
     async def aggregate_multiple_worker_results(
         self,
         execute_stage_has_multiple_workers: bool = False,
-        execute_stage_results: List[List[Any]]=[],
+        execute_stage_results: List[Dict[str, Any]]=[],
         execute_stage_experiment: Optional[Dict[str, Any]]=None,
         execute_stage_setup_config: Config=None,
         execute_stage_monitors: Dict[str, Union[CPUMonitor, MemoryMonitor]]={}
@@ -319,14 +317,12 @@ class Execute(Stage, Generic[Unpack[T]]):
 
             stage_cpu_monitor: CPUMonitor = execute_stage_monitors.get('cpu')
             stage_memory_monitor: MemoryMonitor = execute_stage_monitors.get('memory')
-
-            cpu_stats: Dict[str, List[Tuple[Union[int, float]]]] = defaultdict(list)
-            memory_stats: Dict[str, List[Tuple[Union[int, float]]]] = defaultdict(list)
             
             for result_set in execute_stage_results:
 
                 aggregate_results.extend(result_set.get('results'))
                 elapsed_times.append(result_set.get('total_elapsed'))
+                worker_id = result_set.get('worker_id')
                 
                 streamed_analytics = result_set.get('streamed_analytics')
                 if streamed_analytics:
@@ -341,33 +337,20 @@ class Execute(Stage, Generic[Unpack[T]]):
                 memory_monitor = monitors.get('memory', {})
                 
                 for monitor_name, collection_stats in cpu_monitor.items():
-                    cpu_stats[monitor_name].append(collection_stats)
+                    stage_cpu_monitor.worker_metrics[worker_id][monitor_name] = collection_stats
                     stage_cpu_monitor.collected[monitor_name].extend(collection_stats)
 
                 for monitor_name, collection_stats in memory_monitor.items():
-                    memory_stats[monitor_name].append(collection_stats)
-            
+                    stage_memory_monitor.worker_metrics[worker_id][monitor_name] = collection_stats
 
-            for monitor_name, collection_stats in cpu_stats.items():
-                stage_cpu_monitor.stage_metrics[monitor_name] = [
-                    statistics.median(cpu_usage) for cpu_usage in itertools.zip_longest(
-                        *collection_stats,
-                        fillvalue=0
-                    )
-                ]
-
+            for monitor_name, collection_stats in cpu_monitor.items():
                 stage_cpu_monitor.visibility_filters[monitor_name] = True
                 
-            for monitor_name, collection_stats in memory_stats.items():
-                stage_memory_monitor.collected[monitor_name] = [
-                    sum(memory_usage) for memory_usage in itertools.zip_longest(
-                        *collection_stats,
-                        fillvalue=0
-                    )
-                ]
-
+            for monitor_name, collection_stats in memory_monitor.items():
                 stage_memory_monitor.visibility_filters[monitor_name] = True
-                stage_memory_monitor.stage_metrics[monitor_name] = stage_memory_monitor.collected[monitor_name]
+
+            stage_cpu_monitor.aggregate_worker_stats()
+            stage_memory_monitor.aggregate_worker_stats()
 
             main_monitor_name = f'{self.name}.main'
 

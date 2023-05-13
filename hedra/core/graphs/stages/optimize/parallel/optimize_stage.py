@@ -2,6 +2,7 @@ import dill
 import threading
 import os
 import pickle
+import traceback
 from collections import defaultdict
 from typing import Any, Dict, List, Union
 from hedra.core.engines.client.config import Config
@@ -36,7 +37,6 @@ from hedra.monitoring import (
     CPUMonitor,
     MemoryMonitor
 )
-from hedra.monitoring.base.exceptions import MonitorKilledError
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
 from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
@@ -102,7 +102,6 @@ async def setup_action_channels_and_playwright(
                 options=persona_config.playwright_options
             ))
 
-
     return setup_execute_stage
 
 
@@ -140,6 +139,7 @@ def optimize_stage(serialized_config: str):
         log_level = optimization_config.get('log_level')
         enable_unstable_features = optimization_config.get('enable_unstable_features', False)
         source_stage_name: str = optimization_config.get('source_stage_name')
+        worker_id = optimization_config.get('worker_id')
 
 
         monitor_name = f'{source_stage_name}.worker'
@@ -195,7 +195,6 @@ def optimize_stage(serialized_config: str):
         optimizer_params: List[str] = optimization_config.get('optimizer_params')
         optimizer_iterations: int = optimization_config.get('optimizer_iterations')
         optimizer_algorithm: str = optimization_config.get('optimizer_algorithm')
-        optimizer_feed_forward: bool = optimization_config.get('optimizer_feed_forward')
         optimize_stage_workers: int = optimization_config.get('optimize_stage_workers')
         time_limit: int = optimization_config.get('time_limit')
         batch_size: int = optimization_config.get('execute_stage_batch_size')
@@ -299,7 +298,6 @@ def optimize_stage(serialized_config: str):
                 'stage_name': execute_stage_name,
                 'stage_config': execute_stage_config,
                 'stage_hooks': setup_execute_stage.hooks,
-                'feed_forward': optimizer_feed_forward,
                 'iterations': optimizer_iterations,
                 'algorithm': optimizer_algorithm,
                 'time_limit': time_limit,
@@ -316,7 +314,6 @@ def optimize_stage(serialized_config: str):
                 'stage_name': execute_stage_name,
                 'stage_config': execute_stage_config,
                 'stage_hooks': setup_execute_stage.hooks,
-                'feed_forward': optimizer_feed_forward,
                 'iterations': optimizer_iterations,
                 'algorithm': optimizer_algorithm,
                 'time_limit': time_limit,
@@ -370,6 +367,7 @@ def optimize_stage(serialized_config: str):
         loop.close()
         
         return dill.dumps({
+            'worker_id': worker_id,
             'stage': execute_stage.name,
             'config': execute_stage_config,
             'params': results,
@@ -380,26 +378,26 @@ def optimize_stage(serialized_config: str):
             }
         })
     
-    except KeyError:
-
+    except KeyboardInterrupt:
         cpu_monitor.stop_background_monitor_sync(monitor_name)
         memory_monitor.stop_background_monitor_sync(monitor_name)
 
         raise ProcessKilledError()
     
     except BrokenPipeError:
-
         cpu_monitor.stop_background_monitor_sync(monitor_name)
         memory_monitor.stop_background_monitor_sync(monitor_name)
 
         raise ProcessKilledError()
     
     except RuntimeError:
-
         cpu_monitor.stop_background_monitor_sync(monitor_name)
         memory_monitor.stop_background_monitor_sync(monitor_name)
 
         raise ProcessKilledError()
     
     except Exception as e:
+        cpu_monitor.stop_background_monitor_sync(monitor_name)
+        memory_monitor.stop_background_monitor_sync(monitor_name)
+        
         raise e

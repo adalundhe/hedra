@@ -42,10 +42,6 @@ from hedra.logging import (
     LoggerTypes,
     logging_manager
 )
-from hedra.monitoring import (
-    CPUMonitor,
-    MemoryMonitor
-)
 from hedra.plugins.extensions import get_enabled_extensions
 from hedra.plugins.types.extension.types import ExtensionType
 from hedra.plugins.types.plugin_types import PluginType
@@ -64,6 +60,7 @@ async def start_execution(
     persona_config: Config=None,
     setup_stage: Setup=None,
     workers: int=None,
+    worker_id: int=None,
     source_stage_name: str=None,
     source_stage_stream_configs: List[ReporterConfig]=[],
     logfiles_directory: str=None,
@@ -191,6 +188,7 @@ async def start_execution(
 
 
     results_dict =  {
+        'worker_idx': worker_id,
         'streamed_analytics': persona.streamed_analytics,
         'results': results,
         'total_results': len(results),
@@ -415,6 +413,7 @@ def execute_actions(parallel_config: str):
                 persona_config=source_stage_config,
                 setup_stage=setup_stage,
                 workers=workers,
+                worker_id=worker_id,
                 source_stage_name=source_stage_name,
                 source_stage_stream_configs=source_stage_stream_configs,
                 logfiles_directory=logfiles_directory,

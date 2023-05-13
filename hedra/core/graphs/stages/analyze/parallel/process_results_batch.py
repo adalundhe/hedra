@@ -37,6 +37,7 @@ def process_results_batch(config: Dict[str, Any]):
     source_stage_name = config.get('source_stage_name')
     source_stage_id = config.get('source_stage_id')
     enable_unstable_features = config.get('enable_unstable_features', False)
+    worker_id = config.get('worker_id')
 
     cpu_monitor = CPUMonitor()
     memory_monitor = MemoryMonitor()
@@ -104,6 +105,7 @@ def process_results_batch(config: Dict[str, Any]):
         memory_monitor.stop_background_monitor_sync(monitor_name)
 
         return {
+            'worker_id': worker_id,
             'events': events,
             'monitoring': {
                 'cpu': cpu_monitor.collected,

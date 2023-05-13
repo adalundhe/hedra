@@ -360,6 +360,7 @@ class Analyze(Stage):
         if analyze_stage_has_multiple_workers:
             stage_configs = []
             serializable_context = self.context.as_serializable()
+            worker_idx = 0
 
             for stage_name, _, assigned_workers_count in analyze_stage_batches:
 
@@ -381,12 +382,13 @@ class Analyze(Stage):
                             'source_stage_id': self.stage_id,
                             'analyze_stage_name': stage_name,
                             'analyze_stage_metric_hooks': list(analyze_stage_metric_hook_names),
-                            'analyze_stage_batched_results': batch
+                            'analyze_stage_batched_results': batch,
+                            'worker_id': worker_idx + 1
                         } for batch in analyze_stage_batch_configs[stage_name]
                     ]
                 ))
                 
-
+                worker_idx += 1
                 await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Assigned {assigned_workers_count} to process results from stage - {stage_name}')
 
             return {
@@ -479,12 +481,10 @@ class Analyze(Stage):
             stage_cpu_monitor.stage_type = StageTypes.ANALYZE
             stage_memory_monitor.stage_type = StageTypes.ANALYZE
 
-            cpu_stats: Dict[str, List[Tuple[Union[int, float]]]] = defaultdict(list)
-            memory_stats: Dict[str, List[Tuple[Union[int, float]]]] = defaultdict(list)
-
             for stage_name, stage_results in analyze_stage_batch_results:
                 results = stage_results.pop()
 
+                worker_id = results.get('worker_id')
                 stage_events_set[stage_name] = results.get('events')
 
                 monitors: Dict[str, MonitorResults] = results.get('monitoring', {})
@@ -492,30 +492,14 @@ class Analyze(Stage):
                 memory_monitor = monitors.get('memory', {})
                 
                 for monitor_name, collection_stats in cpu_monitor.items():
-                    cpu_stats[monitor_name].append(collection_stats)
+                    stage_cpu_monitor.worker_metrics[worker_id][monitor_name] = collection_stats
                     stage_cpu_monitor.collected[monitor_name].extend(collection_stats)
 
                 for monitor_name, collection_stats in memory_monitor.items():
-                    memory_stats[monitor_name].append(collection_stats)
-            
+                    stage_memory_monitor.worker_metrics[worker_id][monitor_name] = collection_stats
 
-            for monitor_name, collection_stats in cpu_stats.items():
-                stage_cpu_monitor.stage_metrics[monitor_name] = [
-                    statistics.median(cpu_usage) for cpu_usage in itertools.zip_longest(
-                        *collection_stats,
-                        fillvalue=0
-                    )
-                ]
-                
-            for monitor_name, collection_stats in memory_stats.items():
-                stage_memory_monitor.collected[monitor_name] = [
-                    sum(memory_usage) for memory_usage in itertools.zip_longest(
-                        *collection_stats,
-                        fillvalue=0
-                    )
-                ]
-
-                stage_memory_monitor.stage_metrics[monitor_name] = stage_memory_monitor.collected[monitor_name]
+            stage_cpu_monitor.aggregate_worker_stats()
+            stage_memory_monitor.aggregate_worker_stats()
 
         else:
 

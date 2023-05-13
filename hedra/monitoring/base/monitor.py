@@ -2,6 +2,7 @@ import asyncio
 import functools
 import psutil
 import signal
+import itertools
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from .exceptions import MonitorKilledError
@@ -12,10 +13,9 @@ from typing import (
     Any
 )
 
-def handle_loop_stop(
-    signame
-):
-    pass
+
+WorkerMetrics = Dict[int, Dict[str, List[Union[int, float]]]] 
+
 
 def handle_thread_loop_stop(
     loop: asyncio.AbstractEventLoop,
@@ -70,6 +70,7 @@ class BaseMonitor:
         self.stage_metrics: Dict[str, List[Union[int, float]]] = {}
         self.visibility_filters: Dict[str, bool] = defaultdict(lambda: False)
         self.stage_type: Union[Any, None] = None
+        self.worker_metrics: WorkerMetrics = defaultdict(dict)
 
         self._background_monitors: Dict[str, asyncio.Task] = {}
         self._sync_background_monitors: Dict[str, asyncio.Future] = {}
@@ -106,6 +107,19 @@ class BaseMonitor:
                 interval_sec=interval_sec
             )
         )
+
+    def aggregate_worker_stats(self):
+        raise NotImplementedError('Aggregate worker stats method method must be implemented in a non-base Monitor class.')
+
+    def _collect_worker_stats(self):
+
+        monitor_stats: Dict[str, List[Union[int, float]]] = defaultdict(list)
+
+        for worker_id in self.worker_metrics:
+            for monitor_name, metrics in self.worker_metrics[worker_id].items():
+                monitor_stats[monitor_name].append(metrics)
+
+        return monitor_stats
 
     async def start_background_monitor(
         self,
