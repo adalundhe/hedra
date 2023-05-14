@@ -158,6 +158,7 @@ class ExecutionSummaryTable:
                 ).items(),
                 key=lambda completion_rate: completion_rate[0]
             ))
+            
             for stage_name, stage_completion_rates in completion_rates:
 
                 stage_summary = self.execution_results.get(stage_name)
