@@ -40,7 +40,8 @@ class SubmitEdge(BaseEdge[Submit]):
             'analyze_stage_session_total',
             'analyze_stage_events',
             'analyze_stage_summary_metrics',
-            'session_stage_monitors'
+            'session_stage_monitors',
+            'submit_stage_session_total'
         ]
         self.provides = [
             'submit_stage_metrics',
@@ -225,5 +226,5 @@ class SubmitEdge(BaseEdge[Submit]):
             'submit_stage_streamed_metrics': streamed_metrics,
             'submit_stage_system_metrics': system_metrics,
             'submit_stage_summary_metrics': metrics,
-            'session_total': session_total
+            'submit_stage_session_total': session_total
         }
