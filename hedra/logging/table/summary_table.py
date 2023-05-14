@@ -8,7 +8,7 @@ from .system_summary_table import SystemSummaryTable
 from .table_types import (
     GraphExecutionResults,
     ExecutionResults,
-    SubmitStageSystemMetrics,
+    SystemMetricsCollection,
     GraphResults
 )
 
@@ -32,7 +32,7 @@ class SummaryTable:
         })   
 
         graph_execution_results: GraphExecutionResults = graph_results.get('metrics')
-        submit_stage_system_metrics: SubmitStageSystemMetrics = graph_results.get('submit_stage_system_metrics', {})
+        submit_stage_system_metrics: SystemMetricsCollection = graph_results.get('submit_stage_system_metrics', {})
         graph_system_metrics: SystemMetricsSet = graph_results.get('graph_system_metrics')
 
         self.system_summary_table.graph_metrics_summary = graph_system_metrics

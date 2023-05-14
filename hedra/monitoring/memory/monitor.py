@@ -2,10 +2,6 @@ import os
 import psutil
 import itertools
 from hedra.monitoring.base.monitor import BaseMonitor
-from typing import Optional
-
-
-
 
 
 class MemoryMonitor(BaseMonitor):

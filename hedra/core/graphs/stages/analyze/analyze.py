@@ -719,7 +719,15 @@ class Analyze(Stage):
 
         self.context[self.name] = analyze_stage_contexts
         
-        summaries: Dict[str, Union[int, Dict[str, MetricsSet]]] = {
+        summaries: Dict[
+            str, 
+            Union[
+                str,
+                Dict[str, StageMetricsSummary], 
+                Dict[str, MetricsSet], 
+                SystemMetricsSet
+            ]
+        ] = {
             'stages': {},
             'source': self.name,
             'experiment_metrics_sets': experiment_metrics_sets,

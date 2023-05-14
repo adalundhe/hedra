@@ -8,6 +8,6 @@ ExecutionResults = Dict[str, StageMetricsSummary]
 
 GraphExecutionResults = Dict[str, Dict[str, Union[Dict[str, ExperimentMetricsSet], ExecutionResults, SystemMetricsSet]]]
 
-SubmitStageSystemMetrics = Dict[str, SystemMetricsSet]
+SystemMetricsCollection = Dict[str, SystemMetricsSet]
 
-GraphResults = Dict[str, Union[GraphExecutionResults, SubmitStageSystemMetrics]]
+GraphResults = Dict[str, Union[GraphExecutionResults, SystemMetricsCollection]]
