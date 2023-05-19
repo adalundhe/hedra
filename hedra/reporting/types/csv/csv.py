@@ -57,7 +57,7 @@ class CSV:
 
         self.streams_filepath = config.streams_filepath
 
-        system_metrics_path = Path(self.experiments_filepath)
+        system_metrics_path = Path(config.system_metrics_filepath)
         system_metrics_directory = system_metrics_path.parent
         system_metrics_filename = system_metrics_path.stem
 

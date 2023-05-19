@@ -95,18 +95,18 @@ class XML:
 
         self.streams_metrics_filepath = config.streams_filepath
 
-        system_metrics_path = Path(self.experiments_filepath)
+        system_metrics_path = Path(config.system_metrics_filepath)
         system_metrics_directory = system_metrics_path.parent
         system_metrics_filename = system_metrics_path.stem
 
         self.stage_system_metrics_filepath = os.path.join(
             system_metrics_directory,
-            f'{system_metrics_filename}_stages.csv'
+            f'{system_metrics_filename}_stages.xml'
         )
 
         self.session_system_metrics_filepath = os.path.join(
             system_metrics_directory,
-            f'{system_metrics_filename}_session.csv'
+            f'{system_metrics_filename}_session.xml'
         )
 
         self.events_file: TextIO = None
@@ -656,5 +656,5 @@ class XML:
                 self.session_system_metrics_file.close
             )
 
-        self._executor.shutdown(wait=False, cancel_futures=True)
+        self._executor.shutdown(cancel_futures=True)
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')
