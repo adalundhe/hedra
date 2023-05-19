@@ -20,5 +20,9 @@ class CSVConfig(BaseModel):
         os.getcwd(),
         'streams.csv'
     )
+    system_metrics_filepath: str=os.path.join(
+        os.getcwd(),
+        'system_metrics.csv'
+    )
     overwrite: bool=True
     reporter_type: ReporterTypes=ReporterTypes.CSV

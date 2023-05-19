@@ -9,14 +9,14 @@ import signal
 import re
 import time
 from pathlib import Path
-from typing import List, TextIO, Dict, Union, Any
+from typing import List, TextIO, Dict, Union
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.metric import MetricsSet
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
-from hedra.reporting.system.system_metrics_set import SystemMetricsSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.system.system_metrics_set import SystemMetricsSet
 from .json_config import JSONConfig
 
 
@@ -78,7 +78,7 @@ class JSON:
             f'{filename}_{events_file_timestamp}.json'
         )
 
-    async def submit_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+    async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
 
         if self.system_metrics_file is None:
             self.system_metrics_file = await self._loop.run_in_executor(
@@ -101,7 +101,7 @@ class JSON:
                     )
                 )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving System Metrics to file - {self.system_metrics_filepath}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Session System Metrics to file - {self.system_metrics_filepath}')
 
         metrics_sets: Dict[str, Dict[str, Union[int, float, str]]] = {
             'session': {
@@ -151,7 +151,10 @@ class JSON:
             )
         )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved System Metrics to file - {self.system_metrics_filepath}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Session System Metrics to file - {self.system_metrics_filepath}')
+
+    async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+        pass
 
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
 

@@ -10,10 +10,11 @@ from typing import List, TextIO, Dict, Union
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
-from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric.metrics_set import MetricsSet
+from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.system.system_metrics_set import SystemMetricsSet
 from .csv_config import CSVConfig
 has_connector = True
 
@@ -56,6 +57,20 @@ class CSV:
 
         self.streams_filepath = config.streams_filepath
 
+        system_metrics_path = Path(self.experiments_filepath)
+        system_metrics_directory = system_metrics_path.parent
+        system_metrics_filename = system_metrics_path.stem
+
+        self.stage_system_metrics_filepath = os.path.join(
+            system_metrics_directory,
+            f'{system_metrics_filename}_stages.csv'
+        )
+
+        self.session_system_metrics_filepath = os.path.join(
+            system_metrics_directory,
+            f'{system_metrics_filename}_session.csv'
+        )
+
         self.session_uuid = str(uuid.uuid4())
         self.metadata_string: str = None
         self.logger = HedraLogger()
@@ -70,6 +85,8 @@ class CSV:
         self._variants_writer: csv.DictWriter = None
         self._mutations_writer: csv.DictWriter = None
         self._streams_writer: csv.DictWriter = None
+        self._stage_system_metrics_writer: csv.DictWriter = None
+        self._session_system_metrics_writer: csv.DictWriter = None
 
         self._loop: asyncio.AbstractEventLoop = None
 
@@ -79,6 +96,8 @@ class CSV:
         self.variants_file: TextIO = None
         self.mutations_file: TextIO = None
         self.streams_file: TextIO = None
+        self.stage_system_metrics_file: TextIO = None
+        self.session_system_metrics_file: TextIO = None
 
         self.write_mode = 'w' if config.overwrite else 'a'
 
@@ -118,6 +137,149 @@ class CSV:
             f'{filename}_{events_file_timestamp}.csv'
         )
 
+    async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+        if self.session_system_metrics_file is None:
+            self.session_system_metrics_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.session_system_metrics_filepath,
+                    self.write_mode
+                )
+            )
+
+            for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        self.session_system_metrics_file
+                    )
+                )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Session System Metrics to file - {self.session_system_metrics_filepath}')
+
+        if self._session_system_metrics_writer is None or self.write_mode == 'w':
+            self._session_system_metrics_writer = csv.DictWriter(
+                self.session_system_metrics_file, 
+                fieldnames=[
+                    header for header in SystemMetricsSet.metrics_header_keys if header != 'stage'
+                ]
+            )
+
+            await self._loop.run_in_executor(
+                self._executor,
+                self._session_system_metrics_writer.writeheader
+            )
+
+        metrics_sets: List[Dict[str, Union[int, float, str]]] = []
+
+        for metrics_set in system_metrics_sets:
+
+            cpu_metrics = metrics_set.cpu
+            memory_metrics = metrics_set.memory
+
+            for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                for monitor_metrics in stage_cpu_metrics.values():
+                    metrics_sets.append(monitor_metrics.record)
+
+                stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                for monitor_metrics in stage_memory_metrics.values():
+                    metrics_sets.append(monitor_metrics.record)
+
+                stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                
+                if stage_mb_per_vu_metrics:
+                    metrics_sets.append(stage_mb_per_vu_metrics.record)
+                
+            for monitor_metrics in metrics_set.session_cpu_metrics.values():
+                metrics_sets.append(monitor_metrics.record)
+                
+            for  monitor_metrics in metrics_set.session_memory_metrics.values():
+                metrics_sets.append(monitor_metrics.record)
+
+        await self._loop.run_in_executor(
+            self._executor,
+            self._session_system_metrics_writer.writerows,
+            metrics_sets
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Session System Metrics to file - {self.session_system_metrics_filepath}')
+
+    async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        if self.stage_system_metrics_file is None:
+            self.stage_system_metrics_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.stage_system_metrics_filepath,
+                    self.write_mode
+                )
+            )
+
+            for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        self.stage_system_metrics_file
+                    )
+                )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Stage System Metrics to file - {self.stage_system_metrics_filepath}')
+
+        if self._stage_system_metrics_writer is None or self.write_mode == 'w':
+            self._stage_metrics_csv_writer = csv.DictWriter(
+                self.stage_system_metrics_file, 
+                fieldnames=SystemMetricsSet.metrics_header_keys
+            )
+
+            await self._loop.run_in_executor(
+                self._executor,
+                self._stage_metrics_csv_writer.writeheader
+            )
+
+        metrics_sets: List[Dict[str, Union[int, float, str]]] = []
+
+        for metrics_set in system_metrics_sets:
+
+            cpu_metrics = metrics_set.cpu
+            memory_metrics = metrics_set.memory
+
+            for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                for monitor_metrics in stage_cpu_metrics.values():
+                    metrics_sets.append(monitor_metrics.record)
+
+                stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                for monitor_metrics in stage_memory_metrics.values():
+                    metrics_sets.append(monitor_metrics.record)
+
+                stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                
+                if stage_mb_per_vu_metrics:
+                    metrics_sets.append(stage_mb_per_vu_metrics.record)
+                
+            for monitor_metrics in metrics_set.session_cpu_metrics.values():
+                metrics_sets.append(monitor_metrics.record)
+                
+            for  monitor_metrics in metrics_set.session_memory_metrics.values():
+                metrics_sets.append(monitor_metrics.record)
+
+        await self._loop.run_in_executor(
+            self._executor,
+            self._stage_metrics_csv_writer.writerows,
+            metrics_sets
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Stage System Metrics to file - {self.stage_system_metrics_filepath}')
+
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
         if self.streams_file is None:
             self.streams_file = await self._loop.run_in_executor(
@@ -155,7 +317,7 @@ class CSV:
 
         headers = list(streams_data[0].keys())
 
-        if self._experiments_writer is None or self.write_mode == 'w':
+        if self._streams_writer is None or self.write_mode == 'w':
             self._streams_writer = csv.DictWriter(
                 self.streams_file, 
                 fieldnames=headers
@@ -645,6 +807,18 @@ class CSV:
             await self._loop.run_in_executor(
                 self._executor,
                 self.streams_file.close
+            )
+
+        if self.stage_system_metrics_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.stage_system_metrics_file.close
+            )
+
+        if self.session_system_metrics_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.session_system_metrics_file.close
             )
 
         self._executor.shutdown(wait=False, cancel_futures=True)

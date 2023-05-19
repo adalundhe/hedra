@@ -20,5 +20,9 @@ class XMLConfig(BaseModel):
         os.getcwd(),
         'streams.xml'
     )
+    system_metrics_filepath: str=os.path.join(
+        os.getcwd(),
+        'system_metrics.xml'
+    )
     overwrite: bool=True
     reporter_type: ReporterTypes=ReporterTypes.XML
