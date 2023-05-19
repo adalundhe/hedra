@@ -10,7 +10,7 @@ import signal
 from multiprocessing import current_process, active_children
 from pathlib import Path
 from hedra.core.graphs.stages.base.stage import Stage
-from hedra.core.graphs import Graph
+from hedra.core.graphs.graph import Graph
 from hedra.core.graphs.status import GraphStatus
 from hedra.versioning.flags.types.base.active import active_flags
 from hedra.versioning.flags.types.base.flag_type import FlagTypes

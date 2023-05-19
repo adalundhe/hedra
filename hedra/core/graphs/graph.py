@@ -28,7 +28,7 @@ from hedra.monitoring import(
     MemoryMonitor
 )
 
-from hedra.reporting.metric import MetricsSet
+from hedra.reporting.metric.metrics_set import MetricsSet
 from hedra.reporting.metric.stage_metrics_summary import StageMetricsSummary
 from hedra.reporting.system.system_metrics_set import SystemMetricsSet
 from hedra.reporting.system.system_metrics_set_types import MonitorGroup
@@ -268,7 +268,7 @@ class Graph:
                         stage_name = transition.edge.source.name
                         submit_stage_context = transition.edge.source.context
 
-                        submit_stage_system_metrics_set: SystemMetricsSet = submit_stage_context.get('submit_stage_system_metrics')
+                        submit_stage_system_metrics_set: SystemMetricsSet = submit_stage_context.get('stage_system_metrics')
                         if submit_stage_system_metrics_set:
                             submit_stage_system_metrics[stage_name] = submit_stage_system_metrics_set
                             graph_system_metrics.update(submit_stage_system_metrics_set.metrics)

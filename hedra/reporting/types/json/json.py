@@ -9,12 +9,13 @@ import signal
 import re
 import time
 from pathlib import Path
-from typing import List, TextIO, Dict
+from typing import List, TextIO, Dict, Union, Any
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.metric import MetricsSet
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
+from hedra.reporting.system.system_metrics_set import SystemMetricsSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from .json_config import JSONConfig
 
@@ -43,6 +44,7 @@ class JSON:
         self.metrics_filepath = config.metrics_filepath
         self.experiments_filepath = config.experiments_filepath
         self.streams_filepath = config.streams_filepath
+        self.system_metrics_filepath = config.system_metrics_filepath
         
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._loop: asyncio.AbstractEventLoop = None
@@ -56,6 +58,7 @@ class JSON:
         self.experiments_file: TextIO = None
         self.metrics_file: TextIO = None
         self.streams_file: TextIO = None
+        self.system_metrics_file: TextIO = None
 
         self.write_mode = 'w' if config.overwrite else 'a'
         self.pattern = re.compile("_copy[0-9]+")
@@ -74,6 +77,81 @@ class JSON:
             directory,
             f'{filename}_{events_file_timestamp}.json'
         )
+
+    async def submit_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        if self.system_metrics_file is None:
+            self.system_metrics_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.system_metrics_filepath,
+                    self.write_mode
+                )
+            )
+
+            for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        self.system_metrics_file
+                    )
+                )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving System Metrics to file - {self.system_metrics_filepath}')
+
+        metrics_sets: Dict[str, Dict[str, Union[int, float, str]]] = {
+            'session': {
+                'cpu': {},
+                'memory': {}
+            }
+        }
+
+        for metrics_set in system_metrics_sets:
+
+            cpu_metrics = metrics_set.cpu
+            memory_metrics = metrics_set.memory
+
+            for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                if metrics_sets.get(stage_name) is None:
+                        metrics_sets[stage_name] = {
+                            'cpu': {},
+                            'memory': {}
+                        }
+
+                for monitor_name, monitor_metrics in stage_cpu_metrics.items():
+                    metrics_sets[stage_name]['cpu'][monitor_name] = monitor_metrics.record
+
+                stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                for monitor_name, monitor_metrics in stage_memory_metrics.items():
+                    metrics_sets[stage_name]['memory'][monitor_name] = monitor_metrics.record
+
+                stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                
+                if stage_mb_per_vu_metrics:
+                    metrics_sets[stage_name]['mb_per_vu'] = stage_mb_per_vu_metrics.record
+                
+            for monitor_name, monitor_metrics in metrics_set.session_cpu_metrics.items():
+                metrics_sets['session']['cpu'][monitor_name] = monitor_metrics.record
+                
+            for monitor_name, monitor_metrics in metrics_set.session_memory_metrics.items():
+                metrics_sets['session']['memory'][monitor_name] = monitor_metrics.record
+
+        await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                json.dump,
+                metrics_sets, 
+                self.system_metrics_file, 
+                indent=4
+            )
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved System Metrics to file - {self.system_metrics_filepath}')
 
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
 
@@ -103,16 +181,6 @@ class JSON:
         streams_data ={
             stream_name: stream_set.grouped for stream_name, stream_set in stream_metrics.items()
         }
-
-        if self.metrics_file is None:
-            self.metrics_file = await self._loop.run_in_executor(
-                self._executor,
-                functools.partial(
-                    open,
-                    self.metrics_filepath,
-                    self.write_mode
-                )
-            )
 
         await self._loop.run_in_executor(
             self._executor,
@@ -308,6 +376,12 @@ class JSON:
             await self._loop.run_in_executor(
                 self._executor,
                 self.streams_file.close
+            )  
+
+        if self.system_metrics_file:      
+            await self._loop.run_in_executor(
+                self._executor,
+                self.system_metrics_file.close
             )  
             
         self._executor.shutdown(wait=False, cancel_futures=True)

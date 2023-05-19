@@ -16,6 +16,8 @@ from hedra.reporting import Reporter
 from hedra.reporting.experiment.experiment_metrics_set import ExperimentMetricsSet
 from hedra.reporting.metric import MetricsSet
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
+from hedra.reporting.system.system_metrics_group import SystemMetricsGroup
+from hedra.reporting.system.system_metrics_set_types import SystemMetricGroupType
 from hedra.reporting.system import SystemMetricsSet
 from typing import Optional, Union
 
@@ -79,7 +81,8 @@ class Submit(Stage, Generic[T]):
         submit_stage_events: List[T]=[],
         submit_stage_summary_metrics: List[MetricsSet]=[],
         submit_stage_experiment_metrics: List[ExperimentMetricsSet]=[],
-        submit_stage_streamed_metrics: Dict[str, StageStreamsSet] = {}
+        submit_stage_streamed_metrics: Dict[str, StageStreamsSet] = {},
+        submit_stage_system_metrics: List[SystemMetricsSet]=[],
     ):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Initializing results submission')
 
@@ -96,8 +99,8 @@ class Submit(Stage, Generic[T]):
         cpu_monitor.visibility_filters[main_monitor_name] = False
         memory_monitor.visibility_filters[main_monitor_name] = False
 
-        cpu_monitor.stage_type = StageTypes.EXECUTE
-        memory_monitor.stage_type = StageTypes.EXECUTE
+        cpu_monitor.stage_type = StageTypes.SUBMIT
+        memory_monitor.stage_type = StageTypes.SUBMIT
 
         await cpu_monitor.start_background_monitor(main_monitor_name)
         await memory_monitor.start_background_monitor(main_monitor_name)
@@ -111,7 +114,8 @@ class Submit(Stage, Generic[T]):
             'submit_stage_monitors': {
                 'cpu': cpu_monitor,
                 'memory': memory_monitor
-            }
+            },
+            'submit_stage_system_metrics': submit_stage_system_metrics
         }
 
     @event('collect_process_results_and_metrics')
@@ -281,7 +285,7 @@ class Submit(Stage, Generic[T]):
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {submit_stage_reporter_name}:{submit_stage_reporter.reporter_id} - Submitting Custom Metrics')
 
         return {}
-
+    
     @event(
         'submit_experiment_results',
         'submit_processed_results',
@@ -290,16 +294,11 @@ class Submit(Stage, Generic[T]):
         'submit_error_metrics',
         'submit_custom_metrics'
     )
-    async def complete_submit_session(
+    async def close_stage_system_monitors(
         self,
-        submit_stage_reporter: Reporter=None,
-        submit_stage_reporter_name: str=None,
-        submit_stage_session_total: int=0,
+        submit_stage_system_metrics: List[SystemMetricsSet]=[],
         submit_stage_monitors: Dict[str, Union[CPUMonitor, MemoryMonitor]]={}
     ):
-
-        await submit_stage_reporter.close()
-
         stage_cpu_monitor: CPUMonitor = submit_stage_monitors.get('cpu')
         stage_memory_monitor: MemoryMonitor = submit_stage_monitors.get('memory')
 
@@ -321,20 +320,67 @@ class Submit(Stage, Generic[T]):
             }
         }    
 
-        submit_stage_system_metrics = SystemMetricsSet(
+        system_metrics = SystemMetricsSet(
             submit_stage_monitors,
             {}
         )
 
+        system_metrics.generate_system_summaries()
 
-        submit_stage_system_metrics.generate_system_summaries()
+        for metrics_set in submit_stage_system_metrics:
+
+            metrics_set.metrics.update(submit_stage_monitors)
+            metrics_set.cpu_metrics_by_stage[self.name] = stage_cpu_monitor
+            metrics_set.memory_metrics_by_stage[self.name] = stage_memory_monitor
+
+            metrics_set.cpu = SystemMetricsGroup(
+                metrics_set.cpu_metrics_by_stage,
+                SystemMetricGroupType.CPU 
+            )
+
+            metrics_set.memory = SystemMetricsGroup(
+                metrics_set.memory_metrics_by_stage,
+                SystemMetricGroupType.MEMORY 
+            )
+
+            metrics_set.generate_system_summaries()
+
+        return {
+            'submit_stage_system_metrics': submit_stage_system_metrics,
+            'stage_system_metrics': system_metrics
+        }
+
+    @event('close_stage_system_monitors')
+    async def submit_system_metrics(
+        self,
+        submit_stage_reporter: Reporter=None,
+        submit_stage_reporter_name: str=None,
+        submit_stage_system_metrics: List[SystemMetricsSet]=[]
+    ):
+        
+        await submit_stage_reporter.submit_system_metrics(submit_stage_system_metrics)
+        await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {submit_stage_reporter_name}:{submit_stage_reporter.reporter_id} - Submitting System Metrics')
+
+        return {}
+
+    @context('submit_system_metrics')
+    async def complete_submit_session(
+        self,
+        submit_stage_reporter: Reporter=None,
+        submit_stage_reporter_name: str=None,
+        submit_stage_session_total: int=0,
+        submit_stage_monitors: Dict[str, Union[CPUMonitor, MemoryMonitor]]={},
+        stage_system_metrics: SystemMetricsSet=None
+    ):
+
+        await submit_stage_reporter.close()
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Reporter - {submit_stage_reporter_name}:{submit_stage_reporter.reporter_id} - Completed Metrics submission')
         await self.logger.spinner.set_default_message(f'Successfully submitted the results for {submit_stage_session_total} actions via {submit_stage_reporter_name} reporter')
 
         return {
             'submit_stage_monitors': submit_stage_monitors,
-            'submit_stage_system_metrics': submit_stage_system_metrics
+            'stage_system_metrics': stage_system_metrics
         }
     
     @event('complete_submit_session')

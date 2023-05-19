@@ -2,7 +2,6 @@ import uuid
 import numpy
 import statistics
 from collections import defaultdict
-from hedra.core.graphs.stages.types.stage_types import StageTypes
 from typing import Dict, List, Union
 from .system_metrics_group import SystemMetricsGroup
 from .system_metrics_set_types import (
@@ -122,11 +121,10 @@ class SystemMetricsSet:
             for monitor_name, monitor_metrics in memory_metrics_group.collected.items():
                 self.system_memory_metrics[monitor_name].extend(monitor_metrics)
 
-                stage_type: StageTypes = memory_metrics_group.stage_type
                 is_visible = memory_metrics_group.visibility_filters[monitor_name]
                 stage_batch_size = self.batch_sizes.get(stage_name)
 
-                if stage_type == StageTypes.EXECUTE and is_visible and stage_batch_size:
+                if memory_metrics_group.is_execute_stage and is_visible and stage_batch_size:
 
 
                     mb_per_vu = [

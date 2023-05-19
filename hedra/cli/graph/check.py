@@ -9,7 +9,7 @@ import importlib
 import ntpath
 from pathlib import Path
 from hedra.core.graphs.stages.base.stage import Stage
-from hedra.core.graphs import Graph
+from hedra.core.graphs.graph import Graph
 from hedra.logging import HedraLogger
 from hedra.logging import (
     HedraLogger,

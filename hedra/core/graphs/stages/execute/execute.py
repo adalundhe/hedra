@@ -154,6 +154,8 @@ class Execute(Stage, Generic[Unpack[T]]):
 
         cpu_monitor.stage_type = StageTypes.EXECUTE
         memory_monitor.stage_type = StageTypes.EXECUTE
+        cpu_monitor.is_execute_stage = True
+        memory_monitor.is_execute_stage = True
 
         await cpu_monitor.start_background_monitor(main_monitor_name)
         await memory_monitor.start_background_monitor(main_monitor_name)

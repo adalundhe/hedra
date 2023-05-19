@@ -2,7 +2,6 @@ import asyncio
 import functools
 import psutil
 import signal
-import itertools
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from .exceptions import MonitorKilledError
@@ -71,6 +70,7 @@ class BaseMonitor:
         self.visibility_filters: Dict[str, bool] = defaultdict(lambda: False)
         self.stage_type: Union[Any, None] = None
         self.worker_metrics: WorkerMetrics = defaultdict(dict)
+        self.is_execute_stage = False
 
         self._background_monitors: Dict[str, asyncio.Task] = {}
         self._sync_background_monitors: Dict[str, asyncio.Future] = {}
