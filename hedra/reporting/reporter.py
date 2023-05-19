@@ -287,7 +287,8 @@ class Reporter:
 
     async def submit_system_metrics(self, metrics: List[Any]):
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting {len(metrics)} system metrics sets')
-        await self.selected_reporter.submit_system_metrics(metrics)
+        await self.selected_reporter.submit_session_system_metrics(metrics)
+        await self.selected_reporter.submit_stage_system_metrics(metrics)
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted {len(metrics)} system metrics sets')
 

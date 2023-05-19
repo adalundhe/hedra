@@ -177,23 +177,6 @@ class CSV:
         metrics_sets: List[Dict[str, Union[int, float, str]]] = []
 
         for metrics_set in system_metrics_sets:
-
-            cpu_metrics = metrics_set.cpu
-            memory_metrics = metrics_set.memory
-
-            for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
-
-                for monitor_metrics in stage_cpu_metrics.values():
-                    metrics_sets.append(monitor_metrics.record)
-
-                stage_memory_metrics = memory_metrics.metrics.get(stage_name)
-                for monitor_metrics in stage_memory_metrics.values():
-                    metrics_sets.append(monitor_metrics.record)
-
-                stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
-                
-                if stage_mb_per_vu_metrics:
-                    metrics_sets.append(stage_mb_per_vu_metrics.record)
                 
             for monitor_metrics in metrics_set.session_cpu_metrics.values():
                 metrics_sets.append(monitor_metrics.record)
@@ -265,12 +248,6 @@ class CSV:
                 
                 if stage_mb_per_vu_metrics:
                     metrics_sets.append(stage_mb_per_vu_metrics.record)
-                
-            for monitor_metrics in metrics_set.session_cpu_metrics.values():
-                metrics_sets.append(monitor_metrics.record)
-                
-            for  monitor_metrics in metrics_set.session_memory_metrics.values():
-                metrics_sets.append(monitor_metrics.record)
 
         await self._loop.run_in_executor(
             self._executor,

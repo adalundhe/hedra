@@ -143,7 +143,7 @@ class XML:
                     )
                 )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Session System Metrics to file - {self.system_metrics_filepath}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Session System Metrics to file - {self.session_system_metrics_filepath}')
 
         metrics_sets: Dict[str, MetricRecord] = {}
 
@@ -173,7 +173,7 @@ class XML:
             system_metrics_xml.toprettyxml()
         )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Session System Metrics to file - {self.system_metrics_filepath}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Session System Metrics to file - {self.session_system_metrics_filepath}')
 
     async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
 
@@ -198,7 +198,7 @@ class XML:
                     )
                 )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Stage System Metrics to file - {self.system_metrics_filepath}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Stage System Metrics to file - {self.stage_system_metrics_file}')
 
         metrics_sets: List[MetricRecordGroup]= []
 
@@ -242,7 +242,7 @@ class XML:
             system_metrics_xml.toprettyxml()
         )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Stage System Metrics to file - {self.system_metrics_filepath}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Stage System Metrics to file - {self.stage_system_metrics_filepath}')
 
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
         if self.streams_file is None:
