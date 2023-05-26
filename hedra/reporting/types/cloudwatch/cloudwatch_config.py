@@ -17,6 +17,7 @@ class CloudwatchConfig(BaseModel):
     metrics_rule: str='hedra-metrics'
     experiments_rule: str='hedra-experiments'
     streams_rule: str='hedra-streams'
+    system_metrics_rule: str='system_metrics'
     cloudwatch_targets: conlist(_CloudwatchTarget, min_items=1)
     aws_resource_arns: List[str]=[]
     cloudwatch_source: str='hedra'

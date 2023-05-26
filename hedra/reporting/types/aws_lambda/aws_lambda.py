@@ -3,13 +3,14 @@ import functools
 import json
 import uuid
 import psutil
-from typing import List, Dict
+from typing import List, Dict, Union
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
+from hedra.reporting.system.system_metrics_set import SystemMetricsSet
 from hedra.reporting.types import ReporterTypes
 from .aws_lambda_config import AWSLambdaConfig
 
@@ -34,6 +35,7 @@ class AWSLambda:
         self.metrics_lambda_name = config.metrics_lambda 
         self.shared_metrics_lambda_name = f'{config.metrics_lambda}_shared'
         self.error_metrics_lambda_name = f'{config.metrics_lambda}_error'
+        self.system_metrics_lambda_name = config.system_metrics_lambda
 
         self.experiments_lambda_name = config.experiments_lambda
         self.variants_lambda_name = f'{config.experiments_lambda}_variants'
@@ -68,6 +70,50 @@ class AWSLambda:
         )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Successfully opened connection to AWS - Region: {self.region_name}')
+
+    async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Session System Metrics to file - {self.experiments_lambda_name}')
+        
+        metrics_sets: List[Dict[str, Union[int, float, str]]] = []
+
+        for metrics_set in system_metrics_sets:
+
+            cpu_metrics = metrics_set.cpu
+            memory_metrics = metrics_set.memory
+
+            for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                for monitor_metrics in stage_cpu_metrics.values():
+                    metrics_sets.append(monitor_metrics.record)
+
+                stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                for monitor_metrics in stage_memory_metrics.values():
+                    metrics_sets.append(monitor_metrics.record)
+
+                stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                
+                if stage_mb_per_vu_metrics:
+                    metrics_sets.append(stage_mb_per_vu_metrics.record)
+                
+            for monitor_metrics in metrics_set.session_cpu_metrics.values():
+                metrics_sets.append(monitor_metrics.record)
+                
+            for  monitor_metrics in metrics_set.session_memory_metrics.values():
+                metrics_sets.append(monitor_metrics.record)
+                
+        await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                self._client.invoke,
+                FunctionName=self.experiments_lambda_name,
+                Payload=json.dumps(metrics_sets)
+            )
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Session System Metrics to file - {self.experiments_lambda_name}')
+
+    async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+        pass
 
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Streams to file - {self.streams_lambda_name}')

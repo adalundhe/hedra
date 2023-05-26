@@ -26,6 +26,42 @@ class SystemMetricsSet:
         'variance'
     ]
 
+    session_metrics_metadata = [
+        'name',
+        'group',
+    ]
+
+    stage_metrics_metadata = [
+        'stage',
+        'name',
+        'group',
+    ]
+
+    primary_metrics = [
+        'mean',
+        'median',
+        'max',
+        'min',
+        'stdev',
+        'variance',
+    ]
+
+    quantiles = [
+        'quantile_10th',
+        'quantile_20th',
+        'quantile_25th',
+        'quantile_30th',
+        'quantile_40th',
+        'quantile_50th',
+        'quantile_60th',
+        'quantile_70th',
+        'quantile_75th',
+        'quantile_80th',
+        'quantile_90th',
+        'quantile_95th',
+        'quantile_99th'
+    ]
+
     metrics_header_keys = [
         'stage',
         'name',
@@ -48,7 +84,7 @@ class SystemMetricsSet:
         'quantile_80th',
         'quantile_90th',
         'quantile_95th',
-        'quantile_99th',
+        'quantile_99th'
     ]
 
     def __init__(
@@ -56,6 +92,7 @@ class SystemMetricsSet:
             metrics: MonitorGroup,
             batch_sizes: Dict[str, int]
         ) -> None:
+        
         self.system_metrics_set_id = uuid.uuid4()
         self.system_cpu_metrics: Dict[str, List[Union[int, float]]] = defaultdict(list)
         self.system_memory_metrics: Dict[str, List[Union[int, float]]] = defaultdict(list)

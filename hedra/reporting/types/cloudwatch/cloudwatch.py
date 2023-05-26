@@ -4,12 +4,17 @@ import datetime
 import json
 import uuid
 import psutil
-from typing import List, Dict
+from typing import List, Dict, Union
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
+from hedra.reporting.system.system_metrics_set import (
+    SystemMetricsSet,
+    SessionMetricsCollection,
+    SystemMetricsCollection
+)
 from concurrent.futures import ThreadPoolExecutor
 from .cloudwatch_config import CloudwatchConfig
 
@@ -46,6 +51,9 @@ class Cloudwatch:
         self.variants_rule_name = f'{config.experiments_rule}_variants'
         self.mutations_rule_name = f'{config.experiments_rule}_mutations'
 
+        self.session_system_metrics_rule_name = f'{config.system_metrics_rule}_session'
+        self.stage_system_metrics_rule_name = f'{config.system_metrics_rule}_stage'
+
         self.session_uuid = str(uuid.uuid4())
         self.metadata_string: str = None
         self.logger = HedraLogger()
@@ -74,6 +82,87 @@ class Cloudwatch:
         )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created AWS Cloudwatch client for region - {self.region_name}')
+
+    async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Session System Metrics to Cloudwatch rule - {self.session_system_metrics_rule_name}')
+
+        rows: List[SessionMetricsCollection] = []
+        for metrics_set in system_metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics - {metrics_set.system_metrics_set_id}')
+
+            for monitor_metrics in metrics_set.session_cpu_metrics.values():
+                rows.append(monitor_metrics.record)
+                
+            for  monitor_metrics in metrics_set.session_memory_metrics.values():
+                rows.append(monitor_metrics.record)
+
+        await asyncio.wait_for(
+            self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.put_events,
+                    Entries=[
+                        {
+                            'Time': datetime.datetime.now(),
+                            'Detail': json.dumps(metrics_set.record),
+                            'DetailType': self.session_system_metrics_rule_name,
+                            'Resources': self.aws_resource_arns,
+                            'Source': self.session_system_metrics_rule_name
+                        } for metrics_set in rows
+                    ]
+                )
+            ),
+            timeout=self.submit_timeout
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Session System Metrics to Cloudwatch rule - {self.session_system_metrics_rule_name}')
+    
+    async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Stage System Metrics to Cloudwatch rule - {self.stage_system_metrics_rule_name}')
+
+        rows: List[SystemMetricsCollection] = []
+        for metrics_set in system_metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics - {metrics_set.system_metrics_set_id}')
+
+            cpu_metrics = metrics_set.cpu
+            memory_metrics = metrics_set.memory
+
+            for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                for monitor_metrics in stage_cpu_metrics.values():
+                    rows.append(monitor_metrics.record)
+
+                stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                for monitor_metrics in stage_memory_metrics.values():
+                    rows.append(monitor_metrics.record)
+
+                stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                
+                if stage_mb_per_vu_metrics:
+                    rows.append(stage_mb_per_vu_metrics.record)
+
+        await asyncio.wait_for(
+            self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.put_events,
+                    Entries=[
+                        {
+                            'Time': datetime.datetime.now(),
+                            'Detail': json.dumps(metrics_set.record),
+                            'DetailType': self.stage_system_metrics_rule_name,
+                            'Resources': self.aws_resource_arns,
+                            'Source': self.stage_system_metrics_rule_name
+                        } for metrics_set in rows
+                    ]
+                )
+            ),
+            timeout=self.submit_timeout
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Stage System Metrics to Cloudwatch rule - {self.stage_system_metrics_rule_name}')
 
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
 

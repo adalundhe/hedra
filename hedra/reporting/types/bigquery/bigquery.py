@@ -12,6 +12,7 @@ from hedra.reporting.metric import (
     MetricsSet,
     MetricType
 )
+from hedra.reporting.system.system_metrics_set import SystemMetricsSet
 from .bigquery_config import BigQueryConfig
 
 try:
@@ -44,6 +45,9 @@ class BigQuery:
         self.variants_table_name = f'{self.experiments_table_name}_variants'
         self.mutations_table_name = f'{self.experiments_table_name}_mutations'
 
+        self.session_system_metrics_table_name = f'{config.system_metrics_table}_session'
+        self.stage_system_metrics_table_name = f'{config.system_metrics_table}_stage'
+
         self.session_uuid = str(uuid.uuid4())
         self.metadata_string: str = None
         self.logger = HedraLogger()
@@ -62,6 +66,9 @@ class BigQuery:
         self._variants_table = None
         self._mutations_table = None
 
+        self._session_system_metrics_table = None
+        self._stage_system_metrics_table = None
+
         self._custom_metrics_table = None
         self._shared_metrics_table = None
 
@@ -76,13 +83,179 @@ class BigQuery:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opened connection to Google Cloud - Loaded account config from - {self.service_account_json_path}')
 
+    async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Session System Metrics - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.session_system_metrics_table_name} - if not exists')
+        
+        rows = []
+        for metrics_set in system_metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics - {metrics_set.system_metrics_set_id}')
+
+            if self._session_system_metrics_table is None:
+
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating table - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.session_system_metrics_table_name} - if not exists')
+
+                table_schema = [
+                    bigquery.SchemaField('name', 'STRING', mode='REQUIRED'),
+                    bigquery.SchemaField('group', 'STRING', mode='REQUIRED'),
+                    bigquery.SchemaField('median', 'FLOAT64', mode='REQUIRED'),
+                    bigquery.SchemaField('mean', 'FLOAT64', mode='REQUIRED'),
+                    bigquery.SchemaField('variance', 'FLOAT64', mode='REQUIRED'),
+                    bigquery.SchemaField('stdev','FLOAT64', mode='REQUIRED'),
+                    bigquery.SchemaField('minimum', 'FLOAT64', mode='REQUIRED'),
+                    bigquery.SchemaField('maximum', 'FLOAT64', mode='REQUIRED')
+                ]
+
+                for quantile in metrics_set.quantiles:
+                    table_schema.append(
+                        bigquery.SchemaField(quantile, 'FLOAT64')
+                    )
+
+                table_reference = bigquery.TableReference(
+                    bigquery.DatasetReference(
+                        self.project_name,
+                        self.dataset_name
+                    ),
+                    self.session_system_metrics_table_name
+                )
+
+                session_system_metrics_table = bigquery.Table(
+                    table_reference,
+                    schema=table_schema
+                )
+
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self.client.create_table,
+                        session_system_metrics_table,
+                        exists_ok=True
+                    )
+                )
+
+                self._session_system_metrics_table = session_system_metrics_table
+
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created table - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.session_system_metrics_table_name} - if not exists')
+            
+            for monitor_metrics in metrics_set.session_cpu_metrics.values():
+                rows.append(monitor_metrics.record)
+                
+            for  monitor_metrics in metrics_set.session_memory_metrics.values():
+                rows.append(monitor_metrics.record)
+
+        await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                self.client.insert_rows_json,
+                self._session_system_metrics_table,
+                rows,
+                retry=bigquery.DEFAULT_RETRY.with_predicate(
+                    lambda exc: exc is not None
+                ).with_deadline(
+                    self.retry_timeout
+                )
+            )
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.session_system_metrics_table_name} - if not exists')
+   
+    async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Stage System Metrics - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.stage_system_metrics_table_name} - if not exists')
+        
+        rows = []
+        for metrics_set in system_metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics - {metrics_set.system_metrics_set_id}')
+
+            if self._stage_system_metrics_table is None:
+
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating table - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.stage_system_metrics_table_name} - if not exists')
+
+                table_schema = [
+                    bigquery.SchemaField('name', 'STRING', mode='REQUIRED'),
+                    bigquery.SchemaField('stage', 'STRING', mode='REQUIRED'),
+                    bigquery.SchemaField('group', 'STRING', mode='REQUIRED'),
+                    bigquery.SchemaField('median', 'FLOAT64', mode='REQUIRED'),
+                    bigquery.SchemaField('mean', 'FLOAT64', mode='REQUIRED'),
+                    bigquery.SchemaField('variance', 'FLOAT64', mode='REQUIRED'),
+                    bigquery.SchemaField('stdev','FLOAT64', mode='REQUIRED'),
+                    bigquery.SchemaField('minimum', 'FLOAT64', mode='REQUIRED'),
+                    bigquery.SchemaField('maximum', 'FLOAT64', mode='REQUIRED')
+                ]
+
+                for quantile in metrics_set.quantiles:
+                    table_schema.append(
+                        bigquery.SchemaField(quantile, 'FLOAT64')
+                    )
+
+                table_reference = bigquery.TableReference(
+                    bigquery.DatasetReference(
+                        self.project_name,
+                        self.dataset_name
+                    ),
+                    self.stage_system_metrics_table_name
+                )
+
+                stage_system_metrics_table = bigquery.Table(
+                    table_reference,
+                    schema=table_schema
+                )
+
+                await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self.client.create_table,
+                        stage_system_metrics_table,
+                        exists_ok=True
+                    )
+                )
+
+                self._stage_system_metrics_table = stage_system_metrics_table
+
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created table - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.stage_system_metrics_table_name} - if not exists')
+            
+            for metrics_set in system_metrics_sets:
+
+                cpu_metrics = metrics_set.cpu
+                memory_metrics = metrics_set.memory
+
+                for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                    for monitor_metrics in stage_cpu_metrics.values():
+                        rows.append(monitor_metrics.record)
+
+                    stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                    for monitor_metrics in stage_memory_metrics.values():
+                        rows.append(monitor_metrics.record)
+
+                    stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                    
+                    if stage_mb_per_vu_metrics:
+                        rows.append(stage_mb_per_vu_metrics.record)
+
+        await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                self.client.insert_rows_json,
+                self._stage_system_metrics_table,
+                rows,
+                retry=bigquery.DEFAULT_RETRY.with_predicate(
+                    lambda exc: exc is not None
+                ).with_deadline(
+                    self.retry_timeout
+                )
+            )
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.stage_system_metrics_table_name} - if not exists')
+
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.stream_metrics_table_name} - if not exists')
 
         rows = []
         for stage_name, stream in stream_metrics.items():
-            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Streans - {stage_name}:{stream.stream_set_id}')
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Streams - {stage_name}:{stream.stream_set_id}')
 
             if self._streams_table is None:
 
@@ -154,7 +327,7 @@ class BigQuery:
             )
         )
 
-        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.metrics_table_name} - if not exists')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Metrics - Project: {self.project_name} - Dataset: {self.dataset_name} - Table: {self.stream_metrics_table_name} - if not exists')
 
     async def submit_experiments(self, experiment_metrics: ExperimentMetricsCollectionSet):
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Experiments to table - {self.experiments_table_name}')
