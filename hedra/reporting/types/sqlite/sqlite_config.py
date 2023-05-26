@@ -10,6 +10,7 @@ class SQLiteConfig(BaseModel):
     metrics_table: str='metrics'
     experiments_table: str='experiments'
     streams_table: str='streams'
+    system_metrics_table: str='system_metrics'
     reporter_type: ReporterTypes=ReporterTypes.SQLite
 
     class Config:
