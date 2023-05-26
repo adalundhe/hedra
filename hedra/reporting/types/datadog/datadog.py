@@ -117,10 +117,10 @@ class Datadog:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics - {metrics_set.system_metrics_set_id}')
             
             for monitor_metrics in metrics_set.session_cpu_metrics.values():
-                metrics_sets.append(monitor_metrics.record)
+                metrics_sets.append(monitor_metrics)
                 
             for  monitor_metrics in metrics_set.session_memory_metrics.values():
-                metrics_sets.append(monitor_metrics.record)
+                metrics_sets.append(monitor_metrics)
 
         system_session_metrics_series: List[MetricSeries] = []
 
@@ -172,16 +172,16 @@ class Datadog:
             for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
 
                 for monitor_metrics in stage_cpu_metrics.values():
-                    metrics_sets.append(monitor_metrics.record)
+                    metrics_sets.append(monitor_metrics)
 
                 stage_memory_metrics = memory_metrics.metrics.get(stage_name)
                 for monitor_metrics in stage_memory_metrics.values():
-                    metrics_sets.append(monitor_metrics.record)
+                    metrics_sets.append(monitor_metrics)
 
                 stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
                 
                 if stage_mb_per_vu_metrics:
-                    metrics_sets.append(stage_mb_per_vu_metrics.record)
+                    metrics_sets.append(stage_mb_per_vu_metrics)
 
         system_stage_metrics_series: List[MetricSeries] = []
 

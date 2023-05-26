@@ -6,7 +6,11 @@ from hedra.reporting.experiment.experiments_collection import ExperimentMetricsC
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
-
+from hedra.reporting.system.system_metrics_set import (
+    SystemMetricsSet,
+    SessionMetricsCollection,
+    SystemMetricsCollection
+)
 
 try:
     from hedra.reporting.types.statsd import StatsD
@@ -38,6 +42,71 @@ class Telegraf(StatsD):
         )
 
         self.statsd_type = 'Telegraf'
+        
+    async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Session System Metrics to {self.statsd_type}')
+
+        metrics_sets: List[SessionMetricsCollection] = []
+        for metrics_set in system_metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Preparing Session System Metrics Set - {metrics_set.system_metrics_set_id}')
+  
+            for monitor_metrics in metrics_set.session_cpu_metrics.values():
+                metrics_sets.append(monitor_metrics.record)
+                
+            for  monitor_metrics in metrics_set.session_memory_metrics.values():
+                metrics_sets.append(monitor_metrics.record)
+
+        for metrics_set in metrics_sets:
+
+            for metric_field, metric_value in metrics_set.record.items():
+                
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metric Set - {metrics_set.name}:{metrics_set.group}:{metric_field}')
+                
+                self.connection.send_telegraf(
+                    f'{metrics_set.group}_{metrics_set.name}_{metric_field}',
+                    metric_value
+                )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Session System Metrics to {self.statsd_type}')
+
+    async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Stage System Metrics to {self.statsd_type}')
+
+        metrics_sets: List[SystemMetricsCollection] = []
+        for metrics_set in system_metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Preparing Stage System Metrics Set - {metrics_set.system_metrics_set_id}')
+  
+            cpu_metrics = metrics_set.cpu
+            memory_metrics = metrics_set.memory
+
+            for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                for monitor_metrics in stage_cpu_metrics.values():
+                    metrics_sets.append(monitor_metrics.record)
+
+                stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                for monitor_metrics in stage_memory_metrics.values():
+                    metrics_sets.append(monitor_metrics.record)
+
+                stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                
+                if stage_mb_per_vu_metrics:
+                    metrics_sets.append(stage_mb_per_vu_metrics.record)
+
+        for metrics_set in metrics_sets:
+
+            for metric_field, metric_value in metrics_set.record.items():
+                
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metric Set - {metrics_set.name}:{metrics_set.group}:{metric_field}')
+                
+                self.connection.send_telegraf(
+                    f'{metrics_set.group}_{metrics_set.group}_{metrics_set.name}_{metric_field}',
+                    metric_value
+                )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Stage System Metrics to {self.statsd_type}')
 
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
 
