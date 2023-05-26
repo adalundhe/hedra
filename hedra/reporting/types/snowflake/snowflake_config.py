@@ -15,6 +15,7 @@ class SnowflakeConfig(BaseModel):
     metrics_table: str='metrics'
     experiments_table: str='experiments'
     streams_table: str='streams'
+    system_metrics_table: str='system_metrics'
     connect_timeout: int=30
     reporter_type: ReporterTypes=ReporterTypes.Snowflake
 

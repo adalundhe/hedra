@@ -200,10 +200,10 @@ class Cassandra:
         
         for metrics_set in system_metrics_sets:
             for monitor_metrics in metrics_set.session_cpu_metrics.values():
-                rows.append(monitor_metrics.record)
+                rows.append(monitor_metrics)
                 
             for  monitor_metrics in metrics_set.session_memory_metrics.values():
-                rows.append(monitor_metrics.record)
+                rows.append(monitor_metrics)
 
         for metrics_set in rows:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics - {metrics_set.name}:{metrics_set.group}')
@@ -269,16 +269,16 @@ class Cassandra:
             for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
 
                 for monitor_metrics in stage_cpu_metrics.values():
-                    rows.append(monitor_metrics.record)
+                    rows.append(monitor_metrics)
 
                 stage_memory_metrics = memory_metrics.metrics.get(stage_name)
                 for monitor_metrics in stage_memory_metrics.values():
-                    rows.append(monitor_metrics.record)
+                    rows.append(monitor_metrics)
 
                 stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
                 
                 if stage_mb_per_vu_metrics:
-                    rows.append(stage_mb_per_vu_metrics.record)
+                    rows.append(stage_mb_per_vu_metrics)
 
         for metrics_set in rows:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics - {metrics_set.name}:{metrics_set.group}')
