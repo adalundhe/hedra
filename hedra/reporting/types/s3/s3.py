@@ -10,6 +10,11 @@ from hedra.reporting.experiment.experiments_collection import ExperimentMetricsC
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
+from hedra.reporting.system.system_metrics_set import (
+    SystemMetricsSet,
+    SessionMetricsCollection,
+    SystemMetricsCollection
+)
 from concurrent.futures import ThreadPoolExecutor
 from .s3_config import S3Config
 
@@ -42,6 +47,9 @@ class S3:
         self.errors_bucket_name = f'{config.metrics_bucket}_errors'
         self.custom_metrics_bucket_name = f'{config.metrics_bucket}_custom'
 
+        self.session_system_metrics_bucket_name = f'{config.system_metrics_bucket}_session'
+        self.stage_system_metrics_bucket_name = f'{config.system_metrics_bucket}_stage'
+
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self.client = None
         self._loop = asyncio.get_event_loop()
@@ -65,6 +73,124 @@ class S3:
         )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to AWS S3 - Region: {self.region_name}')
+    
+    async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+        
+        session_system_metrics_bucket_name = f'{self.buckets_namespace}-{self.session_system_metrics_bucket_name}'
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Session System Metrics to Bucket - {session_system_metrics_bucket_name}')
+        
+        try:
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Session System Metrics Bucket - {session_system_metrics_bucket_name} - if not exists')
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.create_bucket,
+                    Bucket=session_system_metrics_bucket_name,
+                    CreateBucketConfiguration={
+                        'LocationConstraint': self.region_name
+                    }
+                )
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Session System Metrics Bucket - {session_system_metrics_bucket_name}')
+
+        except Exception:
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Skipping creation of Session System Metrics Bucket - {session_system_metrics_bucket_name}')
+
+        metrics_sets: List[SessionMetricsCollection] = []
+        
+        for metrics_set in system_metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics - {metrics_set.system_metrics_set_id}')
+            for monitor_metrics in metrics_set.session_cpu_metrics.values():
+                metrics_sets.append(monitor_metrics)
+                
+            for  monitor_metrics in metrics_set.session_memory_metrics.values():
+                metrics_sets.append(monitor_metrics)
+
+        for metrics_set in metrics_sets:
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics Set - {metrics_set.name}:{metrics_set.group}')
+
+            session_system_metrics_set_id = uuid.uuid4()
+
+            metrics_set_set_key = f'{metrics_set.name}_{metrics_set.group}_{session_system_metrics_set_id}'
+            
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.put_object,
+                    Bucket=session_system_metrics_bucket_name,
+                    Key=metrics_set_set_key,
+                    Body=json.dumps(metrics_set.record)
+                )
+            )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Session System Metrics to Bucket - {session_system_metrics_bucket_name}')
+    
+    async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+        
+        stage_system_metrics_bucket_name = f'{self.buckets_namespace}-{self.stage_system_metrics_bucket_name}'
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Stage System Metrics to Bucket - {stage_system_metrics_bucket_name}')
+        
+        try:
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Stage System Metrics Bucket - {stage_system_metrics_bucket_name} - if not exists')
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.create_bucket,
+                    Bucket=stage_system_metrics_bucket_name,
+                    CreateBucketConfiguration={
+                        'LocationConstraint': self.region_name
+                    }
+                )
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Stage System Metrics Bucket - {stage_system_metrics_bucket_name}')
+
+        except Exception:
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Skipping creation of Stage System Metrics Bucket - {stage_system_metrics_bucket_name}')
+
+        metrics_sets: List[SystemMetricsCollection] = []
+        
+        for metrics_set in system_metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics - {metrics_set.system_metrics_set_id}')
+            
+            cpu_metrics = metrics_set.cpu
+            memory_metrics = metrics_set.memory
+
+            for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                for monitor_metrics in stage_cpu_metrics.values():
+                    metrics_sets.append(monitor_metrics)
+
+                stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                for monitor_metrics in stage_memory_metrics.values():
+                    metrics_sets.append(monitor_metrics)
+
+                stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                
+                if stage_mb_per_vu_metrics:
+                    metrics_sets.append(stage_mb_per_vu_metrics)
+
+        for metrics_set in metrics_sets:
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics Set - {metrics_set.name}:{metrics_set.group}')
+
+            stage_system_metrics_set_id = uuid.uuid4()
+
+            metrics_set_set_key = f'{metrics_set.name}_{metrics_set.group}_{stage_system_metrics_set_id}'
+            
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    self.client.put_object,
+                    Bucket=stage_system_metrics_bucket_name,
+                    Key=metrics_set_set_key,
+                    Body=json.dumps(metrics_set.record)
+                )
+            )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Stage System Metrics to Bucket - {stage_system_metrics_bucket_name}')
 
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
 
