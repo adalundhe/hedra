@@ -13,6 +13,11 @@ from hedra.reporting.metric import (
     MetricsSet,
     MetricType
 )
+from hedra.reporting.system.system_metrics_set import (
+    SystemMetricsSet,
+    SessionMetricsCollection,
+    SystemMetricsCollection
+)
 from .cassandra_config import CassandraConfig
 
 
@@ -56,6 +61,9 @@ class Cassandra:
         self.shared_metrics_table_name = f'{config.metrics_table}_shared'
         self.custom_metrics_table_name = f'{config.metrics_table}_custom'
         self.errors_table_name = f'{config.metrics_table}_errors'
+
+        self.session_system_metrics_table_name = f'{config.system_metrics_table}_session'
+        self.stage_system_metrics_table_name = f'{config.system_metrics_table}_stage'
         
         self.replication_strategy = config.replication_strategy
         self.replication = config.replication       
@@ -74,6 +82,9 @@ class Cassandra:
         self._experiments_table = None
         self._variants_table = None
         self._mutations_table = None
+
+        self._session_system_metrics_table = None
+        self._stage_system_metrics_table = None
 
         self._shared_metrics_table = None
         self._custom_metrics_table = None
@@ -144,6 +155,144 @@ class Cassandra:
 
         await self.logger.filesystem.aio['hedra.repoorting'].info(f'{self.metadata_string} - Created Keyspace - {self.keyspace}')
     
+    async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Session System Metrics to - Keyspace: {self.keyspace} - Table: {self.session_system_metrics_table_name}')
+        
+        if self._session_system_metrics_table is None:
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Session System Metrics table - {self.session_system_metrics_table_name} - under keyspace - {self.keyspace}')
+
+            fields = {
+                'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+                'name': columns.Text(min_length=1, index=True),
+                'group': columns.Text(),
+                'median': columns.Float(),
+                'mean': columns.Float(),
+                'variance': columns.Float(),
+                'stdev': columns.Float(),
+                'minimum': columns.Float(),
+                'maximum': columns.Float(),
+                'created_at': columns.DateTime(default=datetime.now)
+            }
+
+            for quantile_name in SystemMetricsSet.quantiles:
+                fields[quantile_name] = columns.Float()
+
+            self._session_system_metrics_table = type(
+                self.session_system_metrics_table_name.capitalize(), 
+                (Model, ), 
+                fields
+            )
+
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    sync_table,
+                    self._session_system_metrics_table,
+                    keyspaces=[self.keyspace]
+                )
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Session System Metrics table - {self.session_system_metrics_table_name} - under keyspace - {self.keyspace}')
+        
+        rows: List[SystemMetricsCollection] = []
+        
+        for metrics_set in system_metrics_sets:
+            for monitor_metrics in metrics_set.session_cpu_metrics.values():
+                rows.append(monitor_metrics)
+                
+            for  monitor_metrics in metrics_set.session_memory_metrics.values():
+                rows.append(monitor_metrics)
+
+        for metrics_set in rows:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics - {metrics_set.name}:{metrics_set.group}')
+
+            await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self._session_system_metrics_table.create,
+                        **metrics_set.record
+                    )
+                )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics to - Keyspace: {self.keyspace} - Table: {self.session_system_metrics_table_name}')
+    
+    async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Stage System Metrics to - Keyspace: {self.keyspace} - Table: {self.stage_system_metrics_table_name}')
+        
+        if self._stage_system_metrics_table is None:
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Stage System Metrics table - {self.stage_system_metrics_table_name} - under keyspace - {self.keyspace}')
+
+            fields = {
+                'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+                'name': columns.Text(min_length=1, index=True),
+                'stage': columns.Text(),
+                'group': columns.Text(),
+                'median': columns.Float(),
+                'mean': columns.Float(),
+                'variance': columns.Float(),
+                'stdev': columns.Float(),
+                'minimum': columns.Float(),
+                'maximum': columns.Float(),
+                'created_at': columns.DateTime(default=datetime.now)
+            }
+
+            for quantile_name in SystemMetricsSet.quantiles:
+                fields[quantile_name] = columns.Float()
+
+            self._stage_system_metrics_table = type(
+                self.stage_system_metrics_table_name.capitalize(), 
+                (Model, ), 
+                fields
+            )
+
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    sync_table,
+                    self._stage_system_metrics_table,
+                    keyspaces=[self.keyspace]
+                )
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Stage System Metrics table - {self.stage_system_metrics_table_name} - under keyspace - {self.keyspace}')
+        
+        rows: List[SessionMetricsCollection] = []
+        
+        for metrics_set in system_metrics_sets:
+            cpu_metrics = metrics_set.cpu
+            memory_metrics = metrics_set.memory
+
+            for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                for monitor_metrics in stage_cpu_metrics.values():
+                    rows.append(monitor_metrics)
+
+                stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                for monitor_metrics in stage_memory_metrics.values():
+                    rows.append(monitor_metrics)
+
+                stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                
+                if stage_mb_per_vu_metrics:
+                    rows.append(stage_mb_per_vu_metrics)
+
+        for metrics_set in rows:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics - {metrics_set.name}:{metrics_set.group}')
+
+            await self._loop.run_in_executor(
+                    self._executor,
+                    functools.partial(
+                        self._stage_system_metrics_table.create,
+                        **metrics_set.record
+                    )
+                )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Shared Metrics to - Keyspace: {self.keyspace} - Table: {self.stage_system_metrics_table_name}')
+
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Streams to - Keyspace: {self.keyspace} - Table: {self.streams_table_name}')
@@ -190,7 +339,7 @@ class Cassandra:
                 await self._loop.run_in_executor(
                         self._executor,
                         functools.partial(
-                            self._metrics_table.create,
+                            self._streams_table.create,
                             **{
                                 'name': f'{stage_name}_streams',
                                 'stage': stage_name,

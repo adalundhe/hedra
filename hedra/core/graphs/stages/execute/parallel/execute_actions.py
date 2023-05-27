@@ -5,6 +5,7 @@ import signal
 import dill
 import pickle
 import warnings
+import traceback
 import asyncio
 import gc
 from collections import defaultdict
@@ -28,6 +29,7 @@ from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
 from hedra.core.graphs.stages.base.stage import Stage
+from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
 from hedra.core.graphs.stages.base.import_tools import (
     import_stages, 
@@ -40,7 +42,6 @@ from hedra.logging import (
     LoggerTypes,
     logging_manager
 )
-
 from hedra.plugins.extensions import get_enabled_extensions
 from hedra.plugins.types.extension.types import ExtensionType
 from hedra.plugins.types.plugin_types import PluginType
@@ -59,6 +60,7 @@ async def start_execution(
     persona_config: Config=None,
     setup_stage: Setup=None,
     workers: int=None,
+    worker_id: int=None,
     source_stage_name: str=None,
     source_stage_stream_configs: List[ReporterConfig]=[],
     logfiles_directory: str=None,
@@ -103,14 +105,15 @@ async def start_execution(
 
         if extension.extension_type == ExtensionType.GENERATOR:
             results = await extension.execute(**{
-                'execute_stage': setup_execute_stage,
+                'execute_stage_name': setup_execute_stage.name,
+                'execute_stage_hooks': setup_execute_stage.hooks,
                 'persona_config': persona_config
             })
 
-            execute_stage = results.get('execute_stage')
+            execute_stage = results.get('execute_stage_hooks')
 
             if execute_stage:
-                setup_execute_stage = results.get('execute_stage')
+                setup_execute_stage.hooks = results.get('execute_stage')
 
     execution_hooks_count = len(actions_and_tasks)
     await logger.filesystem.aio['hedra.core'].info(
@@ -146,6 +149,9 @@ async def start_execution(
                 
     persona.setup(setup_execute_stage.hooks, metadata_string)
 
+    persona.cpu_monitor.stage_type = StageTypes.EXECUTE
+    persona.memory_monitor.stage_type = StageTypes.EXECUTE
+
     await logger.filesystem.aio['hedra.core'].info(f'{metadata_string} - Starting execution')
 
     results = await persona.execute()
@@ -180,12 +186,18 @@ async def start_execution(
     for idx, result in enumerate(results):
         results[idx] = dill.dumps(result)  
 
+
     results_dict =  {
+        'worker_idx': worker_id,
         'streamed_analytics': persona.streamed_analytics,
         'results': results,
         'total_results': len(results),
         'total_elapsed': persona.total_elapsed,
-        'context': context
+        'context': context,
+        'monitoring': {
+            'memory': persona.memory_monitor.collected,
+            'cpu': persona.cpu_monitor.collected
+        }
     }
 
     pending_tasks = [
@@ -238,7 +250,7 @@ def execute_actions(parallel_config: str):
         except RuntimeError:
             pass
 
-    for signame in ('SIGINT', 'SIGTERM'):
+    for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
         loop.add_signal_handler(
             getattr(signal, signame),
             lambda signame=signame: handle_loop_stop(signame)
@@ -261,6 +273,9 @@ def execute_actions(parallel_config: str):
         source_stage_id = parallel_config.get('source_stage_id')
         source_setup_stage_name = parallel_config.get('source_setup_stage_name')
         source_stage_stream_configs = parallel_config.get('source_stage_stream_configs')
+        partition_method = parallel_config.get('partition_method')
+        worker_id = parallel_config.get('worker_id')
+        workers = parallel_config.get('workers')
 
         thread_id = threading.current_thread().ident
         process_id = os.getpid()
@@ -278,9 +293,6 @@ def execute_actions(parallel_config: str):
 
         metadata_string = f'Graph - {graph_name}:{graph_id} - thread:{thread_id} - process:{process_id} - Stage: {source_stage_name}:{source_stage_id} - '
 
-        partition_method = parallel_config.get('partition_method')
-        workers = parallel_config.get('workers')
-        worker_id = parallel_config.get('worker_id')
 
         discovered: Dict[str, Stage] = import_stages(graph_path)
         plugins_by_type = import_plugins(graph_path)
@@ -401,6 +413,7 @@ def execute_actions(parallel_config: str):
                 persona_config=source_stage_config,
                 setup_stage=setup_stage,
                 workers=workers,
+                worker_id=worker_id,
                 source_stage_name=source_stage_name,
                 source_stage_stream_configs=source_stage_stream_configs,
                 logfiles_directory=logfiles_directory,
@@ -408,6 +421,7 @@ def execute_actions(parallel_config: str):
                 extensions=enabled_extensions
             )
         )
+
 
         loop.close()
         gc.collect()

@@ -11,6 +11,7 @@ from typing import (
     Union, 
     Mapping
 )
+from hedra.versioning.flags.types.unstable.flag import unstable_threadsafe
 from .types import ExtensionType
 
 
@@ -43,6 +44,7 @@ class ExtensionPlugin(Plugin):
                     self._args[hook.hook_type] = args.parameters
 
         self.extension_type: ExtensionType = None
+        unstable_threadsafe()
 
     async def execute(
         self,

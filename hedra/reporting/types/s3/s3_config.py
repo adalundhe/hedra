@@ -11,4 +11,5 @@ class S3Config(BaseModel):
     metrics_bucket: str='metrics'
     experiments_bucket: str='experiments'
     streams_bucket: str='streams'
+    system_metrics_bucket: str='system_metrics'
     reporter_type: ReporterTypes=ReporterTypes.S3

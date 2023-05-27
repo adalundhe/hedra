@@ -14,6 +14,7 @@ class CassandraConfig(BaseModel):
     metrics_table: str='metrics'
     streams_table: str='streams'
     experiments_table: str='experiments'
+    system_metrics_table: str='system_metrics'
     replication_strategy: str='SimpleStrategy'
     replication: int=3
     ssl: Optional[SSLContext]=None

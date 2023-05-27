@@ -5,6 +5,11 @@ from hedra.reporting.experiment.experiments_collection import ExperimentMetricsC
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
+from hedra.reporting.system.system_metrics_set import (
+    SystemMetricsSet,
+    SessionMetricsCollection,
+    SystemMetricsCollection
+)
 from .cosmosdb_config import CosmosDBConfig
 
 
@@ -37,9 +42,13 @@ class CosmosDB:
         self.custom_metrics_container_name = f'{self.metrics_container_name}_custom'
         self.errors_container_name = f'{self.metrics_container}_errors'
 
+        self.session_system_metrics_container_name = f'{config.system_metrics_container}_session'
+        self.stage_system_metrics_container_name = f'{config.system_metrics_container}_stage'
+
         self.events_partition_key = config.events_partition_key
         self.metrics_partition_key = config.metrics_partition_key
         self.streams_partition_key = config.streams_partition_key
+        self.system_metrics_partition = config.system_metrics_partition
 
         self.experiments_partition_key = config.experiments_partition_key
         self.variants_partition_key = config.variants_partition_key
@@ -56,6 +65,9 @@ class CosmosDB:
         self.events_container = None
         self.metrics_container = None
         self.streams_container = None
+
+        self.session_system_metrics_container = None
+        self.stage_system_metrics_container = None
 
         self.experiments_container = None
         self.variants_container = None
@@ -84,6 +96,86 @@ class CosmosDB:
         self.database = await self.client.create_database_if_not_exists(self.database_name)
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created or set Database - {self.database_name}')
+
+    async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Session System Metrics container - {self.session_system_metrics_container_name} with Partition Key /{self.system_metrics_partition} if not exists')
+        self.session_system_metrics_container = await self.database.create_container_if_not_exists(
+            self.session_system_metrics_container_name,
+            PartitionKey(f'/{self.system_metrics_partition}')
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created or set Session System Metrics container - {self.session_system_metrics_container_name} with Partition Key /{self.system_metrics_partition}')
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Session System Metrics to container - {self.session_system_metrics_container_name} with Partition Key /{self.system_metrics_partition}')
+        
+        rows: List[SessionMetricsCollection] = []
+
+        for metrics_set in system_metrics_sets:
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics Set - {metrics_set.system_metrics_set_id}')
+
+            for monitor_metrics in metrics_set.session_cpu_metrics.values():
+                rows.append(monitor_metrics)
+                
+            for  monitor_metrics in metrics_set.session_memory_metrics.values():
+                rows.append(monitor_metrics)
+
+
+        for metrics_set in rows:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics Group - {metrics_set.name}:{metrics_set.group}')
+
+            await self.session_system_metrics_container.upsert_item({
+                'id': str(uuid.uuid4()),
+                **metrics_set.record
+            })
+            
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Session System Metrics to container - {self.session_system_metrics_container_name} with Partition Key /{self.system_metrics_partition}')
+
+    async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Stage System Metrics container - {self.stage_system_metrics_container_name} with Partition Key /{self.system_metrics_partition} if not exists')
+        self.stage_system_metrics_container = await self.database.create_container_if_not_exists(
+            self.stage_system_metrics_container_name,
+            PartitionKey(f'/{self.system_metrics_partition}')
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created or set Stage System Metrics container - {self.stage_system_metrics_container_name} with Partition Key /{self.system_metrics_partition}')
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Stage System Metrics to container - {self.stage_system_metrics_container_name} with Partition Key /{self.system_metrics_partition}')
+        
+        rows: List[SystemMetricsCollection] = []
+
+        for metrics_set in system_metrics_sets:
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics Set - {metrics_set.system_metrics_set_id}')
+
+            cpu_metrics = metrics_set.cpu
+            memory_metrics = metrics_set.memory
+
+            for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                for monitor_metrics in stage_cpu_metrics.values():
+                    rows.append(monitor_metrics.record)
+
+                stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                for monitor_metrics in stage_memory_metrics.values():
+                    rows.append(monitor_metrics.record)
+
+                stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                
+                if stage_mb_per_vu_metrics:
+                    rows.append(stage_mb_per_vu_metrics.record)
+
+        for metrics_set in rows:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics Group - {metrics_set.name}:{metrics_set.group}')
+
+            await self.stage_system_metrics_container.upsert_item({
+                'id': str(uuid.uuid4()),
+                **metrics_set.record
+            })
+            
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Stage System Metrics to container - {self.stage_system_metrics_container_name} with Partition Key /{self.system_metrics_partition}')
 
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
 

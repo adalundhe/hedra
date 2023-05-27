@@ -10,6 +10,7 @@ from hedra.core.personas.batching.param_type import ParamType
 from hedra.core.personas import get_persona
 from hedra.core.personas.types.default_persona import DefaultPersona
 from hedra.logging import HedraLogger
+from hedra.monitoring.base.exceptions import MonitorKilledError
 from hedra.tools.data_structures import AsyncList
 from .algorithms import get_algorithm
 from .algorithms.types.base_algorithm import BaseAlgorithm
@@ -28,6 +29,7 @@ class Optimizer:
         
         self.graph_name = config.get('graph_name')
         self.graph_id = config.get('graph_id')
+        self.target_stage_name = config.get('stage_name')
         self.source_stage_name = config.get('source_stage_name')
         self.source_stage_id = config.get('source_stage_id')
         self.stage_config: Config = config.get('stage_config')
@@ -98,6 +100,7 @@ class Optimizer:
 
         self.optimized_results = {
             **optimized_params,
+            'optimize_target_stage': self.target_stage_name,
             'optimization_iters': self.algorithm.max_iter,
             'optimization_iter_duation': self.algorithm.batch_time,
             'optimization_total_time': self.total_optimization_time,
@@ -154,6 +157,12 @@ class Optimizer:
                 results = await persona.execute()
                 completed_count = len([result for result in results if result.error is None])
 
+            except RuntimeError as e:
+                raise e
+            
+            except KeyboardInterrupt as e:
+                raise e
+
             except Exception:
                 pass
 
@@ -187,11 +196,17 @@ class Optimizer:
                 try:
                     self._event_loop.close()
 
+                except KeyboardInterrupt:
+                    raise RuntimeError()
+
                 except BrokenPipeError:
-                    pass
+                    raise RuntimeError()
                     
                 except RuntimeError:
-                    pass
+                    raise RuntimeError()
+                
+                except MonitorKilledError:
+                    raise RuntimeError()
 
             for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
 

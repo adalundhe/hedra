@@ -10,6 +10,7 @@ class Complete(Stage):
     def __init__(self) -> None:
         super().__init__()
 
+        self.retries: int = 0
         self.priority = None
         self.priority_level: StagePriority = StagePriority.map(
             self.priority

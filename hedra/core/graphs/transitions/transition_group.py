@@ -6,9 +6,10 @@ from typing import (
     Tuple
 )
 from collections import defaultdict
-from hedra.core.graphs.stages.base.stage import Stage
+from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
 from hedra.core.graphs.stages.base.parallel.stage_priority import StagePriority
 from hedra.core.graphs.stages.base.parallel.batch_executor import BatchExecutor
+from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from .transition import Transition
 from .common.base_edge import BaseEdge
@@ -78,12 +79,12 @@ class TransitionGroup:
             list(self.transitions_by_edge.values())
         )
 
-        prioritized_groups: List[Tuple[int, Transition]] = []
+        prioritized_groups: List[Tuple[str, str, str, int]] = []
         for group in batched_transitions:
             
             group_priorities: List[int] = []
             for transition_config in group:
-                source, destination, _, _ = transition_config
+                source, destination, _, workers = transition_config
                 
                 transition = self.transitions_by_edge.get((
                     source,
@@ -101,12 +102,10 @@ class TransitionGroup:
             group_priority = 0
             if len(group_priorities) > 0:
                 group_priority = max(group_priorities)
-                
-
-            prioritized_groups.append((
-                group_priority,
-                group
-            ))
+                prioritized_groups.append((
+                    group_priority,
+                    group
+                ))
 
         sorted_batches = list(sorted(
             prioritized_groups,
@@ -128,10 +127,16 @@ class TransitionGroup:
         results: List[Any] = []
 
         for group in self._batched_transitions:
+            sorted_group = sorted(
+                group,
+                key=lambda transition: transition[3],
+                reverse=True
+            )
+                        
             group_results = await asyncio.gather(*[
                 asyncio.create_task(
                     self._execute_transition(transition_config)
-                ) for transition_config in group
+                ) for transition_config in sorted_group
             ])
 
             results.extend(group_results)
@@ -152,5 +157,5 @@ class TransitionGroup:
             executor = BatchExecutor(max_workers=workers)
             transition.edge.source.executor = executor
             self._executors.append(executor)
-
+        
         return await transition.execute()

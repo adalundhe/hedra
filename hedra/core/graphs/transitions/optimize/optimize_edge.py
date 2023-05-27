@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import inspect
+import traceback
 from collections import defaultdict
 from typing import Dict, List, Any, Union
 from hedra.core.engines.client.config import Config
@@ -16,6 +17,7 @@ from hedra.core.graphs.stages.execute.execute import Execute
 from hedra.core.graphs.stages.types.stage_states import StageStates
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
+from hedra.reporting.system.system_metrics_set_types import MonitorGroup
 
 
 ExecuteHooks = List[Union[ActionHook , TaskHook]]
@@ -41,7 +43,8 @@ class OptimizeEdge(BaseEdge[Optimize]):
             'execute_stage_setup_by',
             'setup_stage_ready_stages',
             'setup_stage_candidates',
-            'execute_stage_results'
+            'execute_stage_results',
+            'session_stage_monitors',
         ]
 
         self.provides = [
@@ -52,7 +55,9 @@ class OptimizeEdge(BaseEdge[Optimize]):
             'optimize_stage_optimized_configs',
             'optimize_stage_optimized_hooks',
             'execute_stage_setup_by',
-            'execute_stage_results'
+            'execute_stage_results',
+            'optimize_stage_monitors',
+            'session_stage_monitors'
         ]
 
         self.assigned_candidates = []
@@ -131,6 +136,11 @@ class OptimizeEdge(BaseEdge[Optimize]):
             optimzied_hooks: Stage = self.edge_data['optimize_stage_optimized_hooks'].get(destination.name)
             stage_setup_by: str = self.edge_data['execute_stage_setup_by'].get(destination.name)
 
+            session_stage_monitors: MonitorGroup = self.edge_data['session_stage_monitors']
+            session_stage_monitors.update(
+                self.edge_data['optimize_stage_monitors']
+            )
+
             self.next_history[(self.source.name, destination.name)].update({
                 'setup_stage_configs': self.edge_data['optimize_stage_optimized_configs'],
                 'optimize_stage_optimized_params': self.edge_data['optimize_stage_optimized_params'],
@@ -138,7 +148,8 @@ class OptimizeEdge(BaseEdge[Optimize]):
                 'setup_stage_ready_stages': self.edge_data['setup_stage_ready_stages'],
                 'execute_stage_setup_config': optimized_config,
                 'execute_stage_setup_hooks': optimzied_hooks,
-                'execute_stage_setup_by': stage_setup_by 
+                'execute_stage_setup_by': stage_setup_by,
+                'session_stage_monitors': session_stage_monitors
             }) 
 
     def split(self, edges: List[OptimizeEdge]) -> None:
@@ -199,6 +210,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         
         execute_stages: Dict[str, Execute] = self.stages_by_type.get(StageTypes.EXECUTE)
         optimize_stages = self.stages_by_type.get(StageTypes.OPTIMIZE).items()
+        setup_stages = self.stages_by_type.get(StageTypes.SETUP).items()
         path_lengths: Dict[str, int] = self.path_lengths.get(self.source.name)
 
         all_paths = self.all_paths.get(self.source.name, [])
@@ -226,8 +238,10 @@ class OptimizeEdge(BaseEdge[Optimize]):
 
                 elif len(following_optimize_stage_distances) == 0:
                     selected_optimization_candidates[stage_name] = optimization_candidates.get(stage_name)
-
-        return selected_optimization_candidates
+        
+        return {
+            candidate: candidate_config for candidate, candidate_config in selected_optimization_candidates.items() if candidate in self.edge_data['setup_stage_configs']
+        }
     
     def setup(self) -> None:
 
@@ -240,6 +254,7 @@ class OptimizeEdge(BaseEdge[Optimize]):
         setup_stage_candidates: List[Stage] = []
         setup_stage_configs: Dict[str, Config] = {}
         setup_stage_experiment_config: Dict[str, Union[str, int, List[float]]] = {}
+        session_stage_monitors: MonitorGroup = {}
 
         for source_stage, destination_stage in self.history:
             
@@ -286,13 +301,17 @@ class OptimizeEdge(BaseEdge[Optimize]):
                 if stage_distributions:
                     setup_stage_experiment_config.update(stage_distributions)
 
-            streamed_analytics = previous_history.get('execute_stage_streamed_analytics')
+                stage_monitors = previous_history.get('session_stage_monitors')
+                if stage_monitors:
+                    session_stage_monitors.update(stage_monitors)
 
+            streamed_analytics = previous_history.get('execute_stage_streamed_analytics')
             if streamed_analytics:
                 execute_stage_streamed_analytics[source_stage].extend(streamed_analytics)
 
         self.edge_data = {
             'setup_stage_experiment_config': setup_stage_experiment_config,
+            'session_stage_monitors': session_stage_monitors,
             'execute_stage_streamed_analytics': execute_stage_streamed_analytics,
             'setup_stage_configs': setup_stage_configs,
             'execute_stage_setup_config': execute_stage_setup_config,

@@ -6,6 +6,11 @@ from hedra.reporting.experiment.experiments_collection import ExperimentMetricsC
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
+from hedra.reporting.system.system_metrics_set import (
+    SystemMetricsSet,
+    SessionMetricsCollection,
+    SystemMetricsCollection
+)
 
 try:
     import sqlalchemy
@@ -28,6 +33,152 @@ class TimescaleDB(Postgres):
 
     def __init__(self, config: TimescaleDBConfig) -> None:
         super().__init__(config)
+
+    async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Session System Metrics to Table - {self.session_system_metrics_table_name}')
+
+        async with self._connection.begin() as transaction:
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics to Table - {self.session_system_metrics_table_name} - Initiating transaction')
+            
+            if self._session_system_metrics_table is None:
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Session System Metrics table - {self.session_system_metrics_table_name} - if not exists')
+
+                session_system_metrics_table = sqlalchemy.Table(
+                    self.session_system_metrics_table_name,
+                    self.metadata,
+                    sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
+                    sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
+                    sqlalchemy.Column('group', sqlalchemy.TEXT()),
+                    sqlalchemy.Column('median', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('mean', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('variance', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('stdev', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('minimum', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('maximum', sqlalchemy.FLOAT)
+                )
+
+                for quantile in SystemMetricsSet.quantiles:
+                    session_system_metrics_table.append_column(
+                        sqlalchemy.Column(f'quantile_{quantile}th', sqlalchemy.FLOAT)
+                    )
+
+                await self._connection.execute(
+                    CreateTable(
+                        session_system_metrics_table, 
+                        if_not_exists=True
+                    )
+                )
+
+                await self._connection.execute(
+                        f"SELECT create_hypertable('{self.session_system_metrics_table_name}', 'time', migrate_data => true, if_not_exists => TRUE, create_default_indexes=>FALSE);"
+                    )
+
+                await self._connection.execute(f"CREATE INDEX ON {self.session_system_metrics_table_name} (name, time DESC);")
+            
+                self._session_system_metrics_table = session_system_metrics_table
+
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Session System Metrics table - {self.session_system_metrics_table_name}')
+
+            rows: List[SessionMetricsCollection] = []
+            
+            for metrics_set in system_metrics_sets:
+                for monitor_metrics in metrics_set.session_cpu_metrics.values():
+                    rows.append(monitor_metrics)
+                    
+                for  monitor_metrics in metrics_set.session_memory_metrics.values():
+                    rows.append(monitor_metrics)
+        
+            for metrics_set in rows:
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics - {metrics_set.name}:{metrics_set.group}')
+
+                await self._connection.execute(
+                    self._streams_table.insert(values=metrics_set.record)
+                )
+                
+            await transaction.commit()
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics to Table - {self.session_system_metrics_table_name} - Transaction committed')
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Session System Metrics to Table - {self.session_system_metrics_table_name}')
+
+    async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Stage System Metrics to Table - {self.stage_system_metrics_table_name}')
+
+        async with self._connection.begin() as transaction:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics to Table - {self.stage_system_metrics_table_name} - Initiating transaction')
+            if self._stage_system_metrics_table is None:
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Stage System Metrics table - {self.stage_system_metrics_table_name} - if not exists')
+
+                stage_system_metrics_table = sqlalchemy.Table(
+                    self.stage_system_metrics_table_name,
+                    self.metadata,
+                    sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
+                    sqlalchemy.Column('name', sqlalchemy.VARCHAR(255)),
+                    sqlalchemy.Column('stage', sqlalchemy.VARCHAR(255)),
+                    sqlalchemy.Column('group', sqlalchemy.TEXT()),
+                    sqlalchemy.Column('median', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('mean', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('variance', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('stdev', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('minimum', sqlalchemy.FLOAT),
+                    sqlalchemy.Column('maximum', sqlalchemy.FLOAT)
+                )
+
+                for quantile in SystemMetricsSet.quantiles:
+                    stage_system_metrics_table.append_column(
+                        sqlalchemy.Column(f'quantile_{quantile}th', sqlalchemy.FLOAT)
+                    )
+
+                await self._connection.execute(
+                    CreateTable(
+                        stage_system_metrics_table, 
+                        if_not_exists=True
+                    )
+                )
+
+                await self._connection.execute(
+                    f"SELECT create_hypertable('{self.stage_system_metrics_table_name}', 'time', migrate_data => true, if_not_exists => TRUE, create_default_indexes=>FALSE);"
+                )
+
+                await self._connection.execute(f"CREATE INDEX ON {self.stage_system_metrics_table_name} (name, time DESC);")
+        
+                self._stage_system_metrics_table = stage_system_metrics_table
+
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Stage System Metrics table - {self.stage_system_metrics_table_name}')
+
+            rows: List[SystemMetricsCollection] = []
+            
+            for metrics_set in system_metrics_sets:
+                cpu_metrics = metrics_set.cpu
+                memory_metrics = metrics_set.memory
+
+                for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                    for monitor_metrics in stage_cpu_metrics.values():
+                        rows.append(monitor_metrics)
+
+                    stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                    for monitor_metrics in stage_memory_metrics.values():
+                        rows.append(monitor_metrics)
+
+                    stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                    
+                    if stage_mb_per_vu_metrics:
+                        rows.append(stage_mb_per_vu_metrics)
+        
+            for metrics_set in rows:
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics - {metrics_set.name}:{metrics_set.group}')
+
+                await self._connection.execute(
+                    self._streams_table.insert(values=metrics_set.record)
+                )
+                
+            await transaction.commit()
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics to Table - {self.stage_system_metrics_table_name} - Transaction committed')
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Stage System Metrics to Table - {self.stage_system_metrics_table_name}')
 
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
 
@@ -75,7 +226,6 @@ class TimescaleDB(Postgres):
 
                     await self._connection.execute(f"CREATE INDEX ON {self.streams_table_name} (name, time DESC);")
 
-                
                     self._streams_table = stream_table
 
                     await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Streams table - {self.streams_table_name}')

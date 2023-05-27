@@ -9,4 +9,5 @@ class GoogleCloudStorageConfig(BaseModel):
     metrics_bucket: str='metrics'
     experiments_bucket: str='experiments'
     streams_bucket: str='stages'
+    system_metrics_bucket: str='system_metrics'
     reporter_type: ReporterTypes=ReporterTypes.GCS

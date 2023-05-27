@@ -1,16 +1,20 @@
 import asyncio
 import uuid
+import psutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import List, Dict
-
-import psutil
+from typing import List, Dict, Union
 from hedra.logging import HedraLogger
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import (
     MetricsSet
+)
+from hedra.reporting.system.system_metrics_set import (
+    SystemMetricsSet, 
+    SystemMetricsCollection,
+    SessionMetricsCollection
 )
 from .bigtable_config import BigTableConfig
 
@@ -44,6 +48,9 @@ class BigTable:
         self.custom_metrics_table_ids = {}
         self.errors_table_id = f'{self.metrics_table_id}_errors'
 
+        self.session_system_metrics_table_id = f'{config.system_metrics_table}_session'
+        self.stage_system_metrics_table_id = f'{config.system_metrics_table}_stage'
+
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
 
         self._events_column_family_id = f'{self.events_table_id}_columns'
@@ -53,6 +60,10 @@ class BigTable:
         self._experiments_column_family_id = f'{self.experiments_table_id}_columns'
         self._variants_column_family_id = f'{self.experiments_table_id}_variants_columns'
         self._mutations_column_family_id = f'{self.experiments_table_id}_mutations_columns'
+
+
+        self.session_system_metrics_column_family_id= f'{config.system_metrics_table}_session_columns'
+        self.stage_system_metrics_column_family_id = f'{config.system_metrics_table}_stage_columns'
 
         self._shared_metrics_column_family_id = f'{self.metrics_table_id}_shared_columns'
         self._custom_metrics_column_family_id = f'{self.metrics_table_id}_custom_columns'
@@ -77,6 +88,9 @@ class BigTable:
         self._metrics_table = None
         self._errors_table = None
 
+        self._session_system_metrics_table = None
+        self._stage_system_metrics_table = None
+
         self._experiments_table_columns = None
         self._variants_table_columns = None
         self._mutations_table_columns = None
@@ -84,6 +98,9 @@ class BigTable:
         self._events_table_columns = None
         self._stage_metrics_table_columns = None
         self._streams_table_columns = None
+
+        self._session_system_metrics_columns = None
+        self._stage_system_metrics_columns = None
 
         self._custom_metrics_table_columns = {}
         self._metrics_table_columns = None
@@ -108,6 +125,157 @@ class BigTable:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opened connection to Google Cloud - Created Client Instance - ID:{self.instance_id}')
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opened connection to Google Cloud - Loaded account config from - {self.service_account_json_path}')
+
+    async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Session System Metrics to Table {self.session_system_metrics_table_id}')
+        self._session_system_metrics_table = self.instance.table(self.session_system_metrics_table_id)
+        
+        try:
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Session System Metrics Table - {self.session_system_metrics_table_id} - if not exists')
+            await self._loop.run_in_executor(
+                self._executor,
+                self._session_system_metrics_table.create
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created Session System Metrics Table - {self.session_system_metrics_table_id} - if not exists')
+
+        except Exception:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping creation of Session System Metrics Column Family - {self.session_system_metrics_table_id} - if not exists')
+
+        self._session_system_metrics_columns = self._session_system_metrics_table.column_family(
+            self.session_system_metrics_column_family_id
+        )
+
+        try:
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Session System Metrics Column for Column Family - {self.session_system_metrics_column_family_id} - if not exists')
+            await self._loop.run_in_executor(
+                self._executor,
+                self._session_system_metrics_columns.create
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created Session System Metrics Column for Column Family - {self.session_system_metrics_column_family_id} - if not exists')
+
+        except Exception:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping creation of Session System Metrics Column for Column Family - {self.session_system_metrics_column_family_id} - if not exists')
+
+        metrics_sets: List[SessionMetricsCollection] = []
+
+        for metrics_set in system_metrics_sets:
+            for monitor_metrics in metrics_set.session_cpu_metrics.values():
+                metrics_sets.append(monitor_metrics)
+                
+            for monitor_metrics in metrics_set.session_memory_metrics.values():
+                metrics_sets.append(monitor_metrics)
+
+
+        rows = []
+        for metrics_set in metrics_sets:
+
+            row_key = f'{metrics_set.name}_{str(uuid.uuid4())}'
+            row = self._variants_table.direct_row(row_key)
+
+            for field, value in metrics_set.record:
+                if not isinstance(value, bytes):
+                    value = f'{value}'.encode()
+
+                row.set_cell(
+                    self._variants_column_family_id,
+                    field,
+                    value,
+                    timestamp=datetime.now()
+                )
+
+            rows.append(row)
+
+        await self._loop.run_in_executor(
+            self._executor,
+            self._variants_table.mutate_rows,
+            rows
+        )
+
+    async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Stage System Metrics to Table {self.stage_system_metrics_table_id}')
+        self._stage_system_metrics_table = self.instance.table(self.stage_system_metrics_table_id)
+        
+        try:
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Stage System Metrics Table - {self.stage_system_metrics_table_id} - if not exists')
+            await self._loop.run_in_executor(
+                self._executor,
+                self._stage_system_metrics_table.create
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created Stage System Metrics Table - {self.stage_system_metrics_table_id} - if not exists')
+
+        except Exception:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping creation of Stage System Metrics Column Family - {self.stage_system_metrics_table_id} - if not exists')
+
+        self._stage_system_metrics_columns = self._stage_system_metrics_table.column_family(
+            self.stage_system_metrics_column_family_id
+        )
+
+        try:
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Stage System Metrics Column for Column Family - {self.stage_system_metrics_column_family_id} - if not exists')
+            await self._loop.run_in_executor(
+                self._executor,
+                self._stage_system_metrics_columns.create
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created Stage System Metrics Column for Column Family - {self.stage_system_metrics_column_family_id} - if not exists')
+
+        except Exception:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping creation of Stage System Metrics Column for Column Family - {self.stage_system_metrics_column_family_id} - if not exists')
+
+        metrics_sets: List[SystemMetricsCollection] = []
+
+        for metrics_set in system_metrics_sets:
+
+            cpu_metrics = metrics_set.cpu
+            memory_metrics = metrics_set.memory
+
+            for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                for monitor_metrics in stage_cpu_metrics.values():
+                    metrics_sets.append(monitor_metrics)
+
+                stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                for monitor_metrics in stage_memory_metrics.values():
+                    metrics_sets.append(monitor_metrics)
+
+                stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                
+                if stage_mb_per_vu_metrics:
+                    metrics_sets.append(stage_mb_per_vu_metrics)
+
+        rows = []
+        for metrics_set in metrics_sets:
+
+            row_key = f'{metrics_set.name}_{str(uuid.uuid4())}'
+            row = self._variants_table.direct_row(row_key)
+
+            for field, value in metrics_set.record:
+                if not isinstance(value, bytes):
+                    value = f'{value}'.encode()
+
+                row.set_cell(
+                    self._variants_column_family_id,
+                    field,
+                    value,
+                    timestamp=datetime.now()
+                )
+
+            rows.append(row)
+
+        await self._loop.run_in_executor(
+            self._executor,
+            self._variants_table.mutate_rows,
+            rows
+        )
 
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
 

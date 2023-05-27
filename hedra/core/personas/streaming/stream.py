@@ -9,12 +9,22 @@ from hedra.versioning.flags.types.unstable.flag import unstable
 @unstable
 class Stream:
 
+    __slots__ = (
+        'last_completed',
+        'last_batch_size',
+        'action',
+        'completed'
+    )
+
     def __init__(self) -> None:
-        self.completed_count = 0
         self.last_completed = 0
         self.last_batch_size = 0
         self.action = None
         self.completed: List[BaseResult] = []
+
+    @property
+    def completed_count(self):
+        return len(self.completed)
 
     @property
     def succeeded(self) -> int:
@@ -81,7 +91,6 @@ class Stream:
         except RuntimeError as runtime_error:
             result = runtime_error
         
-        self.completed_count += 1
         self.completed.append(result)
 
         return result

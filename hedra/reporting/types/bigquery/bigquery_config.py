@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-from typing import Dict
 from pydantic import BaseModel
 from hedra.reporting.types.common.types import ReporterTypes
 
@@ -13,6 +11,7 @@ class BigQueryConfig(BaseModel):
     metrics_table: str = 'metrics'
     experiments_table: str= 'experiments'
     streams_table: str='streams'
+    system_metrics_table: str='system_metrics'
     retry_timeout: int = 10
     reporter_type: ReporterTypes=ReporterTypes.BigQuery
 

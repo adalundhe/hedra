@@ -1,6 +1,12 @@
 from __future__ import annotations
 import uuid
-from typing import List, Dict, Tuple, Any
+from typing import (
+    List, 
+    Dict, 
+    Tuple, 
+    Any,
+    Union
+)
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from .analyze.analyze_edge import AnalyzeEdge, BaseEdge
@@ -33,6 +39,7 @@ class Transition:
         self.descendants = []
         self.destinations: List[str] = []
         self.transition_idx = 0
+        self.retries = from_stage.stage_retries
         edge_types = {
             StageTypes.ACT: ActEdge,
             StageTypes.ANALYZE: AnalyzeEdge,
@@ -57,7 +64,16 @@ class Transition:
         if self.edge.source.context is None:
             self.edge.source.context = SimpleContext()
         
-        result = await self.edge.transition()
+        result: Union[None, Tuple[None, StageTypes]] = None
+        if self.retries > 0:
+            for _ in range(self.retries):
+                result = await self.edge.transition()
+
+                if self.edge.exception is None:
+                    break
+            
+        else:
+            result = await self.edge.transition()
 
         self.edge.descendants = {
             descendant: self.edges_by_name.get((

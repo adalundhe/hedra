@@ -20,5 +20,9 @@ class JSONConfig(BaseModel):
         os.getcwd(),
         'streams.json'
     )
+    system_metrics_filepath: str=os.path.join(
+        os.getcwd(),
+        'system_metrics.json'
+    )
     overwrite: bool=True
     reporter_type: ReporterTypes=ReporterTypes.JSON

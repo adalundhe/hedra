@@ -27,7 +27,7 @@ class DistributionFitOptimizer(Optimizer):
 
         self.optimization_start = 0
         self.algorithm: PointOptimizer = None
-
+        
         self.variant_weight = self.stage_config.experiment.get('weight')
         self.distribution_intervals = self.stage_config.experiment.get('intervals')
         self.distribution_type = self.stage_config.experiment.get('distribution_type')
@@ -137,6 +137,7 @@ class DistributionFitOptimizer(Optimizer):
         self.logger.filesystem.sync['hedra.optimize'].info(f'{self.metadata_string} - Optimization - max actions per second - {self._max_aps}')
 
         self.optimized_results = {
+            'optimize_target_stage': self.target_stage_name,
             'optimized_distribution': distribution_optimized_params,
             'optimization_mean_error': mean(distribution_mean_errors),
             'optimization_iters': self.algorithm.max_iter,

@@ -15,6 +15,8 @@ class Idle(Stage):
             self.priority
         )
 
+        self.retries: int = 0
+
     @Internal()
     async def run(self):
         await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Starting graph execution')

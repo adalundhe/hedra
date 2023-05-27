@@ -1,20 +1,39 @@
 
 import asyncio
-import uuid
+import itertools
 import networkx
-import threading
 import os
+import statistics
 import time
-from typing import Dict, List, Any
+import threading
+import uuid
+from typing import (
+    Dict, 
+    List, 
+    Any,
+    Union
+)
 from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.transitions.transition_group import TransitionGroup
 from hedra.logging import HedraLogger
-from hedra.logging.table.table_types import GraphExecutionResults
+from hedra.logging.table.table_types import (
+    GraphExecutionResults,
+    SystemMetricsCollection,
+    GraphResults
+)
+from hedra.monitoring import(
+    CPUMonitor,
+    MemoryMonitor
+)
+
+from hedra.reporting.metric.metrics_set import MetricsSet
+from hedra.reporting.metric.stage_metrics_summary import StageMetricsSummary
+from hedra.reporting.system.system_metrics_set import SystemMetricsSet
+from hedra.reporting.system.system_metrics_set_types import MonitorGroup
 from .transitions import TransitionAssembler, local_transitions
 from .status import GraphStatus
-
 
 
 class Graph:
@@ -152,7 +171,10 @@ class Graph:
         self.logger.hedra.sync.debug(f'{self.metadata_string} - Assembly complete')
         self.logger.filesystem.sync['hedra.core'].debug(f'{self.metadata_string} - Assembly complete')
 
-    async def run(self) -> GraphExecutionResults:
+    async def run(self) -> GraphResults:
+
+        cpu_monitor = CPUMonitor()
+        memory_monitor = MemoryMonitor()
 
         execution_start = time.monotonic()
 
@@ -164,6 +186,8 @@ class Graph:
         self.status = GraphStatus.RUNNING
 
         summary_output: GraphExecutionResults = {}
+        submit_stage_system_metrics: SystemMetricsCollection = {}
+        graph_system_metrics: MonitorGroup = {}
 
         for transition_group in self._transitions:
 
@@ -224,10 +248,30 @@ class Graph:
                         stage_name = transition.edge.source.name
                         submit_stage_context = transition.edge.source.context
 
-                        analyze_stage_summary_metrics = submit_stage_context.get('analyze_stage_summary_metrics')
+                        analyze_stage_summary_metrics: Dict[
+                            str, 
+                            Union[
+                                str,
+                                Dict[str, StageMetricsSummary], 
+                                Dict[str, MetricsSet], 
+                                SystemMetricsSet
+                            ]
+                        ] = submit_stage_context.get('analyze_stage_summary_metrics')
 
                         if analyze_stage_summary_metrics:
                             summary_output[stage_name] = analyze_stage_summary_metrics
+                            stage_system_metrics = analyze_stage_summary_metrics.get('system_metrics', {})
+
+                            graph_system_metrics.update(stage_system_metrics.metrics)
+
+                    if transition.edge.source.stage_type == StageTypes.SUBMIT:
+                        stage_name = transition.edge.source.name
+                        submit_stage_context = transition.edge.source.context
+
+                        submit_stage_system_metrics_set: SystemMetricsSet = submit_stage_context.get('stage_system_metrics')
+                        if submit_stage_system_metrics_set:
+                            submit_stage_system_metrics[stage_name] = submit_stage_system_metrics_set
+                            graph_system_metrics.update(submit_stage_system_metrics_set.metrics)
 
                 if self.status == GraphStatus.FAILED:
                     status_spinner.finalize()
@@ -257,13 +301,47 @@ class Graph:
 
         self.execution_time = execution_start - time.monotonic()
 
-
         for transition_group in self._transitions:
+
+            group_cpu_metrics: List[List[Union[int, float]]] = []
+            group_memory_metrics: List[List[Union[int, float]]]= []
+
             for transition in transition_group:
+
+                stage_name = transition.edge.source.name
+
+                transition_system_metrics = graph_system_metrics.get(stage_name)
+                if transition_system_metrics:
+                    stage_cpu_metrics = graph_system_metrics[stage_name].get('cpu')
+                    stage_memory_metrics = graph_system_metrics[stage_name].get('memory')
+
+                    for metrics in stage_cpu_metrics.stage_metrics.values():
+                        group_cpu_metrics.append(metrics)
+                    
+                    for metrics in stage_memory_metrics.stage_metrics.values():
+                        group_memory_metrics.append(metrics)
 
                 transition.edge.source.context = None
                 transition.edge.destination.context = None
                 transition.edge.history = None
+
+            if len(group_cpu_metrics) > 0 and len(group_memory_metrics) > 0:
+                group_cpu_metrics = [
+                    statistics.median(cpu_usage) for cpu_usage in itertools.zip_longest(
+                        *group_cpu_metrics,
+                        fillvalue=0
+                    )
+                ]
+
+                group_memory_metrics = [
+                    sum(memory_usage) for memory_usage in itertools.zip_longest(
+                        *group_memory_metrics,
+                        fillvalue=0
+                    )
+                ]
+
+            cpu_monitor.collected[self.graph_name].extend(group_cpu_metrics)
+            memory_monitor.collected[self.graph_name].extend(group_memory_metrics)
             
             transition_group.destination_groups = None
             transition_group.transitions = None
@@ -277,7 +355,35 @@ class Graph:
             if task != run_task and task.cancelled() is False:
                 task.cancel()
 
-        return summary_output
+        cpu_monitor.aggregate_worker_stats()
+        memory_monitor.aggregate_worker_stats()
+
+        cpu_monitor.stage_metrics[self.graph_name] = cpu_monitor.collected[self.graph_name]
+        memory_monitor.stage_metrics[self.graph_name] = memory_monitor.collected[self.graph_name]
+
+        cpu_monitor.visibility_filters[self.graph_name] = True
+        memory_monitor.visibility_filters[self.graph_name] = True
+
+        graph_system_metrics = {
+            self.graph_name: {
+                'cpu': cpu_monitor,
+                'memory': memory_monitor
+            }
+        }
+
+        system_metrics = SystemMetricsSet(
+            graph_system_metrics,
+            {}
+        )
+
+        if self.status == GraphStatus.COMPLETE:
+            system_metrics.generate_system_summaries()
+
+        return {
+            'metrics': summary_output,
+            'submit_stage_system_metrics': submit_stage_system_metrics,
+            'graph_system_metrics': system_metrics
+        }
 
     def cleanup(self):
         for executor in self.runner.executors:

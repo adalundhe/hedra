@@ -8,6 +8,11 @@ from hedra.reporting.metric import (
     MetricsSet,
     MetricType
 )
+from hedra.reporting.system.system_metrics_set import (
+    SystemMetricsSet,
+    SessionMetricsCollection,
+    SystemMetricsCollection
+)
 from typing import Dict
 from .datadog_config import DatadogConfig
 
@@ -102,6 +107,117 @@ class Datadog:
         self.metrics_api = MetricsApi(self._client)
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to Datadogg API')
+
+    async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Session System Metrics to Datadog API')
+
+        metrics_sets: List[SessionMetricsCollection] = []
+        for metrics_set in system_metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics - {metrics_set.system_metrics_set_id}')
+            
+            for monitor_metrics in metrics_set.session_cpu_metrics.values():
+                metrics_sets.append(monitor_metrics)
+                
+            for  monitor_metrics in metrics_set.session_memory_metrics.values():
+                metrics_sets.append(monitor_metrics)
+
+        system_session_metrics_series: List[MetricSeries] = []
+
+        for metrics_set in metrics_sets:
+
+            tags = [
+                f'group:{metrics_set.group}'
+            ]
+
+            for field, value in metrics_set.stats.items():
+
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Session System Metric - {metrics_set.name}:{metrics_set.group}:{field}')
+
+                metric_type = metrics_set.types_map.get(field)
+                datadog_metric_type = self._datadog_api_map.get(metric_type)
+
+                if isinstance(value, (int, int16, int32, int64)):
+                    value = int(value)
+
+                elif isinstance(value, (float, float32, float64)):
+                    value = float(value)
+
+                series = MetricSeries(
+                    f'{metrics_set.name}_{metrics_set.group}_{field}', 
+                    [MetricPoint(
+                        timestamp=int(datetime.now().timestamp()),
+                        value=value
+                    )],
+                    type=datadog_metric_type,
+                    tags=tags
+                )
+
+                system_session_metrics_series.append(series)
+                
+        await self.metrics_api.submit_metrics(MetricPayload(system_session_metrics_series))
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Session System Metrics to Datadog API')
+
+    async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Stage System Metrics to Datadog API')
+
+        metrics_sets: List[SystemMetricsCollection] = []
+        for metrics_set in system_metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics - {metrics_set.system_metrics_set_id}')
+            
+            cpu_metrics = metrics_set.cpu
+            memory_metrics = metrics_set.memory
+
+            for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                for monitor_metrics in stage_cpu_metrics.values():
+                    metrics_sets.append(monitor_metrics)
+
+                stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                for monitor_metrics in stage_memory_metrics.values():
+                    metrics_sets.append(monitor_metrics)
+
+                stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                
+                if stage_mb_per_vu_metrics:
+                    metrics_sets.append(stage_mb_per_vu_metrics)
+
+        system_stage_metrics_series: List[MetricSeries] = []
+
+        for metrics_set in metrics_sets:
+
+            tags = [
+                f'group:{metrics_set.group}'
+            ]
+
+            for field, value in metrics_set.stats.items():
+
+                await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Creating Stage System Metric - {metrics_set.name}:{metrics_set.group}:{field}')
+
+                metric_type = metrics_set.types_map.get(field)
+                datadog_metric_type = self._datadog_api_map.get(metric_type)
+
+                if isinstance(value, (int, int16, int32, int64)):
+                    value = int(value)
+
+                elif isinstance(value, (float, float32, float64)):
+                    value = float(value)
+
+                series = MetricSeries(
+                    f'{metrics_set.name}_{metrics_set.group}_{field}', 
+                    [MetricPoint(
+                        timestamp=int(datetime.now().timestamp()),
+                        value=value
+                    )],
+                    type=datadog_metric_type,
+                    tags=tags
+                )
+
+                system_stage_metrics_series.append(series)
+                
+        await self.metrics_api.submit_metrics(MetricPayload(system_stage_metrics_series))
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Stage System Metrics to Datadog API')
 
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
 

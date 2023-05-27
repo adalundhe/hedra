@@ -13,6 +13,10 @@ from hedra.core.engines.types.task import TaskResult
 from hedra.core.engines.types.udp import UDPResult
 from hedra.core.engines.types.websocket import WebsocketResult
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
+from hedra.monitoring import (
+    CPUMonitor,
+    MemoryMonitor
+)
 
 
 ResultsBatch = Dict[str, Union[List[BaseResult], float]]
@@ -22,6 +26,12 @@ MutationConfig = Dict[str, Union[str, float, List[str]]]
 VariantConfig = Dict[str, Union[int, str, float, List[float], MutationConfig]]
 
 ExperimentConfig = Dict[str, Union[str, bool, VariantConfig]]
+
+MemoryMonitorGroup = Dict[str, MemoryMonitor]
+
+CPUMonitorGroup = Dict[str, CPUMonitor]
+
+MonitorGroup = Dict[str, Union[CPUMonitorGroup, MemoryMonitorGroup]]
 
 
 class ResultsSet:

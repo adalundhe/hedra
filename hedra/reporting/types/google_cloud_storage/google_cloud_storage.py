@@ -9,6 +9,11 @@ from hedra.reporting.experiment.experiments_collection import ExperimentMetricsC
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
+from hedra.reporting.system.system_metrics_set import (
+    SystemMetricsSet,
+    SessionMetricsCollection,
+    SystemMetricsCollection
+)
 from .google_cloud_storage_config import GoogleCloudStorageConfig
 
 try:
@@ -38,6 +43,9 @@ class GoogleCloudStorage:
         self.errors_bucket_name = f'{config.metrics_bucket}_errors'
         self.custom_metrics_bucket_name = f'{config.metrics_bucket}_custom'
 
+        self.session_system_metrics_bucket_name = f'{config.system_metrics_bucket}_session'
+        self.stage_system_metrics_bucket_name = f'{config.system_metrics_bucket}_stage'
+
         self.credentials = None
         self.client = None
 
@@ -52,6 +60,8 @@ class GoogleCloudStorage:
         self._metrics_bucket = None
         self._errors_bucket = None
         self._custom_metrics_bucket = None
+        self._session_system_metrics_bucket = None
+        self._stage_system_metrics_bucket = None
 
         self.session_uuid = str(uuid.uuid4())
         self.metadata_string: str = None
@@ -67,6 +77,119 @@ class GoogleCloudStorage:
         self.client = storage.Client.from_service_account_json(self.service_account_json_path)
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opened connection to Google Cloud - Loaded account config from - {self.service_account_json_path}')
+
+    async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        try:
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Session System Metrics bucket at - Namespace: {self.bucket_namespace} - Bucket: {self.session_system_metrics_bucket_name} if not exists')
+
+            self._session_system_metrics_bucket = await self._loop.run_in_executor(
+                self._executor,
+                self.client.get_bucket,
+                f'{self.bucket_namespace}_{self.session_system_metrics_bucket_name}'
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Session System Metrics bucket at - Namespace: {self.bucket_namespace} - Bucket: {self.session_system_metrics_bucket_name}')
+        
+        except Exception:
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Setting Session System Metrics bucket as - Namespace: {self.bucket_namespace} - Bucket: {self.session_system_metrics_bucket_name}')
+
+            self._session_system_metrics_bucket = await self._loop.run_in_executor(
+                self._executor,
+                self.client.create_bucket,
+                f'{self.bucket_namespace}_{self.session_system_metrics_bucket_name}'
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Set Session System Metrics bucket as - Namespace: {self.bucket_namespace} - Bucket: {self.session_system_metrics_bucket_name}')
+
+        metrics_sets: List[SessionMetricsCollection] = []
+        
+        for metrics_set in system_metrics_sets:
+            for monitor_metrics in metrics_set.session_cpu_metrics.values():
+                metrics_sets.append(monitor_metrics)
+                
+            for  monitor_metrics in metrics_set.session_memory_metrics.values():
+                metrics_sets.append(monitor_metrics)
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Session System Metrics to - Namespace: {self.bucket_namespace} - Bucket: {self.session_system_metrics_bucket_name}')
+        for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics Set - {metrics_set.name}:{metrics_set.group}')
+
+            blob = await self._loop.run_in_executor(
+                self._executor,
+                self._streams_bucket.blob,
+                f'{metrics_set.name}_{metrics_set.group}_{self.session_uuid}'
+            )
+
+            await self._loop.run_in_executor(
+                self._executor,
+                blob.upload_from_string,
+                json.dumps(metrics_set.record)
+            )
+    
+    async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        try:
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Stage System Metrics bucket at - Namespace: {self.bucket_namespace} - Bucket: {self.stage_system_metrics_bucket_name} if not exists')
+
+            self._stage_system_metrics_bucket = await self._loop.run_in_executor(
+                self._executor,
+                self.client.get_bucket,
+                f'{self.bucket_namespace}_{self.stage_system_metrics_bucket_name}'
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Stage System Metrics bucket at - Namespace: {self.bucket_namespace} - Bucket: {self.stage_system_metrics_bucket_name}')
+        
+        except Exception:
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Setting Stage System Metrics bucket as - Namespace: {self.bucket_namespace} - Bucket: {self.stage_system_metrics_bucket_name}')
+
+            self._stage_system_metrics_bucket = await self._loop.run_in_executor(
+                self._executor,
+                self.client.create_bucket,
+                f'{self.bucket_namespace}_{self.stage_system_metrics_bucket_name}'
+            )
+
+            await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Set Stage System Metrics bucket as - Namespace: {self.bucket_namespace} - Bucket: {self.stage_system_metrics_bucket_name}')
+
+        metrics_sets: List[SystemMetricsCollection] = []
+        
+        for metrics_set in system_metrics_sets:
+            cpu_metrics = metrics_set.cpu
+            memory_metrics = metrics_set.memory
+
+            for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                for monitor_metrics in stage_cpu_metrics.values():
+                    metrics_sets.append(monitor_metrics)
+
+                stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                for monitor_metrics in stage_memory_metrics.values():
+                    metrics_sets.append(monitor_metrics)
+
+                stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                
+                if stage_mb_per_vu_metrics:
+                    metrics_sets.append(stage_mb_per_vu_metrics)
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Stage System Metrics to - Namespace: {self.bucket_namespace} - Bucket: {self.stage_system_metrics_bucket_name}')
+        for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics Set - {metrics_set.name}:{metrics_set.group}')
+
+            blob = await self._loop.run_in_executor(
+                self._executor,
+                self._streams_bucket.blob,
+                f'{metrics_set.name}_{metrics_set.group}_{self.session_uuid}'
+            )
+
+            await self._loop.run_in_executor(
+                self._executor,
+                blob.upload_from_string,
+                json.dumps(metrics_set.record)
+            )
 
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
 
@@ -505,7 +628,7 @@ class GoogleCloudStorage:
             self.client.close
         )
 
-        self._executor.shutdown()
+        self._executor.shutdown(wait=False, cancel_futures=True)
 
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Session Closed - {self.session_uuid}')
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closed Google Cloud connection')

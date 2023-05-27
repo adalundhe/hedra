@@ -10,7 +10,7 @@ import signal
 from multiprocessing import current_process, active_children
 from pathlib import Path
 from hedra.core.graphs.stages.base.stage import Stage
-from hedra.core.graphs import Graph
+from hedra.core.graphs.graph import Graph
 from hedra.core.graphs.status import GraphStatus
 from hedra.versioning.flags.types.base.active import active_flags
 from hedra.versioning.flags.types.base.flag_type import FlagTypes
@@ -20,16 +20,16 @@ from hedra.logging import (
     logging_manager
 )
 from hedra.logging.table.summary_table import SummaryTable
-from hedra.logging.table.table_types import GraphExecutionResults
-from typing import Dict, Union
-
-
+from hedra.logging.table.table_types import GraphResults
+from typing import Dict
 uvloop.install()
+
 
 def run_graph(
     path: str, 
     cpus: int, 
     skip: str,
+    retries: int,
     show_summaries: str,
     hide_summaries: str,
     log_level: str, 
@@ -128,7 +128,7 @@ def run_graph(
     hedra_config['logging'] = {
         'logfiles_directory': logfiles_directory,
         'log_level': log_level
-    }    
+    }  
     
     with open(hedra_config_filepath, 'w') as hedra_config_file:
         hedra_config['graphs'] = hedra_graphs
@@ -168,15 +168,11 @@ def run_graph(
                     pass
 
         except BrokenPipeError:
-            logger.console.sync.critical('\n\nAborted.\n')   
+            pass 
 
         except RuntimeError:
-            logger.console.sync.critical('\n\nAborted.\n')
+            pass
 
-        if len(child_processes) < 1:
-            logger.console.sync.critical('\n\nAborted.\n')  
-            os._exit(1) 
-  
     graph.assemble()
     for signame in ('SIGINT', 'SIGTERM'):
         loop.add_signal_handler(
@@ -185,17 +181,44 @@ def run_graph(
         )
 
 
-    graph_execution_results: Union[GraphExecutionResults, None] = None
+    graph_execution_results: GraphResults = None
 
     try:
-        graph_execution_results = loop.run_until_complete(graph.run())
-        
+
+        if retries > 0:
+            for _ in range(retries):
+
+                graph_execution_results = loop.run_until_complete(graph.run())
+
+                if graph.status == GraphStatus.COMPLETE:
+                    break
+
+                else:
+                    graph.cleanup()
+
+                    graph = Graph(
+                        graph_name,
+                        list(discovered.values()),
+                        config={
+                            **hedra_core_config,
+                            'graph_path': path,
+                            'graph_module': module.__name__,
+                            'graph_skipped_stages': graph_skipped_stages
+                        },
+                        cpus=cpus
+                    )
+
+                    graph.assemble()
+
+        else:
+            graph_execution_results = loop.run_until_complete(graph.run())
+
     except BrokenPipeError:
-        pass
+        graph.status = GraphStatus.CANCELLED
 
     except RuntimeError:
-        pass
-    
+        graph.status = GraphStatus.CANCELLED
+
     exit_code = 0
 
     if graph.status == GraphStatus.FAILED:
@@ -204,10 +227,10 @@ def run_graph(
         exit_code = 1
 
     elif graph.status == GraphStatus.CANCELLED:
-        logger.console.sync.critical('\nAborted.\n') 
+        logger.console.sync.critical('\n\nAborted.\n') 
         exit_code = 1  
 
-    else:
+    elif graph.status == GraphStatus.COMPLETE:
 
         if graph_execution_results:
             enabled_summaries = show_summaries.split(',')

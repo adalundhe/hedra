@@ -10,6 +10,11 @@ from hedra.reporting.metric import (
     MetricsSet,
     MetricType
 )
+from hedra.reporting.system.system_metrics_set import (
+    SystemMetricsSet,
+    SessionMetricsCollection,
+    SystemMetricsCollection
+)
 
 try:
     from prometheus_client.exposition import basic_auth_handler
@@ -61,6 +66,8 @@ class Prometheus:
         self._events: Dict[str, PrometheusMetric] = {}
         self._metrics: Dict[str, Dict[str, Dict[str, PrometheusMetric]]] = {}
         self._streams: Dict[str, Dict[str, PrometheusMetric]] = {}
+        self._session_system_metrics: Dict[str, Dict[str, PrometheusMetric]] = {}
+        self._stage_system_metrics: Dict[str, Dict[str, PrometheusMetric]] = {}
 
         self._experiments: Dict[str, Dict[str, PrometheusMetric]] = {}
         self._variants: Dict[str, Dict[str, PrometheusMetric]] = {}
@@ -137,6 +144,132 @@ class Prometheus:
             )
 
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Pushed to Prometheus Pushgateway via HTTP')
+
+    async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        for quantile in SystemMetricsSet.quantiles:
+            quantile_key = f'quantile_{quantile}th'
+            self.types_map[quantile_key] = 'gauge'
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Session System Metrics to Prometheus - Namespace: {self.namespace}')
+
+        metrics_sets: List[SessionMetricsCollection] = []
+        
+        for metrics_set in system_metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics - {metrics_set.system_metrics_set_id}')
+            for monitor_metrics in metrics_set.session_cpu_metrics.values():
+                metrics_sets.append(monitor_metrics)
+                
+            for  monitor_metrics in metrics_set.session_memory_metrics.values():
+                metrics_sets.append(monitor_metrics)
+
+        for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics - {metrics_set.name}:{metrics_set.group}')
+
+            session_system_metric_set = self._session_system_metrics.get(metrics_set.name)
+            if session_system_metric_set is None:
+                tags = [
+                    f'name:{metrics_set.name}',
+                    f'group:{metrics_set.group}'
+                ]
+
+
+                fields = {}
+
+                for metric_field in metrics_set.record.keys():
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics Group - {metrics_set.name}:{metrics_set.group}:{metric_field}')
+                    metric_type = self.types_map.get(metric_field)
+                    metric_name = f'{metrics_set.name}_{metrics_set.group}_{metric_field}'.replace('.', '_')
+
+                    prometheus_metric = PrometheusMetric(
+                        metric_name,
+                        metric_type,
+                        metric_description=f'{metrics_set.name} {metrics_set.group} {metric_field}',
+                        metric_labels=tags,
+                        metric_namespace=self.namespace,
+                        registry=self.registry
+                    )
+                    prometheus_metric.create_metric()
+
+                    fields[metric_field] = prometheus_metric
+
+                self._session_system_metrics[metrics_set.name] = fields
+            
+            for field, prometheus_metric in session_system_metric_set.items():
+                metric_value = metrics_set.record.get(field)
+                prometheus_metric.update(metric_value)
+
+        await self._submit_to_pushgateway()
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Session System Metrics to Prometheus - Namespace: {self.namespace}')
+    
+    async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        for quantile in SystemMetricsSet.quantiles:
+            quantile_key = f'quantile_{quantile}th'
+            self.types_map[quantile_key] = 'gauge'
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Stage System Metrics to Prometheus - Namespace: {self.namespace}')
+
+        metrics_sets: List[SystemMetricsCollection] = []
+        
+        for metrics_set in system_metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics - {metrics_set.system_metrics_set_id}')
+            
+            cpu_metrics = metrics_set.cpu
+            memory_metrics = metrics_set.memory
+
+            for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                for monitor_metrics in stage_cpu_metrics.values():
+                    metrics_sets.append(monitor_metrics)
+
+                stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                for monitor_metrics in stage_memory_metrics.values():
+                    metrics_sets.append(monitor_metrics)
+
+                stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                
+                if stage_mb_per_vu_metrics:
+                    metrics_sets.append(stage_mb_per_vu_metrics)
+
+        for metrics_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics - {metrics_set.name}:{metrics_set.group}')
+
+            stage_system_metric_set = self._stage_system_metrics.get(metrics_set.name)
+            if stage_system_metric_set is None:
+                tags = [
+                    f'name:{metrics_set.name}',
+                    f'group:{metrics_set.group}'
+                ]
+
+
+                fields = {}
+
+                for metric_field in metrics_set.record.keys():
+                    await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics Group - {metrics_set.name}:{metrics_set.group}:{metric_field}')
+                    metric_type = self.types_map.get(metric_field)
+                    metric_name = f'{metrics_set.name}_{metrics_set.group}_{metric_field}'.replace('.', '_')
+
+                    prometheus_metric = PrometheusMetric(
+                        metric_name,
+                        metric_type,
+                        metric_description=f'{metrics_set.name} {metrics_set.group} {metric_field}',
+                        metric_labels=tags,
+                        metric_namespace=self.namespace,
+                        registry=self.registry
+                    )
+                    prometheus_metric.create_metric()
+
+                    fields[metric_field] = prometheus_metric
+
+                self._stage_system_metrics[metrics_set.name] = fields
+            
+            for field, prometheus_metric in stage_system_metric_set.items():
+                metric_value = metrics_set.record.get(field)
+                prometheus_metric.update(metric_value)
+
+        await self._submit_to_pushgateway()
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Stage System Metrics to Prometheus - Namespace: {self.namespace}')
 
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
 

@@ -8,14 +8,15 @@ import signal
 import os
 import time
 from pathlib import Path
-from typing import List, TextIO, Dict
+from typing import List, TextIO, Dict, Union
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from xml.dom.minidom import parseString
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
-from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric.metrics_set import MetricsSet
+from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
+from hedra.reporting.system.system_metrics_set import SystemMetricsSet
 from .xml_config import XMLConfig
 
 try:
@@ -34,10 +35,15 @@ def handle_loop_stop(
 ): 
     try:
         events_file.close()
-        executor.shutdown() 
+        executor.shutdown(wait=False, cancel_futures=True) 
         loop.stop()
     except Exception:
         pass
+
+
+MetricRecord = Dict[str, Union[int, float, str]]
+MetricRecordGroup = Dict[str, List[MetricRecord]]
+MetricRecordCollection = Dict[str, MetricRecord]
     
 
 class XML:
@@ -89,14 +95,154 @@ class XML:
 
         self.streams_metrics_filepath = config.streams_filepath
 
+        system_metrics_path = Path(config.system_metrics_filepath)
+        system_metrics_directory = system_metrics_path.parent
+        system_metrics_filename = system_metrics_path.stem
+
+        self.stage_system_metrics_filepath = os.path.join(
+            system_metrics_directory,
+            f'{system_metrics_filename}_stages.xml'
+        )
+
+        self.session_system_metrics_filepath = os.path.join(
+            system_metrics_directory,
+            f'{system_metrics_filename}_session.xml'
+        )
+
         self.events_file: TextIO = None
         self.metrics_file: TextIO = None
         self.experiments_file: TextIO = None
         self.variants_file: TextIO = None
         self.mutations_file: TextIO = None
         self.streams_file: TextIO = None
+        self.stage_system_metrics_file: TextIO = None
+        self.session_system_metrics_file: TextIO = None
 
         self.write_mode = 'w' if config.overwrite else 'a'
+
+    async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        if self.session_system_metrics_file is None:
+            self.session_system_metrics_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.session_system_metrics_filepath,
+                    self.write_mode
+                )
+            )
+
+            for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        self.session_system_metrics_file
+                    )
+                )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Session System Metrics to file - {self.session_system_metrics_filepath}')
+
+        metrics_sets: Dict[str, MetricRecord] = {}
+
+        for metrics_set in system_metrics_sets:
+
+            for monitor_name, monitor_metrics in metrics_set.session_cpu_metrics.items():
+
+                system_metrics_collection: MetricRecordCollection = {}
+
+                memory_metrics = metrics_set.session_memory_metrics.get(monitor_name)
+
+                system_metrics_collection['cpu'] = monitor_metrics.record
+                system_metrics_collection['memory'] = memory_metrics.record
+                
+                metrics_sets[monitor_name] = system_metrics_collection
+
+        system_metrics_xml = dicttoxml(
+            metrics_sets, 
+            custom_root='system'
+        )
+
+        system_metrics_xml = parseString(system_metrics_xml)
+
+        await self._loop.run_in_executor(
+            self._executor,
+            self.session_system_metrics_file.write,
+            system_metrics_xml.toprettyxml()
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Session System Metrics to file - {self.session_system_metrics_filepath}')
+
+    async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        if self.stage_system_metrics_file is None:
+            self.stage_system_metrics_file = await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    open,
+                    self.stage_system_metrics_filepath,
+                    self.write_mode
+                )
+            )
+
+            for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop,
+                        self.stage_system_metrics_file
+                    )
+                )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saving Stage System Metrics to file - {self.stage_system_metrics_file}')
+
+        metrics_sets: List[MetricRecordGroup]= []
+
+        for metrics_set in system_metrics_sets:
+
+            cpu_metrics = metrics_set.cpu
+            memory_metrics = metrics_set.memory
+
+            for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                stage_system_metrics_record: MetricRecordGroup = {
+                    'cpu': [],
+                    'memory': [],
+                    'mb_per_vu': []
+                }
+
+                for monitor_metrics in stage_cpu_metrics.values():
+                    stage_system_metrics_record['cpu'].append(monitor_metrics.record)
+
+                stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                for monitor_metrics in stage_memory_metrics.values():
+                    stage_system_metrics_record['memory'].append(monitor_metrics.record)
+
+                stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                
+                if stage_mb_per_vu_metrics:
+                    stage_system_metrics_record['mb_per_vu'].append(stage_mb_per_vu_metrics.record)
+
+                metrics_sets.append(stage_system_metrics_record)
+
+        system_metrics_xml = dicttoxml(
+            metrics_sets, 
+            custom_root='system'
+        )
+
+        system_metrics_xml = parseString(system_metrics_xml)
+
+        await self._loop.run_in_executor(
+            self._executor,
+            self.stage_system_metrics_file.write,
+            system_metrics_xml.toprettyxml()
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Saved Stage System Metrics to file - {self.stage_system_metrics_filepath}')
 
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
         if self.streams_file is None:
@@ -498,5 +644,17 @@ class XML:
                 self.streams_file.close
             )
 
-        self._executor.shutdown()
+        if self.stage_system_metrics_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.stage_system_metrics_file.close
+            )
+
+        if self.session_system_metrics_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.session_system_metrics_file.close
+            )
+
+        self._executor.shutdown(cancel_futures=True)
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')

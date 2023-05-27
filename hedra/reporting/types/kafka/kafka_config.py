@@ -10,10 +10,12 @@ class KafkaConfig(BaseModel):
     metrics_topic: str='metrics'
     experiments_topic: str='experiments'
     streams_topic: str='streams'
+    system_metrics_topic='system_metrics'
     events_partition: int=0
     metrics_partition: int=0
     experiments_partition: int=0
     streams_partition: int=0
+    system_metrics_partition: int=0
     compression_type: Optional[str]
     timeout: int=1000
     idempotent: bool=True

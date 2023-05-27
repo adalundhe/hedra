@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict
 from pydantic import BaseModel
 from hedra.reporting.types.common.types import ReporterTypes
 
@@ -12,6 +12,7 @@ class AWSTimestreamConfig(BaseModel):
     metrics_table: str='metrics'
     experiments_table: str='experiments'
     streams_table: str='streams'
+    system_metrics_table: str='system_metrics'
     retention_options: Dict[str, int] = {
         "MemoryStoreRetentionPeriodInHours": 1,
         "MagneticStoreRetentionPeriodInDays": 365,

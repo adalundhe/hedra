@@ -3,8 +3,12 @@ import asyncio
 import psutil
 import uuid
 import math
-from typing import Dict, List, Union
-from concurrent.futures import ThreadPoolExecutor
+from typing import (
+    Dict, 
+    List, 
+    Union,
+    Optional
+)
 from hedra.logging import HedraLogger
 from asyncio import Task
 from hedra.core.hooks.types.base.hook_type import HookType
@@ -16,6 +20,10 @@ from hedra.core.personas.types.types import PersonaTypes
 from hedra.core.personas.streaming import (
     Stream,
     StreamAnalytics
+)
+from hedra.monitoring import (
+    CPUMonitor,
+    MemoryMonitor
 )
 from hedra.reporting.processed_result.results import results_types
 from hedra.reporting.reporter import (
@@ -88,7 +96,9 @@ class DefaultPersona:
         'pending',
         'collect_analytics',
         'collection_interval',
-        'bypass_cleanup'
+        'bypass_cleanup',
+        'cpu_monitor',
+        'memory_monitor'
     )    
 
     def __init__(self, config: Config):
@@ -135,6 +145,8 @@ class DefaultPersona:
         self.collection_interval: int = 1
         self.pending: List[asyncio.Task] = []
         self.bypass_cleanup: bool = False
+        self.cpu_monitor = CPUMonitor()
+        self.memory_monitor = MemoryMonitor()
 
     def setup(
             self, 
@@ -192,6 +204,8 @@ class DefaultPersona:
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Executing {self.actions_count} Hooks: {hook_names}')
 
         total_time = self.total_time
+        
+        monitor_name = f'{self.stage_name}.persona'
 
         await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Executing for a total of - {total_time} - seconds')
         loop = asyncio.get_running_loop()
@@ -201,6 +215,10 @@ class DefaultPersona:
                 reporter.logger.filesystem.aio['hedra.reporting'].logger_enabled = False
                 reporter.selected_reporter.logger.filesystem.aio['hedra.reporting'].logger_enabled = False
                 await reporter.connect()
+
+            
+            await self.cpu_monitor.start_background_monitor(monitor_name)
+            await self.memory_monitor.start_background_monitor(monitor_name)
 
             await self.start_stream()
 
@@ -217,10 +235,16 @@ class DefaultPersona:
 
             self.streamed_analytics = await self.stop_stream()
 
+            await self.cpu_monitor.stop_background_monitor(monitor_name)
+            await self.memory_monitor.stop_background_monitor(monitor_name)
+
             for reporter in self.stream_reporters:
                 await reporter.close()
 
         else:
+
+            await self.cpu_monitor.start_background_monitor(monitor_name)
+            await self.memory_monitor.start_background_monitor(monitor_name)
 
             self.start = time.monotonic()
             completed, pending = await asyncio.wait([
@@ -232,6 +256,24 @@ class DefaultPersona:
             ], timeout=self.graceful_stop)
 
             self.end = time.monotonic()
+
+            await self.cpu_monitor.stop_background_monitor(monitor_name)
+            await self.memory_monitor.stop_background_monitor(monitor_name)
+
+        self.cpu_monitor.close()
+        self.memory_monitor.close() 
+
+        execution_elapsed = int(self.end - self.start)
+
+        self.cpu_monitor.trim_monitor_samples(
+            monitor_name,
+            execution_elapsed
+        )
+
+        self.memory_monitor.trim_monitor_samples(
+            monitor_name,
+            execution_elapsed
+        )
 
         self.pending_actions = len(pending)
         await self.logger.filesystem.aio['hedra.core'].debug(
@@ -312,10 +354,11 @@ class DefaultPersona:
 
         stream_analytics = StreamAnalytics()
         
-        start = time.time()
-        batch_start = time.time()
         stream_submission_tasks = []
         collection_stop_time = self.total_time - 1
+
+        start = time.time()
+        batch_start = time.time()
 
         while self.completed_time < collection_stop_time and self.run_timer:
             self.completed_time = time.time() - start

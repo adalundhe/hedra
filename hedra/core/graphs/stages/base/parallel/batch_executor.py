@@ -85,7 +85,9 @@ class BatchExecutor:
         
         except BrokenProcessPool:
             raise ProcessKilledError()
-
+        
+        except KeyboardInterrupt:
+            raise ProcessKilledError()
 
     def partion_stage_batches(self, stages: List[Any], ) -> List[Tuple[str, Any, int]]:
 
@@ -309,7 +311,7 @@ class BatchExecutor:
 
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
-            self.pool.shutdown()
+            self.pool.shutdown(cancel_futures=True)
 
             child_processes = active_children()
             for child in child_processes:
@@ -318,7 +320,7 @@ class BatchExecutor:
     def close(self):
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
-            self.pool.shutdown()
+            self.pool.shutdown(cancel_futures=True)
 
             child_processes = active_children()
             for child in child_processes:

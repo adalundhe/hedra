@@ -4,6 +4,15 @@ from .stream import Stream
 
 class StreamAnalytics:
 
+    __slots__ = (
+        'interval_completion_rates',
+        'interval_timings',
+        'interval_completed_counts',
+        'interval_succeeded_counts',
+        'interval_failed_counts',
+        'interval_batch_timings'
+    )
+
     def __init__(self) -> None:    
         self.interval_completion_rates: List[float] = []
         self.interval_timings: List[Dict[str, float]] = []

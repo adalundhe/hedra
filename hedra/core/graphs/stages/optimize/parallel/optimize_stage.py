@@ -2,25 +2,16 @@ import dill
 import threading
 import os
 import pickle
+import traceback
 from collections import defaultdict
 from typing import Any, Dict, List, Union
 from hedra.core.engines.client.config import Config
+from hedra.core.engines.types.registry import RequestTypes
+from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
+from hedra.core.engines.types.registry import registered_engines
 from hedra.core.graphs.stages.optimize.optimization import Optimizer, DistributionFitOptimizer
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.setup.setup import Setup
-from hedra.core.hooks.types.base.event_graph import EventGraph
-from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
-from hedra.core.engines.types.registry import registered_engines
-from hedra.core.personas.persona_registry import registered_personas
-from hedra.core.hooks.types.base.registrar import registrar
-from hedra.plugins.types.plugin_types import PluginType
-from hedra.plugins.types.engine.engine_plugin import EnginePlugin
-from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
-from hedra.core.hooks.types.base.hook_type import HookType
-from hedra.core.hooks.types.base.simple_context import SimpleContext
-from hedra.core.hooks.types.action.hook import ActionHook
-from hedra.core.hooks.types.task.hook import TaskHook
-from hedra.core.engines.types.registry import RequestTypes
 from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
 from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.base.import_tools import (
@@ -28,12 +19,27 @@ from hedra.core.graphs.stages.base.import_tools import (
     import_plugins,
     set_stage_hooks
 )
+from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.graphs.stages.optimize.optimization.algorithms import registered_algorithms
+from hedra.core.hooks.types.base.event_graph import EventGraph
+from hedra.core.hooks.types.base.registrar import registrar
+from hedra.core.hooks.types.base.hook_type import HookType
+from hedra.core.hooks.types.base.simple_context import SimpleContext
+from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.task.hook import TaskHook
+from hedra.core.personas.persona_registry import registered_personas
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
 from hedra.logging import (
     HedraLogger,
     LoggerTypes
 )
+from hedra.monitoring import (
+    CPUMonitor,
+    MemoryMonitor
+)
+from hedra.plugins.types.plugin_types import PluginType
+from hedra.plugins.types.engine.engine_plugin import EnginePlugin
+from hedra.plugins.types.persona.persona_plugin import PersonaPlugin
 from hedra.versioning.flags.types.base.active import active_flags
 from hedra.versioning.flags.types.base.flag_type import FlagTypes
 
@@ -96,7 +102,6 @@ async def setup_action_channels_and_playwright(
                 options=persona_config.playwright_options
             ))
 
-
     return setup_execute_stage
 
 
@@ -133,6 +138,20 @@ def optimize_stage(serialized_config: str):
         logfiles_directory = optimization_config.get('logfiles_directory')
         log_level = optimization_config.get('log_level')
         enable_unstable_features = optimization_config.get('enable_unstable_features', False)
+        source_stage_name: str = optimization_config.get('source_stage_name')
+        worker_id = optimization_config.get('worker_id')
+
+
+        monitor_name = f'{source_stage_name}.worker'
+
+        cpu_monitor = CPUMonitor()
+        memory_monitor = MemoryMonitor()
+
+        cpu_monitor.stage_type = StageTypes.OPTIMIZE
+        memory_monitor.stage_type = StageTypes.OPTIMIZE
+
+        cpu_monitor.start_background_monitor_sync(monitor_name)
+        memory_monitor.start_background_monitor_sync(monitor_name)
 
         active_flags[FlagTypes.UNSTABLE_FEATURE] = enable_unstable_features
     
@@ -164,12 +183,9 @@ def optimize_stage(serialized_config: str):
         logger.filesystem.create_filelogger('hedra.core.log')
         logger.filesystem.create_filelogger('hedra.optimize.log')
             
-        source_stage_name: str = optimization_config.get('source_stage_name')
         source_stage_id: str = optimization_config.get('source_stage_id')
         source_stage_context: Dict[str, Any] = optimization_config.get('source_stage_context')
 
-        setup_stage_experiment_config: Dict[str, List[float]] = optimization_config.get('setup_stage_experiment_config')
-        
         execute_stage_name: str = optimization_config.get('execute_stage_name')
         execute_stage_config: Config = optimization_config.get('execute_stage_config')
         execute_setup_stage_name: Config = optimization_config.get('execute_setup_stage_name')
@@ -179,7 +195,6 @@ def optimize_stage(serialized_config: str):
         optimizer_params: List[str] = optimization_config.get('optimizer_params')
         optimizer_iterations: int = optimization_config.get('optimizer_iterations')
         optimizer_algorithm: str = optimization_config.get('optimizer_algorithm')
-        optimizer_feed_forward: bool = optimization_config.get('optimizer_feed_forward')
         optimize_stage_workers: int = optimization_config.get('optimize_stage_workers')
         time_limit: int = optimization_config.get('time_limit')
         batch_size: int = optimization_config.get('execute_stage_batch_size')
@@ -283,7 +298,6 @@ def optimize_stage(serialized_config: str):
                 'stage_name': execute_stage_name,
                 'stage_config': execute_stage_config,
                 'stage_hooks': setup_execute_stage.hooks,
-                'feed_forward': optimizer_feed_forward,
                 'iterations': optimizer_iterations,
                 'algorithm': optimizer_algorithm,
                 'time_limit': time_limit,
@@ -300,7 +314,6 @@ def optimize_stage(serialized_config: str):
                 'stage_name': execute_stage_name,
                 'stage_config': execute_stage_config,
                 'stage_hooks': setup_execute_stage.hooks,
-                'feed_forward': optimizer_feed_forward,
                 'iterations': optimizer_iterations,
                 'algorithm': optimizer_algorithm,
                 'time_limit': time_limit,
@@ -343,21 +356,48 @@ def optimize_stage(serialized_config: str):
             context.update({
                 context_key: context_value for context_key, context_value in serializable_context
             })
+
+        
+        cpu_monitor.stop_background_monitor_sync(monitor_name)
+        memory_monitor.stop_background_monitor_sync(monitor_name)
+
+        cpu_monitor.close()
+        memory_monitor.close()
         
         loop.close()
         
         return dill.dumps({
+            'worker_id': worker_id,
             'stage': execute_stage.name,
             'config': execute_stage_config,
             'params': results,
-            'context': context
+            'context': context,
+            'monitoring': {
+                'cpu': cpu_monitor.collected,
+                'memory': memory_monitor.collected
+            }
         })
+    
+    except KeyboardInterrupt:
+        cpu_monitor.stop_background_monitor_sync(monitor_name)
+        memory_monitor.stop_background_monitor_sync(monitor_name)
 
+        raise ProcessKilledError()
+    
     except BrokenPipeError:
+        cpu_monitor.stop_background_monitor_sync(monitor_name)
+        memory_monitor.stop_background_monitor_sync(monitor_name)
+
         raise ProcessKilledError()
     
     except RuntimeError:
+        cpu_monitor.stop_background_monitor_sync(monitor_name)
+        memory_monitor.stop_background_monitor_sync(monitor_name)
+
         raise ProcessKilledError()
     
     except Exception as e:
+        cpu_monitor.stop_background_monitor_sync(monitor_name)
+        memory_monitor.stop_background_monitor_sync(monitor_name)
+        
         raise e
