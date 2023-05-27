@@ -184,16 +184,17 @@ Much of Hedra's extensibility comes in the form of both extensive integrations/o
 ### __Engines__ 
 Engines are the underlying protocol or library integrations required for Hedra to performance test your application (for example HTTP, UDP, Playwright). Hedra currently supports the following Engines, with additional install requirements shown if necessary:
 
-| Engine        | Additional Install Option                                       |  Dependencies                 |
-| -----------   | -----------                                                     |------------                   |
-| HTTP          | N/A                                                             | N/A                           |
-| HTTP2         | N/A                                                             | h2, hpack                     |
-| UDP           | N/A                                                             | N/A                           |
-| Websocket     | N/A                                                             | N/A                           |
-| GRPC          | pip install hedra[grpc]                                         | grpcio grpco-tools, h2, hpack |
-| GraphQL       | pip install hedra[graphql]                                      | gql                           |
-| GraphQL-HTTP2 | pip install hedra[graphql]                                      | gql, h2, hpack                |
-| Playwright    | pip install hedra[playwright] && playwright install             | playwright                    |
+| Engine           | Additional Install Option                                       |  Dependencies                 |
+| -----------      | -----------                                                     |------------                   |
+| HTTP             | N/A                                                             | N/A                           |
+| HTTP2            | N/A                                                             | h2, hpack                     |
+| HTTP3 (unstable) | pip install hedra[http3]                                        | aioquic                       |
+| UDP              | N/A                                                             | N/A                           |
+| Websocket        | N/A                                                             | N/A                           |
+| GRPC             | pip install hedra[grpc]                                         | grpcio grpco-tools, h2, hpack |
+| GraphQL          | pip install hedra[graphql]                                      | gql                           |
+| GraphQL-HTTP2    | pip install hedra[graphql]                                      | gql, h2, hpack                |
+| Playwright       | pip install hedra[playwright] && playwright install             | playwright                    |
 
 
 <br/>
@@ -202,17 +203,19 @@ Engines are the underlying protocol or library integrations required for Hedra t
 
 Personas are responsible for scheduling when `@action()` or `@task()` hooks execute over the specified Execute stage's test duration. No additional install dependencies are required for Personas, and the following personas are currently supported out-of-box:
 
-| Persona               | Setup Config Name       | Description                                                                                                                                                                                                    |
-| ----------            | ----------------        | -----------------                                                                                                                                                                                              |
-| Batched               | batched                 | Executes each action or task hook in batches of the specified size, with an optional wait between each batch spawning                                                                                          |
-| Constant Arrival Rate | constant-arrival        | Hedra automatically adjusts the batch size after each batch spawns based upon the number of hooks that have completed, attempting to achieve `batch_size` completions per batch                                |
-| Constant Spawn Rate   | constant-spawn          | Like `Batched`, but cycles through actions before waiting `batch_interval` time.                                                                                                                               |
-| Default               | N/A                     | Cycles through all action/task hooks in the Execute stage, resulting in a (mostly) even distribution of execution                                                                                              |
-| No-Wait               | no-wait                 | Cycles through all action/task hooks in the Execute stage, resulting in a (mostly) even distribution of execution. __WARNING__: This persona may cause OOM as it does not use the memory management algorithm. |    
-| Ramped                | ramped                  | Starts at a batch size of  `batch_gradient` * `batch_size`. Batch size increases by the gradient each batch with an optional wait between each batch spawning                                                  |
-| Ramped Interval       | ramped-interval         | Executes `batch_size` hooks before waiting `batch_gradient` * `batch_interval` time. Interval increases by the gradient each batch                                                                             |
-| Sorted                | sorted                  | Executes each action/task hook in batches of the specified size and in the order provided to each hook's (optional) `order` parameter                                                                          |
-| Weighted              | weighted                | Executes action/task hooks in batches of the specified size, with each batch being generated from a sampled distribution based upon that action's weight                                                       |
+| Persona               | Setup Config Name       | Description                                                                                                                                                                                                                         |
+| ----------            | ----------------        | -----------------                                                                                                                                                               |
+| Approximate Distribution (unstable) | approximate-distribution                 | Hedra automatically adjusts the batch size after each batch spawns according to the concurrency at the current distribution step. This Persona 
+is only available to and is selected by default if a Variant of an Experiment is assigned a distribution.                                                                                                                           |
+| Batched               | batched                 | Executes each action or task hook in batches of the specified size, with an optional wait between each batch spawning                                                           |
+| Constant Arrival Rate | constant-arrival        | Hedra automatically adjusts the batch size after each batch spawns based upon the number of hooks that have completed, attempting to achieve `batch_size` completions per batch |
+| Constant Spawn Rate   | constant-spawn          | Like `Batched`, but cycles through actions before waiting `batch_interval` time.                                                                                                |
+| Default               | N/A                     | Cycles through all action/task hooks in the Execute stage, resulting in a (mostly) even distribution of execution                                                               |
+| No-Wait               | no-wait                 | Cycles through all action/task hooks in the Execute stage with no memory usage or other waits. __WARNING__: This persona may cause OOM.                                         |    
+| Ramped                | ramped                  | Starts at a batch size of  `batch_gradient` * `batch_size`. Batch size increases by the gradient each batch with an optional wait between each batch spawning                   |
+| Ramped Interval       | ramped-interval         | Executes `batch_size` hooks before waiting `batch_gradient` * `batch_interval` time. Interval increases by the gradient each batch                                              |
+| Sorted                | sorted                  | Executes each action/task hook in batches of the specified size and in the order provided to each hook's (optional) `order` parameter                                           |
+| Weighted              | weighted                | Executes action/task hooks in batches of the specified size, with each batch being generated from a sampled distribution based upon that action's weight                        |
 
 <br/>
 
@@ -220,11 +223,12 @@ Personas are responsible for scheduling when `@action()` or `@task()` hooks exec
 
 Algorithms are used by Hedra `Optimize` stages to calculate maximal test config options like `batch_size`, `batch_gradient`, and/or `batch_interval`. All out-of-box supported algorithms use `scikit-learn` and include:
 
-| Algorithm               | Setup Config Name   | Description                                                                           |
-| ----------              | ----------------    | -----------------                                                                     |
-| SHG                     | shg                 | Uses `scikit-learn`'s Simple Global Homology (SHGO) global optimization algorithm     |
-| Dual Annealing          | dual-annealing      | Uses `scikit-learn`'s Dual Annealing global optimization algorithm                    |
-| Differential Evolution  | diff-evolution      | Uses `scikit-learn`'s Differential Evolution global optimization algorithm            |
+| Algorithm                   | Setup Config Name    | Description                                                                                                                          |
+| ----------                  | ----------------     | -----------------                                                                                                                    |
+| SHG                         | shg                  | Uses `scikit-learn`'s Simple Global Homology (SHGO) global optimization algorithm                                                    |
+| Dual Annealing              | dual-annealing       | Uses `scikit-learn`'s Dual Annealing global optimization algorithm                                                                   |
+| Differential Evolution      | diff-evolution       | Uses `scikit-learn`'s Differential Evolution global optimization algorithm                                                           |
+| Point Optimizer (unstable)  | point-optimizer      | Uses a custom least-squares algorithm. Can only be used by assigning a distribution to a Variant stage for an Experiment.           |
 
 <br/>
 
@@ -264,6 +268,7 @@ Reporters are the integrations Hedra uses for submitting aggregated and unaggreg
 | Telegraf             | pip install hedra[statsd]                                 | aio_statsd                               |
 | TelegrafStatsD       | pip install hedra[statsd]                                 | aio_statsd                               |
 | TimescaleDB          | pip install hedra[sql]                                    | aiopg, psycopg2-binary, sqlalchemy       |
+| XML                  | pip install hedra[xml]                                    | dicttoxml                                |
 
 <br/>
 

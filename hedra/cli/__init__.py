@@ -12,7 +12,6 @@ warnings.simplefilter("ignore")
 @click.group(cls=CLI)
 def run():
 
-
     def stop_processes_at_exit():
         child_processes = active_children()
         for child in child_processes:
