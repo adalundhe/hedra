@@ -29,6 +29,7 @@ def run_graph(
     path: str, 
     cpus: int, 
     skip: str,
+    retries: int,
     show_summaries: str,
     hide_summaries: str,
     log_level: str, 
@@ -183,8 +184,34 @@ def run_graph(
     graph_execution_results: GraphResults = None
 
     try:
-        
-        graph_execution_results = loop.run_until_complete(graph.run())
+
+        if retries > 0:
+            for _ in range(retries):
+
+                graph_execution_results = loop.run_until_complete(graph.run())
+
+                if graph.status == GraphStatus.COMPLETE:
+                    break
+
+                else:
+                    graph.cleanup()
+
+                    graph = Graph(
+                        graph_name,
+                        list(discovered.values()),
+                        config={
+                            **hedra_core_config,
+                            'graph_path': path,
+                            'graph_module': module.__name__,
+                            'graph_skipped_stages': graph_skipped_stages
+                        },
+                        cpus=cpus
+                    )
+
+                    graph.assemble()
+
+        else:
+            graph_execution_results = loop.run_until_complete(graph.run())
 
     except BrokenPipeError:
         graph.status = GraphStatus.CANCELLED
@@ -203,7 +230,7 @@ def run_graph(
         logger.console.sync.critical('\n\nAborted.\n') 
         exit_code = 1  
 
-    else:
+    elif graph.status == GraphStatus.COMPLETE:
 
         if graph_execution_results:
             enabled_summaries = show_summaries.split(',')

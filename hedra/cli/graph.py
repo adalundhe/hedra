@@ -25,6 +25,11 @@ def graph():
     help='Comma-delimited list of Stage names to skip.'
 )
 @click.option(
+    '--retries',
+    default=0,
+    help='Global retries for graph.'
+)
+@click.option(
     '--show-summaries',
     default='',
     help='Comma-delimited list of results tables to show upon completion.'
@@ -67,6 +72,7 @@ def run(
     path: str, 
     cpus: int, 
     skip: str,
+    retries: int,
     show_summaries: str,
     hide_summaries: str,
     log_level: str, 
@@ -79,6 +85,7 @@ def run(
         path, 
         cpus,
         skip, 
+        retries,
         show_summaries,
         hide_summaries,
         log_level, 
