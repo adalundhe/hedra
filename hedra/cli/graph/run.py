@@ -21,7 +21,7 @@ from hedra.logging import (
 )
 from hedra.logging.table.summary_table import SummaryTable
 from hedra.logging.table.table_types import GraphResults
-from typing import Dict, Union
+from typing import Dict
 uvloop.install()
 
 
