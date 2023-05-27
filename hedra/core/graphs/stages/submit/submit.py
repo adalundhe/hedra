@@ -30,6 +30,7 @@ class Submit(Stage, Generic[T]):
     stream: bool = False
     config: T= None
     priority: Optional[str]=None
+    retries: int=0
     
     def __init__(self) -> None:
         super().__init__()
@@ -66,6 +67,8 @@ class Submit(Stage, Generic[T]):
         self.priority_level: StagePriority = StagePriority.map(
             self.priority
         )
+
+        self.stage_retries = self.retries
 
     @Internal()
     async def run(self):

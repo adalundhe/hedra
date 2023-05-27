@@ -63,6 +63,7 @@ T = TypeVarTuple('T')
 class Execute(Stage, Generic[Unpack[T]]):
     stage_type=StageTypes.EXECUTE
     priority: Optional[str]=None
+    retries: int=0
 
     def __init__(self) -> None:
         super().__init__()
@@ -114,6 +115,8 @@ class Execute(Stage, Generic[Unpack[T]]):
         self.priority_level: StagePriority = StagePriority.map(
             self.priority
         )
+
+        self.stage_retries = self.retries
 
     @Internal()
     async def run(self):

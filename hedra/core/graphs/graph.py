@@ -376,7 +376,8 @@ class Graph:
             {}
         )
 
-        system_metrics.generate_system_summaries()
+        if self.status == GraphStatus.COMPLETE:
+            system_metrics.generate_system_summaries()
 
         return {
             'metrics': summary_output,

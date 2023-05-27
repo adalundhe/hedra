@@ -15,6 +15,7 @@ class Error(Stage):
     def __init__(self) -> None:
         super().__init__()
         self.error = None
+        self.retries: int = 0
 
         self.priority = None
         self.priority_level: StagePriority = StagePriority.map(

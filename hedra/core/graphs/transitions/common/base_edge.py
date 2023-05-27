@@ -6,7 +6,8 @@ from typing import (
     Dict, 
     List, 
     Union, 
-    Optional
+    Optional,
+    Tuple
 )
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.stages.types.stage_types import StageTypes
@@ -54,7 +55,7 @@ class BaseEdge(Generic[T]):
         self.history[key] = value
         
 
-    async def transition(self):
+    async def transition(self) -> Tuple[None, StageTypes]:
         raise NotImplementedError('Err. - Please implement this method in the Edge class inheriting BaseEdge')
 
     def update(self, destingation: Stage):

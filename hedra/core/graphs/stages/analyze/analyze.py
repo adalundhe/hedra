@@ -3,7 +3,6 @@
 import asyncio
 import dill
 import functools
-import itertools
 import statistics
 import signal
 import time
@@ -115,6 +114,7 @@ class Analyze(Stage):
     is_parallel=False
     handler=None
     priority: Optional[str]=None
+    retries: int = 0
 
     def __init__(self) -> None:
         super().__init__()
@@ -128,6 +128,7 @@ class Analyze(Stage):
             HookType.TRANSFORM, 
         ]
 
+        self.stage_retries = self.retries
         self.requires_shutdown = True
         self.allow_parallel = True
         self.analysis_execution_time = 0

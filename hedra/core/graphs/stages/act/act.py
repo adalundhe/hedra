@@ -19,6 +19,7 @@ T = TypeVarTuple('T')
 class Act(Stage, Generic[Unpack[T]]):
     stage_type=StageTypes.ACT
     priority: Optional[str]=None
+    retries=0
 
     def __init__(self) -> None:
         super().__init__()
@@ -50,6 +51,8 @@ class Act(Stage, Generic[Unpack[T]]):
         self.priority_level: StagePriority = StagePriority.map(
             self.priority
         )
+
+        self.stage_retries = self.retries
 
     @Internal()
     async def run(self):

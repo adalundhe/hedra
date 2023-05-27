@@ -95,6 +95,7 @@ class Optimize(Stage):
         )
     ]
     priority: Optional[str]=None
+    retries: int=0
     
     def __init__(self) -> None:
         super().__init__()
@@ -131,6 +132,8 @@ class Optimize(Stage):
         self.priority_level: StagePriority = StagePriority.map(
             self.priority
         )
+
+        self.stage_retries = self.retries
 
     @Internal()
     async def run(self):

@@ -114,6 +114,7 @@ class Setup(Stage, Generic[Unpack[T]]):
     tracing: TracingConfig=None
     priority: Optional[str]=None
     actions_filepaths: Optional[Dict[str, str]]=None
+    retries: int=0
 
     
     def __init__(self) -> None:
@@ -193,6 +194,8 @@ class Setup(Stage, Generic[Unpack[T]]):
         self.priority_level: StagePriority = StagePriority.map(
             self.priority
         )
+
+        self.stage_retries = self.retries
 
     @Internal()
     async def run(self):
