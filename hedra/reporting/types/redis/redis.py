@@ -6,6 +6,11 @@ from hedra.reporting.experiment.experiments_collection import ExperimentMetricsC
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
+from hedra.reporting.system.system_metrics_set import (
+    SystemMetricsSet,
+    SessionMetricsCollection,
+    SystemMetricsCollection
+)
 from .redis_config import RedisConfig
 
 
@@ -39,6 +44,8 @@ class Redis:
         self.shared_metrics_channel = f'{self.metrics_channel}_metrics'
         self.errors_channel = f'{self.metrics_channel}_errors'
         self.custom_metrics_channel = f'{self.metrics_channel}_custom'
+        self.session_system_metrics_channel = f'{config.system_metrics_channel}_session'
+        self.stage_system_metrics_channel = f'{config.system_metrics_channel}_stage'
 
         self.channel_type = config.channel_type
         self.connection = None
@@ -58,6 +65,86 @@ class Redis:
         )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to Redis instance at - {self.base}://{self.host} - Database: {self.database}')
+
+    async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        metrics_sets: List[SessionMetricsCollection] = []
+        
+        for metrics_set in system_metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics - {metrics_set.system_metrics_set_id}')
+            for monitor_metrics in metrics_set.session_cpu_metrics.values():
+                metrics_sets.append(monitor_metrics)
+                
+            for  monitor_metrics in metrics_set.session_memory_metrics.values():
+                metrics_sets.append(monitor_metrics)
+
+        for metrics_set in metrics_sets:
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics - {metrics_set.name}:{metrics_set.group}')
+
+            if self.channel_type == 'channel':
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Session System Metrics to Channel - {self.session_system_metrics_channel} - Group: {metrics_set.group}')
+                await self.connection.publish(
+                    self.session_system_metrics_channel,
+                    json.dumps(metrics_set.record)
+                )
+
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Session System Metrics to Channel - {self.session_system_metrics_channel} - Group: {metrics_set.group}')
+
+            else:
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Session System Metrics to Redis Set - {self.session_system_metrics_channel} - Group: {metrics_set.group}')
+                await self.connection.sadd(
+                    self.session_system_metrics_channel,
+                    json.dumps(metrics_set.record)
+                )
+
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Session System Metrics to Redis Set - {self.session_system_metrics_channel} - Group: {metrics_set.group}')
+
+    async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        metrics_sets: List[SystemMetricsCollection] = []
+        
+        for metrics_set in system_metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics - {metrics_set.system_metrics_set_id}')
+            
+            cpu_metrics = metrics_set.cpu
+            memory_metrics = metrics_set.memory
+
+            for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                for monitor_metrics in stage_cpu_metrics.values():
+                    metrics_sets.append(monitor_metrics)
+
+                stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                for monitor_metrics in stage_memory_metrics.values():
+                    metrics_sets.append(monitor_metrics)
+
+                stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                
+                if stage_mb_per_vu_metrics:
+                    metrics_sets.append(stage_mb_per_vu_metrics)
+
+        for metrics_set in metrics_sets:
+
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics - {metrics_set.name}:{metrics_set.group}')
+
+            if self.channel_type == 'channel':
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Stage System Metrics to Channel - {self.stage_system_metrics_channel} - Group: {metrics_set.group}')
+                await self.connection.publish(
+                    self.stage_system_metrics_channel,
+                    json.dumps(metrics_set.record)
+                )
+
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Stage System Metrics to Channel - {self.stage_system_metrics_channel} - Group: {metrics_set.group}')
+
+            else:
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Stage System Metrics to Redis Set - {self.stage_system_metrics_channel} - Group: {metrics_set.group}')
+                await self.connection.sadd(
+                    self.stage_system_metrics_channel,
+                    json.dumps(metrics_set.record)
+                )
+
+                await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Stage System Metrics to Redis Set - {self.stage_system_metrics_channel} - Group: {metrics_set.group}')
 
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
 

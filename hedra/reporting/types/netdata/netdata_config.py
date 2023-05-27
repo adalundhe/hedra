@@ -1,4 +1,3 @@
-from typing import Dict
 from pydantic import BaseModel
 from hedra.reporting.types.common.types import ReporterTypes
 

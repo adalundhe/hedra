@@ -12,4 +12,5 @@ class MongoDBConfig(BaseModel):
     metrics_collection: str='metrics'
     experiments_collection: str='experiment'
     streams_collection: str='streams'
+    system_metrics_collection='system_metrics'
     reporter_type: ReporterTypes=ReporterTypes.MongoDB

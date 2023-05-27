@@ -6,6 +6,11 @@ from hedra.reporting.experiment.experiments_collection import ExperimentMetricsC
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.metric.stage_streams_set import StageStreamsSet
 from hedra.reporting.metric import MetricsSet
+from hedra.reporting.system.system_metrics_set import (
+    SystemMetricsSet,
+    SessionMetricsCollection,
+    SystemMetricsCollection
+)
 from .kafka_config import KafkaConfig
 
 try:
@@ -36,10 +41,15 @@ class Kafka:
         self.variants_topic = f'{config.experiments_topic}_variants'
         self.mutations_topic = f'{config.experiments_topic}_metrics'
 
+        self.session_system_metrics_topic= f'{config.system_metrics_topic}_session'
+        self.stage_system_metrics_topic = f'{config.system_metrics_topic}_stage'
+
         self.events_partition = config.events_partition
         self.metrics_partition = config.metrics_partition
         self.experiments_partition = config.experiments_partition
         self.streams_partition = config.streams_partition
+
+        self.system_metrics_partition = config.system_metrics_partition
 
         self.shared_metrics_partition = config.metrics_partition
         self.errors_partition = config.metrics_partition
@@ -80,6 +90,88 @@ class Kafka:
         await self._producer.start()
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to Kafka at - {self.host}')
+
+    async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Session System Metric to Topic - {self.session_system_metrics_topic} - Partition - {self.system_metrics_partition}')
+        
+        batch = self._producer.create_batch()
+
+        metrics_sets: List[SessionMetricsCollection] = []
+        
+        for metrics_set in system_metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics - {metrics_set.system_metrics_set_id}')
+            for monitor_metrics in metrics_set.session_cpu_metrics.values():
+                metrics_sets.append(monitor_metrics)
+                
+            for  monitor_metrics in metrics_set.session_memory_metrics.values():
+                metrics_sets.append(monitor_metrics)
+
+        for metric_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metric - {metric_set.name}:{metric_set.group}')
+
+            batch.append(
+                value=json.dumps(
+                    metric_set.record
+                ).encode('utf-8'),
+                timestamp=None, 
+                key=bytes(f'{metric_set.name}_{metric_set.group}', 'utf')
+            )
+
+        await self._producer.send_batch(
+            batch,
+            self.session_system_metrics_topic,
+            partition=self.system_metrics_partition
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Session System Metric to Topic - {self.session_system_metrics_topic} - Partition - {self.system_metrics_partition}')
+
+    async def submit_stage_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Stage System Metric to Topic - {self.stage_system_metrics_topic} - Partition - {self.system_metrics_partition}')
+        
+        batch = self._producer.create_batch()
+
+        metrics_sets: List[SystemMetricsCollection] = []
+        
+        for metrics_set in system_metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics - {metrics_set.system_metrics_set_id}')
+            
+            cpu_metrics = metrics_set.cpu
+            memory_metrics = metrics_set.memory
+
+            for stage_name, stage_cpu_metrics in  cpu_metrics.metrics.items():
+
+                for monitor_metrics in stage_cpu_metrics.values():
+                    metrics_sets.append(monitor_metrics)
+
+                stage_memory_metrics = memory_metrics.metrics.get(stage_name)
+                for monitor_metrics in stage_memory_metrics.values():
+                    metrics_sets.append(monitor_metrics)
+
+                stage_mb_per_vu_metrics = metrics_set.mb_per_vu.get(stage_name)
+                
+                if stage_mb_per_vu_metrics:
+                    metrics_sets.append(stage_mb_per_vu_metrics)
+
+        for metric_set in metrics_sets:
+            await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metric - {metric_set.name}:{metric_set.group}')
+
+            batch.append(
+                value=json.dumps(
+                    metric_set.record
+                ).encode('utf-8'),
+                timestamp=None, 
+                key=bytes(f'{metric_set.name}_{metric_set.group}', 'utf')
+            )
+
+        await self._producer.send_batch(
+            batch,
+            self.stage_system_metrics_topic,
+            partition=self.system_metrics_partition
+        )
+
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Stage System Metric to Topic - {self.stage_system_metrics_topic} - Partition - {self.system_metrics_partition}')
 
     async def submit_streams(self, stream_metrics: Dict[str, StageStreamsSet]):
 

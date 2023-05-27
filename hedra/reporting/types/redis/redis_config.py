@@ -12,6 +12,7 @@ class RedisConfig(BaseModel):
     metrics_channel: str='metrics'
     experiments_channel: str='experiments'
     streams_channel: str='streams'
+    system_metrics_channel='system_metrics'
     channel_type: str='pipeline'
     secure: bool=False
     reporter_type: ReporterTypes=ReporterTypes.Redis

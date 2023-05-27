@@ -114,7 +114,7 @@ class InfluxDB:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Stage System Metrics to Bucket - {self.stage_system_metrics_bucket_name}')
 
-        metrics_sets: List[SessionMetricsCollection] = []
+        metrics_sets: List[SystemMetricsCollection] = []
         
         for metrics_set in system_metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics - {metrics_set.system_metrics_set_id}')
