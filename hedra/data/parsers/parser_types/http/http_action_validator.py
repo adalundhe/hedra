@@ -17,6 +17,7 @@ class HTTPActionTag(BaseModel):
 
 
 class HTTPActionValidator(BaseModel):
+    engine: StrictStr
     name: StrictStr
     url: AnyHttpUrl
     method: StrictStr='GET'

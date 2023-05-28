@@ -1,6 +1,7 @@
 import uuid
 import json
 from hedra.core.engines.client.config import Config
+from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.graphql import (
     GraphQLAction,
     MercuryGraphQLClient
@@ -20,11 +21,14 @@ class GraphQLActionParser(BaseParser):
 
     def __init__(
         self,
-        config: Config
+        config: Config,
+        options: Dict[str, Any]={}
     ) -> None:
         super().__init__(
             GraphQLActionParser.__name__,
-            config
+            config,
+            RequestTypes.GRAPHQL,
+            options
         )
 
     async def parse(

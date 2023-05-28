@@ -17,6 +17,7 @@ class WebsocketActionTag(BaseModel):
 
 
 class WebsocketActionValidator(BaseModel):
+    engine: StrictStr
     name: StrictStr
     url: AnyHttpUrl
     method: StrictStr='GET'

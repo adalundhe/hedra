@@ -18,6 +18,7 @@ class UDPActionTag(BaseModel):
 
 
 class UDPActionValidator(BaseModel):
+    engine: StrictStr
     name: StrictStr
     url: AnyHttpUrl
     wait_for_response: StrictBool=False

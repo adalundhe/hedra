@@ -17,6 +17,7 @@ class GraphQLActionTag(BaseModel):
 
 
 class GraphQLActionValidator(BaseModel):
+    engine: StrictStr
     name: StrictStr
     url: AnyHttpUrl
     method: StrictStr='GET'

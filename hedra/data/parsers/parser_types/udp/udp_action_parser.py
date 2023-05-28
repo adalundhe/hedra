@@ -6,6 +6,7 @@ from hedra.core.engines.types.udp import (
 )
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.base.simple_context import SimpleContext
+from hedra.core.engines.types.common.types import RequestTypes
 from hedra.data.parsers.parser_types.common.base_parser import BaseParser
 from hedra.data.parsers.parser_types.common.parsing import (
     parse_data,
@@ -19,11 +20,14 @@ class UDPActionParser(BaseParser):
 
     def __init__(
         self,
-        config: Config
+        config: Config,
+        options: Dict[str, Any]={}
     ) -> None:
         super().__init__(
             UDPActionParser.__name__,
-            config
+            config,
+            RequestTypes.UDP,
+            options
         )
 
     async def parse(

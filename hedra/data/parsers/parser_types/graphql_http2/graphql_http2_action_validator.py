@@ -17,6 +17,7 @@ class GraphQLHTTP2ActionTag(BaseModel):
 
 
 class GraphQLHTTP2ActionValidator(BaseModel):
+    engine: StrictStr
     name: StrictStr
     url: AnyHttpUrl
     method: StrictStr='GET'

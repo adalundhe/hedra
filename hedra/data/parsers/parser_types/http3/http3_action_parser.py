@@ -8,6 +8,7 @@ from hedra.core.engines.types.http3 import (
 
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.base.simple_context import SimpleContext
+from hedra.core.engines.types.common.types import RequestTypes
 from hedra.data.parsers.parser_types.common.base_parser import BaseParser
 from hedra.data.parsers.parser_types.common.parsing import (
     normalize_headers,
@@ -22,11 +23,14 @@ class HTTP3ActionParser(BaseParser):
 
     def __init__(
         self,
-        config: Config
+        config: Config,
+        options: Dict[str, Any]={}
     ) -> None:
         super().__init__(
             HTTP3ActionParser.__name__,
-            config
+            config,
+            RequestTypes.HTTP3,
+            options
         )
 
     async def parse(

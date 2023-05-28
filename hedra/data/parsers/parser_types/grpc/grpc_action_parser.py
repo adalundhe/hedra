@@ -5,6 +5,7 @@ from hedra.core.engines.types.grpc import (
     MercuryGRPCClient
 )
 from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.data.parsers.parser_types.common.base_parser import BaseParser
 from hedra.data.parsers.parser_types.common.parsing import (
@@ -22,11 +23,13 @@ class GRPCActionParser(BaseParser):
     def __init__(
         self,
         config: Config,
-        options: Dict[str, Any]
+        options: Dict[str, Any]={}
     ) -> None:
         super().__init__(
             GRPCActionParser.__name__,
-            config
+            config,
+            RequestTypes.GRPC,
+            options
         )
 
         self.grpc_options = GRPCOptionsValidator(

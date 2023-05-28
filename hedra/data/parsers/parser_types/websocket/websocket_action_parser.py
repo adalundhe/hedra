@@ -6,6 +6,7 @@ from hedra.core.engines.types.websocket import (
 )
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.base.simple_context import SimpleContext
+from hedra.core.engines.types.common.types import RequestTypes
 from hedra.data.parsers.parser_types.common.base_parser import BaseParser
 from hedra.data.parsers.parser_types.common.parsing import (
     normalize_headers,
@@ -20,11 +21,14 @@ class WebsocketActionParser(BaseParser):
 
     def __init__(
         self,
-        config: Config
+        config: Config,
+        options: Dict[str, Any]={}
     ) -> None:
         super().__init__(
             WebsocketActionParser.__name__,
-            config
+            config,
+            RequestTypes.WEBSOCKET,
+            options
         )
 
     async def parse(

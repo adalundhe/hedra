@@ -50,6 +50,7 @@ class PlaywrightActionTag(BaseModel):
 
 
 class PlaywrightActionValidator(BaseModel):
+    engine: StrictStr
     name: StrictStr
     command: StrictStr
     page: Optional[PlaywrightPageValidator]
