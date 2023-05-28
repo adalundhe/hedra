@@ -1,4 +1,5 @@
 import uuid
+import json
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.graphql import (
     GraphQLAction,
@@ -7,7 +8,10 @@ from hedra.core.engines.types.graphql import (
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.data.parsers.parser_types.common.base_parser import BaseParser
-from hedra.data.parsers.parser_types.common.parsing import normalize_headers
+from hedra.data.parsers.parser_types.common.parsing import (
+    normalize_headers,
+    parse_tags
+)
 from typing import Any, Coroutine, Dict
 from .graphql_action_validator import GraphQLActionValidator
 
@@ -29,11 +33,18 @@ class GraphQLActionParser(BaseParser):
         stage: str
     ) -> Coroutine[Any, Any, Coroutine[Any, Any, ActionHook]]:
         
+        graphql_variables_data = action_data.get('variables')
+        if isinstance(graphql_variables_data, (str, bytes, bytearray,)):
+            graphql_variables_data = json.loads(graphql_variables_data)
+
         normalized_headers = normalize_headers(action_data)
+        tags_data = parse_tags(action_data)
 
         generator_action = GraphQLActionValidator(**{
             **action_data,
-            'headers': normalized_headers
+            'headers': normalized_headers,
+            'variables': graphql_variables_data,
+            'tags': tags_data
         })
 
         action = GraphQLAction(

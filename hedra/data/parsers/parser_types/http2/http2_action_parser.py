@@ -34,15 +34,14 @@ class HTTP2ActionParser(BaseParser):
     ) -> Coroutine[Any, Any, Coroutine[Any, Any, ActionHook]]:
         
         normalized_headers = normalize_headers(action_data)
-        parsed_data = parse_data(
-            action_data,
-            normalized_headers.get('content-type')
-        )
+        parsed_data = parse_data(action_data)
+        tags_data = parse_data(action_data)
 
         generator_action = HTTP2ActionValidator(**{
             **action_data,
             'headers': normalized_headers,
-            'data': parsed_data
+            'data': parsed_data,
+            'tags': tags_data
         })
 
         action = HTTP2Action(

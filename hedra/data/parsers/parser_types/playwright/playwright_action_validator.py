@@ -26,7 +26,7 @@ class PlaywrightInputValidator(BaseModel):
     filepath: Optional[StrictStr]
     file: Optional[StrictStr]
     path: Optional[StrictStr]
-    option: Optional[Any]
+    option: Optional[Union[StrictStr, StrictBool, StrictInt, StrictFloat]]
     by_label: StrictBool=False
     by_value: StrictBool=False
 

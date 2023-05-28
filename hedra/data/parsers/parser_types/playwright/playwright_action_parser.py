@@ -1,4 +1,5 @@
 import uuid
+import json
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.playwright import (
     PlaywrightCommand,
@@ -12,7 +13,10 @@ from hedra.core.engines.types.playwright import (
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.data.parsers.parser_types.common.base_parser import BaseParser
-from hedra.data.parsers.parser_types.common.parsing import normalize_headers
+from hedra.data.parsers.parser_types.common.parsing import (
+    normalize_headers,
+    parse_tags
+)
 from typing import Any, Coroutine, Dict
 from .playwright_action_validator import (
     PlaywrightActionValidator,
@@ -41,6 +45,15 @@ class PlaywrightActionParser(BaseParser):
     ) -> Coroutine[Any, Any, Coroutine[Any, Any, ActionHook]]:
         
         normalized_headers = normalize_headers(action_data)
+        tags_data = parse_tags(action_data)
+
+        playwright_input_args = action_data.get('args')
+        if isinstance(playwright_input_args, (str, bytes, bytearray,)):
+            playwright_input_args = playwright_input_args.split(',')
+
+        playwright_options_extra = action_data.get('extra')
+        if isinstance(playwright_options_extra, (str, bytes, bytearray,)):
+            playwright_options_extra = json.loads(playwright_options_extra)
 
         generator_action = PlaywrightActionValidator(
             name=action_data.get('name'),
@@ -60,7 +73,7 @@ class PlaywrightActionParser(BaseParser):
                 key=action_data.get('key'),
                 text=action_data.get('text'),
                 expression=action_data.get('expression'),
-                args=action_data.get('args'),
+                args=playwright_input_args,
                 filepath=action_data.get('filepath'),
                 file=action_data.get('file'),
                 path=action_data.get('path'),
@@ -73,13 +86,13 @@ class PlaywrightActionParser(BaseParser):
                 option=action_data.get('option'),
                 is_checked=action_data.get('is_checked', False),
                 timeout=action_data.get('timeout'),
-                extra=action_data.get('extra'),
+                extra=playwright_options_extra,
                 switch_by=action_data.get('switch_by')
             ),
             weight=action_data.get('weight'),
             order=action_data.get('order'),
             user=action_data.get('user'),
-            tags=action_data.get('tags', [])
+            tags=tags_data
         )
 
         action = PlaywrightCommand(
@@ -96,7 +109,11 @@ class PlaywrightActionParser(BaseParser):
             )),
             options=Options(**generator_action.options.dict(
                 exclude_none=True
-            ))
+            )),
+            user=generator_action.user,
+            tags=[
+                tag.dict() for tag in generator_action.tags
+            ]
         )
 
         session = MercuryPlaywrightClient(

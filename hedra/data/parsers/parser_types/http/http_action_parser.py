@@ -9,7 +9,8 @@ from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.data.parsers.parser_types.common.base_parser import BaseParser
 from hedra.data.parsers.parser_types.common.parsing import (
     normalize_headers,
-    parse_data
+    parse_data,
+    parse_tags
 )
 from typing import Any, Coroutine, Dict
 from .http_action_validator import HTTPActionValidator
@@ -33,15 +34,14 @@ class HTTPActionParser(BaseParser):
     ) -> Coroutine[Any, Any, Coroutine[Any, Any, ActionHook]]:
         
         normalized_headers = normalize_headers(action_data)
-        parsed_data = parse_data(
-            action_data,
-            normalized_headers.get('content-type')
-        )
+        parsed_data = parse_data(action_data)
+        tags_data = parse_tags(action_data)
 
         generator_action = HTTPActionValidator(**{
             **action_data,
             'headers': normalized_headers,
-            'data': parsed_data
+            'data': parsed_data,
+            'tags': tags_data
         })
 
         action = HTTPAction(

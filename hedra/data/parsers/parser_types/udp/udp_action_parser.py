@@ -7,6 +7,10 @@ from hedra.core.engines.types.udp import (
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.data.parsers.parser_types.common.base_parser import BaseParser
+from hedra.data.parsers.parser_types.common.parsing import (
+    parse_data,
+    parse_tags
+)
 from typing import Any, Coroutine, Dict
 from .udp_action_validator import UDPActionValidator
 
@@ -28,8 +32,14 @@ class UDPActionParser(BaseParser):
         stage: str
     ) -> Coroutine[Any, Any, Coroutine[Any, Any, ActionHook]]:
 
+        parsed_data = parse_data(action_data)
+        tags_data = parse_tags(action_data)
 
-        generator_action = UDPActionValidator(**action_data)
+        generator_action = UDPActionValidator(**{
+            **action_data,
+            'data': parsed_data,
+            'tags': tags_data
+        })
 
         action = UDPAction(
             generator_action.name,
