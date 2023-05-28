@@ -21,12 +21,8 @@ from .parser_types import (
 
 class Parser:
 
-    def __init__(
-        self,
-        config: Config
-    ) -> None:
+    def __init__(self) -> None:
         
-        self.config = config
         self._parsers: Dict[
             str,
             Callable[
@@ -103,6 +99,7 @@ class Parser:
         self, 
         action_data: Dict[str, Any],
         stage: str,
+        config: Config,
         options: Dict[str, Any]={}
     ):
         engine_type = action_data.get('engine')
@@ -110,7 +107,7 @@ class Parser:
         parser = self._active_parsers.get(engine_type)
         if parser is None:
             parser = self._parsers.get(engine_type)(
-                self.config,
+                config,
                 options
             )
 

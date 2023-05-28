@@ -5,7 +5,10 @@ import psutil
 import signal
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
+from hedra.core.engines.client.config import Config
+from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.data.connectors.common.connector_type import ConnectorType
+from hedra.data.parsers.parser import Parser
 from typing import List, Dict, Any
 from .aws_lambda_connector_config import AWSLambdaConnectorConfig
 
@@ -49,6 +52,8 @@ class AWSLambdaConnector:
         self.logger = HedraLogger()
         self.logger.initialize()
 
+        self.parser = Parser()
+
     async def connect(self):
 
         for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
@@ -77,16 +82,24 @@ class AWSLambdaConnector:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Successfully opened connection to AWS - Region: {self.region_name}')
 
-    async def load_action_data(self) -> List[Dict[str, Any]]:
-        return await self._loop.run_in_executor(
-            self._executor,
-            functools.partial(
-                self._client.invoke,
-                FunctionName=self.lambda_name
-            )
-        )
+    async def load_action_data(
+        self,
+        stage: str,
+        parser_config: Config,
+        options: Dict[str, Any]={}
+    ) -> List[ActionHook]:
+        actions = await self.load_data()
+
+        return await asyncio.gather(*[
+            self.parser.parse(
+                action_data,
+                stage,
+                parser_config,
+                options
+            ) for action_data in actions
+        ])
     
-    async def load_data(self) -> List[Dict[str, Any]]:
+    async def load_data(self) -> Any:
         return await self._loop.run_in_executor(
             self._executor,
             functools.partial(
