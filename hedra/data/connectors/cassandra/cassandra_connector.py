@@ -1,11 +1,13 @@
 import asyncio
 import functools
 import os
+import json
 import signal
 import psutil
 import uuid
 from typing import List, Dict, Any, Union, Callable
 from concurrent.futures import ThreadPoolExecutor
+from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.data.parsers.parser import Parser
 from hedra.logging import HedraLogger
@@ -55,7 +57,12 @@ def handle_loop_stop(
 
 class Cassandra:
 
-    def __init__(self, config: CassandraConnectorConfig) -> None:
+    def __init__(
+        self, 
+        config: CassandraConnectorConfig,
+        stage: str,
+        parser_config: Config,
+    ) -> None:
         self.cluster = None
         self.session = None
 
@@ -74,6 +81,9 @@ class Cassandra:
 
         self.session_uuid = str(uuid.uuid4())
         self.metadata_string: str = None
+        self.stage = stage
+        self.parser_config = parser_config
+
         self.logger = HedraLogger()
         self.logger.initialize()
 
@@ -106,7 +116,7 @@ class Cassandra:
             'varint': columns.VarInt,
         }
 
-        self._fields: Dict[str, Dict[str, Any]] = {}
+        self._fields: Dict[str, columns.Column] = {}
         self._columns_factory: Dict[
             str,
             Callable[
@@ -252,10 +262,17 @@ class Cassandra:
     ) -> List[Dict[str, Any]]:
         
         cassandra_load_request = CassandraLoadValidator(**options)
-        self._fields.update(**{
-        })
 
         if self._table is None:
+            
+            self._fields.update(**{
+                field_name: self._columns_factory.get(
+                    field_config.field_type
+                )(
+                    field_config.options
+                ) for field_name, field_config in cassandra_load_request.fields.items()
+            })
+
             self._table = type(
                 self.table_name.capitalize()
                 (Model, ),
@@ -288,8 +305,6 @@ class Cassandra:
                 )
             )
 
-
-
         return [
             row for row in data_rows
         ]
@@ -298,11 +313,23 @@ class Cassandra:
         self,
         options: Dict[str, Any]={}
     ) -> List[ActionHook]:
-        actions = await self.load_data()
+        
+        self._fields = {
+            'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+            'name': columns.Text(min_length=1, index=True),
+            'action': columns.Blob()
+        }
+
+        actions = await self.load_data()        
 
         return await asyncio.gather(*[
             self.parser.parse(
-                action_data,
+                {
+                    'name': action_data.get('name'),
+                    **json.loads(
+                        action_data.get('action', {})
+                    )
+                },
                 self.stage,
                 self.parser_config,
                 options
