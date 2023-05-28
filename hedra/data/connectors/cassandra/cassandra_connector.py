@@ -15,32 +15,25 @@ from .cassandra_connector_config import CassandraConnectorConfig
 from .cassandra_load_validator import CassandraLoadValidator
 
 
-from cassandra.cqlengine import columns
-from cassandra.cqlengine import connection
-from datetime import datetime
-from cassandra.cqlengine.management import sync_table
-from cassandra.cqlengine.models import Model
-from cassandra.cqlengine.query import ModelQuerySet
-from cassandra.cluster import Cluster
-from cassandra.auth import PlainTextAuthProvider
-from cassandra.query import dict_factory
-has_connector = True
+try:
+    from cassandra.cqlengine import columns
+    from cassandra.cqlengine import connection
+    from cassandra.query import dict_factory
+    from cassandra.cqlengine.query import ModelQuerySet
+    from cassandra.cqlengine.models import Model
+    from cassandra.cluster import Cluster
+    from cassandra.auth import PlainTextAuthProvider
+    has_connector = True
 
-
-# try:
-#     from cassandra.cqlengine import columns
-#     from cassandra.cqlengine import connection
-#     from datetime import datetime
-#     from cassandra.cqlengine.management import sync_table
-#     from cassandra.cqlengine.models import Model
-#     from cassandra.cluster import Cluster
-#     from cassandra.auth import PlainTextAuthProvider
-#     has_connector = True
-
-# except Exception:
-#     Cluster = None
-#     PlainTextAuthProvider = None
-#     has_connector = False
+except ImportError:
+    columns = object
+    connection = object
+    dict_factory = lambda: None
+    ModelQuerySet = object
+    Model = object
+    Cluster = object
+    PlainTextAuthProvider = object
+    has_connector = False
 
 
 def handle_loop_stop(
