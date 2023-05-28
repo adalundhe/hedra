@@ -5,7 +5,7 @@ import psutil
 import signal
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
-from hedra.connectors.common.connector_type import ConnectorType
+from hedra.data.connectors.common.connector_type import ConnectorType
 from typing import List, Dict, Any
 from .aws_lambda_connector_config import AWSLambdaConnectorConfig
 

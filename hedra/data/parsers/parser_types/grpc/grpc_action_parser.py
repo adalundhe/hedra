@@ -14,18 +14,26 @@ from hedra.data.parsers.parser_types.common.parsing import (
 )
 from typing import Any, Coroutine, Dict
 from .grpc_action_validator import GRPCActionValidator
+from .grpc_options_validator import GRPCOptionsValidator
 
 
 class GRPCActionParser(BaseParser):
 
     def __init__(
         self,
-        config: Config
+        config: Config,
+        options: Dict[str, Any]
     ) -> None:
         super().__init__(
             GRPCActionParser.__name__,
             config
         )
+
+        self.grpc_options = GRPCOptionsValidator(
+            protobuf_map=options.get('protobuf_map')
+        )
+
+        self.protobuf_map = self.grpc_options.protobuf_map
 
     async def parse(
         self, 
@@ -33,14 +41,17 @@ class GRPCActionParser(BaseParser):
         stage: str
     ) -> Coroutine[Any, Any, Coroutine[Any, Any, ActionHook]]:
         
+        action_name = action_data.get('name')
         normalized_headers = normalize_headers(action_data)
         parsed_data = parse_data(action_data)
         tags_data = parse_tags(action_data)
 
+        protobuf = self.protobuf_map[action_name](**parsed_data)
+
         generator_action = GRPCActionValidator(**{
             **action_data,
             'headers': normalized_headers,
-            'data': parsed_data,
+            'data': protobuf,
             'tags': tags_data
         })
 

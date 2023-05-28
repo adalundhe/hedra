@@ -1,4 +1,4 @@
-from hedra.connectors.common.connector_type import ConnectorType
+from hedra.data.connectors.common.connector_type import ConnectorType
 from pydantic import BaseModel, StrictStr
 
 
