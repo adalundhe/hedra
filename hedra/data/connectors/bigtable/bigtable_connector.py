@@ -7,7 +7,6 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
-from hedra.data.connectors.common.connector_type import ConnectorType
 from hedra.data.parsers.parser import Parser
 from hedra.logging import HedraLogger
 from .bigtable_connector_config import BigTableConnectorConfig
@@ -96,20 +95,6 @@ class BigTableConnector:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opened connection to Google Cloud - Created Client Instance - ID:{self.instance_id}')
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opened connection to Google Cloud - Loaded account config from - {self.service_account_json_path}')
 
-    async def load_data(self) -> List[Dict[str, Any]]:
-        self._table = self.instance.table(self._table_name)
-
-        data_rows: PartialRowsData = await self._loop.run_in_executor(
-            self._executor,
-            functools.partial(
-                self._table.read_rows
-            )
-        )
-
-        return [
-            row.to_dict() for row in data_rows
-        ]
-
     async def load_actions(
         self,
         options: Dict[str, Any]={}
@@ -124,6 +109,23 @@ class BigTableConnector:
                 options
             ) for action_data in actions
         ])
+    
+    async def load_data(
+        self,
+        options: Dict[str, Any]={}
+    ) -> List[Dict[str, Any]]:
+        self._table = self.instance.table(self._table_name)
+
+        data_rows: PartialRowsData = await self._loop.run_in_executor(
+            self._executor,
+            functools.partial(
+                self._table.read_rows
+            )
+        )
+
+        return [
+            row.to_dict() for row in data_rows
+        ]
     
     async def close(self):
         self._executor.shutdown()

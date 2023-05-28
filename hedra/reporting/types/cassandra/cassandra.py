@@ -2,6 +2,7 @@ import asyncio
 import functools
 import os
 import psutil
+import signal
 import uuid
 from typing import List, Dict
 from concurrent.futures import ThreadPoolExecutor
@@ -31,10 +32,22 @@ try:
     from cassandra.auth import PlainTextAuthProvider
     has_connector = True
 
+
 except Exception:
     Cluster = None
     PlainTextAuthProvider = None
     has_connector = False
+
+def handle_loop_stop(
+    signame, 
+    executor: ThreadPoolExecutor, 
+    loop: asyncio.AbstractEventLoop
+): 
+    try:
+        executor.shutdown(wait=False, cancel_futures=True) 
+        loop.stop()
+    except Exception:
+        pass
 
 
 class Cassandra:
@@ -94,6 +107,16 @@ class Cassandra:
 
     async def connect(self):
 
+        for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
+            self._loop.add_signal_handler(
+                getattr(signal, signame),
+                lambda signame=signame: handle_loop_stop(
+                    signame,
+                    self._executor,
+                    self._loop
+                )
+            )
+
         host_port_combinations = ', '.join([
             f'{host}:{self.port}' for host in self.hosts
         ])
@@ -124,7 +147,7 @@ class Cassandra:
         if self.keyspace is None:
             self.keyspace = 'hedra'
 
-        await self.logger.filesystem.aio['hedra.repoorting'].info(f'{self.metadata_string} - Creating Keyspace - {self.keyspace}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Creating Keyspace - {self.keyspace}')
 
         keyspace_options = f"'class' : '{self.replication_strategy}', 'replication_factor' : {self.replication}"
         keyspace_query = f"CREATE KEYSPACE IF NOT EXISTS {self.keyspace} WITH REPLICATION = " + "{" + keyspace_options  + "};"
@@ -153,7 +176,7 @@ class Cassandra:
             )
         )
 
-        await self.logger.filesystem.aio['hedra.repoorting'].info(f'{self.metadata_string} - Created Keyspace - {self.keyspace}')
+        await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created Keyspace - {self.keyspace}')
     
     async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
 
@@ -789,8 +812,10 @@ class Cassandra:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closing connection to Cassandra Cluster at - {host_port_combinations}')
 
         await self._loop.run_in_executor(
-            None,
+            self._executor,
             self.cluster.shutdown
         )
+
+        self._executor.shutdown()
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closed connection to Cassandra Cluster at - {host_port_combinations}')

@@ -9,14 +9,11 @@ from typing import (
     Tuple
 )
 from hedra.core.engines.client.config import Config
-from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
-from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.data.connectors.aws_lambda.aws_lambda_connector_config import AWSLambdaConnectorConfig
 from hedra.data.connectors.bigtable.bigtable_connector_config import BigTableConnectorConfig
 from hedra.data.connectors.connector import Connector
-from hedra.tools.filesystem import open
 
 
 RawResultsSet = Dict[str, Dict[str, Union[int, float, List[Any]]]]
@@ -49,7 +46,12 @@ class LoadHook(Hook):
         self.names = list(set(names))
         self.loader_config = loader
         self.parser_config: Union[Config, None] = None
-        self.loader: Union[Connector, None] = None
+        self.loader: Union[Connector, None] = Connector(
+            self.stage,
+            self.loader_config,
+            self.parser_config
+        )
+
         self._strip_pattern = re.compile('[^a-z]+')
         self.loaded = False
 
@@ -59,15 +61,11 @@ class LoadHook(Hook):
             return kwargs
         
         execute = await self._execute_call(**kwargs)
-        
-        if execute and self.loader_config and self.loader is None:
-            self.loader = Connector(
-                self.stage,
-                self.loader_config,
-                self.parser_config
-            )
 
-        if execute and self.loader and self.loader.connected is False:
+        if self.loader.connected is False:
+            self.loader.selected.stage = self.stage
+            self.loader.selected.parser_config = self.parser_config
+
             await self.loader.connect()
 
         if execute:
