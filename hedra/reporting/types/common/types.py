@@ -28,7 +28,7 @@ class ReporterTypes(Enum):
     S3='s3'
     Snowflake='snowflake'
     SQLite='sqlite'
-    StatsD='satsd'
+    StatsD='statsd'
     Telegraf='telegraf'
     TelegrafStatsD='telegraf_statsd'
     TimescaleDB='timescaledb'

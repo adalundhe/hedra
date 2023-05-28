@@ -1,9 +1,10 @@
 import asyncio
 import uuid
+import signal
 import psutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import List, Dict, Union
+from typing import List, Dict
 from hedra.logging import HedraLogger
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
@@ -27,6 +28,19 @@ except Exception:
     bigtable = None
     Credentials = None
     has_connector = False
+
+
+def handle_loop_stop(
+    signame, 
+    executor: ThreadPoolExecutor, 
+    loop: asyncio.AbstractEventLoop
+): 
+    try:
+        executor.shutdown(wait=False, cancel_futures=True) 
+        loop.stop()
+    except Exception:
+        pass
+    
 
 
 class BigTable:
@@ -111,6 +125,16 @@ class BigTable:
         self._loop = asyncio.get_event_loop()
 
     async def connect(self):
+
+        for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
+            self._loop.add_signal_handler(
+                getattr(signal, signame),
+                lambda signame=signame: handle_loop_stop(
+                    signame,
+                    self._executor,
+                    self._loop
+                )
+            )
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opening amd authorizing connection to Google Cloud - Loading account config from - {self.service_account_json_path}')
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Opening session - {self.session_uuid}')
@@ -870,6 +894,8 @@ class BigTable:
             self._executor,
             self.client.close
         )
+
+        self._executor.shutdown()
 
 
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Session Closed - {self.session_uuid}')

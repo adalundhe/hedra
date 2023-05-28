@@ -27,6 +27,7 @@ class GeneratorAction(BaseModel):
     url: AnyHttpUrl
     method: StrictStr='GET'
     headers: Dict[StrictStr, StrictStr]={}
+    query: StrictStr
     params: Optional[Dict[StrictStr, Union[StrictInt, StrictStr, StrictFloat]]]
     data: Optional[Union[StrictStr, Json]]
     weight: Optional[Union[StrictInt, StrictFloat]]

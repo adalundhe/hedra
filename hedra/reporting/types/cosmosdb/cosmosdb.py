@@ -121,7 +121,6 @@ class CosmosDB:
             for  monitor_metrics in metrics_set.session_memory_metrics.values():
                 rows.append(monitor_metrics)
 
-
         for metrics_set in rows:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Session System Metrics Group - {metrics_set.name}:{metrics_set.group}')
 

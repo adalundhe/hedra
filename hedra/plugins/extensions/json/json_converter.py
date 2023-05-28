@@ -402,6 +402,8 @@ class JSONConverter(ExtensionPlugin):
                 self._session.get('http')
             )(config)
 
+            action.metadata.user = json_action.user
+
             await action.url.lookup()
             action.setup()
 
@@ -416,6 +418,11 @@ class JSONConverter(ExtensionPlugin):
             hook.stage = execute_stage_name
             hook.context = SimpleContext()
             hook.hook_id = uuid.uuid4()
+            
+            hook.metadata.order = json_action.order
+            hook.metadata.weight = json_action.weight
+            hook.metadata.tags = json_action.tags
+            hook.metadata.user = json_action.user
 
             action_data.append(hook)
 
