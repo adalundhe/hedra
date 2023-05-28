@@ -7,6 +7,6 @@ class FieldOption:
 
 
 class CassandraLoadValidator(BaseModel):
-    fields: Dict[StrictStr, FieldOption]
+    fields: Optional[Dict[StrictStr, FieldOption]]
     filters: Optional[Dict[StrictStr, Any]]
     limit: Optional[StrictInt]
