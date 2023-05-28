@@ -36,9 +36,14 @@ def handle_loop_stop(
         pass
 
 
-class BigTable:
+class BigTableConnector:
 
-    def __init__(self, config: BigTableConnectorConfig) -> None:
+    def __init__(
+        self, 
+        config: BigTableConnectorConfig,
+        stage: str,
+        parser_config: Config,
+    ) -> None:
 
         self.service_account_json_path = config.service_account_json_path
         self.instance_id = config.instance_id
@@ -48,6 +53,9 @@ class BigTable:
 
         self.session_uuid = str(uuid.uuid4())
         self.metadata_string: str = None
+        self.stage = stage
+        self.parser_config = parser_config
+
         self.logger = HedraLogger()
         self.logger.initialize()
 
@@ -102,10 +110,8 @@ class BigTable:
             row.to_dict() for row in data_rows
         ]
 
-    async def load_action_data(
+    async def load_actions(
         self,
-        stage: str,
-        parser_config: Config,
         options: Dict[str, Any]={}
     ) -> List[ActionHook]:
         actions = await self.load_data()
@@ -113,8 +119,8 @@ class BigTable:
         return await asyncio.gather(*[
             self.parser.parse(
                 action_data,
-                stage,
-                parser_config,
+                self.stage,
+                self.parser_config,
                 options
             ) for action_data in actions
         ])

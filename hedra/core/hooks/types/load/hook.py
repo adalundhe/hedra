@@ -1,9 +1,4 @@
-import psutil
-import asyncio
 import re
-import functools
-from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
 from typing import (
     Callable, 
     Awaitable, 
@@ -13,9 +8,14 @@ from typing import (
     List, 
     Tuple
 )
+from hedra.core.engines.client.config import Config
+from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.engines.types.common.results_set import ResultsSet
+from hedra.data.connectors.aws_lambda.aws_lambda_connector_config import AWSLambdaConnectorConfig
+from hedra.data.connectors.bigtable.bigtable_connector_config import BigTableConnectorConfig
+from hedra.data.connectors.connector import Connector
 from hedra.tools.filesystem import open
 
 
@@ -30,7 +30,10 @@ class LoadHook(Hook):
         shortname: str, 
         call: Callable[..., Awaitable[Any]], 
         *names: Tuple[str, ...],
-        load_path: str=None,
+        loader: Union[
+            AWSLambdaConnectorConfig,
+            BigTableConnectorConfig,
+        ]=None, 
         order: int=1,
         skip: bool=False
     ) -> None:
@@ -44,88 +47,58 @@ class LoadHook(Hook):
         )
 
         self.names = list(set(names))
-        self.load_path = load_path
-        self.executor = ThreadPoolExecutor(
-            max_workers=psutil.cpu_count(logical=False)
-        )
-        self.loop = None
-        self._strip_pattern = re.compile('[^a-z]+'); 
+        self.loader_config = loader
+        self.parser_config: Union[Config, None] = None
+        self.loader: Union[Connector, None] = None
+        self._strip_pattern = re.compile('[^a-z]+')
+        self.loaded = False
 
     async def call(self, **kwargs) -> None:
 
-        if self.skip:
+        if self.skip or self.loaded:
             return kwargs
         
         execute = await self._execute_call(**kwargs)
-
-        if execute:
-            self.loop = asyncio.get_event_loop()
-            return await self.loop.run_in_executor(
-                self.executor,
-                functools.partial(
-                    self._run,
-                    **kwargs
-                )
+        
+        if execute and self.loader_config and self.loader is None:
+            self.loader = Connector(
+                self.stage,
+                self.loader_config,
+                self.parser_config
             )
 
-    def _run(self, **kwargs):
-        import asyncio
-        import uvloop
-        uvloop.install()
+        if execute and self.loader and self.loader.connected is False:
+            await self.loader.connect()
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        if execute:
 
-        return loop.run_until_complete(self._load(**kwargs))
+            hook_args = {
+                name: value for name, value in kwargs.items() if name in self.params
+            }
+            
 
-    async def _load(self, **kwargs):
+            try:
+                load_result: Union[Dict[str, Any], Any] = await self._call(**{
+                    **hook_args,
+                    'loader': self.loader.selected
+                })
 
-        restore_file = await open(self.load_path, 'r')
-        
-        file_stem = Path(self.load_path).stem
-        restore_slug = self._strip_pattern.sub('',file_stem.lower())
-        file_data = await restore_file.read()
+            except Exception:
+                load_result: Dict[str, Any] = {}
 
-        hook_args = {name: value for name, value in kwargs.items() if name in self.params}
-        hook_args[restore_slug] = file_data
+            
+            if self.loader:
+                await self.loader.close()
 
-        load_result: Union[Any, dict] = await self._call(**{name: value for name, value in hook_args.items() if name in self.params})
+            self.loaded = True
 
-        if restore_slug == 'results':
+            if isinstance(load_result, dict):
+                return {
+                    **kwargs,
+                    **load_result
+                }
 
-            for stage_name, stage_data in load_result.items():
-
-                if isinstance(stage_data, ResultsSet) is False:
-                    results_set = ResultsSet(stage_data)
-                    results_set.load_results()
-
-                    load_result[stage_name] = results_set
-
-        self.context[file_data] = load_result
-
-        await restore_file.close()
-
-        if isinstance(load_result, dict):
             return {
                 **kwargs,
-                **load_result
+                self.shortname: load_result
             }
-
-        return {
-            **kwargs,
-            self.shortname: load_result
-        }
-
-    def copy(self):
-        load_hook = LoadHook(
-            self.name,
-            self.shortname,
-            self._call,
-            self.load_path,
-            order=self.order,
-            skip=self.skip,
-        )
-
-        load_hook.stage = self.stage
-
-        return load_hook

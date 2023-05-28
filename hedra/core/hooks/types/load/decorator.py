@@ -1,21 +1,26 @@
 import functools
-from typing import Tuple
+from typing import Tuple, Union
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.registrar import registrar
+from hedra.data.connectors.aws_lambda.aws_lambda_connector_config import AWSLambdaConnectorConfig
+from hedra.data.connectors.bigtable.bigtable_connector_config import BigTableConnectorConfig
 from .validator import LoadHookValidator
 
 
 @registrar(HookType.LOAD)
 def load(
     *names: Tuple[str, ...], 
-    load_path: str=None, 
+    loader: Union[
+        AWSLambdaConnectorConfig,
+        BigTableConnectorConfig,
+    ]=None, 
     order: int=1,
     skip: bool=False
 ):
     
     LoadHookValidator(
         names=names,
-        load_path=load_path,
+        loader=loader,
         order=order,
         skip=skip
     )

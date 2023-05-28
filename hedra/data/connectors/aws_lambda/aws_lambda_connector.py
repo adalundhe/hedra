@@ -34,7 +34,12 @@ def handle_loop_stop(
 
 class AWSLambdaConnector:
 
-    def __init__(self, config: AWSLambdaConnectorConfig) -> None:
+    def __init__(
+        self, 
+        config: AWSLambdaConnectorConfig,
+        stage: str,
+        parser_config: Config,
+    ) -> None:
         self.aws_access_key_id = config.aws_access_key_id
         self.aws_secret_access_key = config.aws_secret_access_key
         self.region_name = config.region_name
@@ -48,6 +53,8 @@ class AWSLambdaConnector:
         self.connector_type = ConnectorType.AWSLambda
         self.connector_type_name = self.connector_type.name.capitalize()
         self.metadata_string: str = None
+        self.stage = stage
+        self.parser_config = parser_config
 
         self.logger = HedraLogger()
         self.logger.initialize()
@@ -82,10 +89,8 @@ class AWSLambdaConnector:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Successfully opened connection to AWS - Region: {self.region_name}')
 
-    async def load_action_data(
+    async def load_actions(
         self,
-        stage: str,
-        parser_config: Config,
         options: Dict[str, Any]={}
     ) -> List[ActionHook]:
         actions = await self.load_data()
@@ -93,13 +98,16 @@ class AWSLambdaConnector:
         return await asyncio.gather(*[
             self.parser.parse(
                 action_data,
-                stage,
-                parser_config,
+                self.stage,
+                self.parser_config,
                 options
             ) for action_data in actions
         ])
     
-    async def load_data(self) -> Any:
+    async def load_data(
+        self, 
+        options: Dict[str, Any]={}
+    ) -> Any:
         return await self._loop.run_in_executor(
             self._executor,
             functools.partial(
