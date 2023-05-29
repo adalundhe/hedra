@@ -330,5 +330,11 @@ class Cassandra:
         ])
     
     async def close(self):
+
+        await self._loop.run_in_executor(
+            self._executor,
+            self.cluster.shutdown
+        )
+
         self._executor.shutdown(cancel_futures=True)
     

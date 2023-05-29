@@ -1,19 +1,23 @@
+from __future__ import annotations
 import asyncio
-import csv
+import functools
+import json
 import psutil
 import uuid
 import os
-import functools
-import pathlib
 import signal
-from typing import List, TextIO, Dict, Any
+import pathlib
+import re
+from typing import List, TextIO, Dict, Union, Any
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.data.connectors.common.connector_type import ConnectorType
 from hedra.data.parsers.parser import Parser
-from .csv_connector_config import CSVConnectorConfig
-from .csv_load_validator import CSVLoadValidator
+from .json_connector_config import JSONConnectorConfig
+
+
 has_connector = True
 
 
@@ -21,26 +25,28 @@ def handle_loop_stop(
     signame, 
     executor: ThreadPoolExecutor, 
     loop: asyncio.AbstractEventLoop, 
-    csv_file: TextIO
+    json_file: TextIO
 ): 
     try:
-        csv_file.close()
+        json_file.close()
         executor.shutdown(wait=False, cancel_futures=True) 
         loop.stop()
     except Exception:
         pass
-    
 
-class CSVConnector:
+
+class JSONConnector:
 
     def __init__(
         self, 
-        config: CSVConnectorConfig,
+        config: JSONConnectorConfig,
         stage: str,
         parser_config: Config,
     ) -> None:
         self.filepath = config.filepath
+        
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
+        self._loop: asyncio.AbstractEventLoop = None
 
         self.session_uuid = str(uuid.uuid4())
         self.metadata_string: str = None
@@ -50,19 +56,16 @@ class CSVConnector:
         self.logger = HedraLogger()
         self.logger.initialize()
 
-        self._csv_reader: csv.DictReader = None
-        self.csv_file: TextIO = None
+        self.json_file: TextIO = None
 
-        self._loop: asyncio.AbstractEventLoop = None
         self.file_mode = config.file_mode
-        self.headers = config.headers
-
+        self.pattern = re.compile("_copy[0-9]+")
         self.parser = Parser()
 
     async def connect(self):
         self._loop = asyncio._get_running_loop()
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping connect')
-
+        
         if self.filepath[:2] == '~/':
             user_directory = pathlib.Path.home()
             self.filepath = os.path.join(
@@ -78,8 +81,8 @@ class CSVConnector:
             )
         )
         
-        if self.csv_file is None:
-            self.csv_file = await self._loop.run_in_executor(
+        if self.json_file is None:
+            self.json_file = await self._loop.run_in_executor(
                 self._executor,
                 functools.partial(
                     open,
@@ -95,7 +98,7 @@ class CSVConnector:
                         signame,
                         self._executor,
                         self._loop,
-                        self.csv_file
+                        self.json_file
                     )
                 )
 
@@ -105,8 +108,8 @@ class CSVConnector:
         self,
         options: Dict[str, Any]={}
     ) -> List[ActionHook]:
-    
-        actions = await self.load_data()
+        
+        actions: List[Dict[str, Any]] = await self.load_data()
 
         return await asyncio.gather(*[
             self.parser.parse(
@@ -120,34 +123,20 @@ class CSVConnector:
     async def load_data(
         self, 
         options: Dict[str, Any]={}
-    ) -> List[Dict[str, Any]]:
-        
-        csv_options = CSVLoadValidator(**options)
-        headers = csv_options.headers
-
-        if headers is None and self.headers:
-            headers = self.headers
-        
-        if self._csv_reader is None:
-            self._csv_reader = csv.DictReader(
-                self.filepath, 
-                fieldnames=headers
-            )
-
+    ) -> Any:
         return await self._loop.run_in_executor(
             self._executor,
-            self._load_data
+            functools.partial(
+                json.load,
+                self.json_file
+            )
         )
-    
-    def _load_data(self):
-        return [ row for row in self._csv_reader ]
     
     async def close(self):
 
         await self._loop.run_in_executor(
             self._executor,
-            self.csv_file.close
+            self.json_file.close
         )
 
         self._executor.shutdown(cancel_futures=True)     
-        
