@@ -1,6 +1,6 @@
 from pydantic import BaseModel, StrictStr
-from typing import List
+from typing import List, Optional
 
 
 class CSVLoadValidator(BaseModel):
-    headers: List[StrictStr]
+    headers: Optional[List[StrictStr]]

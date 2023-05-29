@@ -46,7 +46,7 @@ class CSV:
         self.metadata_string: str = None
         self.stage = stage
         self.parser_config = parser_config
-        
+
         self.logger = HedraLogger()
         self.logger.initialize()
 
@@ -55,6 +55,8 @@ class CSV:
 
         self._loop: asyncio.AbstractEventLoop = None
         self.file_mode = config.file_mode
+        self.headers = config.headers
+
         self.parser = Parser()
 
     async def connect(self):
@@ -103,6 +105,7 @@ class CSV:
         self,
         options: Dict[str, Any]={}
     ) -> List[ActionHook]:
+    
         actions = await self.load_data()
 
         return await asyncio.gather(*[
@@ -120,11 +123,15 @@ class CSV:
     ) -> List[Dict[str, Any]]:
         
         csv_options = CSVLoadValidator(**options)
+        headers = csv_options.headers
+
+        if headers is None and self.headers:
+            headers = self.headers
         
         if self._csv_reader is None:
             self._csv_reader = csv.DictReader(
                 self.filepath, 
-                fieldnames=csv_options.headers
+                fieldnames=headers
             )
 
         return await self._loop.run_in_executor(
