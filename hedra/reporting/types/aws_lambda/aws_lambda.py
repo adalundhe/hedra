@@ -323,5 +323,5 @@ class AWSLambda:
             
 
     async def close(self):
-        self._executor.shutdown()
+        self._executor.shutdown(cancel_futures=True)
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')

@@ -816,6 +816,6 @@ class Cassandra:
             self.cluster.shutdown
         )
 
-        self._executor.shutdown()
+        self._executor.shutdown(cancel_futures=True)
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closed connection to Cassandra Cluster at - {host_port_combinations}')

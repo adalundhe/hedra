@@ -8,6 +8,7 @@ class ConnectorType(Enum):
     CosmosDB='cosmosdb'
     CSV='csv'
     GCS='gcs'
+    HAR='har'
     JSON='json'
     Kafka='kafka'
     MongoDB='mongodb'

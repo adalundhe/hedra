@@ -31,7 +31,7 @@ def handle_loop_stop(
         pass
     
 
-class CSV:
+class CSVConnector:
 
     def __init__(
         self, 

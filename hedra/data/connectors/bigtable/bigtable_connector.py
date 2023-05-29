@@ -128,4 +128,4 @@ class BigTableConnector:
         ]
     
     async def close(self):
-        self._executor.shutdown()
+        self._executor.shutdown(cancel_futures=True)

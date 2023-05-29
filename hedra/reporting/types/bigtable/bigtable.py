@@ -895,7 +895,7 @@ class BigTable:
             self.client.close
         )
 
-        self._executor.shutdown()
+        self._executor.shutdown(cancel_futures=True)
 
 
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Session Closed - {self.session_uuid}')
