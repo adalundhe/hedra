@@ -10,17 +10,16 @@ from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.data.parsers.parser import Parser
 from .google_cloud_storage_connector_config import GoogleCloudStorageConnectorConfig
 
-from google.cloud import storage
-has_connector = True
 
-# try:
+try:
 
-#     from google.cloud import storage
-#     has_connector = True
+    from google.cloud import storage
+    has_connector = True
 
-# except Exception:
-#     storage = None
-#     has_connector = False
+except Exception:
+    storage = None
+    has_connector = False
+
 
 class GoogleCloudStorageConnector:
 
