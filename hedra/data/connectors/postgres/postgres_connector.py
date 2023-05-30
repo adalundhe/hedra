@@ -45,6 +45,7 @@ class PostgresConnection:
         stage: str,
         parser_config: Config,
     ) -> None:
+        
         self.host = config.host
         self.database = config.database
         self.username = config.username
