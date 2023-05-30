@@ -35,6 +35,7 @@ def handle_loop_stop(
 
 
 class S3Connector:
+    connector_type=ConnectorType.S3
 
     def __init__(
         self, 

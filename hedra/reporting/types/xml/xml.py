@@ -120,6 +120,22 @@ class XML:
 
         self.write_mode = 'w' if config.overwrite else 'a'
 
+    async def connect(self):
+        self._loop = asyncio._get_running_loop()
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Setting filepaths')
+        
+        original_filepath = Path(self.events_filepath)
+        
+        directory = original_filepath.parent
+        filename = original_filepath.stem
+
+        events_file_timestamp = time.time()
+
+        self.events_filepath = os.path.join(
+            directory,
+            f'{filename}_{events_file_timestamp}.xml'
+        )
+
     async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
 
         if self.session_system_metrics_file is None:

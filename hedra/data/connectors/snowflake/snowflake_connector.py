@@ -43,7 +43,8 @@ def handle_loop_stop(
         pass
 
 
-class Snowflake:
+class SnowflakeConnector:
+    connector_type=ConnectorType.Snowflake
 
     def __init__(
         self, 
@@ -124,6 +125,22 @@ class Snowflake:
 
         except asyncio.TimeoutError:
             raise Exception('Err. - Connection to Snowflake timed out - check your account id, username, and password.')
+
+    async def load_actions(
+        self,
+        options: Dict[str, Any]={}
+    ) -> List[ActionHook]:
+        
+        actions: List[Dict[str, Any]] = await self.load_data()
+
+        return await asyncio.gather(*[
+            self.parser.parse(
+                action_data,
+                self.stage,
+                self.parser_config,
+                options
+            ) for action_data in actions
+        ])
 
     async def load_data(
         self, 

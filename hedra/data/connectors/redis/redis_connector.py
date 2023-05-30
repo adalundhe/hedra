@@ -22,7 +22,8 @@ except Exception:
     has_connector = True
 
 
-class Redis:
+class RedisConnector:
+    connector_type=ConnectorType.Redis
 
     def __init__(
         self, 

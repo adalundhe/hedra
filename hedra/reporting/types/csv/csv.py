@@ -123,7 +123,7 @@ class CSV:
 
     async def connect(self):
         self._loop = asyncio._get_running_loop()
-        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Skipping connect')
+        await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Setting filepaths')
         
         original_filepath = Path(self.events_filepath)
         

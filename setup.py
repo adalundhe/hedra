@@ -103,7 +103,8 @@ setup(
             'datadog_api_client',
             'aiokafka',
             'haralyzer',
-            'asyncpg'
+            'asyncpg',
+            'xmltodict'
         ],
         'all-engines': [
             'grpcio',
@@ -212,7 +213,8 @@ setup(
             'google-cloud-storage',
         ],
         'xml': [
-            'dicttoxml'
+            'dicttoxml',
+            'xmltodict'
         ],
         'opentelemetry': [
             'opentelemetry-api'

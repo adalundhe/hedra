@@ -40,6 +40,7 @@ has_connector = True
 
 
 class SQLiteConnector:
+    connector_type=ConnectorType.SQLite
 
     def __init__(
         self, 
