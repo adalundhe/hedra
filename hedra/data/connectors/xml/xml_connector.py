@@ -22,10 +22,12 @@ from hedra.data.connectors.common.connector_type import ConnectorType
 from hedra.data.parsers.parser import Parser
 from .xml_connector_config import XMLConnectorConfig
 
+
 try:
     import xmltodict
 except Exception:
     xmltodict = object
+
 
 collections.Iterable = collections.abc.Iterable
 
