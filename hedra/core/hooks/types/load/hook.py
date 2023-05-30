@@ -57,10 +57,10 @@ class LoadHook(Hook):
 
     async def call(self, **kwargs) -> None:
 
+        self.skip = await self._execute_call(**kwargs)
+
         if self.skip or self.loaded:
             return kwargs
-        
-        execute = await self._execute_call(**kwargs)
 
         if self.loader.connected is False:
             self.loader.selected.stage = self.stage
@@ -68,35 +68,33 @@ class LoadHook(Hook):
 
             await self.loader.connect()
 
-        if execute:
+        hook_args = {
+            name: value for name, value in kwargs.items() if name in self.params
+        }
+        
 
-            hook_args = {
-                name: value for name, value in kwargs.items() if name in self.params
-            }
-            
+        try:
+            load_result: Union[Dict[str, Any], Any] = await self._call(**{
+                **hook_args,
+                'loader': self.loader.selected
+            })
 
-            try:
-                load_result: Union[Dict[str, Any], Any] = await self._call(**{
-                    **hook_args,
-                    'loader': self.loader.selected
-                })
+        except Exception:
+            load_result: Dict[str, Any] = {}
 
-            except Exception:
-                load_result: Dict[str, Any] = {}
+        
+        if self.loader:
+            await self.loader.close()
 
-            
-            if self.loader:
-                await self.loader.close()
+        self.loaded = True
 
-            self.loaded = True
-
-            if isinstance(load_result, dict):
-                return {
-                    **kwargs,
-                    **load_result
-                }
-
+        if isinstance(load_result, dict):
             return {
                 **kwargs,
-                self.shortname: load_result
+                **load_result
             }
+
+        return {
+            **kwargs,
+            self.shortname: load_result
+        }
