@@ -72,7 +72,7 @@ from .reporting import (
     XMLConfig
 )
 
-from .data.connectors import (
+from .data.connectors.connector import (
     AWSLambdaConnectorConfig,
     BigTableConnectorConfig,
     CassandraConnectorConfig,
