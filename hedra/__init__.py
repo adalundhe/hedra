@@ -71,3 +71,23 @@ from .reporting import (
     TimescaleDBConfig,
     XMLConfig
 )
+
+from .data.connectors import (
+    AWSLambdaConnectorConfig,
+    BigTableConnectorConfig,
+    CassandraConnectorConfig,
+    CosmosDBConnectorConfig,
+    CSVConnectorConfig,
+    GoogleCloudStorageConnectorConfig,
+    HARConnectorConfig,
+    JSONConnectorConfig,
+    KafkaConnectorConfig,
+    MongoDBConnectorConfig,
+    MySQLConnectorConfig,
+    PostgresConnectorConfig,
+    RedisConnectorConfig,
+    S3ConnectorConfig,
+    SnowflakeConnectorConfig,
+    SQLiteConnectorConfig,
+    XMLConnectorConfig
+)
