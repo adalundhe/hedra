@@ -9,6 +9,7 @@ from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.data.parsers.parser import Parser
 from hedra.logging import HedraLogger
+from hedra.data.connectors.common.connector_type import ConnectorType
 from .bigtable_connector_config import BigTableConnectorConfig
 
 try:
@@ -36,6 +37,7 @@ def handle_loop_stop(
 
 
 class BigTableConnector:
+    connector_type = ConnectorType.BigTable
 
     def __init__(
         self, 

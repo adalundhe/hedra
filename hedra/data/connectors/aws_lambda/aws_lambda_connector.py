@@ -33,6 +33,7 @@ def handle_loop_stop(
 
 
 class AWSLambdaConnector:
+    connector_type = ConnectorType.AWSLambda
 
     def __init__(
         self, 
@@ -50,7 +51,6 @@ class AWSLambdaConnector:
         self._loop = asyncio.get_event_loop()
         self.session_uuid = str(uuid.uuid4())
 
-        self.connector_type = ConnectorType.AWSLambda
         self.connector_type_name = self.connector_type.name.capitalize()
         self.metadata_string: str = None
         self.stage = stage

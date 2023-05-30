@@ -36,6 +36,7 @@ def handle_loop_stop(
 
 
 class JSONConnector:
+    connector_type=ConnectorType.JSON
 
     def __init__(
         self, 

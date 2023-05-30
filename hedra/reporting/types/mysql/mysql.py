@@ -25,7 +25,7 @@ try:
     import aiomysql
     warnings.filterwarnings('ignore', category=aiomysql.Warning)
 
-    from aiomysql.sa import create_engine
+    from aiomysql.sa import create_engine, SAConnection
     from sqlalchemy.schema import CreateTable
     
     has_connector = True
@@ -35,6 +35,7 @@ except Exception:
     sa = object
     create_engine = object
     CreateTable = object
+    SAConnection = object
     OperationalError = object
     has_connector = object
 
@@ -103,9 +104,10 @@ class MySQL:
             password=self.password
         )
 
-        self._connection = await self._engine.acquire()
+        self._connection: SAConnection = await self._engine.acquire()
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to MySQL instance at - {self.host} - Database: {self.database}')
+    
     async def submit_session_system_metrics(self, system_metrics_sets: List[SystemMetricsSet]):
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Session System Metrics to Table - {self.session_system_metrics_table_name}')

@@ -14,21 +14,21 @@ from hedra.data.connectors.common.connector_type import ConnectorType
 from hedra.data.parsers.parser import Parser
 from .kafka_connector_config import KafkaConnectorConfig
 
-from aiokafka import AIOKafkaConsumer
-from aiokafka.structs import ConsumerRecord
-has_connector = True
 
-# try:
+try:
 
-#     from aiokafka import AIOKafkaConsumer
-#     has_connector = True
+    from aiokafka import AIOKafkaConsumer
+    from aiokafka.structs import ConsumerRecord
+    has_connector = True
 
-# except Exception:
-#     AIOKafkaConsumer = None
-#     has_connector = False
+except Exception:
+    AIOKafkaConsumer = object
+    ConsumerRecord = object
+    has_connector = False
 
 
-class Kafka:
+class KafkaConnector:
+    connector_type=ConnectorType.Kafka
 
     def __init__(
         self, 

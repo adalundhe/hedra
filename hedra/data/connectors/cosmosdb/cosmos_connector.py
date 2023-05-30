@@ -9,6 +9,7 @@ from typing import (
 from hedra.logging import HedraLogger
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.data.connectors.common.connector_type import ConnectorType
 from hedra.data.parsers.parser import Parser
 from .cosmos_connector_config import CosmosDBConnectorConfig
 
@@ -22,7 +23,8 @@ except Exception:
     has_connector = False
 
 
-class CosmosDB:
+class CosmosDBConnector:
+    connector_type=ConnectorType.CosmosDB
 
     def __init__(
         self, config: CosmosDBConnectorConfig,

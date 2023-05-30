@@ -89,7 +89,7 @@ class MongoDB:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitting Stage System Metrics to Bucket - {self.session_system_metrics_collection}')
 
-        metrics_sets: List[SessionMetricsCollection] = []
+        metrics_sets: List[SystemMetricsCollection] = []
         
         for metrics_set in system_metrics_sets:
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Submitting Stage System Metrics - {metrics_set.system_metrics_set_id}')
@@ -227,4 +227,5 @@ class MongoDB:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Submitted Error Metrics to Bucket - {self.errors_collection}')
 
     async def close(self):
+        await self.connection.close()
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')

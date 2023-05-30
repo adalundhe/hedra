@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.data.connectors.common.connector_type import ConnectorType
 from hedra.data.parsers.parser import Parser
 from .google_cloud_storage_connector_config import GoogleCloudStorageConnectorConfig
 
@@ -37,6 +38,7 @@ def handle_loop_stop(
 
 
 class GoogleCloudStorageConnector:
+    connector_type=ConnectorType.GCS
 
     def __init__(
         self, 

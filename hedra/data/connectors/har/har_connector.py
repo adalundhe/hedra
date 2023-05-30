@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.data.connectors.common.connector_type import ConnectorType
 from hedra.data.parsers.parser import Parser
 from typing import (
     Dict, 
@@ -21,24 +22,19 @@ from typing import (
 )
 from .har_connector_config import HARConnectorConfig
 
-from haralyzer import HarParser, HarEntry
-from haralyzer.http import Request
+try:
 
-has_connector=True
+    from haralyzer import HarParser, HarEntry
+    from haralyzer.http import Request
 
-# try:
+    has_connector=True
 
-#     from haralyzer import HarParser, HarEntry
-#     from haralyzer.http import Request
+except ImportError:
+    has_connector=False
 
-#     has_connector=True
-
-# except ImportError:
-#     has_connector=False
-
-#     HarParser=object
-#     HarEntry=object
-#     Request=object
+    HarParser=object
+    HarEntry=object
+    Request=object
 
 
 def handle_loop_stop(
@@ -56,6 +52,7 @@ def handle_loop_stop(
     
 
 class HARConnector:
+    connector_type=ConnectorType.HAR
 
     def __init__(
         self, 

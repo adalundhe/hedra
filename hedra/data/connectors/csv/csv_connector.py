@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.data.connectors.common.connector_type import ConnectorType
 from hedra.data.parsers.parser import Parser
 from .csv_connector_config import CSVConnectorConfig
 from .csv_load_validator import CSVLoadValidator
@@ -32,6 +33,7 @@ def handle_loop_stop(
     
 
 class CSVConnector:
+    connector_type=ConnectorType.CSV
 
     def __init__(
         self, 

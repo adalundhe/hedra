@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Union, Callable
 from concurrent.futures import ThreadPoolExecutor
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.data.connectors.common.connector_type import ConnectorType
 from hedra.data.parsers.parser import Parser
 from hedra.logging import HedraLogger
 from .cassandra_connector_config import CassandraConnectorConfig
@@ -48,7 +49,8 @@ def handle_loop_stop(
         pass
 
 
-class Cassandra:
+class CassandraConnector:
+    connector_type = ConnectorType.Cassandra
 
     def __init__(
         self, 
