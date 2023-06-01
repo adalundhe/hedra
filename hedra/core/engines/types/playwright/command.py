@@ -14,7 +14,14 @@ class Page:
         'frame'
     )
 
-    def __init__(self, selector: str=None, attribute: str=None, x_coordinate: int=0, y_coordinate: int=0, frame=0) -> None:
+    def __init__(
+        self, 
+        selector: str=None, 
+        attribute: str=None, 
+        x_coordinate: int=0, 
+        y_coordinate: int=0, 
+        frame=0
+    ) -> None:
         self.selector = selector
         self.attribute = attribute
         self.x_coordinate = x_coordinate
@@ -29,7 +36,11 @@ class URL:
         'headers'
     )
 
-    def __init__(self, location: str=None, headers: Dict[str, str]={}) -> None:
+    def __init__(
+        self, 
+        location: str=None, 
+        headers: Dict[str, str]={}
+    ) -> None:
         self.location = location
         self.headers = headers
 
@@ -85,7 +96,15 @@ class Options:
         'switch_by'
     )
 
-    def __init__(self, event: str=None, option=None, is_checked=False, timeout=10, extra={}, switch_by: str='url') -> None:
+    def __init__(
+        self, 
+        event: str=None, 
+        option=None, 
+        is_checked=False, 
+        timeout=10, 
+        extra: Dict[str, Any]={}, 
+        switch_by: str='url'
+    ) -> None:
         self.event = event
         self.option = option
         self.is_checked = is_checked

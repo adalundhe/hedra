@@ -66,22 +66,48 @@ class PlaywrightSerializer(BaseSerializer):
         
         url_config = action.get('url', {})
         metadata = action.get('metadata', {})
+        page_config = action.get('page', {})
+        input_config = action.get('input', {})
+        url_config = action.get('url', {})
+        options_config=action.get('options', {})
         
-        http_action = PlaywrightCommand(
+        playwright_command = PlaywrightCommand(
             name=action.get('name'),
-            url=url_config.get('full'),
-            headers=action.get('headers'),
-            data=action.get('data'),
+            command=action.get('command'),
+            page=Page(
+                selector=page_config.get('selector'),
+                attribute=page_config.get('attribute'),
+                x_coordinate=page_config.get('x_coordinate'),
+                y_coordinate=page_config.get('y_coordinate'),
+                frame=page_config.get('frame', 0)
+            ),
+            url=URL(
+                location=url_config.get('locations'),
+                headers=url_config.get('headers', {})
+            ),
+            input=Input(
+                key=input_config.get('key'),
+                text=input_config.get('text'),
+                expression=input_config.get('expression'),
+                args=input_config.get('args'),
+                filepath=input_config.get('filepath'),
+                file=input_config.get('file'),
+                path=input_config.get('path'),
+                option=input_config.get('option'),
+                by_label=input_config.get('by_label', False),
+                by_value=input_config.get('by_value', False)
+            ),
+            options=Options(
+                event=options_config.get('event'),
+                option=options_config.get('option'),
+                is_checked=options_config.get('is_checked'),
+                timeout=options_config.get('timeout', 10),
+                extra=options_config.get('extra', {}),
+                switch_by=options_config.get('switch_by', 'url')
+            ),
             user=metadata.get('user'),
-            tags=metadata.get('tags', []),
-            redirects=action.get('redirects', 3)
+            tags=metadata.get('tags', [])
         )
 
-        http_action.url.ip_addr = url_config.get('ip_addr')
-        http_action.url.socket_config = url_config.get('socket_config')
-        http_action.url.has_ip_addr = url_config.get('has_ip_addr')
-
-        http_action.setup()
-
-        return http_action
+        return playwright_command
     
