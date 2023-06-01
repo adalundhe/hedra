@@ -9,12 +9,12 @@ class HTTP3Serializer(BaseSerializer):
     def __init__(self) -> None:
         super().__init__()
 
-    def serialize_action(
+    def action_to_serializable(
         self,
         action: HTTP3Action
     ) -> Dict[str, Union[str, List[str]]]:
         
-        serialized_action = super().serialize_action()
+        serialized_action = super().action_to_serializable()
         return {
             **serialized_action,
             'type': RequestTypes.HTTP3,

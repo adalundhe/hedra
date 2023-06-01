@@ -8,7 +8,7 @@ class BaseSerializer:
     def __init__(self) -> None:
         self.metadata_serializer = MetadataSerializer()
 
-    def serialize_action(
+    def action_to_serializable(
         self, 
         action: BaseAction
     ) -> Dict[str, Union[str, List[str]]]:

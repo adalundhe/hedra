@@ -9,7 +9,7 @@ class GRPCSerializer(BaseSerializer):
     def __init__(self) -> None:
         super().__init__()
 
-    def serialize_action(
+    def action_to_serializable(
         self,
         action: GRPCAction
     ) -> Dict[str, Union[str, List[str]]]:

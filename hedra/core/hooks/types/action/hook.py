@@ -37,7 +37,7 @@ class ActionHook(Hook):
         self.names = list(set(names))
         self.session: Any = None
         self.action: Any = None
-        self.checks = []
+        self.checks: List[Any] = []
         self.before: List[str] = []
         self.after: List[str] = []
         self.is_notifier = False
@@ -59,7 +59,6 @@ class ActionHook(Hook):
             weight=self.metadata.weight,
             order=self.order,
             skip=self.skip,
-            sourcefile=self.sourcefile,
             metadata={
                 **self.metadata.copy()
             }
@@ -72,3 +71,28 @@ class ActionHook(Hook):
 
     async def call(self, *args, **kwargs):
         return await self._call(*args, **kwargs)
+    
+    def to_dict(self) -> str:
+        return {
+            'name': self.name,
+            'shortname': self.shortname,
+            'skip': self.skip,
+            'hook_type': HookType.ACTION,
+            'names': self.names,
+            'checks': [
+                check if isinstance(check, str) else check.name for check in self.checks
+            ],
+            'channels': [
+                channel if isinstance(channel, str) else channel.name for channel in self.channels
+            ],
+            'notifiers': [
+                notifier if isinstance(notifier, str) else notifier.name for notifier in self.notifiers
+            ],
+            'listeners': [
+                listener if isinstance(listener, str) else listener.name for listener in self.listeners
+            ],
+            'order': self.metadata.order,
+            'weight': self.metadata.weight,
+            'user': self.metadata.user,
+            'tags': self.metadata.tags
+        }

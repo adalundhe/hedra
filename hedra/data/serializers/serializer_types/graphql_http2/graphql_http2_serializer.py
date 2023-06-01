@@ -9,7 +9,7 @@ class GraphQLHTTP2Serializer(BaseSerializer):
     def __init__(self) -> None:
         super().__init__()
 
-    def serialize_action(
+    def action_to_serializable(
         self,
         action: GraphQLHTTP2Action
     ) -> Dict[str, Union[str, List[str]]]:

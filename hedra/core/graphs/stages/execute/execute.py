@@ -39,6 +39,7 @@ from hedra.core.personas.persona_registry import (
     registered_personas, 
     DefaultPersona
 )
+from hedra.data.serializers import Serializer
 from hedra.logging import logging_manager
 from hedra.monitoring import (
     CPUMonitor,
@@ -117,6 +118,7 @@ class Execute(Stage, Generic[Unpack[T]]):
         )
 
         self.stage_retries = self.retries
+        self.serializer = Serializer()
 
     @Internal()
     async def run(self):
@@ -294,9 +296,11 @@ class Execute(Stage, Generic[Unpack[T]]):
         execute_stage_setup_by: str=None,
         execute_stage_stream_configs: List[ReporterConfig] = []
     ):
-        loaded_actions: Dict[str, List[str]] = defaultdict(list)
-        for action in execute_stage_loaded_actions:
-            pass
+        loaded_actions: List[str] = []
+        for action_hook in execute_stage_loaded_actions:
+            loaded_actions.append(
+                self.serializer.serialize_action(action_hook)
+            ) 
 
         if execute_stage_has_multiple_workers:
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting execution for - {self.workers} workers')
