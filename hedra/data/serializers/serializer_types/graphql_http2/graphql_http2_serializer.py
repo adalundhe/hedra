@@ -19,7 +19,7 @@ class GraphQLHTTP2Serializer(BaseSerializer):
 
         return {
             **serialized_action,
-            'type': RequestTypes.HTTP2,
+            'type': RequestTypes.GRAPHQL_HTTP2,
             'url': {
                 'full': action.url.full,
                 'ip_addr': action.url.ip_addr,
