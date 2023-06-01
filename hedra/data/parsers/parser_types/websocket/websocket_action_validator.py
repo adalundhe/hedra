@@ -24,6 +24,7 @@ class WebsocketActionValidator(BaseModel):
     headers: Dict[StrictStr, StrictStr]={}
     params: Optional[Dict[StrictStr, Union[StrictInt, StrictStr, StrictFloat]]]
     data: Optional[Union[StrictStr, Json]]
+    sourcefile: StrictStr
     weight: Optional[Union[StrictInt, StrictFloat]]
     order: Optional[StrictInt]
     user: Optional[StrictStr]

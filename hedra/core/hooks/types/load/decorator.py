@@ -1,4 +1,5 @@
 import functools
+import os
 from typing import Tuple, Union
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.registrar import registrar

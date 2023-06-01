@@ -77,6 +77,7 @@ from .data.connectors.connector import (
     BigTableConnectorConfig,
     CassandraConnectorConfig,
     CosmosDBConnectorConfig,
+    Connector,
     CSVConnectorConfig,
     GoogleCloudStorageConnectorConfig,
     HARConnectorConfig,

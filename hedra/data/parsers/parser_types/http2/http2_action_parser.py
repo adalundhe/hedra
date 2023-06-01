@@ -73,7 +73,8 @@ class HTTP2ActionParser(BaseParser):
         hook = ActionHook(
             f'{stage}.{generator_action.name}',
             generator_action.name,
-            None
+            None,
+            sourcefile=generator_action.sourcefile,
         )
 
         hook.session = session

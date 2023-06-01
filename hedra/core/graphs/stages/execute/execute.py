@@ -173,6 +173,31 @@ class Execute(Stage, Generic[Unpack[T]]):
                 'memory': memory_monitor
             }
         }
+    
+    @event('get_stage_config')
+    async def collect_loaded_actions(self):
+        loaded_actions: List[ActionHook] = []
+
+        for value in self.context.values():
+
+            if isinstance(value, ActionHook):
+                loaded_actions.append(value)
+
+            elif isinstance(value, list):
+
+                for item in value:
+                    if isinstance(item, ActionHook):
+                        loaded_actions.append(item)
+
+            elif isinstance(value, dict):
+
+                for item in value.values():
+                    if isinstance(item, ActionHook):
+                        loaded_actions.append(item)
+
+        return {
+            'execute_stage_loaded_actions': loaded_actions
+        }
 
     @event('get_stage_config')
     async def get_stage_plugins(self):
@@ -250,6 +275,7 @@ class Execute(Stage, Generic[Unpack[T]]):
             }
 
     @condition(
+        'collect_loaded_actions',
         'get_stage_plugins',
         'get_stage_experiment'
     )
@@ -261,12 +287,21 @@ class Execute(Stage, Generic[Unpack[T]]):
     @event('check_has_multiple_workers')
     async def run_multiple_worker_jobs(
         self,
+        execute_stage_loaded_actions: List[ActionHook]=[],
         execute_stage_has_multiple_workers: bool = False,
         execute_stage_setup_config: Config=None,
         execute_stage_plugins: Dict[str, List[Any]]={},
         execute_stage_setup_by: str=None,
         execute_stage_stream_configs: List[ReporterConfig] = []
     ):
+        loaded_actions: Dict[str, List[str]] = defaultdict(list)
+        for action in execute_stage_loaded_actions:
+            loader_id = action.loader_config.loader_id
+
+            loaded_actions[loader_id].append(
+                action.loader_config.dict()
+            )
+
         if execute_stage_has_multiple_workers:
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting execution for - {self.workers} workers')
 
@@ -286,6 +321,7 @@ class Execute(Stage, Generic[Unpack[T]]):
                         'source_stage_context': {
                             context_key: context_value for context_key, context_value in serializable_context
                         },
+                        'execute_stage_loaded_actions': loaded_actions,
                         'source_setup_stage_name': execute_stage_setup_by,
                         'source_stage_id': self.stage_id,
                         'source_stage_plugins': execute_stage_plugins,

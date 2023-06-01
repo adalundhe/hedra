@@ -23,6 +23,7 @@ class UDPActionValidator(BaseModel):
     url: AnyHttpUrl
     wait_for_response: StrictBool=False
     data: Optional[Union[StrictStr, Json]]
+    sourcefile: StrictStr
     weight: Optional[Union[StrictInt, StrictFloat]]
     order: Optional[StrictInt]
     user: Optional[StrictStr]

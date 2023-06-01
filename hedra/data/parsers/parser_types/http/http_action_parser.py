@@ -73,7 +73,14 @@ class HTTPActionParser(BaseParser):
         hook = ActionHook(
             f'{stage}.{generator_action.name}',
             generator_action.name,
-            None
+            None,
+            sourcefile=generator_action.sourcefile,
+            order=generator_action.order,
+            weight=generator_action.weight,
+            metadata={
+                'user': generator_action.user,
+                'tags': generator_action.tags
+            }
         )
 
         hook.session = session
@@ -81,11 +88,6 @@ class HTTPActionParser(BaseParser):
         hook.stage = stage
         hook.context = SimpleContext()
         hook.hook_id = uuid.uuid4()
-      
-        hook.metadata.order = generator_action.order
-        hook.metadata.weight = generator_action.weight
-        hook.metadata.tags = generator_action.tags
-        hook.metadata.user = generator_action.user
 
         return hook
 

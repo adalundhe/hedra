@@ -24,6 +24,7 @@ class GraphQLHTTP2ActionValidator(BaseModel):
     headers: Dict[StrictStr, StrictStr]={}
     query: StrictStr
     operation_name: StrictStr
+    sourcefile: StrictStr
     variables: Dict[str, Union[StrictStr, StrictInt, StrictFloat, StrictBool, None]]
     weight: Optional[Union[StrictInt, StrictFloat]]
     order: Optional[StrictInt]

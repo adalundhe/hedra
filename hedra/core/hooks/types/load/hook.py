@@ -76,7 +76,7 @@ class LoadHook(Hook):
         try:
             load_result: Union[Dict[str, Any], Any] = await self._call(**{
                 **hook_args,
-                'loader': self.loader.selected
+                'loader': self.loader
             })
 
         except Exception:

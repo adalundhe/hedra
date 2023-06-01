@@ -1,7 +1,14 @@
 from hedra.core.engines.client.config import Config
-from typing import Dict, Union, Any, Callable
-from .aws_lambda.aws_lambda_connector import AWSLambdaConnector
+from hedra.core.hooks.types.action.hook import ActionHook
+from typing import (
+    Dict, 
+    Union, 
+    Any, 
+    Callable, 
+    List
+)
 
+from .aws_lambda.aws_lambda_connector import AWSLambdaConnector
 from .aws_lambda.aws_lambda_connector_config import AWSLambdaConnectorConfig
 from .bigtable.bigtable_connector import BigTableConnector
 from .bigtable.bigtable_connector_config import BigTableConnectorConfig
@@ -182,6 +189,7 @@ class Connector:
         self.stage = stage
         self.parser_config = parser_config
         self.connected = False
+        self.actions: Union[List[ActionHook] , None] = None
 
     async def connect(self):
         await self.selected.connect()
@@ -191,9 +199,11 @@ class Connector:
         self,
         options: Dict[str, Any]={}
     ):
-        return await self.selected.load_actions(
+        self.actions = await self.selected.load_actions(
             options=options
         )
+
+        return self.actions
     
     async def load_data(
         self,
