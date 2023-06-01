@@ -105,28 +105,3 @@ class UDPAction(BaseAction):
     def write_chunks(self, writer: Writer):
         for chunk in self.data:
             writer.write(chunk)
-
-    def to_serializable(self):
-
-        return {
-            'name': self.name,
-            'type': self.type,
-            'wait_for_response': self.wait_for_response,
-            'url': {
-                'ip_addr': self.url.ip_addr,
-                'port': self.url.port,
-                'url': self.url.full,
-                'socket_config': self.url.socket_config,
-                'is_ssl': self.url.is_ssl
-            },
-            'data': {
-                'data': self._data,
-                'encoded_data': self.encoded_data
-            },
-
-            'metadata': {
-                'user': self.metadata.user,
-                'tags': self.metadata.tags
-            },
-            'hooks': self.hooks.to_serializable()
-        }

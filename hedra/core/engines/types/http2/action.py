@@ -169,34 +169,3 @@ class HTTP2Action(BaseAction):
                 0, len(encoded_headers), self._remote_settings.max_frame_size
             )
         ]
-
-    def to_serializable(self):
-
-        return {
-            'name': self.name,
-            'type': self.type,
-            'method': self.method,
-            'url': {
-                'ip_addr': self.url.ip_addr,
-                'port': self.url.port,
-                'url': self.url.full,
-                'socket_config': self.url.socket_config,
-                'is_ssl': self.url.is_ssl
-            },
-            'headers': {
-                'headers': self._headers,
-                'encoded_headers': self.encoded_headers
-            },
-            'data': {
-                'data': self._data,
-                'encoded_data': self.encoded_data
-            },
-
-            'metadata': {
-                'user': self.metadata.user,
-                'tags': self.metadata.tags
-            },
-            'hooks': self.hooks.to_serializable()
-        }
-        
-        
