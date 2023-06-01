@@ -100,7 +100,7 @@ class PlaywrightSerializer(BaseSerializer):
             options=Options(
                 event=options_config.get('event'),
                 option=options_config.get('option'),
-                is_checked=options_config.get('is_checked'),
+                is_checked=options_config.get('is_checked', False),
                 timeout=options_config.get('timeout', 10),
                 extra=options_config.get('extra', {}),
                 switch_by=options_config.get('switch_by', 'url')
