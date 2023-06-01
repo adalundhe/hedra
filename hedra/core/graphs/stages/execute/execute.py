@@ -296,11 +296,7 @@ class Execute(Stage, Generic[Unpack[T]]):
     ):
         loaded_actions: Dict[str, List[str]] = defaultdict(list)
         for action in execute_stage_loaded_actions:
-            loader_id = action.loader_config.loader_id
-
-            loaded_actions[loader_id].append(
-                action.loader_config.dict()
-            )
+            pass
 
         if execute_stage_has_multiple_workers:
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting execution for - {self.workers} workers')

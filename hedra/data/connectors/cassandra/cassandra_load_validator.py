@@ -10,3 +10,6 @@ class CassandraLoadValidator(BaseModel):
     fields: Optional[Dict[StrictStr, FieldOption]]
     filters: Optional[Dict[StrictStr, Any]]
     limit: Optional[StrictInt]
+
+    class Config:
+        arbitrary_types_allowed=True

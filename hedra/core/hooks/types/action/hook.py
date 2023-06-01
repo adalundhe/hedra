@@ -6,12 +6,10 @@ from typing import (
     Callable, 
     Awaitable, 
     Tuple,
-    Optional
 )
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.hook_metadata import HookMetadata
-from .validator import ActionLoaderConfigValidator
 
 
 class ActionHook(Hook):
@@ -25,7 +23,6 @@ class ActionHook(Hook):
         weight: int=1, 
         order: int=1, 
         skip: bool=False,
-        loader_config: Optional[Dict[str, Any]]=None,
         metadata: Dict[str, Union[str, int]]={}
     ) -> None:
         super().__init__(
@@ -53,7 +50,6 @@ class ActionHook(Hook):
             order=order,
             **metadata
         )
-        self.loader_config = ActionLoaderConfigValidator(**loader_config)
 
     def copy(self):
         action_hook = ActionHook(
@@ -76,11 +72,3 @@ class ActionHook(Hook):
 
     async def call(self, *args, **kwargs):
         return await self._call(*args, **kwargs)
-    
-    def serialize_action(self) -> str:
-        if self.action is None:
-            raise Exception('Cannot seralize Action hook without action.')
-        
-        return self.action.serialize()
-        
-        

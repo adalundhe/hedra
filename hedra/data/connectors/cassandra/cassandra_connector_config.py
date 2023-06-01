@@ -1,7 +1,7 @@
 from ssl import SSLContext
 from typing import List, Optional
 from pydantic import BaseModel, StrictStr, StrictInt
-from hedra.reporting.types.common.types import ReporterTypes
+from hedra.data.connectors.common.connector_type import ConnectorType
 
 
 class CassandraConnectorConfig(BaseModel):
@@ -14,7 +14,7 @@ class CassandraConnectorConfig(BaseModel):
     replication_strategy: StrictStr='SimpleStrategy'
     replication: StrictInt=3
     ssl: Optional[SSLContext]=None
-    reporter_type: ReporterTypes=ReporterTypes.Cassandra
+    connector_type: ConnectorType=ConnectorType.Cassandra
 
     class Config:
-        arbitrary_types_allowed = True
+        arbitrary_types_allowed=True

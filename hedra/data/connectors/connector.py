@@ -1,11 +1,9 @@
 from hedra.core.engines.client.config import Config
-from hedra.core.hooks.types.action.hook import ActionHook
 from typing import (
     Dict, 
     Union, 
     Any, 
-    Callable, 
-    List
+    Callable
 )
 
 from .aws_lambda.aws_lambda_connector import AWSLambdaConnector
@@ -47,7 +45,22 @@ from .xml.xml_connector_config import XMLConnectorConfig
 
 ConnectorConfig = Union[
     AWSLambdaConnectorConfig,
-    BigTableConnectorConfig
+    BigTableConnectorConfig,
+    CassandraConnectorConfig,
+    CosmosDBConnectorConfig,
+    CSVConnectorConfig,
+    GoogleCloudStorageConnectorConfig,
+    HARConnectorConfig,
+    JSONConnectorConfig,
+    KafkaConnectorConfig,
+    MongoDBConnectorConfig,
+    MySQLConnectorConfig,
+    PostgresConnectorConfig,
+    RedisConnectorConfig,
+    S3ConnectorConfig,
+    SnowflakeConnectorConfig,
+    SQLiteConnectorConfig,
+    XMLConnectorConfig
 ]
 
 
@@ -189,7 +202,6 @@ class Connector:
         self.stage = stage
         self.parser_config = parser_config
         self.connected = False
-        self.actions: Union[List[ActionHook] , None] = None
 
     async def connect(self):
         await self.selected.connect()
@@ -199,11 +211,9 @@ class Connector:
         self,
         options: Dict[str, Any]={}
     ):
-        self.actions = await self.selected.load_actions(
+        return await self.selected.load_actions(
             options=options
         )
-
-        return self.actions
     
     async def load_data(
         self,
