@@ -1,23 +1,25 @@
-from hedra.core.engines.types.http.action import HTTPAction
+from hedra.core.engines.types.graphql_http2.action import GraphQLHTTP2Action
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.data.serializers.serializer_types.common.base_serializer import BaseSerializer
 from typing import List, Dict, Union, Any
 
 
-class HTTPSerializer(BaseSerializer):
+class GraphQLHTTP2Serializer(BaseSerializer):
 
     def __init__(self) -> None:
         super().__init__()
 
     def serialize_action(
         self,
-        action: HTTPAction
+        action: GraphQLHTTP2Action
     ) -> Dict[str, Union[str, List[str]]]:
-        
-        serialized_action = super().serialize_action()
+        serialized_action = super().serialize_action(
+            action
+        )
+
         return {
             **serialized_action,
-            'type': RequestTypes.HTTP,
+            'type': RequestTypes.HTTP2,
             'url': {
                 'full': action.url.full,
                 'ip_addr': action.url.ip_addr,
@@ -26,12 +28,8 @@ class HTTPSerializer(BaseSerializer):
             },
             'method': action.method,
             'headers': action._headers,
-            'header_items': action._header_items,
-            'encoded_headers': action.encoded_headers,
             'data': action.data,
-            'encoded_data': action.encoded_data,
             'is_stream': action.is_stream,
-            'redirects': action.redirects,
             'is_setup': action.is_setup,
             'action_args': action.action_args,
         }
@@ -39,26 +37,25 @@ class HTTPSerializer(BaseSerializer):
     def deserialize_action(
         self,
         action: Dict[str, Any]
-    ) -> HTTPAction:
+    ) -> GraphQLHTTP2Action:
         
         url_config = action.get('url', {})
         metadata = action.get('metadata', {})
-        
-        http_action = HTTPAction(
+
+        graphql_http2_action = GraphQLHTTP2Action(
             name=action.get('name'),
             url=url_config.get('full'),
+            method=action.get('method'),
             headers=action.get('headers'),
             data=action.get('data'),
             user=metadata.get('user'),
-            tags=metadata.get('tags', []),
-            redirects=action.get('redirects', 3)
+            tags=metadata.get('tags', [])
         )
 
-        http_action.url.ip_addr = url_config.get('ip_addr')
-        http_action.url.socket_config = url_config.get('socket_config')
-        http_action.url.has_ip_addr = url_config.get('has_ip_addr')
+        graphql_http2_action.url.ip_addr = url_config.get('ip_addr')
+        graphql_http2_action.url.socket_config = url_config.get('socket_config')
+        graphql_http2_action.url.has_ip_addr = url_config.get('has_ip_addr')
 
-        http_action.setup()
+        graphql_http2_action.setup()
 
-        return http_action
-    
+        return graphql_http2_action
