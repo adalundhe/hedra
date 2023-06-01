@@ -1,14 +1,23 @@
 import json
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.graphql.action import GraphQLAction
+from hedra.core.engines.types.graphql.client import MercuryGraphQLClient
 from hedra.core.engines.types.graphql_http2.action import GraphQLHTTP2Action
+from hedra.core.engines.types.graphql_http2.client import MercuryGraphQLHTTP2Client
 from hedra.core.engines.types.grpc.action import GRPCAction
+from hedra.core.engines.types.grpc.client import MercuryGRPCClient
 from hedra.core.engines.types.http.action import HTTPAction
+from hedra.core.engines.types.http.client import MercuryHTTPClient
 from hedra.core.engines.types.http2.action import HTTP2Action
+from hedra.core.engines.types.http2.client import MercuryHTTP2Client
 from hedra.core.engines.types.http3.action import HTTP3Action
+from hedra.core.engines.types.http3.client import MercuryHTTP3Client
 from hedra.core.engines.types.playwright.command import PlaywrightCommand
+from hedra.core.engines.types.playwright.client import MercuryPlaywrightClient
 from hedra.core.engines.types.udp.action import UDPAction
+from hedra.core.engines.types.udp.client import MercuryUDPClient
 from hedra.core.engines.types.websocket.action import WebsocketAction
+from hedra.core.engines.types.websocket.client import MercuryWebsocketClient
 from hedra.core.hooks.types.action.hook import ActionHook
 from typing import List, Union, Callable, Dict, Any
 from .serializer_types import (
@@ -96,11 +105,13 @@ class Serializer:
 
         serializable_action = serializer.action_to_serializable(action)
         serializable_hook = action_hook.to_dict()
+        serializable_session = action_hook.session.config_to_dict()
 
-        return {
+        return json.dumps({
             'hook': serializable_hook,
-            'action': serializable_action
-        }
+            'action': serializable_action,
+            'session': serializable_session
+        })
     
     def deserialize_action(
         self,

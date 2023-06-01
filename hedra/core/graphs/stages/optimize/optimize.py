@@ -421,15 +421,17 @@ class Optimize(Stage):
                         await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Playwright Session - {hook.session.session_id} - Color Scheme: {persona_config.color_scheme}')
 
 
-                        await hook.session.setup(ContextConfig(
-                            browser_type=persona_config.browser_type,
-                            device_type=persona_config.device_type,
-                            locale=persona_config.locale,
-                            geolocation=persona_config.geolocation,
-                            permissions=persona_config.permissions,
-                            color_scheme=persona_config.color_scheme,
-                            options=persona_config.playwright_options
-                        ))
+                        await hook.session.setup(
+                            config=ContextConfig(
+                                browser_type=persona_config.browser_type,
+                                device_type=persona_config.device_type,
+                                locale=persona_config.locale,
+                                geolocation=persona_config.geolocation,
+                                permissions=persona_config.permissions,
+                                color_scheme=persona_config.color_scheme,
+                                options=persona_config.playwright_options
+                            )
+                        )
 
                 optimize_stage_candidates[stage_name] = execute_stage
 

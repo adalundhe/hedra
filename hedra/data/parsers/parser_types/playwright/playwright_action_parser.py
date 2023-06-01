@@ -126,15 +126,17 @@ class PlaywrightActionParser(BaseParser):
             group_size=self.config.group_size
         )
 
-        await session.setup(ContextConfig(
-            browser_type=self.config.browser_type,
-            device_type=self.config.device_type,
-            locale=self.config.locale,
-            geolocation=self.config.geolocation,
-            permissions=self.config.permissions,
-            color_scheme=self.config.color_scheme,
-            options=self.config.playwright_options
-        ))
+        await session.setup(
+            config=ContextConfig(
+                browser_type=self.config.browser_type,
+                device_type=self.config.device_type,
+                locale=self.config.locale,
+                geolocation=self.config.geolocation,
+                permissions=self.config.permissions,
+                color_scheme=self.config.color_scheme,
+                options=self.config.playwright_options
+            )
+        )
 
         hook = ActionHook(
             f'{stage}.{generator_action.name}',

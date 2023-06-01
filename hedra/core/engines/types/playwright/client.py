@@ -1,6 +1,12 @@
 import asyncio
 import uuid
-from typing import Dict, List, Coroutine, Any
+from typing import (
+    Dict, 
+    List, 
+    Coroutine, 
+    Any, 
+    Union
+)
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.engines.types.common.types import RequestTypes
@@ -41,7 +47,7 @@ class MercuryPlaywrightClient(BaseEngine[PlaywrightCommand, PlaywrightResult]):
         self.timeouts = timeouts
         self.registered: Dict[str, PlaywrightCommand] = {}
         self.closed = False
-        self.config = None
+        self.config: Union[ContextConfig, None] = None
 
         self.sem = asyncio.Semaphore(value=concurrency)
         self.active = 0
@@ -51,12 +57,27 @@ class MercuryPlaywrightClient(BaseEngine[PlaywrightCommand, PlaywrightResult]):
         self._discarded_contexts = []
         self._pending_context_groups: List[ContextGroup] = []
         self._playwright_setup = False
+    
+    def config_to_dict(self):
+        return {
+            'concurrency': self.pool.size,
+            'group_size': self.pool.group_size,
+            'timeouts': self.timeouts,
+            'context_config': {
+                **self.config.data,
+                'options': self.config.options
+            }
+        }
 
     async def set_pool(self, concurrency: int):
         self.sem = asyncio.Semaphore(value=concurrency)
         self.pool = ContextPool(concurrency, reset_connections=self.pool.reset_connections)
 
-    async def setup(self, config: ContextConfig):
+    async def setup(self, config: ContextConfig=None):
+
+        if config is None and self.config:
+            config = self.config
+
         if self._playwright_setup is False:
             self.config = config
             self.pool.create_pool(self.config)

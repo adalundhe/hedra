@@ -7,6 +7,8 @@ from typing import (
     Awaitable, 
     Tuple,
 )
+from hedra.core.engines.types.common.base_action import BaseAction
+from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.hook_metadata import HookMetadata
@@ -35,8 +37,8 @@ class ActionHook(Hook):
         )
         
         self.names = list(set(names))
-        self.session: Any = None
-        self.action: Any = None
+        self.session: BaseEngine = None
+        self.action: BaseAction = None
         self.checks: List[Any] = []
         self.before: List[str] = []
         self.after: List[str] = []

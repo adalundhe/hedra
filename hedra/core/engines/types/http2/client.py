@@ -76,6 +76,18 @@ class MercuryHTTP2Client(BaseEngine[Union[A, HTTP2Action], Union[R, HTTP2Result]
         self.waiter = None
 
         self.ssl_context = get_http2_ssl_context()
+
+    def config_to_dict(self):
+        return {
+            'concurrency': self.pool.size,
+            'timeouts': {
+                'connect_timeout': self.timeouts.connect_timeout,
+                'socket_read_timeout': self.timeouts.socket_read_timeout,
+                'total_timeout': self.timeouts.total_timeout
+            },
+            'reset_connections': self.pool.reset_connections
+        }
+
     
     async def set_pool(self, concurrency: int):
         self.sem = Semaphore(value=concurrency)

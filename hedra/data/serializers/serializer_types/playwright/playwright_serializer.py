@@ -1,3 +1,4 @@
+from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.playwright.command import (
     PlaywrightCommand,
     Page,
@@ -5,6 +6,7 @@ from hedra.core.engines.types.playwright.command import (
     Options,
     URL
 )
+from hedra.core.engines.types.playwright.client import MercuryPlaywrightClient, ContextConfig
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.data.serializers.serializer_types.common.base_serializer import BaseSerializer
 from typing import List, Dict, Union, Any
@@ -110,4 +112,19 @@ class PlaywrightSerializer(BaseSerializer):
         )
 
         return playwright_command
+    
+    def deserialize_client_config(self, client_config: Dict[str, Any]) -> MercuryPlaywrightClient:
+        playwright_client = MercuryPlaywrightClient(
+            concurrency=client_config.get('concurrency'),
+            group_size=client_config.get('group_size'),
+            timeouts=Timeouts(
+                **client_config.get('timeouts', {})
+            )
+        )
+
+        playwright_client.config = ContextConfig(
+            **client_config.get('context_config')
+        )
+        
+        return playwright_client
     

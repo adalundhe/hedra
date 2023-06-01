@@ -1,4 +1,6 @@
+from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.graphql.action import GraphQLAction
+from hedra.core.engines.types.graphql.client import MercuryGraphQLClient
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.data.serializers.serializer_types.common.base_serializer import BaseSerializer
 from typing import List, Dict, Union, Any
@@ -60,3 +62,12 @@ class GraphQLSerializer(BaseSerializer):
         graphql_action.setup()
 
         return graphql_action
+    
+    def deserialize_client_config(self, client_config: Dict[str, Any]) -> MercuryGraphQLClient:
+        return MercuryGraphQLClient(
+            concurrency=client_config.get('concurrency'),
+            timeouts=Timeouts(
+                **client_config.get('timeouts', {})
+            ),
+            reset_connections=client_config.get('reset_sessions')
+        )
