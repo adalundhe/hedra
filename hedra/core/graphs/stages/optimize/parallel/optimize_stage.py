@@ -29,6 +29,7 @@ from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.personas.persona_registry import registered_personas
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
+from hedra.data.serializers import Serializer
 from hedra.logging import (
     HedraLogger,
     LoggerTypes
@@ -48,11 +49,12 @@ HooksByType = Dict[HookType, Union[List[ActionHook], List[TaskHook]]]
 
 
 async def setup_action_channels_and_playwright(
-    setup_stage: Setup,
-    execute_stage: Execute,
-    logger: HedraLogger,
-    metadata_string: str,
-    persona_config: Config
+    setup_stage: Setup=None,
+    execute_stage: Execute=None,
+    logger: HedraLogger=None,
+    metadata_string: str=None,
+    persona_config: Config=None,
+    loaded_actions: List[str]=[]
 ) -> Execute:
     setup_stage.context = SimpleContext()
     setup_stage.generation_setup_candidates = 1
@@ -70,14 +72,21 @@ async def setup_action_channels_and_playwright(
     
     stages: Dict[str, Stage] =  setup_stage.context['setup_stage_ready_stages']
     setup_execute_stage: Stage = stages.get(execute_stage.name)
+    setup_execute_stage.logger = logger
 
-    setup_execute_stage_hooks = {}
-    for hook_type in setup_execute_stage.hooks:
-        setup_execute_stage_hooks.update({
-            hook.name: hook for hook in setup_execute_stage.hooks[hook_type]
-        })
 
-    actions_and_tasks: List[Union[ActionHook, TaskHook]] = setup_execute_stage.context['execute_stage_setup_hooks']
+    actions_and_tasks: List[Union[ActionHook, TaskHook]] = []
+
+    serializer = Serializer()
+    if len(loaded_actions) > 0:
+        for serialized_action in loaded_actions:
+            actions_and_tasks.append(
+                serializer.deserialize_action(serialized_action)
+            )
+
+    actions_and_tasks.extend(
+        setup_stage.context['execute_stage_setup_hooks'].get(execute_stage.name, [])
+    )
 
     for hook in actions_and_tasks:
 
@@ -103,6 +112,20 @@ async def setup_action_channels_and_playwright(
                     options=persona_config.playwright_options
                 )
             )
+
+    hooks_by_type: Dict[
+        HookType, 
+        Union[
+            List[ActionHook], 
+            List[TaskHook]
+        ]
+    ] = defaultdict(list)
+
+    for hook in actions_and_tasks:
+        hooks_by_type[hook.hook_type].append(hook)
+
+    setup_execute_stage.hooks[HookType.ACTION] = hooks_by_type[HookType.ACTION]
+    setup_execute_stage.hooks[HookType.TASK] = hooks_by_type[HookType.TASK]
 
     return setup_execute_stage
 

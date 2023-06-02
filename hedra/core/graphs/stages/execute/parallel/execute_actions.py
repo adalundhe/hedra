@@ -115,20 +115,6 @@ async def start_execution(
         setup_stage.context['execute_stage_setup_hooks'].get(source_stage_name, [])
     )
 
-    for extension in extensions.values():
-
-        if extension.extension_type == ExtensionType.GENERATOR:
-            results = await extension.execute(**{
-                'execute_stage_name': setup_execute_stage.name,
-                'execute_stage_hooks': setup_execute_stage.hooks,
-                'persona_config': persona_config
-            })
-
-            execute_stage = results.get('execute_stage_hooks')
-
-            if execute_stage:
-                setup_execute_stage.hooks = results.get('execute_stage')
-
     execution_hooks_count = len(actions_and_tasks)
     await logger.filesystem.aio['hedra.core'].info(
         f'{metadata_string} - Executing {execution_hooks_count} actions with a batch size of {persona_config.batch_size} for {persona_config.total_time} seconds using Persona - {persona.type.capitalize()}'
