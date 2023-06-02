@@ -321,7 +321,7 @@ class Execute(Stage, Generic[Unpack[T]]):
                         'source_stage_context': {
                             context_key: context_value for context_key, context_value in serializable_context
                         },
-                        'execute_stage_loaded_actions': loaded_actions,
+                        'source_stage_loaded_actions': loaded_actions,
                         'source_setup_stage_name': execute_stage_setup_by,
                         'source_stage_id': self.stage_id,
                         'source_stage_plugins': execute_stage_plugins,
@@ -438,10 +438,14 @@ class Execute(Stage, Generic[Unpack[T]]):
     @event('check_has_multiple_workers')
     async def setup_single_worker_job(
         self,
+        execute_stage_loaded_actions: List[ActionHook]=[],
         execute_stage_has_multiple_workers: bool = False,
         execute_stage_setup_config: Config=None,
         execute_stage_extensions: Dict[str, ExtensionPlugin]={}
     ):
+
+
+        self.hooks[HookType.ACTION].extend(execute_stage_loaded_actions)
 
         if execute_stage_has_multiple_workers is False:
 
