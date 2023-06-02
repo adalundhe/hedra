@@ -15,9 +15,7 @@ class HTTP2Serializer(BaseSerializer):
         self,
         action: HTTP2Action
     ) -> Dict[str, Union[str, List[str]]]:
-        serialized_action = super().serialize_action(
-            action
-        )
+        serialized_action = super().action_to_serializable(action)
 
         return {
             **serialized_action,

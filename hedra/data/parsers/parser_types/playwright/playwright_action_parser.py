@@ -138,6 +138,8 @@ class PlaywrightActionParser(BaseParser):
             )
         )
 
+        await session.prepare(action)
+
         hook = ActionHook(
             f'{stage}.{generator_action.name}',
             generator_action.name,

@@ -141,6 +141,7 @@ class Execute(Stage, Generic[Unpack[T]]):
             'execute_stage_streamed_analytics',
             'execute_stage_monitors',
             'session_stage_monitors',
+            'execute_stage_loaded_actions'
         ]
         persona_type_name = '-'.join([
             segment.capitalize() for segment in execute_stage_setup_config.persona_type.split('-')
@@ -180,18 +181,21 @@ class Execute(Stage, Generic[Unpack[T]]):
     async def collect_loaded_actions(self):
         loaded_actions: List[ActionHook] = []
 
-        for value in self.context.values():
+        for context_key, value in self.context.items():
 
             if isinstance(value, ActionHook):
+                self.context.ignore_serialization_filters.append(context_key)
                 loaded_actions.append(value)
 
             elif isinstance(value, list):
+                self.context.ignore_serialization_filters.append(context_key)
 
                 for item in value:
                     if isinstance(item, ActionHook):
                         loaded_actions.append(item)
 
             elif isinstance(value, dict):
+                self.context.ignore_serialization_filters.append(context_key)
 
                 for item in value.values():
                     if isinstance(item, ActionHook):
@@ -306,7 +310,6 @@ class Execute(Stage, Generic[Unpack[T]]):
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting execution for - {self.workers} workers')
 
             serializable_context = self.context.as_serializable() 
-
             results_sets = await self.executor.execute_stage_batch(
                 execute_actions,
                 [

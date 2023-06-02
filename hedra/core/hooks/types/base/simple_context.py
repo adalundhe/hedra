@@ -82,7 +82,7 @@ class SimpleContext:
 
         serialization_items = []
         for key, value in self.__dict__.items():
-            if key.startswith('__') is False and key not in  ignore_items:
+            if key.startswith('__') is False and key not in ignore_items:
                 serialization_items.append((
                     key,
                     value

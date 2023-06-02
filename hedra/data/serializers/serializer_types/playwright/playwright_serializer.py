@@ -22,7 +22,7 @@ class PlaywrightSerializer(BaseSerializer):
         action: PlaywrightCommand
     ) -> Dict[str, Union[str, List[str]]]:
         
-        serialized_action = super().action_to_serializable()
+        serialized_action = super().action_to_serializable(action)
         return {
             **serialized_action,
             'type': RequestTypes.PLAYWRIGHT,

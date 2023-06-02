@@ -1,4 +1,5 @@
-import json
+import dill
+import traceback
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.graphql.action import GraphQLAction
 from hedra.core.engines.types.graphql.client import MercuryGraphQLClient
@@ -107,17 +108,18 @@ class Serializer:
         serializable_hook = action_hook.to_dict()
         serializable_client_config = action_hook.session.config_to_dict()
 
-        return json.dumps({
+        return dill.dumps({
             'hook': serializable_hook,
             'action': serializable_action,
             'client_config': serializable_client_config
         })
+
     
     def deserialize_action(
         self,
         serialized_action_hook: Union[str, bytes]
     ):
-        deserialized_action_hook: Dict[str, Any] = json.loads(serialized_action_hook)
+        deserialized_action_hook: Dict[str, Any] = dill.loads(serialized_action_hook)
 
         deserialized_hook = deserialized_action_hook.get('hook', {})
         deserialized_action: Dict[str, Any] = deserialized_action_hook.get('action')
@@ -132,9 +134,10 @@ class Serializer:
             self._active_serializers[action_type] = serializer
 
         action_hook = ActionHook(
-            name=deserialized_hook.get('name'),
-            shortname=deserialized_hook.get('shortname'),
-            names=deserialized_hook.get('names'),
+            deserialized_hook.get('name'),
+            deserialized_hook.get('shortname'),
+            None,
+            *deserialized_hook.get('names', []),
             weight=deserialized_hook.get('weight'),
             order=deserialized_hook.get('order'),
             skip=deserialized_hook.get('skip'),

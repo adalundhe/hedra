@@ -15,9 +15,7 @@ class GraphQLSerializer(BaseSerializer):
         self,
         action: GraphQLAction
     ) -> Dict[str, Union[str, List[str]]]:
-        serialized_action = super().serialize_action(
-            action
-        )
+        serialized_action = super().action_to_serializable(action)
 
         return {
             **serialized_action,

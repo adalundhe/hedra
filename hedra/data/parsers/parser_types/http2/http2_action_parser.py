@@ -67,8 +67,7 @@ class HTTP2ActionParser(BaseParser):
             tracing_session=self.config.tracing
         )
 
-        await action.url.lookup()
-        action.setup()
+        await session.prepare(action)
 
         hook = ActionHook(
             f'{stage}.{generator_action.name}',
