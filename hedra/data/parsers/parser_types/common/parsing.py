@@ -17,11 +17,12 @@ def normalize_headers(action_data: Dict[str, Any]) -> Dict[str, str]:
 
 
 def parse_data(
-    action_data: Dict[str, Any]
+    action_data: Dict[str, Any],
+    content_type: str
 ) -> Union[str, Dict[str, Any]]:
 
     action_item_data = action_data.get('data')
-    if isinstance(action_item_data, (str, bytes, bytearray, )):
+    if isinstance(action_item_data, (str, bytes, bytearray, )) and content_type == 'application/json':
         action_item_data = json.loads(action_item_data)
 
     return action_item_data

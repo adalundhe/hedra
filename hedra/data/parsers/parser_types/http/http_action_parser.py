@@ -38,7 +38,13 @@ class HTTPActionParser(BaseParser):
     ) -> Coroutine[Any, Any, Coroutine[Any, Any, ActionHook]]:
         
         normalized_headers = normalize_headers(action_data)
-        parsed_data = parse_data(action_data)
+        content_type = normalized_headers.get('content-type')
+
+        parsed_data = parse_data(
+            action_data,
+            content_type
+        )
+        
         tags_data = parse_tags(action_data)
 
         generator_action = HTTPActionValidator(**{
