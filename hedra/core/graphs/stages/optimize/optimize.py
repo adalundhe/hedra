@@ -26,6 +26,7 @@ from hedra.core.hooks.types.internal.decorator import Internal
 from hedra.core.graphs.stages.optimize.optimization import Optimizer, DistributionFitOptimizer
 from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
+from hedra.data.serializers import Serializer
 from hedra.logging import logging_manager
 from hedra.monitoring import (
     CPUMonitor,
@@ -132,6 +133,7 @@ class Optimize(Stage):
         )
 
         self.stage_retries = self.retries
+        self.serializer = Serializer()
 
     @Internal()
     async def run(self):
@@ -240,6 +242,37 @@ class Optimize(Stage):
             'optimize_stage_extensions': execute_stage_extensions
         }
     
+    @event()
+    async def collect_loaded_actions(
+        self,
+        optimize_stage_candidates: Dict[str, Execute]={},
+    ):
+        loaded_actions: Dict[str, List[ActionHook]] = defaultdict(list)
+
+        for candidate_stage in optimize_stage_candidates.values():
+
+            for value in candidate_stage.context.values():
+
+                if isinstance(value, ActionHook):
+                    loaded_actions[candidate_stage.name].append(value)
+
+                elif isinstance(value, list):
+
+                    for item in value:
+                        if isinstance(item, ActionHook):
+                            loaded_actions[candidate_stage.name].append(item)
+
+                elif isinstance(value, dict):
+
+                    for item in value.values():
+                        if isinstance(item, ActionHook):
+                            loaded_actions[candidate_stage.name].append(item)
+
+        return {
+            'optimize_stage_loaded_actions': loaded_actions
+        }
+
+    
     @condition(
         'collect_optimization_stages',
         'get_stage_plugins'
@@ -258,6 +291,7 @@ class Optimize(Stage):
         optimize_stage_batched_stages: BatchedOptimzationCandidates=[],
         setup_stage_experiment_config: Dict[str, Union[str, int, List[float]]]={},
         execute_stage_streamed_analytics: Dict[str, List[StreamAnalytics]]={},
+        optimize_stage_loaded_actions: Dict[str, List[ActionHook]]=[],
         optimize_stage_has_multiple_workers: bool = False
     ):
         if optimize_stage_has_multiple_workers:
@@ -275,12 +309,20 @@ class Optimize(Stage):
 
                 batch_size = int(selected_stage_config.batch_size/assigned_workers_count)
 
+                stage_loaded_actions = optimize_stage_loaded_actions.get(stage_name)
+                loaded_actions: List[str] = [
+                    self.serializer.serialize_action(
+                        action_hook
+                    ) for action_hook in stage_loaded_actions
+                ]
+
                 for worker_id in range(assigned_workers_count):
 
                     execute_stage_plugins = defaultdict(list)
 
                     for plugin in stage.plugins.values():
                         execute_stage_plugins[plugin.type].append(plugin.name)
+
 
                     configs.append({
                         'graph_name': self.graph_name,
@@ -297,6 +339,7 @@ class Optimize(Stage):
                         'source_stage_id': self.stage_id,
                         'execute_stage_name': stage_name,
                         'setup_stage_experiment_config': setup_stage_experiment_config,
+                        'execute_stage_loaded_actions': loaded_actions,
                         'execute_stage_streamed_analytics': execute_stage_streamed_analytics,
                         'execute_stage_generation_count': assigned_workers_count,
                         'execute_stage_id': stage.execution_stage_id,

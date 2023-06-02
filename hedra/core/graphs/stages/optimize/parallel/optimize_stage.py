@@ -223,6 +223,7 @@ def optimize_stage(serialized_config: str):
         optimize_stage_workers: int = optimization_config.get('optimize_stage_workers')
         time_limit: int = optimization_config.get('time_limit')
         batch_size: int = optimization_config.get('execute_stage_batch_size')
+        execute_stage_loaded_actions = optimization_config.get('execute_stage_loaded_actions')
 
         metadata_string = f'Graph - {graph_name}:{graph_id} - thread:{thread_id} - process:{process_id} - Stage: {source_stage_name}:{source_stage_id} - '
         discovered: Dict[str, Stage] = import_stages(graph_path)
@@ -299,7 +300,8 @@ def optimize_stage(serialized_config: str):
             logger=logger,
             metadata_string=metadata_string,
             persona_config=execute_stage_config,
-            execute_stage=execute_stage
+            execute_stage=execute_stage,
+            loaded_actions=execute_stage_loaded_actions
         ))
 
         pipeline_stages = {
