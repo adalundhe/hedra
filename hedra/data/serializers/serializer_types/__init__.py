@@ -6,4 +6,4 @@ from .http2.http2_serializer import HTTP2Serializer
 from .http3.http3_serializer import HTTP3Serializer
 from .playwright.playwright_serializer import PlaywrightSerializer
 from .udp.udp_serializer import UDPSerializer
-from .websocket.websocket_serializers import WebsocketSerializer
+from .websocket.websocket_serializer import WebsocketSerializer
