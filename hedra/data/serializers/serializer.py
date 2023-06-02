@@ -105,21 +105,24 @@ class Serializer:
 
         serializable_action = serializer.action_to_serializable(action)
         serializable_hook = action_hook.to_dict()
-        serializable_session = action_hook.session.config_to_dict()
+        serializable_client_config = action_hook.session.config_to_dict()
 
         return json.dumps({
             'hook': serializable_hook,
             'action': serializable_action,
-            'session': serializable_session
+            'client_config': serializable_client_config
         })
     
     def deserialize_action(
         self,
-        serialized_action: Union[str, bytes]
+        serialized_action_hook: Union[str, bytes]
     ):
-        deserialized_action_hook: Dict[str, Any] = json.loads(serialized_action)
+        deserialized_action_hook: Dict[str, Any] = json.loads(serialized_action_hook)
 
+        deserialized_hook = deserialized_action_hook.get('hook', {})
         deserialized_action: Dict[str, Any] = deserialized_action_hook.get('action')
+        deserialized_client_config = deserialized_action_hook.get('client_config', {})
+
         action_type = deserialized_action.get('type', RequestTypes.HTTP)
 
         serializer = self._active_serializers.get(action_type)
@@ -128,8 +131,6 @@ class Serializer:
             serializer = self._action_serializers.get(action_type)()
             self._active_serializers[action_type] = serializer
 
-        deserialized_hook = deserialized_action_hook.get('hook', {})
-        
         action_hook = ActionHook(
             name=deserialized_hook.get('name'),
             shortname=deserialized_hook.get('shortname'),
@@ -146,4 +147,7 @@ class Serializer:
         action = serializer.deserialize_action(deserialized_action)
         action_hook.action = action
 
-        return 
+        session = serializer.deserialize_client_config(deserialized_client_config)
+        action_hook.session = session
+
+        return action_hook
