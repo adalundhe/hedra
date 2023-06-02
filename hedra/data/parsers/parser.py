@@ -103,8 +103,8 @@ class Parser:
         options: Dict[str, Any]={}
     ):
         engine_type = action_data.get('engine')
-
         parser = self._active_parsers.get(engine_type)
+
         if parser is None:
             parser = self._parsers.get(engine_type)(
                 config,

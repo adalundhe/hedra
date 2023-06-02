@@ -31,6 +31,10 @@ class Hook:
         self.hook_type = hook_type
         self.stage_instance: Any = None
         self.conditions: List[Callable[..., Any]] = []
+
+        if call is None:
+            call = self._default_call
+
         self.args = inspect.signature(call)
         self.params = self.args.parameters
         self.context: SimpleContext = SimpleContext()
@@ -61,6 +65,9 @@ class Hook:
             execute = await condition(**{name: value for name, value in hook_args.items() if name in self.params})
 
         return execute
+    
+    async def _default_call(self, **kwargs):
+        pass
 
     def copy(self):
         return Hook(

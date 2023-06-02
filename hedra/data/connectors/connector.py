@@ -195,8 +195,8 @@ class Connector:
             connector_config.connector_type
         )(
             connector_config,
-            self.stage,
-            self.parser_config
+            stage,
+            parser_config
         )
 
         self.stage = stage
@@ -224,4 +224,5 @@ class Connector:
         )
     
     async def close(self):
-        return await self.close()
+        self.connected = False
+        return await self.selected.close()

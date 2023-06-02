@@ -167,6 +167,7 @@ class Graph:
         self.runner.generate_stages(self.stages)
         self._transitions = self.runner.build_transitions_graph(self.execution_order, self.graph)
         self.runner.map_to_setup_stages(self.graph)
+        self.runner.apply_config_to_load_hooks()
 
         self.logger.hedra.sync.debug(f'{self.metadata_string} - Assembly complete')
         self.logger.filesystem.sync['hedra.core'].debug(f'{self.metadata_string} - Assembly complete')

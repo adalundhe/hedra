@@ -44,7 +44,7 @@ class HTTPActionParser(BaseParser):
             action_data,
             content_type
         )
-        
+
         tags_data = parse_tags(action_data)
 
         generator_action = HTTPActionValidator(**{
@@ -80,7 +80,6 @@ class HTTPActionParser(BaseParser):
             f'{stage}.{generator_action.name}',
             generator_action.name,
             None,
-            sourcefile=generator_action.sourcefile,
             order=generator_action.order,
             weight=generator_action.weight,
             metadata={

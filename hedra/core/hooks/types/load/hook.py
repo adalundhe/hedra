@@ -1,4 +1,5 @@
 import re
+import traceback
 from typing import (
     Callable, 
     Awaitable, 
@@ -57,9 +58,9 @@ class LoadHook(Hook):
 
     async def call(self, **kwargs) -> None:
 
-        self.skip = await self._execute_call(**kwargs)
+        condition_result = await self._execute_call(**kwargs)
 
-        if self.skip or self.loaded:
+        if self.skip or self.loaded or condition_result is False:
             return kwargs
 
         if self.loader.connected is False:
@@ -72,19 +73,12 @@ class LoadHook(Hook):
             name: value for name, value in kwargs.items() if name in self.params
         }
         
-
-        try:
-            load_result: Union[Dict[str, Any], Any] = await self._call(**{
-                **hook_args,
-                'loader': self.loader
-            })
-
-        except Exception:
-            load_result: Dict[str, Any] = {}
-
+        load_result: Union[Dict[str, Any], Any] = await self._call(**{
+            **hook_args,
+            'loader': self.loader
+        })
         
-        if self.loader:
-            await self.loader.close()
+        await self.loader.close()
 
         self.loaded = True
 
@@ -98,3 +92,19 @@ class LoadHook(Hook):
             **kwargs,
             self.shortname: load_result
         }
+    
+    def copy(self):
+        load_hook = LoadHook(
+            self.name,
+            self.shortname,
+            self._call,
+            *self.names,
+            loader=self.loader_config,
+            order=self.order,
+            skip=self.skip
+        )
+
+        load_hook.stage = self.stage
+        load_hook.parser_config = self.parser_config
+
+        return load_hook
