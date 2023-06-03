@@ -2,15 +2,25 @@ import dill
 import traceback
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.graphql.action import GraphQLAction
+from hedra.core.engines.types.graphql.result import GraphQLResult
 from hedra.core.engines.types.graphql_http2.action import GraphQLHTTP2Action
+from hedra.core.engines.types.graphql_http2.result import GraphQLHTTP2Result
 from hedra.core.engines.types.grpc.action import GRPCAction
+from hedra.core.engines.types.grpc.result import GRPCResult
 from hedra.core.engines.types.http.action import HTTPAction
+from hedra.core.engines.types.http.result import HTTPResult
 from hedra.core.engines.types.http2.action import HTTP2Action
+from hedra.core.engines.types.http2.result import HTTP2Result
 from hedra.core.engines.types.http3.action import HTTP3Action
+from hedra.core.engines.types.http3.result import HTTP3Result
 from hedra.core.engines.types.playwright.command import PlaywrightCommand
+from hedra.core.engines.types.playwright.result import PlaywrightResult
 from hedra.core.engines.types.task.task import Task
+from hedra.core.engines.types.task.result import TaskResult
 from hedra.core.engines.types.udp.action import UDPAction
+from hedra.core.engines.types.udp.result import UDPResult
 from hedra.core.engines.types.websocket.action import WebsocketAction
+from hedra.core.engines.types.websocket.result import WebsocketResult
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.task.hook import TaskHook
 from typing import Union, Callable, Dict, Any
@@ -36,15 +46,30 @@ Action = Union[
     HTTP2Action,
     HTTP3Action,
     PlaywrightCommand,
+    Task,
     UDPAction,
     WebsocketAction
+]
+
+
+Result = Union[
+    GraphQLResult,
+    GraphQLHTTP2Result,
+    GRPCResult,
+    HTTPResult,
+    HTTP2Result,
+    HTTP3Result,
+    PlaywrightResult,
+    TaskResult,
+    UDPResult,
+    WebsocketResult
 ]
 
 
 class Serializer:
 
     def __init__(self) -> None:
-        self._action_serializers: Dict[
+        self._serializers: Dict[
             str,
             Callable[
                 ...,
@@ -97,11 +122,11 @@ class Serializer:
         action: Action = hook.action
         serializer = self._active_serializers.get(action.type)
 
-        if serializer is None and action.type in self._action_serializers:
-            serializer = self._action_serializers.get(action.type)()
+        if serializer is None and action.type in self._serializers:
+            serializer = self._serializers.get(action.type)()
             self._active_serializers[action.type] = serializer
 
-        serializable = serializer.to_serializable(action)
+        serializable = serializer.action_to_serializable(action)
         serializable_hook = hook.to_dict()
         serializable_client_config = hook.session.config_to_dict()
 
@@ -125,8 +150,8 @@ class Serializer:
 
         serializer = self._active_serializers.get(action_type)
     
-        if serializer is None and action_type in self._action_serializers:
-            serializer = self._action_serializers.get(action_type)()
+        if serializer is None and action_type in self._serializers:
+            serializer = self._serializers.get(action_type)()
             self._active_serializers[action_type] = serializer
 
         if action_type == RequestTypes.TASK:
@@ -171,4 +196,33 @@ class Serializer:
         action_hook.session = session
 
         return action_hook
-        
+    
+    def serialize_result(
+        self,
+        result: Result
+    ):
+        serializer = self._active_serializers.get(result.type)
+
+        if serializer is None and result.type in self._serializers:
+            serializer = self._serializers.get(result.type)()
+            self._active_serializers[result.type] = serializer
+
+        serializable = serializer.result_to_serializable(result)
+
+        return dill.dumps(serializable)
+    
+    def deserialize_result(
+        self,
+        serialized_result: Union[str, bytes]
+    ) -> Result:
+        deserialized_result: Dict[str, Any] = dill.loads(serialized_result)
+
+        result_type = deserialized_result.get('type', RequestTypes.HTTP)
+
+        serializer = self._active_serializers.get(result_type)
+    
+        if serializer is None and result_type in self._serializers:
+            serializer = self._serializers.get(result_type)()
+            self._active_serializers[result_type] = serializer
+
+        return serializer.deserialize_result(deserialized_result)
