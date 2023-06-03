@@ -1,24 +1,22 @@
 import uuid
-import json
 from hedra.core.engines.client.config import Config
-from hedra.core.engines.types.common.types import RequestTypes
-from hedra.core.engines.types.graphql import (
-    GraphQLAction,
-    GraphQLResult,
-    MercuryGraphQLClient
+from hedra.core.engines.types.http import (
+    HTTPAction,
+    HTTPResult
 )
-from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.engines.types.common.types import RequestTypes
 from hedra.data.parsers.parser_types.common.base_parser import BaseParser
 from hedra.data.parsers.parser_types.common.parsing import (
     normalize_headers,
+    parse_data,
     parse_tags
 )
 from typing import Any, Coroutine, Dict
-from .graphql_action_validator import GraphQLActionValidator
-from .graphql_result_validator import GraphQLResultValidator
+from .http_action_validator import HTTPActionValidator
+from .http_result_validator import HTTPResultValidator
 
 
-class GraphQLResultParser(BaseParser):
+class HTTPActionParser(BaseParser):
 
     def __init__(
         self,
@@ -26,49 +24,48 @@ class GraphQLResultParser(BaseParser):
         options: Dict[str, Any]={}
     ) -> None:
         super().__init__(
-            GraphQLResultParser.__name__,
+            HTTPActionParser.__name__,
             config,
-            RequestTypes.GRAPHQL,
+            RequestTypes.GRPC,
             options
         )
 
     async def parse(
         self, 
         result_data: Dict[str, Any]
-    ) -> Coroutine[Any, Any, Coroutine[Any, Any, GraphQLResult]]:
+    ) -> Coroutine[Any, Any, Coroutine[Any, Any, HTTPResult]]:
         
-        graphql_variables_data = result_data.get('variables')
-        if isinstance(graphql_variables_data, (str, bytes, bytearray,)):
-            graphql_variables_data = json.loads(graphql_variables_data)
-
         normalized_headers = normalize_headers(result_data)
+        content_type = normalized_headers.get('content-type')
+
+        parsed_data = parse_data(
+            result_data,
+            content_type
+        )
+
         tags_data = parse_tags(result_data)
 
-        generator_action = GraphQLActionValidator(
+        generator_action = HTTPActionValidator(
             engine=result_data.get('engine'),
             name=result_data.get('name'),
             url=result_data.get('url'),
             method=result_data.get('method'),
             headers=normalized_headers,
-            query=result_data.get('query'),
-            operation_name=result_data.get('operation_name'),
-            variables=graphql_variables_data,
+            params=result_data.get('params'),
+            data=parsed_data,
             weight=result_data.get('weight'),
             order=result_data.get('order'),
             user=result_data.get('user'),
             tag=tags_data
         )
 
-        action = GraphQLAction(
+
+        action = HTTPAction(
             generator_action.name,
             generator_action.url,
             method=generator_action.method,
             headers=generator_action.headers,
-            data={
-                'query': generator_action.query,
-                'operation_name': generator_action.operation_name,
-                'variables': generator_action.variables
-            },
+            data=generator_action.data,
             user=generator_action.user,
             tags=[
                 tag.dict() for tag in generator_action.tags
@@ -76,7 +73,7 @@ class GraphQLResultParser(BaseParser):
         )
 
 
-        result_validator = GraphQLResultValidator(
+        result_validator = HTTPResultValidator(
             error=result_data.get('error'),       
             status=result_data.get('status'),
             reason=result_data.get('reason'),
@@ -89,7 +86,7 @@ class GraphQLResultParser(BaseParser):
             checks=result_data.get('checks')
         )
 
-        result = GraphQLResult(
+        result = HTTPResult(
             action,
             error=Exception(result_validator.error) if result_validator.error else None
         )

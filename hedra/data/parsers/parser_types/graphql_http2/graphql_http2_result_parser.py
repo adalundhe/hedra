@@ -1,24 +1,21 @@
-import uuid
 import json
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.common.types import RequestTypes
-from hedra.core.engines.types.graphql import (
-    GraphQLAction,
-    GraphQLResult,
-    MercuryGraphQLClient
+from hedra.core.engines.types.graphql_http2 import (
+    GraphQLHTTP2Action,
+    GraphQLHTTP2Result
 )
-from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.data.parsers.parser_types.common.base_parser import BaseParser
 from hedra.data.parsers.parser_types.common.parsing import (
     normalize_headers,
     parse_tags
 )
 from typing import Any, Coroutine, Dict
-from .graphql_action_validator import GraphQLActionValidator
-from .graphql_result_validator import GraphQLResultValidator
+from .graphql_http2_action_validator import GraphQLHTTP2ActionValidator
+from .graphql_http2_result_validator import GraphQLHTTP2ResultValidator
 
 
-class GraphQLResultParser(BaseParser):
+class GraphQLHTTP2ResultParser(BaseParser):
 
     def __init__(
         self,
@@ -26,7 +23,7 @@ class GraphQLResultParser(BaseParser):
         options: Dict[str, Any]={}
     ) -> None:
         super().__init__(
-            GraphQLResultParser.__name__,
+            GraphQLHTTP2ResultParser.__name__,
             config,
             RequestTypes.GRAPHQL,
             options
@@ -35,7 +32,7 @@ class GraphQLResultParser(BaseParser):
     async def parse(
         self, 
         result_data: Dict[str, Any]
-    ) -> Coroutine[Any, Any, Coroutine[Any, Any, GraphQLResult]]:
+    ) -> Coroutine[Any, Any, Coroutine[Any, Any, GraphQLHTTP2Result]]:
         
         graphql_variables_data = result_data.get('variables')
         if isinstance(graphql_variables_data, (str, bytes, bytearray,)):
@@ -44,7 +41,7 @@ class GraphQLResultParser(BaseParser):
         normalized_headers = normalize_headers(result_data)
         tags_data = parse_tags(result_data)
 
-        generator_action = GraphQLActionValidator(
+        generator_action = GraphQLHTTP2ActionValidator(
             engine=result_data.get('engine'),
             name=result_data.get('name'),
             url=result_data.get('url'),
@@ -59,7 +56,7 @@ class GraphQLResultParser(BaseParser):
             tag=tags_data
         )
 
-        action = GraphQLAction(
+        action = GraphQLHTTP2Action(
             generator_action.name,
             generator_action.url,
             method=generator_action.method,
@@ -76,7 +73,7 @@ class GraphQLResultParser(BaseParser):
         )
 
 
-        result_validator = GraphQLResultValidator(
+        result_validator = GraphQLHTTP2ResultValidator(
             error=result_data.get('error'),       
             status=result_data.get('status'),
             reason=result_data.get('reason'),
@@ -89,7 +86,7 @@ class GraphQLResultParser(BaseParser):
             checks=result_data.get('checks')
         )
 
-        result = GraphQLResult(
+        result = GraphQLHTTP2Result(
             action,
             error=Exception(result_validator.error) if result_validator.error else None
         )
