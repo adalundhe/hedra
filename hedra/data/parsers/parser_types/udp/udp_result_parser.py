@@ -5,6 +5,7 @@ from hedra.core.engines.types.udp import (
 )
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.data.parsers.parser_types.common.base_parser import BaseParser
+from hedra.data.parsers.parser_types.common.result_validator import ResultValidator
 from hedra.data.parsers.parser_types.common.parsing import (
     normalize_headers,
     parse_data,
@@ -12,7 +13,6 @@ from hedra.data.parsers.parser_types.common.parsing import (
 )
 from typing import Any, Coroutine, Dict
 from .udp_action_validator import UDPActionValidator
-from .udp_result_validator import UDPResultValidator
 
 
 class UDPActionParser(BaseParser):
@@ -60,22 +60,11 @@ class UDPActionParser(BaseParser):
             ]
         )
 
-
-        action = UDPAction(
-            generator_action.name,
-            generator_action.url,
-            data=generator_action.data,
-            user=generator_action.user,
-            tags=[
-                tag.dict() for tag in generator_action.tags
-            ]
-        )
-
         body = result_data.get('body')
         if isinstance(body, str):
             body = body.encode()
 
-        result_validator = UDPResultValidator(
+        result_validator = ResultValidator(
             error=result_data.get('error'), 
             body=body,      
             status=result_data.get('status'),

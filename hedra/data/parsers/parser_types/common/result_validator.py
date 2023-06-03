@@ -2,14 +2,16 @@ from pydantic import (
     BaseModel,
     StrictStr,
     StrictInt,
-    StrictFloat
+    StrictFloat,
+    StrictBytes
 )
 
 from typing import List, Optional
 
 
-class GraphQLHTTP2ResultValidator(BaseModel):
+class ResultValidator(BaseModel):
     error: Optional[StrictStr]
+    body: Optional[StrictBytes]
     status: StrictInt
     reason: Optional[StrictStr]
     params: Optional[StrictStr]

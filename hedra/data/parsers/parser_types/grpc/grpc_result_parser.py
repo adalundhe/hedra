@@ -6,6 +6,7 @@ from hedra.core.engines.types.grpc import (
     GRPCResult
 )
 from hedra.data.parsers.parser_types.common.base_parser import BaseParser
+from hedra.data.parsers.parser_types.common.result_validator import ResultValidator
 from hedra.data.parsers.parser_types.common.parsing import (
     normalize_headers,
     parse_data,
@@ -13,7 +14,6 @@ from hedra.data.parsers.parser_types.common.parsing import (
 )
 from typing import Any, Coroutine, Dict
 from .grpc_action_validator import GRPCActionValidator
-from .grpc_result_validator import GRPCResultValidator
 from .grpc_options_validator import GRPCOptionsValidator
 
 
@@ -75,7 +75,7 @@ class GRPCResultParser(BaseParser):
             ]
         )
 
-        result_validator = GRPCResultValidator(
+        result_validator = ResultValidator(
             error=result_data.get('error'),       
             status=result_data.get('status'),
             reason=result_data.get('reason'),

@@ -6,6 +6,7 @@ from hedra.core.engines.types.http import (
 )
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.data.parsers.parser_types.common.base_parser import BaseParser
+from hedra.data.parsers.parser_types.common.result_validator import ResultValidator
 from hedra.data.parsers.parser_types.common.parsing import (
     normalize_headers,
     parse_data,
@@ -13,7 +14,6 @@ from hedra.data.parsers.parser_types.common.parsing import (
 )
 from typing import Any, Coroutine, Dict
 from .http_action_validator import HTTPActionValidator
-from .http_result_validator import HTTPResultValidator
 
 
 class HTTPActionParser(BaseParser):
@@ -73,7 +73,7 @@ class HTTPActionParser(BaseParser):
         )
 
 
-        result_validator = HTTPResultValidator(
+        result_validator = ResultValidator(
             error=result_data.get('error'),       
             status=result_data.get('status'),
             reason=result_data.get('reason'),

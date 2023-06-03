@@ -213,7 +213,6 @@ class PlaywrightSerializer(BaseSerializer):
         )
 
         playwright_result.checks = result.get('checks')
-        playwright_result.source = result.get('source')
         playwright_result.wait_start = result.get('wait_start')
         playwright_result.start = result.get('start')
         playwright_result.connect_end = result.get('connect_end')

@@ -6,13 +6,13 @@ from hedra.core.engines.types.graphql_http2 import (
     GraphQLHTTP2Result
 )
 from hedra.data.parsers.parser_types.common.base_parser import BaseParser
+from hedra.data.parsers.parser_types.common.result_validator import ResultValidator
 from hedra.data.parsers.parser_types.common.parsing import (
     normalize_headers,
     parse_tags
 )
 from typing import Any, Coroutine, Dict
 from .graphql_http2_action_validator import GraphQLHTTP2ActionValidator
-from .graphql_http2_result_validator import GraphQLHTTP2ResultValidator
 
 
 class GraphQLHTTP2ResultParser(BaseParser):
@@ -73,7 +73,7 @@ class GraphQLHTTP2ResultParser(BaseParser):
         )
 
 
-        result_validator = GraphQLHTTP2ResultValidator(
+        result_validator = ResultValidator(
             error=result_data.get('error'),       
             status=result_data.get('status'),
             reason=result_data.get('reason'),

@@ -4,18 +4,16 @@ from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.graphql import (
     GraphQLAction,
-    GraphQLResult,
-    MercuryGraphQLClient
+    GraphQLResult
 )
-from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.data.parsers.parser_types.common.base_parser import BaseParser
+from hedra.data.parsers.parser_types.common.result_validator import ResultValidator
 from hedra.data.parsers.parser_types.common.parsing import (
     normalize_headers,
     parse_tags
 )
 from typing import Any, Coroutine, Dict
 from .graphql_action_validator import GraphQLActionValidator
-from .graphql_result_validator import GraphQLResultValidator
 
 
 class GraphQLResultParser(BaseParser):
@@ -76,7 +74,7 @@ class GraphQLResultParser(BaseParser):
         )
 
 
-        result_validator = GraphQLResultValidator(
+        result_validator = ResultValidator(
             error=result_data.get('error'),       
             status=result_data.get('status'),
             reason=result_data.get('reason'),
