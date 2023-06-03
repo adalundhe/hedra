@@ -25,7 +25,7 @@ class HTTP3ActionParser(BaseParser):
         super().__init__(
             HTTP3ActionParser.__name__,
             config,
-            RequestTypes.GRPC,
+            RequestTypes.HTTP3,
             options
         )
 

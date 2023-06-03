@@ -25,7 +25,7 @@ class GraphQLHTTP2ResultParser(BaseParser):
         super().__init__(
             GraphQLHTTP2ResultParser.__name__,
             config,
-            RequestTypes.GRAPHQL,
+            RequestTypes.GRAPHQL_HTTP2,
             options
         )
 

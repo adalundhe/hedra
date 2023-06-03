@@ -85,9 +85,10 @@ class HTTP3Serializer(BaseSerializer):
             str(k.decode()): str(v.decode()) for k, v in result.headers.items()
         }
 
-        data = result.data
-        if isinstance(data, bytes) or isinstance(data, bytearray):
-            data = str(data.decode())
+        body: Union[str, None] = None
+        if result.body:
+            body = str(result.body.decode())
+
 
         return {
             **serialized_result,
@@ -98,7 +99,7 @@ class HTTP3Serializer(BaseSerializer):
             'query': result.query,
             'type': result.type,
             'headers': encoded_headers,
-            'data': data,
+            'body': body,
             'tags': result.tags,
             'user': result.user,
             'error': str(result.error),
@@ -123,6 +124,11 @@ class HTTP3Serializer(BaseSerializer):
             error=Exception(result.get('error'))
         )
 
+        body = result.get('body')
+        if isinstance(body, str):
+            body = body.encode()
+
+        deserialized_result.body = body
         deserialized_result.status = result.get('status')
         deserialized_result.reason = result.get('reason')
         deserialized_result.params = result.get('params')

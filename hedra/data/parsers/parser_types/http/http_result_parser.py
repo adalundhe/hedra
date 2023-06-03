@@ -26,7 +26,7 @@ class HTTPActionParser(BaseParser):
         super().__init__(
             HTTPActionParser.__name__,
             config,
-            RequestTypes.GRPC,
+            RequestTypes.HTTP,
             options
         )
 

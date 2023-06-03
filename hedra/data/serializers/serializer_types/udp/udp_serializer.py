@@ -76,9 +76,9 @@ class UDPSerializer(BaseSerializer):
         
         serialized_result = super().result_to_serializable(result)
 
-        data = self.data
-        if isinstance(data, bytes) or isinstance(data, bytearray):
-            data = str(data.decode())
+        body: Union[str, None] = None
+        if result.body:
+            body = str(result.body.decode())
 
         return {
             **serialized_result,
@@ -87,7 +87,7 @@ class UDPSerializer(BaseSerializer):
             'params': result.params,
             'query': result.query,
             'type': result.type,
-            'data': data,
+            'body': body,
             'tags': result.tags,
             'user': result.user,
             'status': result.status,
@@ -112,7 +112,11 @@ class UDPSerializer(BaseSerializer):
             error=Exception(result.get('error'))
         )
 
-        deserialized_result.data = result.get('data')
+        body = result.get('body')
+        if isinstance(body, str):
+            body = body.encode()
+
+        deserialized_result.body = body
         deserialized_result.status = result.get('status')
         deserialized_result.checks = result.get('checks')
         deserialized_result.wait_start = result.get('wait_start')
