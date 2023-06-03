@@ -13,6 +13,7 @@ from hedra.core.engines.types.task import TaskResult
 from hedra.core.engines.types.udp import UDPResult
 from hedra.core.engines.types.websocket import WebsocketResult
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
+from hedra.data.serializers import Serializer
 from hedra.monitoring import (
     CPUMonitor,
     MemoryMonitor
@@ -59,6 +60,7 @@ class ResultsSet:
 
         self.serialized_results: List[Dict[str, Any]] = execution_results.get('serialized_results', [])
         self.experiment = execution_results.get('experiment')
+        self.serializer = Serializer()
 
         self.types = {
             RequestTypes.GRAPHQL: GraphQLResult,
@@ -77,7 +79,7 @@ class ResultsSet:
             yield result
 
 
-    def to_serializable(self):
+    def action_to_serializable(self):
         return {
             'total_elapsed': self.total_elapsed,
             'total_results': self.total_results,

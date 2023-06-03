@@ -66,7 +66,7 @@ class Hooks(Generic[A]):
 
         return names
 
-    def to_serializable(self):
+    def action_to_serializable(self):
         return {
             'notify': self.notify,
             'listen': self.listen,

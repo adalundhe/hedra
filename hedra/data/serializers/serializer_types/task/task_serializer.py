@@ -12,12 +12,12 @@ class TaskSerializer(BaseSerializer):
     def __init__(self) -> None:
         super().__init__()
 
-    def to_serializable(
+    def action_to_serializable(
         self,
         task: Task
     ) -> Dict[str, Union[str, List[str]]]:
         
-        serialized_action = super().to_serializable(task)
+        serialized_action = super().action_to_serializable(task)
         return {
             **serialized_action,
             'type': RequestTypes.TASK,

@@ -85,7 +85,7 @@ class SaveHook(Hook):
                 results: RawResultsSet = self.context[param_name]
                 
                 for stage_name, result, in results.items():
-                    results[stage_name] = result.to_serializable()
+                    results[stage_name] = result.action_to_serializable()
 
                 context_value = results
 

@@ -109,7 +109,7 @@ async def start_execution(
     if len(loaded_actions) > 0:
         for serialized_action in loaded_actions:
             actions_and_tasks.append(
-                serializer.deserialize(serialized_action)
+                serializer.deserialize_action(serialized_action)
             )
 
     actions_and_tasks.extend(

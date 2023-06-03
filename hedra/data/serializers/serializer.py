@@ -90,7 +90,7 @@ class Serializer:
             ] 
         ] = {}
 
-    def serialize(
+    def serialize_action(
         self,
         hook: Union[ActionHook, TaskHook]
     ):
@@ -111,7 +111,7 @@ class Serializer:
             'client_config': serializable_client_config
         })
     
-    def deserialize(
+    def deserialize_action(
         self,
         serialized_hook: Union[str, bytes]
     ):
