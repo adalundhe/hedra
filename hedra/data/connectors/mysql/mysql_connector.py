@@ -86,7 +86,7 @@ class MySQLConnector:
         actions = await self.load_data()
 
         return await asyncio.gather(*[
-            self.parser.parse(
+            self.parser.parse_action(
                 action_data,
                 self.stage,
                 self.parser_config,

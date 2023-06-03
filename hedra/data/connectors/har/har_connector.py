@@ -181,7 +181,7 @@ class HARConnector:
                 action_order += 1
 
         return await asyncio.gather(*[
-            self.parser.parse(
+            self.parser.parse_action(
                 action_data,
                 self.stage,
                 self.parser_config,

@@ -15,7 +15,7 @@ from typing import Any, Coroutine, Dict
 from .http2_action_validator import HTTP2ActionValidator
 
 
-class HTTP2ActionParser(BaseParser):
+class HTTP2ResultParser(BaseParser):
 
     def __init__(
         self,
@@ -23,7 +23,7 @@ class HTTP2ActionParser(BaseParser):
         options: Dict[str, Any]={}
     ) -> None:
         super().__init__(
-            HTTP2ActionParser.__name__,
+            HTTP2ResultParser.__name__,
             config,
             RequestTypes.HTTP2,
             options

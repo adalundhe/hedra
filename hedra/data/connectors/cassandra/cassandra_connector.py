@@ -318,7 +318,7 @@ class CassandraConnector:
         actions = await self.load_data()        
 
         return await asyncio.gather(*[
-            self.parser.parse(
+            self.parser.parse_action(
                 {
                     'name': action_data.get('name'),
                     **json.loads(

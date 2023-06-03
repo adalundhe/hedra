@@ -15,7 +15,7 @@ from typing import Any, Coroutine, Dict
 from .websocket_action_validator import WebsocketActionValidator
 
 
-class WebsocketActionParser(BaseParser):
+class WebsocketResultParser(BaseParser):
 
     def __init__(
         self,
@@ -23,7 +23,7 @@ class WebsocketActionParser(BaseParser):
         options: Dict[str, Any]={}
     ) -> None:
         super().__init__(
-            WebsocketActionParser.__name__,
+            WebsocketResultParser.__name__,
             config,
             RequestTypes.GRPC,
             options

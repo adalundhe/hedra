@@ -15,7 +15,7 @@ from typing import Any, Coroutine, Dict
 from .udp_action_validator import UDPActionValidator
 
 
-class UDPActionParser(BaseParser):
+class UDPResultParser(BaseParser):
 
     def __init__(
         self,
@@ -23,7 +23,7 @@ class UDPActionParser(BaseParser):
         options: Dict[str, Any]={}
     ) -> None:
         super().__init__(
-            UDPActionParser.__name__,
+            UDPResultParser.__name__,
             config,
             RequestTypes.UDP,
             options
