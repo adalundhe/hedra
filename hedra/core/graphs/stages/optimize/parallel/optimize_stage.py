@@ -2,30 +2,38 @@ import dill
 import threading
 import os
 import pickle
-import traceback
 from collections import defaultdict
 from typing import Any, Dict, List, Union
 from hedra.core.engines.client.config import Config
-from hedra.core.engines.types.registry import RequestTypes
-from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
-from hedra.core.engines.types.registry import registered_engines
-from hedra.core.graphs.stages.optimize.optimization import Optimizer, DistributionFitOptimizer
-from hedra.core.graphs.stages.base.stage import Stage
-from hedra.core.graphs.stages.setup.setup import Setup
+from hedra.core.engines.types.playwright import (
+    MercuryPlaywrightClient, 
+    ContextConfig
+)
+from hedra.core.engines.types.registry import (
+    registered_engines,
+    RequestTypes
+)
 from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
-from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.base.import_tools import (
     import_stages, 
     import_plugins,
     set_stage_hooks
 )
-from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.core.graphs.stages.base.stage import Stage
+from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.optimize.optimization.algorithms import registered_algorithms
+from hedra.core.graphs.stages.optimize.optimization import (
+    Optimizer, 
+    DistributionFitOptimizer
+)
+from hedra.core.graphs.stages.setup.setup import Setup
+from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.base.event_graph import EventGraph
 from hedra.core.hooks.types.base.registrar import registrar
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.simple_context import SimpleContext
-from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.load.hook import LoadHook
 from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.personas.persona_registry import registered_personas
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
@@ -130,6 +138,10 @@ async def setup_action_channels_and_playwright(
 
     setup_execute_stage.hooks[HookType.ACTION] = hooks_by_type[HookType.ACTION]
     setup_execute_stage.hooks[HookType.TASK] = hooks_by_type[HookType.TASK]
+
+    for load_hook in setup_execute_stage.hooks[HookType.LOAD]:
+        load_hook: LoadHook = load_hook
+        load_hook.parser_config = setup_stage.config
 
     return setup_execute_stage
 

@@ -26,6 +26,7 @@ from hedra.core.personas.persona_registry import registered_personas
 from hedra.core.hooks.types.base.event_graph import EventGraph
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.load.hook import LoadHook
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
@@ -148,6 +149,10 @@ async def start_execution(
             await hook.session.setup(
                 config=config
             )
+
+    for load_hook in setup_execute_stage.hooks[HookType.LOAD]:
+        load_hook: LoadHook = load_hook
+        load_hook.parser_config = setup_stage.config
     
     pipeline_stages = {
         setup_execute_stage.name: setup_execute_stage
