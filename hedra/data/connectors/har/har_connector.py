@@ -18,7 +18,8 @@ from typing import (
     List, 
     TextIO, 
     Union,
-    Any
+    Any,
+    Coroutine
 )
 from .har_connector_config import HARConnectorConfig
 
@@ -123,10 +124,16 @@ class HARConnector:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opening from file - {self.filepath}')
 
+    async def load_execute_stage_summary(
+        self,
+        options: Dict[str, Any]={}
+    ) -> Coroutine[Any, Any, NotImplementedError]:
+        raise NotImplementedError('Execute stage summary loading is not available for the HAR Connector.')
+
     async def load_actions(
         self,
         options: Dict[str, Any]={}
-    ) -> List[ActionHook]:
+    ) -> Coroutine[Any, Any, List[ActionHook]]:
         
         self._parser = HarParser(
             har_data=json.loads(self.har_file)
@@ -192,14 +199,14 @@ class HARConnector:
     async def load_results(
         self,
         options: Dict[str, Any]={}
-    ) -> NotImplementedError:
+    ) -> Coroutine[Any, Any, NotImplementedError]:
         raise NotImplementedError('Results loading is not available for the HAR Connector.')
     
     async def load_data(
         self, 
         options: Dict[str, Any]={}
-    ) -> None:
-        return None
+    ) -> Coroutine[Any, Any, NotImplementedError]:
+        raise NotImplementedError('Data loading is not available for the HAR Connector.')
     
     async def close(self):
         await self._loop.run_in_executor(

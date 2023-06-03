@@ -12,14 +12,16 @@ from typing import (
     TextIO, 
     Dict, 
     Union,
-    Any
+    Any,
+    Coroutine
 )
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.core.engines.client.config import Config
+from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.data.connectors.common.connector_type import ConnectorType
-from hedra.core.engines.types.common.results_set import ResultsSet
+from hedra.data.connectors.common.execute_stage_summary_validator import ExecuteStageSummaryValidator
 from hedra.data.parsers.parser import Parser
 from .xml_connector_config import XMLConnectorConfig
 
@@ -115,12 +117,24 @@ class XMLConnector:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opening from file - {self.filepath}')
 
+    async def load_execute_stage_summary(
+        self,
+        options: Dict[str, Any]={}
+    ) -> Coroutine[Any, Any, ExecuteStageSummaryValidator]:
+        execute_stage_summary = await self.load_data(
+            options=options
+        )
+        
+        return ExecuteStageSummaryValidator(**execute_stage_summary)
+
     async def load_actions(
         self,
         options: Dict[str, Any]={}
-    ) -> List[ActionHook]:
+    ) -> Coroutine[Any, Any, List[ActionHook]]:
         
-        actions: List[Dict[str, Any]] = await self.load_data()
+        actions: List[Dict[str, Any]] = await self.load_data(
+            options=options
+        )
 
         return await asyncio.gather(*[
             self.parser.parse_action(
@@ -134,8 +148,10 @@ class XMLConnector:
     async def load_results(
         self,
         options: Dict[str, Any]={}
-    ) -> ResultsSet:
-        results = await self.load_data()
+    ) -> Coroutine[Any, Any, ResultsSet]:
+        results = await self.load_data(
+            options=options
+        )
 
         return ResultsSet({
             'stage_results': await asyncio.gather(*[
@@ -151,7 +167,7 @@ class XMLConnector:
     async def load_data(
         self, 
         options: Dict[str, Any]={}
-    ) -> Any:
+    ) -> Coroutine[Any, Any, List[Dict[str, Any]]]:
         
         file_data = await self._loop.run_in_executor(
             self._executor,

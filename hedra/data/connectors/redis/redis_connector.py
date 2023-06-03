@@ -2,12 +2,18 @@ import asyncio
 import json
 import time
 import uuid
-from typing import List, Dict, Any
+from typing import (
+    List, 
+    Dict, 
+    Any,
+    Coroutine
+)
 from hedra.logging import HedraLogger
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.data.connectors.common.connector_type import ConnectorType
+from hedra.data.connectors.common.execute_stage_summary_validator import ExecuteStageSummaryValidator
 from hedra.data.parsers.parser import Parser
 from .redis_connector_config import RedisConnectorConfig
 
@@ -63,11 +69,23 @@ class RedisConnector:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to Redis instance at - {self.base}://{self.host} - Database: {self.database}')
 
+    async def load_execute_stage_summary(
+        self,
+        options: Dict[str, Any]={}
+    ) -> Coroutine[Any, Any, ExecuteStageSummaryValidator]:
+        execute_stage_summary = await self.load_data(
+            options=options
+        )
+        
+        return ExecuteStageSummaryValidator(**execute_stage_summary)
+
     async def load_actions(
         self,
         options: Dict[str, Any]={}
-    ) -> List[ActionHook]:
-        actions = await self.load_data()
+    ) -> Coroutine[Any, Any, List[ActionHook]]:
+        actions = await self.load_data(
+            options=options
+        )
 
         return await asyncio.gather(*[
             self.parser.parse_action(
@@ -81,8 +99,10 @@ class RedisConnector:
     async def load_results(
         self,
         options: Dict[str, Any]={}
-    ) -> ResultsSet:
-        results = await self.load_data()
+    ) -> Coroutine[Any, Any, ResultsSet]:
+        results = await self.load_data(
+            options=options
+        )
 
         return ResultsSet({
             'stage_results': await asyncio.gather(*[
@@ -98,7 +118,7 @@ class RedisConnector:
     async def load_data(
         self, 
         options: Dict[str, Any]={}
-    ) -> List[Dict[str, Any]]:
+    ) -> Coroutine[Any, Any, List[Dict[str, Any]]]:
         
         if self.channel:
             async with self.connection.client() as connection:

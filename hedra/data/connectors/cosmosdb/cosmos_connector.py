@@ -4,13 +4,15 @@ from typing import (
     List,
     Dict,
     Any,
-    Union
+    Union,
+    Coroutine
 )
 from hedra.logging import HedraLogger
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.data.connectors.common.connector_type import ConnectorType
+from hedra.data.connectors.common.execute_stage_summary_validator import ExecuteStageSummaryValidator
 from hedra.data.parsers.parser import Parser
 from .cosmos_connector_config import CosmosDBConnectorConfig
 
@@ -72,11 +74,21 @@ class CosmosDBConnector:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Created or set Database - {self.database_name}')
 
         self.container = self.database.get_container_client(self.container_name)
-
+    
+    async def load_execute_stage_summary(
+        self,
+        options: Dict[str, Any]={}
+    ) -> Coroutine[Any, Any, ExecuteStageSummaryValidator]:
+        execute_stage_summary = await self.load_data(
+            options=options
+        )
+        
+        return ExecuteStageSummaryValidator(**execute_stage_summary)
+    
     async def load_actions(
         self,
         options: Dict[str, Any]={}
-    ) -> List[ActionHook]:
+    ) -> Coroutine[Any, Any, List[ActionHook]]:
         actions = await self.load_data()
 
         return await asyncio.gather(*[
@@ -91,7 +103,7 @@ class CosmosDBConnector:
     async def load_results(
         self,
         options: Dict[str, Any]={}
-    ) -> ResultsSet:
+    ) -> Coroutine[Any, Any, ResultsSet]:
         results = await self.load_data()
 
         return ResultsSet({
@@ -108,7 +120,7 @@ class CosmosDBConnector:
     async def load_data(
         self, 
         options: Dict[str, Any]={}
-    ) -> List[Dict[str, Any]]:
+    ) -> Coroutine[Any, Any, List[Dict[str, Any]]]:
         return [
             record async for record in self.container.read_all_items(
                 max_item_count=options.get('max_item_count'),

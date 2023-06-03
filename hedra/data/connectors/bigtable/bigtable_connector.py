@@ -4,12 +4,18 @@ import functools
 import signal
 import psutil
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Dict, Any
+from typing import (
+    List, 
+    Dict, 
+    Any,
+    Coroutine
+)
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.data.parsers.parser import Parser
 from hedra.data.connectors.common.connector_type import ConnectorType
+from hedra.data.connectors.common.execute_stage_summary_validator import ExecuteStageSummaryValidator
 from hedra.logging import HedraLogger
 from .bigtable_connector_config import BigTableConnectorConfig
 
@@ -98,10 +104,20 @@ class BigTableConnector:
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opened connection to Google Cloud - Created Client Instance - ID:{self.instance_id}')
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opened connection to Google Cloud - Loaded account config from - {self.service_account_json_path}')
 
+    async def load_execute_stage_summary(
+        self,
+        options: Dict[str, Any]={}
+    ) -> Coroutine[Any, Any, ExecuteStageSummaryValidator]:
+        execute_stage_summary = await self.load_data(
+            options=options
+        )
+        
+        return ExecuteStageSummaryValidator(**execute_stage_summary)
+
     async def load_actions(
         self,
         options: Dict[str, Any]={}
-    ) -> List[ActionHook]:
+    ) -> Coroutine[Any, Any, List[ActionHook]]:
         actions = await self.load_data()
 
         return await asyncio.gather(*[
@@ -116,7 +132,7 @@ class BigTableConnector:
     async def load_results(
         self,
         options: Dict[str, Any]={}
-    ) -> ResultsSet:
+    ) -> Coroutine[Any, Any, ResultsSet]:
         results = await self.load_data()
 
         return ResultsSet({
@@ -133,7 +149,7 @@ class BigTableConnector:
     async def load_data(
         self,
         options: Dict[str, Any]={}
-    ) -> List[Dict[str, Any]]:
+    ) -> Coroutine[Any, Any, List[Dict[str, Any]]]:
         self._table = self.instance.table(self._table_name)
 
         data_rows: PartialRowsData = await self._loop.run_in_executor(

@@ -1,24 +1,28 @@
 import asyncio
 import uuid
-from typing import List, Dict, Any
+from typing import (
+    List, 
+    Dict, 
+    Any,
+    Coroutine
+)
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.data.connectors.common.connector_type import ConnectorType
+from hedra.data.connectors.common.execute_stage_summary_validator import ExecuteStageSummaryValidator
 from hedra.data.parsers.parser import Parser
 from hedra.logging import HedraLogger
 from .mongodb_connector_config import MongoDBConnectorConfig
 
-from motor.motor_asyncio import AsyncIOMotorClient
 
-# try:
-#     from motor.motor_asyncio import AsyncIOMotorClient
-#     has_connector = True
+try:
+    from motor.motor_asyncio import AsyncIOMotorClient
+    has_connector = True
 
-# except Exception:
-#     AsyncIOMotorClient = None
-#     has_connector = False
-
+except Exception:
+    AsyncIOMotorClient = None
+    has_connector = False
 
 
 class MongoDBConnector:
@@ -62,12 +66,24 @@ class MongoDBConnector:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to MongoDB instance at - {self.host} - Database: {self.database_name}')
 
+    async def load_execute_stage_summary(
+        self,
+        options: Dict[str, Any]={}
+    ) -> Coroutine[Any, Any, ExecuteStageSummaryValidator]:
+        execute_stage_summary = await self.load_data(
+            options=options
+        )
+        
+        return ExecuteStageSummaryValidator(**execute_stage_summary)
+
     async def load_actions(
         self,
         options: Dict[str, Any]={}
-    ) -> List[ActionHook]:
+    ) -> Coroutine[Any, Any, List[ActionHook]]:
         
-        actions: List[Dict[str, Any]] = await self.load_data()
+        actions: List[Dict[str, Any]] = await self.load_data(
+            options=options
+        )
 
         return await asyncio.gather(*[
             self.parser.parse_action(
@@ -81,8 +97,10 @@ class MongoDBConnector:
     async def load_results(
         self,
         options: Dict[str, Any]={}
-    ) -> ResultsSet:
-        results = await self.load_data()
+    ) -> Coroutine[Any, Any, ResultsSet]:
+        results = await self.load_data(
+            options=options
+        )
 
         return ResultsSet({
             'stage_results': await asyncio.gather(*[
@@ -98,7 +116,7 @@ class MongoDBConnector:
     async def load_data(
         self, 
         options: Dict[str, Any]={}
-    ) -> Any:
+    ) -> Coroutine[Any, Any, List[Dict[str, Any]]]:
         return await self.database[self.collection].find(
             limit=options.get('limit')
         )

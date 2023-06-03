@@ -8,10 +8,15 @@ from hedra.logging import HedraLogger
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.data.connectors.common.connector_type import ConnectorType
-from hedra.data.connectors.common.result_type import Result
+from hedra.data.connectors.common.execute_stage_summary_validator import ExecuteStageSummaryValidator
 from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.data.parsers.parser import Parser
-from typing import List, Dict, Any
+from typing import (
+    List, 
+    Dict, 
+    Any,
+    Coroutine
+)
 from .aws_lambda_connector_config import AWSLambdaConnectorConfig
 
 try:
@@ -91,10 +96,20 @@ class AWSLambdaConnector:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Successfully opened connection to AWS - Region: {self.region_name}')
 
+    async def load_execute_stage_summary(
+        self,
+        options: Dict[str, Any]={}
+    ) -> Coroutine[Any, Any, ExecuteStageSummaryValidator]:
+        execute_stage_summary = await self.load_data(
+            options=options
+        )
+        
+        return ExecuteStageSummaryValidator(**execute_stage_summary)
+
     async def load_actions(
         self,
         options: Dict[str, Any]={}
-    ) -> List[ActionHook]:
+    ) -> Coroutine[Any, Any, List[ActionHook]]:
         actions = await self.load_data()
 
         return await asyncio.gather(*[
@@ -109,7 +124,7 @@ class AWSLambdaConnector:
     async def load_results(
         self,
         options: Dict[str, Any]={}
-    ) -> ResultsSet:
+    ) -> Coroutine[Any, Any, ResultsSet]:
         results = await self.load_data()
 
         return ResultsSet({
@@ -127,7 +142,7 @@ class AWSLambdaConnector:
     async def load_data(
         self, 
         options: Dict[str, Any]={}
-    ) -> Any:
+    ) -> Coroutine[Any, Any, Any]:
         return await self._loop.run_in_executor(
             self._executor,
             functools.partial(

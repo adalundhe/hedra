@@ -4,39 +4,41 @@ from typing import (
     List, 
     Dict, 
     Union,
-    Any
+    Any,
+    Coroutine
 )
 from hedra.logging import HedraLogger
 from hedra.core.engines.client.config import Config
+from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.data.connectors.common.connector_type import ConnectorType
-from hedra.core.engines.types.common.results_set import ResultsSet
+from hedra.data.connectors.common.execute_stage_summary_validator import ExecuteStageSummaryValidator
 from hedra.data.parsers.parser import Parser
 from .sqlite_connector_config import SQLiteConnectorConfig
 
 
-import sqlalchemy
-from sqlalchemy.engine.result import Result as SQLResult
-from sqlalchemy.ext.asyncio import (
-    create_async_engine,
-    AsyncEngine,
-    AsyncConnection,
-)
+def noop_create_async_engine():
+    pass
 
-has_connector = True
 
-# try:
-#     import sqlalchemy
-#     from sqlalchemy.ext.asyncio import create_async_engine
-    
-#     has_connector = True
+try:
+    import sqlalchemy
+    from sqlalchemy.engine.result import Result as SQLResult
+    from sqlalchemy.ext.asyncio import (
+        create_async_engine,
+        AsyncEngine,
+        AsyncConnection,
+    )
+        
+    has_connector = True
 
-# except Exception:
-#     ASYNCIO_STRATEGY = None
-#     sqlalchemy = object
-#     CreateTable = object
-#     OperationalError = object
-#     has_connector = object
+except Exception:
+    sqlalchemy = object
+    SQLResult = None
+    create_async_engine = noop_create_async_engine
+    AsyncEngine = object
+    AsyncConnection = object
+    has_connector = False
 
 
 
@@ -75,11 +77,23 @@ class SQLiteConnector:
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connected to SQLite at - {self.path} - Database: {self.database}')
 
+    async def load_execute_stage_summary(
+        self,
+        options: Dict[str, Any]={}
+    ) -> Coroutine[Any, Any, ExecuteStageSummaryValidator]:
+        execute_stage_summary = await self.load_data(
+            options=options
+        )
+        
+        return ExecuteStageSummaryValidator(**execute_stage_summary)
+
     async def load_actions(
         self,
         options: Dict[str, Any]={}
-    ) -> List[ActionHook]:
-        actions = await self.load_data()
+    ) -> Coroutine[Any, Any, List[ActionHook]]:
+        actions = await self.load_data(
+            options=options
+        )
 
         return await asyncio.gather(*[
             self.parser.parse_action(
@@ -93,8 +107,10 @@ class SQLiteConnector:
     async def load_results(
         self,
         options: Dict[str, Any]={}
-    ) -> ResultsSet:
-        results = await self.load_data()
+    ) -> Coroutine[Any, Any, ResultsSet]:
+        results = await self.load_data(
+            options=options
+        )
 
         return ResultsSet({
             'stage_results': await asyncio.gather(*[
@@ -110,7 +126,7 @@ class SQLiteConnector:
     async def load_data(
         self, 
         options: Dict[str, Any]={}
-    ) -> List[Dict[str, Any]]:
+    ) -> Coroutine[Any, Any, List[Dict[str, Any]]]:
         
         if self._table is None:
             self._table = sqlalchemy.Table(

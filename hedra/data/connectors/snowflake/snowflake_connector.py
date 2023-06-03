@@ -8,27 +8,40 @@ from typing import (
     List, 
     Dict, 
     Union,
-    Any
+    Any,
+    Coroutine
 )
 from hedra.logging import HedraLogger
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.data.connectors.common.connector_type import ConnectorType
+from hedra.data.connectors.common.execute_stage_summary_validator import ExecuteStageSummaryValidator
 from hedra.data.parsers.parser import Parser
 from .snowflake_connector_config import SnowflakeConnectorConfig
+
+
+def noop_create_engine():
+    pass
 
 
 try:
     import sqlalchemy
     from snowflake.sqlalchemy import URL
     from sqlalchemy import create_engine
-    from sqlalchemy.engine import Engine, Connection
+    from sqlalchemy.engine import (
+        Engine, 
+        Connection
+    )
     
     has_connector = True
 
 except Exception:
-    snowflake = None
+    sqlalchemy = object
+    URL = object
+    create_engine=noop_create_engine
+    Engine = object
+    Connection = object
     has_connector = False
 
 
@@ -127,12 +140,24 @@ class SnowflakeConnector:
         except asyncio.TimeoutError:
             raise Exception('Err. - Connection to Snowflake timed out - check your account id, username, and password.')
 
+    async def load_execute_stage_summary(
+        self,
+        options: Dict[str, Any]={}
+    ) -> Coroutine[Any, Any, ExecuteStageSummaryValidator]:
+        execute_stage_summary = await self.load_data(
+            options=options
+        )
+        
+        return ExecuteStageSummaryValidator(**execute_stage_summary)
+
     async def load_actions(
         self,
         options: Dict[str, Any]={}
-    ) -> List[ActionHook]:
+    ) -> Coroutine[Any, Any, List[ActionHook]]:
         
-        actions: List[Dict[str, Any]] = await self.load_data()
+        actions: List[Dict[str, Any]] = await self.load_data(
+            options=options
+        )
 
         return await asyncio.gather(*[
             self.parser.parse_action(
@@ -146,8 +171,10 @@ class SnowflakeConnector:
     async def load_results(
         self,
         options: Dict[str, Any]={}
-    ) -> ResultsSet:
-        results = await self.load_data()
+    ) -> Coroutine[Any, Any, ResultsSet]:
+        results = await self.load_data(
+            options=options
+        )
 
         return ResultsSet({
             'stage_results': await asyncio.gather(*[
@@ -163,7 +190,7 @@ class SnowflakeConnector:
     async def load_data(
         self, 
         options: Dict[str, Any]={}
-    ) -> List[Dict[str, Any]]:
+    ) -> Coroutine[Any, Any, List[Dict[str, Any]]]:
         
         if self._table is None:
             

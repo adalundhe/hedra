@@ -5,12 +5,20 @@ import json
 import signal
 import psutil
 import uuid
-from typing import List, Dict, Any, Union, Callable
+from typing import (
+    List, 
+    Dict, 
+    Any, 
+    Union, 
+    Callable,
+    Coroutine
+)
 from concurrent.futures import ThreadPoolExecutor
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.data.connectors.common.connector_type import ConnectorType
+from hedra.data.connectors.common.execute_stage_summary_validator import ExecuteStageSummaryValidator
 from hedra.data.parsers.parser import Parser
 from hedra.logging import HedraLogger
 from .cassandra_connector_config import CassandraConnectorConfig
@@ -255,10 +263,20 @@ class CassandraConnector:
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Created Keyspace - {self.keyspace}')
 
+    async def load_execute_stage_summary(
+        self,
+        options: Dict[str, Any]={}
+    ) -> Coroutine[Any, Any, ExecuteStageSummaryValidator]:
+        execute_stage_summary = await self.load_data(
+            options=options
+        )
+        
+        return ExecuteStageSummaryValidator(**execute_stage_summary)
+
     async def load_data(
         self,
         options: Dict[str, Any]={}
-    ) -> List[Dict[str, Any]]:
+    ) -> Coroutine[Any, Any, List[Dict[str, Any]]]:
         
         cassandra_load_request = CassandraLoadValidator(**options)
 
@@ -311,7 +329,7 @@ class CassandraConnector:
     async def load_actions(
         self,
         options: Dict[str, Any]={}
-    ) -> List[ActionHook]:
+    ) -> Coroutine[Any, Any, List[ActionHook]]:
         
         self._fields = {
             'id': columns.UUID(primary_key=True, default=uuid.uuid4),
@@ -339,7 +357,7 @@ class CassandraConnector:
     async def load_results(
         self,
         options: Dict[str, Any]={}
-    ) -> ResultsSet:
+    ) -> Coroutine[Any, Any, ResultsSet]:
         
         self._fields = {
             'id': columns.UUID(primary_key=True, default=uuid.uuid4),

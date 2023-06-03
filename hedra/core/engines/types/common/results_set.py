@@ -52,7 +52,7 @@ class ResultsSet:
         self.stage_optimized = execution_results.get('stage_optimized', False)
         self.stage_persona_type = execution_results.get('stage_persona_type', 'default')
         self.stage_workers = execution_results.get(
-            'stage_persona_type',
+            'stage_workers',
             psutil.cpu_count(logical=False)
         )
 
