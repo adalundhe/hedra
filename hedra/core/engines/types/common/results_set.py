@@ -79,19 +79,18 @@ class ResultsSet:
             yield result
 
 
-    def action_to_serializable(self):
+    def to_serializable(self):
         return {
             'total_elapsed': self.total_elapsed,
             'total_results': self.total_results,
-            'results': [result.to_dict() for result in self.results]
+            'results': [
+                self.serializer.serialize_result(result) for result in self.results
+            ]
         }
     
     def load_results(self):
         self.results = [
-            self.types.get(
-                result.get('type'), 
-                HTTPResult
-            ).from_dict(result) for result in self.serialized_results
+            self.serializer.deserialize_result(result) for result in self.serialized_results
         ]
 
     def group(self) -> Dict[str, List[BaseResult]]:
