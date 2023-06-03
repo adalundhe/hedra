@@ -10,6 +10,7 @@ from typing import List, Dict, Any, Union
 from hedra.logging import HedraLogger
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.data.connectors.common.result_type import Result
 from hedra.data.connectors.common.connector_type import ConnectorType
 from hedra.data.parsers.parser import Parser
 from .postgres_connector_config import PostgresConnectorConfig
@@ -17,7 +18,7 @@ from .postgres_connector_config import PostgresConnectorConfig
 
 try:
     import sqlalchemy
-    from sqlalchemy.engine.result import Result
+    from sqlalchemy.engine.result import Result as SQLResult
     from sqlalchemy.ext.asyncio import create_async_engine
     from sqlalchemy.ext.asyncio.engine import (
         AsyncEngine, 
@@ -27,7 +28,7 @@ try:
     has_connector = True
 
 except Exception:
-    Result = object
+    SQLResult = object
     sqlalchemy = object
     AsyncEngine = object
     AsyncConnection = object
@@ -98,6 +99,21 @@ class PostgresConnection:
             ) for action_data in actions
         ])
     
+    async def load_results(
+        self,
+        options: Dict[str, Any]={}
+    ) -> List[Result]:
+        results = await self.load_data()
+
+        return await asyncio.gather(*[
+            self.parser.parse_result(
+                results_data,
+                self.stage,
+                self.parser_config,
+                options
+            ) for results_data in results
+        ])
+    
     async def load_data(
         self, 
         options: Dict[str, Any]={}
@@ -114,7 +130,7 @@ class PostgresConnection:
         async with self._engine.connect() as connection:
             connection: AsyncConnection = connection
             
-            results: Result = await connection.execute(
+            results: SQLResult = await connection.execute(
                 self._table.select(**options)
             )
 

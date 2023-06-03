@@ -215,6 +215,14 @@ class Connector:
             options=options
         )
     
+    async def load_results(
+        self,
+        options: Dict[str, Any]={}
+    ):
+        return await self.selected.load_results(
+            options=options
+        )
+    
     async def load_data(
         self,
         options: Dict[str, Any]={}

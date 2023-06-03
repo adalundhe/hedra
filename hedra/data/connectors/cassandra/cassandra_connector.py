@@ -9,11 +9,15 @@ from typing import List, Dict, Any, Union, Callable
 from concurrent.futures import ThreadPoolExecutor
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.data.connectors.common.result_type import Result
 from hedra.data.connectors.common.connector_type import ConnectorType
 from hedra.data.parsers.parser import Parser
 from hedra.logging import HedraLogger
 from .cassandra_connector_config import CassandraConnectorConfig
 from .cassandra_load_validator import CassandraLoadValidator
+
+def noop_factory():
+    pass
 
 
 try:
@@ -29,7 +33,7 @@ try:
 except ImportError:
     columns = object
     connection = object
-    dict_factory = lambda: None
+    dict_factory=noop_factory
     ModelQuerySet = object
     Model = object
     Cluster = object
@@ -311,24 +315,48 @@ class CassandraConnector:
         
         self._fields = {
             'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+            'engine': columns.Text(min_length=1, index=True),
             'name': columns.Text(min_length=1, index=True),
-            'action': columns.Blob()
+            'result': columns.Blob()
         }
 
-        actions = await self.load_data()        
+        results = await self.load_data()        
 
         return await asyncio.gather(*[
             self.parser.parse_action(
                 {
-                    'name': action_data.get('name'),
+                    'name': result_data.get('name'),
                     **json.loads(
-                        action_data.get('action', {})
+                        result_data.get('result', {})
                     )
                 },
                 self.stage,
                 self.parser_config,
                 options
-            ) for action_data in actions
+            ) for result_data in results
+        ])
+    
+    async def load_results(
+        self,
+        options: Dict[str, Any]={}
+    ) -> List[Result]:
+        
+        self._fields = {
+            'id': columns.UUID(primary_key=True, default=uuid.uuid4),
+            'engine': columns.Text(min_length=1, index=True),
+            'name': columns.Text(min_length=1, index=True),
+            'action': columns.Blob()
+        }
+
+        results = await self.load_data()
+
+        return await asyncio.gather(*[
+            self.parser.parse_result(
+                result_data,
+                self.stage,
+                self.parser_config,
+                options
+            ) for result_data in results
         ])
     
     async def close(self):

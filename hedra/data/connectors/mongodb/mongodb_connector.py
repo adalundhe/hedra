@@ -3,6 +3,7 @@ import uuid
 from typing import List, Dict, Any
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.data.connectors.common.result_type import Result
 from hedra.data.connectors.common.connector_type import ConnectorType
 from hedra.data.parsers.parser import Parser
 from hedra.logging import HedraLogger
@@ -76,7 +77,22 @@ class MongoDBConnector:
                 options
             ) for action_data in actions
         ])
-    
+
+    async def load_results(
+        self,
+        options: Dict[str, Any]={}
+    ) -> List[Result]:
+        results = await self.load_data()
+
+        return await asyncio.gather(*[
+            self.parser.parse_result(
+                results_data,
+                self.stage,
+                self.parser_config,
+                options
+            ) for results_data in results
+        ])
+
     async def load_data(
         self, 
         options: Dict[str, Any]={}

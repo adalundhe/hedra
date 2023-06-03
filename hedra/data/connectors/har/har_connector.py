@@ -189,6 +189,12 @@ class HARConnector:
             ) for action_data in actions
         ])
     
+    async def load_results(
+        self,
+        options: Dict[str, Any]={}
+    ) -> NotImplementedError:
+        raise NotImplementedError('Results loading is not available for the HAR Connector.')
+    
     async def load_data(
         self, 
         options: Dict[str, Any]={}
