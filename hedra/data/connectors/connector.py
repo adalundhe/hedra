@@ -1,9 +1,14 @@
 from hedra.core.engines.client.config import Config
+from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.engines.types.common.results_set import ResultsSet
+from hedra.data.connectors.common.execute_stage_summary_validator import ExecuteStageSummaryValidator
 from typing import (
     Dict, 
     Union, 
     Any, 
-    Callable
+    List,
+    Callable,
+    Coroutine
 )
 
 from .aws_lambda.aws_lambda_connector import AWSLambdaConnector
@@ -207,10 +212,18 @@ class Connector:
         await self.selected.connect()
         self.connected = True
 
+    async def load_execute_stage_summary(
+        self,
+        options: Dict[str, Any]={}
+    ) -> Coroutine[Any, Any, ExecuteStageSummaryValidator]:
+        return await self.selected.load_execute_stage_summary(
+            options=options
+        )
+
     async def load_actions(
         self,
         options: Dict[str, Any]={}
-    ):
+    ) -> Coroutine[Any, Any, List[ActionHook]]:
         return await self.selected.load_actions(
             options=options
         )
@@ -218,7 +231,7 @@ class Connector:
     async def load_results(
         self,
         options: Dict[str, Any]={}
-    ):
+    ) -> Coroutine[Any, Any, ResultsSet]:
         return await self.selected.load_results(
             options=options
         )
@@ -226,7 +239,7 @@ class Connector:
     async def load_data(
         self,
         options: Dict[str, Any]={}
-    ):
+    ) -> Coroutine[Any, Any, Any]:
         return await self.load_data(
             options=options
         )
