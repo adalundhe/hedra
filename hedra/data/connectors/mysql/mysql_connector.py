@@ -5,7 +5,7 @@ from typing import List, Dict, Any
 from hedra.logging import HedraLogger
 from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.action.hook import ActionHook
-from hedra.data.connectors.common.result_type import Result
+from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.data.connectors.common.connector_type import ConnectorType
 from hedra.data.parsers.parser import Parser
 from .mysql_connector_config import MySQLConnectorConfig
@@ -98,17 +98,19 @@ class MySQLConnector:
     async def load_results(
         self,
         options: Dict[str, Any]={}
-    ) -> List[Result]:
+    ) -> ResultsSet:
         results = await self.load_data()
 
-        return await asyncio.gather(*[
-            self.parser.parse_result(
-                results_data,
-                self.stage,
-                self.parser_config,
-                options
-            ) for results_data in results
-        ])
+        return ResultsSet({
+            'stage_results': await asyncio.gather(*[
+                self.parser.parse_result(
+                    results_data,
+                    self.stage,
+                    self.parser_config,
+                    options
+                ) for results_data in results
+            ])
+        })
     
     async def load_data(
         self, 

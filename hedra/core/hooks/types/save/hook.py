@@ -1,21 +1,32 @@
-import psutil
-import asyncio
-import functools
-from concurrent.futures import ThreadPoolExecutor
 from typing import (
     Callable, 
     Awaitable, 
     Any, 
     Tuple, 
-    Dict
+    Dict,
+    Union
 )
+from hedra.core.engines.client.config import Config
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
-from hedra.core.engines.types.common.results_set import ResultsSet
-from hedra.tools.filesystem import open
-
-
-RawResultsSet = Dict[str, ResultsSet]
+from hedra.data.connectors.aws_lambda.aws_lambda_connector_config import AWSLambdaConnectorConfig
+from hedra.data.connectors.bigtable.bigtable_connector_config import BigTableConnectorConfig
+from hedra.data.connectors.cassandra.cassandra_connector_config import CassandraConnectorConfig
+from hedra.data.connectors.cosmosdb.cosmos_connector_config import CosmosDBConnectorConfig
+from hedra.data.connectors.csv.csv_connector_config import CSVConnectorConfig
+from hedra.data.connectors.google_cloud_storage.google_cloud_storage_connector_config import GoogleCloudStorageConnectorConfig
+from hedra.data.connectors.har.har_connector_config import HARConnectorConfig
+from hedra.data.connectors.json.json_connector_config import JSONConnectorConfig
+from hedra.data.connectors.kafka.kafka_connector_config import KafkaConnectorConfig
+from hedra.data.connectors.mongodb.mongodb_connector_config import MongoDBConnectorConfig
+from hedra.data.connectors.mysql.mysql_connector_config import MySQLConnectorConfig
+from hedra.data.connectors.postgres.postgres_connector_config import PostgresConnectorConfig
+from hedra.data.connectors.redis.redis_connector_config import RedisConnectorConfig
+from hedra.data.connectors.s3.s3_connector_config import S3ConnectorConfig
+from hedra.data.connectors.snowflake.snowflake_connector_config import SnowflakeConnectorConfig
+from hedra.data.connectors.sqlite.sqlite_connector_config import SQLiteConnectorConfig
+from hedra.data.connectors.xml.xml_connector_config import XMLConnectorConfig
+from hedra.data.connectors.connector import Connector
 
 
 class SaveHook(Hook):
@@ -26,7 +37,26 @@ class SaveHook(Hook):
         shortname: str, 
         call: Callable[..., Awaitable[Any]], 
         *names: Tuple[str, ...],
-        save_path: str=None,
+        loader: Union[
+            AWSLambdaConnectorConfig,
+            BigTableConnectorConfig,
+            CassandraConnectorConfig,
+            CosmosDBConnectorConfig,
+            CSVConnectorConfig,
+            GoogleCloudStorageConnectorConfig,
+            HARConnectorConfig,
+            JSONConnectorConfig,
+            KafkaConnectorConfig,
+            MongoDBConnectorConfig,
+            MySQLConnectorConfig,
+            PostgresConnectorConfig,
+            RedisConnectorConfig,
+            S3ConnectorConfig,
+            SnowflakeConnectorConfig,
+            SQLiteConnectorConfig,
+            XMLConnectorConfig
+
+        ]=None, 
         order: int=1,
         skip: bool=False
     ) -> None:
@@ -40,91 +70,61 @@ class SaveHook(Hook):
         )
 
         self.names = list(set(names))
-        self.save_path = save_path
-        self.executor = ThreadPoolExecutor(
-            max_workers=psutil.cpu_count(logical=False)
+        self.loader_config = loader
+        self.parser_config: Union[Config, None] = None
+        self.loader: Union[Connector, None] = Connector(
+            self.stage,
+            self.loader_config,
+            self.parser_config
         )
 
-        self.loop = None
+        self.loaded = False
 
     async def call(self, **kwargs) -> None:
 
-        if self.skip:
+        condition_result = await self._execute_call(**kwargs)
+
+        if self.skip or self.loaded or condition_result is False:
             return kwargs
+
+        if self.loader.connected is False:
+            self.loader.selected.stage = self.stage
+            self.loader.selected.parser_config = self.parser_config
+
+            await self.loader.connect()
+
+        hook_args = {
+            name: value for name, value in kwargs.items() if name in self.params
+        }
         
-        self.loop = asyncio.get_event_loop()
-
-        return await self.loop.run_in_executor(
-            self.executor,
-            functools.partial(
-                self._run,
-                **kwargs
-            )
-        )
-
-    def _run(self, **kwargs):
-        import asyncio
-        import uvloop
-        uvloop.install()
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-        return loop.run_until_complete(self._write(**kwargs))
-
-    async def _write(self, **kwargs) -> None:
-
-        save_file = await open(self.save_path, 'w')
-
-        hook_args = {name: value for name, value in kwargs.items() if name in self.params}
-
-        for param_name in self.params.keys():
-
-            if param_name == 'results':
-                
-                results: RawResultsSet = self.context[param_name]
-                
-                for stage_name, result, in results.items():
-                    results[stage_name] = result.action_to_serializable()
-
-                context_value = results
-
-            else:
-
-                context_value = self.context[param_name]
-
-            if param_name != 'self' and context_value is not None:
-                hook_args[param_name] = context_value
+        load_result: Union[Dict[str, Any], Any] = await self._call(**{
+            **hook_args,
+            'loader': self.loader
+        })
         
-        if 'results' in list(self.params.keys()):
-            results = []
+        await self.loader.close()
 
-            for stage_results in context_value.values():
-                results.extend(
-                    stage_results.results
-                )
 
-            context_value['results'] = results
+        self.loaded = True
 
-        await save_file.write(
-            await self._call(**{name: value for name, value in kwargs.items() if name in self.params})
-        )
+        if isinstance(load_result, dict):
+            return {
+                **kwargs,
+                **load_result
+            }
 
-        await save_file.close()
-
-        for context_key in hook_args:
-            if self.context.get(context_key):
-                self.context[context_key] = type(self.context[context_key])()
-                kwargs[context_key] = type(self.context[context_key])()
-
-        return kwargs    
+        return {
+            **kwargs,
+            self.shortname: load_result
+        }
 
     def copy(self):
         save_hook = SaveHook(
             self.name,
             self.shortname,
             self._call,
-            self.save_path,
+            *self.names,
+            loader=self.loader_config,
             order=self.order,
             skip=self.skip,
         )

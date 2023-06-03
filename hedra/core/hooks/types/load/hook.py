@@ -1,12 +1,9 @@
-import re
-import traceback
 from typing import (
     Callable, 
     Awaitable, 
     Any, 
     Dict, 
     Union, 
-    List, 
     Tuple
 )
 from hedra.core.engines.client.config import Config
@@ -14,10 +11,22 @@ from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.data.connectors.aws_lambda.aws_lambda_connector_config import AWSLambdaConnectorConfig
 from hedra.data.connectors.bigtable.bigtable_connector_config import BigTableConnectorConfig
+from hedra.data.connectors.cassandra.cassandra_connector_config import CassandraConnectorConfig
+from hedra.data.connectors.cosmosdb.cosmos_connector_config import CosmosDBConnectorConfig
+from hedra.data.connectors.csv.csv_connector_config import CSVConnectorConfig
+from hedra.data.connectors.google_cloud_storage.google_cloud_storage_connector_config import GoogleCloudStorageConnectorConfig
+from hedra.data.connectors.har.har_connector_config import HARConnectorConfig
+from hedra.data.connectors.json.json_connector_config import JSONConnectorConfig
+from hedra.data.connectors.kafka.kafka_connector_config import KafkaConnectorConfig
+from hedra.data.connectors.mongodb.mongodb_connector_config import MongoDBConnectorConfig
+from hedra.data.connectors.mysql.mysql_connector_config import MySQLConnectorConfig
+from hedra.data.connectors.postgres.postgres_connector_config import PostgresConnectorConfig
+from hedra.data.connectors.redis.redis_connector_config import RedisConnectorConfig
+from hedra.data.connectors.s3.s3_connector_config import S3ConnectorConfig
+from hedra.data.connectors.snowflake.snowflake_connector_config import SnowflakeConnectorConfig
+from hedra.data.connectors.sqlite.sqlite_connector_config import SQLiteConnectorConfig
+from hedra.data.connectors.xml.xml_connector_config import XMLConnectorConfig
 from hedra.data.connectors.connector import Connector
-
-
-RawResultsSet = Dict[str, Dict[str, Union[int, float, List[Any]]]]
 
 
 class LoadHook(Hook):
@@ -31,6 +40,22 @@ class LoadHook(Hook):
         loader: Union[
             AWSLambdaConnectorConfig,
             BigTableConnectorConfig,
+            CassandraConnectorConfig,
+            CosmosDBConnectorConfig,
+            CSVConnectorConfig,
+            GoogleCloudStorageConnectorConfig,
+            HARConnectorConfig,
+            JSONConnectorConfig,
+            KafkaConnectorConfig,
+            MongoDBConnectorConfig,
+            MySQLConnectorConfig,
+            PostgresConnectorConfig,
+            RedisConnectorConfig,
+            S3ConnectorConfig,
+            SnowflakeConnectorConfig,
+            SQLiteConnectorConfig,
+            XMLConnectorConfig
+
         ]=None, 
         order: int=1,
         skip: bool=False
@@ -53,7 +78,6 @@ class LoadHook(Hook):
             self.parser_config
         )
 
-        self._strip_pattern = re.compile('[^a-z]+')
         self.loaded = False
 
     async def call(self, **kwargs) -> None:
