@@ -303,7 +303,7 @@ class Execute(Stage, Generic[Unpack[T]]):
         loaded_actions: List[str] = []
         for action_hook in execute_stage_loaded_actions:
             loaded_actions.append(
-                self.serializer.serialize_action(action_hook)
+                self.serializer.serialize(action_hook)
             ) 
 
         if execute_stage_has_multiple_workers:

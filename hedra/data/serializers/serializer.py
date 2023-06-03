@@ -2,25 +2,18 @@ import dill
 import traceback
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.graphql.action import GraphQLAction
-from hedra.core.engines.types.graphql.client import MercuryGraphQLClient
 from hedra.core.engines.types.graphql_http2.action import GraphQLHTTP2Action
-from hedra.core.engines.types.graphql_http2.client import MercuryGraphQLHTTP2Client
 from hedra.core.engines.types.grpc.action import GRPCAction
-from hedra.core.engines.types.grpc.client import MercuryGRPCClient
 from hedra.core.engines.types.http.action import HTTPAction
-from hedra.core.engines.types.http.client import MercuryHTTPClient
 from hedra.core.engines.types.http2.action import HTTP2Action
-from hedra.core.engines.types.http2.client import MercuryHTTP2Client
 from hedra.core.engines.types.http3.action import HTTP3Action
-from hedra.core.engines.types.http3.client import MercuryHTTP3Client
 from hedra.core.engines.types.playwright.command import PlaywrightCommand
-from hedra.core.engines.types.playwright.client import MercuryPlaywrightClient
+from hedra.core.engines.types.task.task import Task
 from hedra.core.engines.types.udp.action import UDPAction
-from hedra.core.engines.types.udp.client import MercuryUDPClient
 from hedra.core.engines.types.websocket.action import WebsocketAction
-from hedra.core.engines.types.websocket.client import MercuryWebsocketClient
 from hedra.core.hooks.types.action.hook import ActionHook
-from typing import List, Union, Callable, Dict, Any
+from hedra.core.hooks.types.task.hook import TaskHook
+from typing import Union, Callable, Dict, Any
 from .serializer_types import (
     GraphQLSerializer,
     GraphQLHTTP2Serializer,
@@ -29,6 +22,7 @@ from .serializer_types import (
     HTTP2Serializer,
     HTTP3Serializer,
     PlaywrightSerializer,
+    TaskSerializer,
     UDPSerializer,
     WebsocketSerializer
 )
@@ -62,6 +56,7 @@ class Serializer:
                     HTTP2Serializer,
                     HTTP3Serializer,
                     PlaywrightSerializer,
+                    TaskSerializer,
                     UDPSerializer,
                     WebsocketSerializer
                 ]
@@ -74,6 +69,7 @@ class Serializer:
             RequestTypes.HTTP2: lambda: HTTP2Serializer(),
             RequestTypes.HTTP3: lambda: HTTP3Serializer(),
             RequestTypes.PLAYWRIGHT: lambda: PlaywrightSerializer(),
+            RequestTypes.TASK: lambda: TaskSerializer(),
             RequestTypes.UDP: lambda: UDPSerializer(),
             RequestTypes.WEBSOCKET: lambda: WebsocketSerializer()
         }
@@ -88,42 +84,42 @@ class Serializer:
                 HTTP2Serializer,
                 HTTP3Serializer,
                 PlaywrightSerializer,
+                TaskSerializer,
                 UDPSerializer,
                 WebsocketSerializer
             ] 
         ] = {}
 
-    def serialize_action(
+    def serialize(
         self,
-        action_hook: ActionHook
+        hook: Union[ActionHook, TaskHook]
     ):
-        action: Action = action_hook.action
+        action: Action = hook.action
         serializer = self._active_serializers.get(action.type)
 
         if serializer is None and action.type in self._action_serializers:
             serializer = self._action_serializers.get(action.type)()
             self._active_serializers[action.type] = serializer
 
-        serializable_action = serializer.action_to_serializable(action)
-        serializable_hook = action_hook.to_dict()
-        serializable_client_config = action_hook.session.config_to_dict()
+        serializable = serializer.to_serializable(action)
+        serializable_hook = hook.to_dict()
+        serializable_client_config = hook.session.config_to_dict()
 
         return dill.dumps({
             'hook': serializable_hook,
-            'action': serializable_action,
+            'action': serializable,
             'client_config': serializable_client_config
         })
-
     
-    def deserialize_action(
+    def deserialize(
         self,
-        serialized_action_hook: Union[str, bytes]
+        serialized_hook: Union[str, bytes]
     ):
-        deserialized_action_hook: Dict[str, Any] = dill.loads(serialized_action_hook)
+        deserialized_hook: Dict[str, Any] = dill.loads(serialized_hook)
 
-        deserialized_hook = deserialized_action_hook.get('hook', {})
-        deserialized_action: Dict[str, Any] = deserialized_action_hook.get('action')
-        deserialized_client_config = deserialized_action_hook.get('client_config', {})
+        deserialized_hook = deserialized_hook.get('hook', {})
+        deserialized_action: Dict[str, Any] = deserialized_hook.get('action', {})
+        deserialized_client_config = deserialized_hook.get('client_config', {})
 
         action_type = deserialized_action.get('type', RequestTypes.HTTP)
 
@@ -133,24 +129,46 @@ class Serializer:
             serializer = self._action_serializers.get(action_type)()
             self._active_serializers[action_type] = serializer
 
-        action_hook = ActionHook(
-            deserialized_hook.get('name'),
-            deserialized_hook.get('shortname'),
-            None,
-            *deserialized_hook.get('names', []),
-            weight=deserialized_hook.get('weight'),
-            order=deserialized_hook.get('order'),
-            skip=deserialized_hook.get('skip'),
-            metadata={
-                'user': deserialized_hook.get('user'),
-                'tags': deserialized_hook.get('tags')
-            }
-        )
+        if action_type == RequestTypes.TASK:
 
-        action = serializer.deserialize_action(deserialized_action)
+            action_hook = TaskHook(
+                deserialized_hook.get('name'),
+                deserialized_hook.get('shortname'),
+                None,
+                *deserialized_hook.get('names', []),
+                weight=deserialized_hook.get('weight'),
+                order=deserialized_hook.get('order'),
+                skip=deserialized_hook.get('skip'),
+                metadata={
+                    'user': deserialized_hook.get('user'),
+                    'tags': deserialized_hook.get('tags')
+                }
+            )
+
+            action = serializer.deserialize_task(deserialized_action)
+        
+        else:
+
+            action_hook = ActionHook(
+                deserialized_hook.get('name'),
+                deserialized_hook.get('shortname'),
+                None,
+                *deserialized_hook.get('names', []),
+                weight=deserialized_hook.get('weight'),
+                order=deserialized_hook.get('order'),
+                skip=deserialized_hook.get('skip'),
+                metadata={
+                    'user': deserialized_hook.get('user'),
+                    'tags': deserialized_hook.get('tags')
+                }
+            )
+
+            action = serializer.deserialize_action(deserialized_action)
+
         action_hook.action = action
 
         session = serializer.deserialize_client_config(deserialized_client_config)
         action_hook.session = session
 
         return action_hook
+        

@@ -89,7 +89,7 @@ async def setup_action_channels_and_playwright(
     if len(loaded_actions) > 0:
         for serialized_action in loaded_actions:
             actions_and_tasks.append(
-                serializer.deserialize_action(serialized_action)
+                serializer.deserialize(serialized_action)
             )
 
     actions_and_tasks.extend(

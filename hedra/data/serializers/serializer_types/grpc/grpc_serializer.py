@@ -1,6 +1,7 @@
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.grpc.action import GRPCAction
 from hedra.core.engines.types.grpc.client import MercuryGRPCClient
+from hedra.core.engines.types.grpc.result import GRPCResult
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.data.serializers.serializer_types.common.base_serializer import BaseSerializer
 from typing import List, Dict, Union, Any
@@ -11,11 +12,11 @@ class GRPCSerializer(BaseSerializer):
     def __init__(self) -> None:
         super().__init__()
 
-    def action_to_serializable(
+    def to_serializable(
         self,
         action: GRPCAction
     ) -> Dict[str, Union[str, List[str]]]:
-        serialized_action = super().action_to_serializable(action)
+        serialized_action = super().to_serializable(action)
 
         return {
             **serialized_action,
@@ -68,3 +69,67 @@ class GRPCSerializer(BaseSerializer):
             ),
             reset_connections=client_config.get('reset_sessions')
         )
+    
+    def result_to_serializable(
+        self,
+        result: GRPCResult
+    ) -> Dict[str, Any]:
+        
+        serialized_result = super().result_to_serializable(result)
+
+        encoded_headers = {
+            str(k.decode()): str(v.decode()) for k, v in result.headers.items()
+        }
+
+        data = result.data
+        if isinstance(data, bytes) or isinstance(data, bytearray):
+            data = str(data.decode())
+
+        return {
+            **serialized_result,
+            'url': result.url,
+            'method': result.method,
+            'path': result.path,
+            'params': result.params,
+            'query': result.query,
+            'type': result.type,
+            'headers': encoded_headers,
+            'data': data,
+            'tags': result.tags,
+            'user': result.user,
+            'error': str(result.error),
+            'status': result.status,
+            'reason': result.reason,
+        }
+    
+    def deserialize_result(
+        self,
+        result: Dict[str, Any]
+    ) -> GRPCResult:
+        deserialized_result = GRPCResult(
+            GRPCAction(
+                name=result.get('name'),
+                url=result.get('url'),
+                method=result.get('method'),
+                headers=result.get('headers'),
+                data=result.get('data'),
+                user=result.get('user'),
+                tags=result.get('tags', [])      
+            ),
+            error=Exception(result.get('error'))
+        )
+
+        deserialized_result.status = result.get('status')
+        deserialized_result.reason = result.get('reason')
+        deserialized_result.params = result.get('params')
+        deserialized_result.query = result.get('query')
+        deserialized_result.wait_start = result.get('wait_start')
+        deserialized_result.start = result.get('start')
+        deserialized_result.connect_end = result.get('connect_end')
+        deserialized_result.write_end = result.get('write_end')
+        deserialized_result.complete = result.get('complete')
+        deserialized_result.checks = result.get('checks')
+
+        deserialized_result.type = RequestTypes.HTTP2
+
+        return deserialized_result

@@ -311,7 +311,7 @@ class Optimize(Stage):
 
                 stage_loaded_actions = optimize_stage_loaded_actions.get(stage_name)
                 loaded_actions: List[str] = [
-                    self.serializer.serialize_action(
+                    self.serializer.serialize(
                         action_hook
                     ) for action_hook in stage_loaded_actions
                 ]
