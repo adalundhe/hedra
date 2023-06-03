@@ -126,13 +126,13 @@ class Serializer:
             serializer = self._serializers.get(action.type)()
             self._active_serializers[action.type] = serializer
 
-        serializable = serializer.action_to_serializable(action)
+        serializable_action = serializer.action_to_serializable(action)
         serializable_hook = hook.to_dict()
         serializable_client_config = hook.session.config_to_dict()
 
         return dill.dumps({
             'hook': serializable_hook,
-            'action': serializable,
+            'action': serializable_action,
             'client_config': serializable_client_config
         })
     
@@ -142,7 +142,7 @@ class Serializer:
     ):
         deserialized_hook: Dict[str, Any] = dill.loads(serialized_hook)
 
-        deserialized_hook = deserialized_hook.get('hook', {})
+        deserialized_hook_config = deserialized_hook.get('hook', {})
         deserialized_action: Dict[str, Any] = deserialized_hook.get('action', {})
         deserialized_client_config = deserialized_hook.get('client_config', {})
 
@@ -157,16 +157,16 @@ class Serializer:
         if action_type == RequestTypes.TASK:
 
             action_hook = TaskHook(
-                deserialized_hook.get('name'),
-                deserialized_hook.get('shortname'),
+                deserialized_hook_config.get('name'),
+                deserialized_hook_config.get('shortname'),
                 None,
-                *deserialized_hook.get('names', []),
-                weight=deserialized_hook.get('weight'),
-                order=deserialized_hook.get('order'),
-                skip=deserialized_hook.get('skip'),
+                *deserialized_hook_config.get('names', []),
+                weight=deserialized_hook_config.get('weight'),
+                order=deserialized_hook_config.get('order'),
+                skip=deserialized_hook_config.get('skip'),
                 metadata={
-                    'user': deserialized_hook.get('user'),
-                    'tags': deserialized_hook.get('tags')
+                    'user': deserialized_hook_config.get('user'),
+                    'tags': deserialized_hook_config.get('tags')
                 }
             )
 
@@ -175,16 +175,16 @@ class Serializer:
         else:
 
             action_hook = ActionHook(
-                deserialized_hook.get('name'),
-                deserialized_hook.get('shortname'),
+                deserialized_hook_config.get('name'),
+                deserialized_hook_config.get('shortname'),
                 None,
-                *deserialized_hook.get('names', []),
-                weight=deserialized_hook.get('weight'),
-                order=deserialized_hook.get('order'),
-                skip=deserialized_hook.get('skip'),
+                *deserialized_hook_config.get('names', []),
+                weight=deserialized_hook_config.get('weight'),
+                order=deserialized_hook_config.get('order'),
+                skip=deserialized_hook_config.get('skip'),
                 metadata={
-                    'user': deserialized_hook.get('user'),
-                    'tags': deserialized_hook.get('tags')
+                    'user': deserialized_hook_config.get('user'),
+                    'tags': deserialized_hook_config.get('tags')
                 }
             )
 
