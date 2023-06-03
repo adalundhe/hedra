@@ -57,7 +57,6 @@ class PlaywrightActionValidator(BaseModel):
     url: Optional[PlaywrightURLValidator]
     input: Optional[PlaywrightInputValidator]
     options: Optional[PlaywrightOptionsValidator]
-    sourcefile: StrictStr
     weight: Optional[Union[StrictInt, StrictFloat]]
     order: Optional[StrictInt]
     user: Optional[StrictStr]
