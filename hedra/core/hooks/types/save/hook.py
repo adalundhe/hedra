@@ -7,7 +7,7 @@ from typing import (
     Union
 )
 from hedra.core.engines.client.config import Config
-from hedra.core.engines.types.common.actions_registry import actions_registry
+from hedra.core.engines.types.common.action_registry import actions_registry
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.data.connectors.aws_lambda.aws_lambda_connector_config import AWSLambdaConnectorConfig
@@ -73,26 +73,26 @@ class SaveHook(Hook):
         self.names = list(set(names))
         self.loader_config = loader
         self.parser_config: Union[Config, None] = None
-        self.loader: Union[Connector, None] = Connector(
+        self.connector: Union[Connector, None] = Connector(
             self.stage,
             self.loader_config,
             self.parser_config
         )
 
-        self.loaded = False
+        self.saved = False
 
     async def call(self, **kwargs) -> None:
 
         condition_result = await self._execute_call(**kwargs)
 
-        if self.skip or self.loaded or condition_result is False:
+        if self.skip or self.saved or condition_result is False:
             return kwargs
 
-        if self.loader.connected is False:
-            self.loader.selected.stage = self.stage
-            self.loader.selected.parser_config = self.parser_config
+        if self.connector.connected is False:
+            self.connector.selected.stage = self.stage
+            self.connector.selected.parser_config = self.parser_config
 
-            await self.loader.connect()
+            await self.connector.connect()
 
         hook_args = {
             name: value for name, value in kwargs.items() if name in self.params
@@ -100,17 +100,14 @@ class SaveHook(Hook):
         
         load_result: Union[Dict[str, Any], Any] = await self._call(**{
             **hook_args,
-            'actions_and_tasks': [
-                *hook_registry.get_hooks_by_type(HookType.ACTION),
-                *hook_registry.get_hooks_by_type(HookType.TASK)
-            ],
-            'loader': self.loader
+            'actions': actions_registry.actions(),
+            'connector': self.connector.selected
         })
         
-        await self.loader.close()
+        await self.connector.close()
 
 
-        self.loaded = True
+        self.saved = True
 
         if isinstance(load_result, dict):
             return {

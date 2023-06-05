@@ -98,7 +98,7 @@ class LoadHook(Hook):
         self.names = list(set(names))
         self.loader_config = loader
         self.parser_config: Union[Config, None] = None
-        self.loader: Union[Connector, None] = Connector(
+        self.connector: Union[Connector, None] = Connector(
             self.stage,
             self.loader_config,
             self.parser_config
@@ -113,11 +113,11 @@ class LoadHook(Hook):
         if self.skip or self.loaded or condition_result is False:
             return kwargs
 
-        if self.loader.connected is False:
-            self.loader.selected.stage = self.stage
-            self.loader.selected.parser_config = self.parser_config
+        if self.connector.connected is False:
+            self.connector.selected.stage = self.stage
+            self.connector.selected.parser_config = self.parser_config
 
-            await self.loader.connect()
+            await self.connector.connect()
 
         hook_args = {
             name: value for name, value in kwargs.items() if name in self.params
@@ -125,10 +125,10 @@ class LoadHook(Hook):
         
         load_result: Union[Dict[str, Any], Any] = await self._call(**{
             **hook_args,
-            'loader': self.loader
+            'connector': self.connector.selected
         })
         
-        await self.loader.close()
+        await self.connector.close()
 
         self.loaded = True
 
