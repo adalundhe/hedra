@@ -13,7 +13,7 @@ class PlaywrightOptionsValidator(BaseModel):
     event: Optional[StrictStr]
     option: Any
     is_checked: Optional[StrictBool]
-    timeout: Optional[StrictInt]
+    timeout: Optional[Union[StrictInt, StrictFloat]]
     extra: Optional[Dict[str, Any]]
     switch_by: Optional[StrictStr]
 

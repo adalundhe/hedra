@@ -5,6 +5,7 @@ import psutil
 import signal
 import uuid
 from typing import List, Dict
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
@@ -22,18 +23,25 @@ from hedra.reporting.system.system_metrics_set import (
 from .cassandra_config import CassandraConfig
 
 
+
+def noop_sync_table():
+    pass
+
+
 try:
     from cassandra.cqlengine import columns
     from cassandra.cqlengine import connection
-    from datetime import datetime
     from cassandra.cqlengine.management import sync_table
     from cassandra.cqlengine.models import Model
     from cassandra.cluster import Cluster
     from cassandra.auth import PlainTextAuthProvider
     has_connector = True
 
-
 except Exception:
+    columns = object
+    connection = object
+    sync_table = noop_sync_table
+    Model = None
     Cluster = None
     PlainTextAuthProvider = None
     has_connector = False
