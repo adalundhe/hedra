@@ -48,35 +48,10 @@ from hedra.core.engines.types.websocket import (
     WebsocketResult
 )
 
-
-from .action_schemas import (
-    CassandraGraphQLActionSchema,
-    CassandraGraphQLHTTP2ActionSchema,
-    CassandraGRPCActionSchema,
-    CassandraHTTPActionSchema,
-    CassandraHTTP2ActionSchema,
-    CassandraHTTP3ActionSchema,
-    CassandraPlaywrightActionSchema,
-    CassandraTaskSchema,
-    CassandraUDPActionSchema,
-    CassandraWebsocketActionSchema
-)
-
-from .result_schemas import (
-    CassandraGraphQLResultSchema,
-    CassandraGraphQLHTTP2ResultSchema,
-    CassandraGRPCResultSchema,
-    CassandraHTTPResultSchema,
-    CassandraHTTP2ResultSchema,
-    CassandraHTTP3ResultSchema,
-    CassandraPlaywrightResultSchema,
-    CassandraTaskResultSchema,
-    CassandraUDPResultSchema,
-    CassandraWebsocketResultSchema
-)
+from .cassandra_schema_set import CassandraSchemaSet
 
 
 class CassandraConverter:
 
     def __init__(self) -> None:
-        pass
+        self.schemas = CassandraSchemaSet()

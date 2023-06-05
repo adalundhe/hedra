@@ -11,7 +11,8 @@ from typing import (
     Any, 
     Union, 
     Callable,
-    Coroutine
+    Coroutine,
+    Type
 )
 from concurrent.futures import ThreadPoolExecutor
 from hedra.core.engines.client.config import Config
@@ -23,14 +24,17 @@ from hedra.data.parsers.parser import Parser
 from hedra.logging import HedraLogger
 from .cassandra_connector_config import CassandraConnectorConfig
 from .cassandra_load_validator import CassandraLoadValidator
+from .converter import CassandraConverter
 
-def noop_factory():
+
+def noop():
     pass
 
 
 try:
     from cassandra.cqlengine import columns
     from cassandra.cqlengine import connection
+    from cassandra.cqlengine.management import sync_table
     from cassandra.query import dict_factory
     from cassandra.cqlengine.query import ModelQuerySet
     from cassandra.cqlengine.models import Model
@@ -41,7 +45,8 @@ try:
 except ImportError:
     columns = object
     connection = object
-    dict_factory=noop_factory
+    sync_table = noop
+    dict_factory = noop
     ModelQuerySet = object
     Model = object
     Cluster = object
@@ -93,8 +98,6 @@ class CassandraConnector:
 
         self.logger = HedraLogger()
         self.logger.initialize()
-
-        self._table: Union[Model, None] = None
 
         self._executor = ThreadPoolExecutor(max_workers=psutil.cpu_count(logical=False))
         self._loop = asyncio.get_event_loop()
@@ -189,6 +192,8 @@ class CassandraConnector:
             'varint':  lambda column_config: columns.VarInt(**column_config),
         }
 
+        self.converter = CassandraConverter()
+
     async def connect(self):
 
         for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
@@ -263,6 +268,27 @@ class CassandraConnector:
 
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Created Keyspace - {self.keyspace}')
 
+    async def create_schemas(self):
+        for schema in self.converter.schemas.action_schemas(self.table_name):
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    sync_table,
+                    schema,
+                    keyspaces=[self.keyspace]
+                )
+            )
+
+        for schema in self.converter.schemas.results_schemas(self.table_name):
+            await self._loop.run_in_executor(
+                self._executor,
+                functools.partial(
+                    sync_table,
+                    schema,
+                    keyspaces=[self.keyspace]
+                )
+            )
+
     async def load_execute_stage_summary(
         self,
         options: Dict[str, Any]={}
@@ -280,29 +306,30 @@ class CassandraConnector:
         
         cassandra_load_request = CassandraLoadValidator(**options)
 
-        if self._table is None:
+        table: Type[Model] = options.get('table')
+
+        if table is None:
             
-            self._fields.update(**{
+            fields = {
                 field_name: self._columns_factory.get(
                     field_config.field_type
                 )(
                     field_config.options
                 ) for field_name, field_config in cassandra_load_request.fields.items()
-            })
+            }
 
-            self._table = type(
+            table = type(
                 self.table_name.capitalize()
                 (Model, ),
-                self._fields
+                fields
             )
 
         if cassandra_load_request.filters:
-            self._table.filter()
 
             data_rows: ModelQuerySet = await self._loop.run_in_executor(
                 self._executor,
                 functools.partial(
-                    self._table.filter,
+                    table.filter,
                     **cassandra_load_request.filters
                 )
             )
@@ -310,7 +337,7 @@ class CassandraConnector:
         else:
             data_rows: ModelQuerySet = await self._loop.run_in_executor(
                 self._executor,
-                self._table.all
+                table.all
             )
 
         if cassandra_load_request.limit:
@@ -331,27 +358,34 @@ class CassandraConnector:
         options: Dict[str, Any]={}
     ) -> Coroutine[Any, Any, List[ActionHook]]:
         
-        self._fields = {
-            'id': columns.UUID(primary_key=True, default=uuid.uuid4),
-            'engine': columns.Text(min_length=1, index=True),
-            'name': columns.Text(min_length=1, index=True),
-            'result': columns.Blob()
-        }
+        tables = [
+            table for table in self.converter.schemas.action_schemas(self.table_name)
+        ]
 
-        results = await self.load_data()        
+        actions: List[Dict[str, Any]] = []
+
+        table_results: List[List[Dict[str, Any]]] = await asyncio.gather(*[
+            asyncio.create_task(
+                self.load_data(
+                    options={
+                        'table': table,
+                        **options
+                    }
+                )
+            ) for table in tables
+        ])
+
+        for table_result in table_results:
+            actions.extend(table_result)
+  
 
         return await asyncio.gather(*[
             self.parser.parse_action(
-                {
-                    'name': result_data.get('name'),
-                    **json.loads(
-                        result_data.get('result', {})
-                    )
-                },
+                action_data,
                 self.stage,
                 self.parser_config,
                 options
-            ) for result_data in results
+            ) for action_data in actions
         ])
     
     async def load_results(
@@ -359,14 +393,25 @@ class CassandraConnector:
         options: Dict[str, Any]={}
     ) -> Coroutine[Any, Any, ResultsSet]:
         
-        self._fields = {
-            'id': columns.UUID(primary_key=True, default=uuid.uuid4),
-            'engine': columns.Text(min_length=1, index=True),
-            'name': columns.Text(min_length=1, index=True),
-            'action': columns.Blob()
-        }
+        tables = [
+            table for table in self.converter.schemas.action_schemas(self.table_name)
+        ]
 
-        results = await self.load_data()
+        results: List[Dict[str, Any]] = []
+
+        table_results: List[List[Dict[str, Any]]] = await asyncio.gather(*[
+            asyncio.create_task(
+                self.load_data(
+                    options={
+                        'table': table,
+                        **options
+                    }
+                )
+            ) for table in tables
+        ])
+
+        for table_result in table_results:
+            results.extend(table_result)
 
         return ResultsSet({
             'stage_results': await asyncio.gather(*[
