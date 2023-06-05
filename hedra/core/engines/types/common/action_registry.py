@@ -62,4 +62,4 @@ def makeActionRegistry():
     return ActionRegistry()
 
 
-actions_regsitry = makeActionRegistry()
+actions_registry = makeActionRegistry()

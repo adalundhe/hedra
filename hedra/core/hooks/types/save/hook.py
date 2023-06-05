@@ -7,7 +7,7 @@ from typing import (
     Union
 )
 from hedra.core.engines.client.config import Config
-from hedra.core.hooks.types.base.hook_registry import hook_registry
+from hedra.core.engines.types.common.actions_registry import actions_registry
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.data.connectors.aws_lambda.aws_lambda_connector_config import AWSLambdaConnectorConfig
