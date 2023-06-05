@@ -9,7 +9,6 @@ from typing import (
     List, 
     Dict, 
     Any, 
-    Union, 
     Callable,
     Coroutine,
     Type
@@ -356,6 +355,12 @@ class CassandraConnector:
         return [
             row for row in data_rows
         ]
+    
+    async def store_actions(
+        self,
+        options: Dict[str, Any]={}
+    ) -> Coroutine[Any, Any, List[Dict[str, Any]]]:
+        pass
 
     async def load_actions(
         self,

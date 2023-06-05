@@ -1,4 +1,4 @@
-from cassandra_graphql_action_schema import CassandraGraphQLActionSchema
+from .cassandra_graphql_action_schema import CassandraGraphQLActionSchema
 from .cassandra_graphql_http2_action_schema import CassandraGraphQLHTTP2ActionSchema
 from .cassandra_grpc_action_schema import CassandraGRPCActionSchema
 from .cassandra_http_action_schema import CassandraHTTPActionSchema
