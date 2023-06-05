@@ -307,6 +307,10 @@ class CassandraConnector:
         cassandra_load_request = CassandraLoadValidator(**options)
 
         table: Type[Model] = options.get('table')
+        table_name = options.get('table_name')
+        
+        if table_name is None:
+            table_name = self.table_name
 
         if table is None:
             
@@ -319,7 +323,7 @@ class CassandraConnector:
             }
 
             table = type(
-                self.table_name.capitalize()
+                table_name,
                 (Model, ),
                 fields
             )
@@ -369,10 +373,11 @@ class CassandraConnector:
                 self.load_data(
                     options={
                         'table': table,
+                        'table_name': table_name,
                         **options
                     }
                 )
-            ) for table in tables
+            ) for table_name, table in tables
         ])
 
         for table_result in table_results:
@@ -404,10 +409,11 @@ class CassandraConnector:
                 self.load_data(
                     options={
                         'table': table,
+                        'table_name': table_name
                         **options
                     }
                 )
-            ) for table in tables
+            ) for table_name, table in tables
         ])
 
         for table_result in table_results:

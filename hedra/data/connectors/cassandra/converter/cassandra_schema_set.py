@@ -130,7 +130,10 @@ class CassandraSchemaSet:
         for schema in self._action_schemas.values():
             cassandra_schema = schema(table_name)
 
-            yield cassandra_schema.actions_table
+            request_type = cassandra_schema.type.lower()
+            assembled_table_name = f'{table_name}_{request_type}'
+
+            yield assembled_table_name, cassandra_schema.actions_table
     
     def results_schemas(
         self, 
@@ -139,4 +142,7 @@ class CassandraSchemaSet:
         for schema in self._results_schemas.values():
             cassandra_schema = schema(table_name)
 
-            yield cassandra_schema.results_table
+            request_type = cassandra_schema.type.lower()
+            assembled_table_name = f'{table_name}_{request_type}'
+
+            yield assembled_table_name, cassandra_schema.results_table
