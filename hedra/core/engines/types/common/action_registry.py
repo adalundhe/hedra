@@ -39,6 +39,12 @@ class ActionRegistry:
         for action in self._actions.values():
             yield action
 
+    def __setitem__(self, name: str, value: Action):
+        self._actions[name] = value
+
+    def actions(self) -> List[Action]:
+        return list(self._actions.values())
+
     def names(self):
         for action_name in self._actions.keys():
             yield action_name

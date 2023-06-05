@@ -16,11 +16,11 @@ from typing_extensions import TypeVarTuple, Unpack
 from hedra.core.engines.client import Client
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.engines.types.playwright import (
     MercuryPlaywrightClient,
     ContextConfig
 )
-from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.engines.types.registry import registered_engines
 from hedra.core.hooks.types.condition.decorator import condition
 from hedra.core.hooks.types.context.decorator import context
@@ -179,27 +179,35 @@ class Execute(Stage, Generic[Unpack[T]]):
     
     @event('get_stage_config')
     async def collect_loaded_actions(self):
-        loaded_actions: List[ActionHook] = []
+
+        loaded_actions: List[Union[ActionHook, TaskHook]] = []
+
+        ignore_context_keys = set()
 
         for context_key, value in self.context.items():
 
-            if isinstance(value, ActionHook):
-                self.context.ignore_serialization_filters.append(context_key)
-                loaded_actions.append(value)
+            if context_key != 'execute_stage_setup_hooks':
 
-            elif isinstance(value, list):
-                self.context.ignore_serialization_filters.append(context_key)
+                if isinstance(value, ActionHook):
+                    ignore_context_keys.add(context_key)
+                    loaded_actions.append(value)
 
-                for item in value:
-                    if isinstance(item, ActionHook):
-                        loaded_actions.append(item)
+                elif isinstance(value, list):
+                    for item in value:
+                        if isinstance(item, ActionHook):
+                            ignore_context_keys.add(context_key)
+                            loaded_actions.append(item)
 
-            elif isinstance(value, dict):
-                self.context.ignore_serialization_filters.append(context_key)
+                elif isinstance(value, dict):
+                    for item in value.values():
+                        if isinstance(item, ActionHook):
+                            ignore_context_keys.add(context_key)
+                            loaded_actions.append(item)
 
-                for item in value.values():
-                    if isinstance(item, ActionHook):
-                        loaded_actions.append(item)
+        
+        self.context.ignore_serialization_filters.extend(
+            list(ignore_context_keys)
+        )
 
         return {
             'execute_stage_loaded_actions': loaded_actions

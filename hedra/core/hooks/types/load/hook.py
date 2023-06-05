@@ -7,6 +7,9 @@ from typing import (
     Tuple
 )
 from hedra.core.engines.client.config import Config
+from hedra.core.hooks.types.base.hook_registry import hook_registry
+from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.data.connectors.aws_lambda.aws_lambda_connector_config import AWSLambdaConnectorConfig
@@ -27,6 +30,31 @@ from hedra.data.connectors.snowflake.snowflake_connector_config import Snowflake
 from hedra.data.connectors.sqlite.sqlite_connector_config import SQLiteConnectorConfig
 from hedra.data.connectors.xml.xml_connector_config import XMLConnectorConfig
 from hedra.data.connectors.connector import Connector
+
+
+ActionType = (
+    ActionHook,
+    TaskHook
+)
+
+
+def register_loaded_actions(
+        load_result: Union[Dict[str, Any], Any]
+    ):
+        if isinstance(load_result, ActionType):
+            hook_registry[load_result.name] = load_result
+
+        elif isinstance(load_result, list):
+            for item in load_result:
+                print('GOT: ', item)
+                if isinstance(item, ActionType):
+                    print('IS ACTION!')
+                    hook_registry[item.name] = item
+
+        elif isinstance(load_result, dict):
+            for item in load_result.values():
+                if isinstance(item, ActionType):
+                    hook_registry[item.name] = item
 
 
 class LoadHook(Hook):
@@ -106,11 +134,19 @@ class LoadHook(Hook):
 
         self.loaded = True
 
+        print(load_result)
+
         if isinstance(load_result, dict):
+
+            for value in load_result.values():
+                register_loaded_actions(value)
+
             return {
                 **kwargs,
                 **load_result
             }
+        
+        register_loaded_actions(load_result)
 
         return {
             **kwargs,

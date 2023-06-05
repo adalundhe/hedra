@@ -7,6 +7,7 @@ from typing import (
     Union
 )
 from hedra.core.engines.client.config import Config
+from hedra.core.hooks.types.base.hook_registry import hook_registry
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.data.connectors.aws_lambda.aws_lambda_connector_config import AWSLambdaConnectorConfig
@@ -99,6 +100,10 @@ class SaveHook(Hook):
         
         load_result: Union[Dict[str, Any], Any] = await self._call(**{
             **hook_args,
+            'actions_and_tasks': [
+                *hook_registry.get_hooks_by_type(HookType.ACTION),
+                *hook_registry.get_hooks_by_type(HookType.TASK)
+            ],
             'loader': self.loader
         })
         
