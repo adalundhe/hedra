@@ -103,10 +103,30 @@ class CassandraSchemaSet:
             RequestTypes.WEBSOCKET: lambda table_name: CassandraWebsocketResultSchema(table_name)
         }
 
+    def get_action_schema(
+        self, 
+        request_type: RequestTypes,
+        table_name: str
+    ):
+        return self._action_schemas.get(
+            request_type,
+            CassandraHTTPActionSchema
+        )(table_name)
+    
+    def get_result_schema(
+        self, 
+        request_type: RequestTypes,
+        table_name: str
+    ):
+        return self._results_schemas.get(
+            request_type,
+            CassandraHTTPResultSchema
+        )(table_name)
+
     def action_schemas(
         self, 
         table_name: str
-    ) -> Model:
+    ):
         for schema in self._action_schemas.values():
             cassandra_schema = schema(table_name)
 
@@ -115,7 +135,7 @@ class CassandraSchemaSet:
     def results_schemas(
         self, 
         table_name: str
-    ) -> Model:
+    ):
         for schema in self._results_schemas.values():
             cassandra_schema = schema(table_name)
 

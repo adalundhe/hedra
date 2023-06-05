@@ -74,3 +74,9 @@ from .result_schemas import (
     CassandraUDPResultSchema,
     CassandraWebsocketResultSchema
 )
+
+
+class CassandraConverter:
+
+    def __init__(self) -> None:
+        pass
