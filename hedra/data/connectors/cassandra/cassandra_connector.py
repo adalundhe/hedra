@@ -24,7 +24,7 @@ from hedra.data.parsers.parser import Parser
 from hedra.logging import HedraLogger
 from .cassandra_connector_config import CassandraConnectorConfig
 from .cassandra_load_validator import CassandraLoadValidator
-from .converter import CassandraConverter
+from .schema_set import CassandraSchemaSet
 
 
 def noop():
@@ -192,7 +192,7 @@ class CassandraConnector:
             'varint':  lambda column_config: columns.VarInt(**column_config),
         }
 
-        self.converter = CassandraConverter()
+        self.schemas = CassandraSchemaSet()
 
     async def connect(self):
 
@@ -269,7 +269,7 @@ class CassandraConnector:
         await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Created Keyspace - {self.keyspace}')
 
     async def create_schemas(self):
-        for schema in self.converter.schemas.action_schemas(self.table_name):
+        for schema in self.schemas.action_schemas(self.table_name):
             await self._loop.run_in_executor(
                 self._executor,
                 functools.partial(
@@ -279,7 +279,7 @@ class CassandraConnector:
                 )
             )
 
-        for schema in self.converter.schemas.results_schemas(self.table_name):
+        for schema in self.schemas.results_schemas(self.table_name):
             await self._loop.run_in_executor(
                 self._executor,
                 functools.partial(
@@ -363,7 +363,7 @@ class CassandraConnector:
     ) -> Coroutine[Any, Any, List[ActionHook]]:
         
         tables = [
-            table for table in self.converter.schemas.action_schemas(self.table_name)
+            table for table in self.schemas.action_schemas(self.table_name)
         ]
 
         actions: List[Dict[str, Any]] = []
@@ -399,7 +399,7 @@ class CassandraConnector:
     ) -> Coroutine[Any, Any, ResultsSet]:
         
         tables = [
-            table for table in self.converter.schemas.action_schemas(self.table_name)
+            table for table in self.schemas.action_schemas(self.table_name)
         ]
 
         results: List[Dict[str, Any]] = []
