@@ -125,7 +125,7 @@ class LoadHook(Hook):
         
         load_result: Union[Dict[str, Any], Any] = await self._call(**{
             **hook_args,
-            'connector': self.connector.selected
+            'connector': self.connector
         })
         
         await self.connector.close()

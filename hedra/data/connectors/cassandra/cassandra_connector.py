@@ -1,7 +1,6 @@
 import asyncio
 import functools
 import os
-import json
 import signal
 import psutil
 import uuid
@@ -11,11 +10,22 @@ from typing import (
     Any, 
     Callable,
     Coroutine,
+    Union,
     Type
 )
 from concurrent.futures import ThreadPoolExecutor
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.common.results_set import ResultsSet
+from hedra.core.engines.types.graphql.action import GraphQLAction
+from hedra.core.engines.types.graphql_http2.action import GraphQLHTTP2Action
+from hedra.core.engines.types.grpc.action import GRPCAction
+from hedra.core.engines.types.http.action import HTTPAction
+from hedra.core.engines.types.http2.action import HTTP2Action
+from hedra.core.engines.types.http3.action import HTTP3Action
+from hedra.core.engines.types.playwright.command import PlaywrightCommand
+from hedra.core.engines.types.task.task import Task
+from hedra.core.engines.types.udp.action import UDPAction
+from hedra.core.engines.types.websocket.action import WebsocketAction
 from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.data.connectors.common.connector_type import ConnectorType
 from hedra.data.connectors.common.execute_stage_summary_validator import ExecuteStageSummaryValidator
@@ -28,6 +38,20 @@ from .schema_set import CassandraSchemaSet
 
 def noop():
     pass
+
+
+Action = Union[
+    GraphQLAction,
+    GraphQLHTTP2Action,
+    GRPCAction,
+    HTTPAction,
+    HTTP2Action,
+    HTTP3Action,
+    PlaywrightCommand,
+    Task,
+    UDPAction,
+    WebsocketAction
+]
 
 
 try:
@@ -358,6 +382,7 @@ class CassandraConnector:
     
     async def store_actions(
         self,
+        actions: List[Action],
         options: Dict[str, Any]={}
     ) -> Coroutine[Any, Any, List[Dict[str, Any]]]:
         pass

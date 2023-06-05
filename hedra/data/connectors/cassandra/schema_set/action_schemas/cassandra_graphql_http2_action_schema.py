@@ -1,6 +1,9 @@
+import json
 import uuid
 from datetime import datetime
 from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core.engines.types.graphql_http2.action import GraphQLHTTP2Action
+from typing import Dict, Any, List
 
 
 try:
@@ -43,3 +46,67 @@ class CassandraGraphQLHTTP2ActionSchema:
         )
 
         self.type = RequestTypes.GRAPHQL_HTTP2
+
+        self._types_map: Dict[type, str] = {
+            str: 'string',
+            int: 'integer',
+            float: 'float',
+            bytes: 'bytes'
+        }
+
+        self._reverse_types_map: Dict[str, type] = {
+            mapped_name: mapped_type for mapped_type, mapped_name in self._types_map.items()
+        }
+
+    def to_schema_record(
+        self,
+        action: GraphQLHTTP2Action
+    ) -> Dict[str, Any]:
+        return {
+            'id': uuid.UUID(action.action_id),
+            'name': action.name,
+            'url': action.url,
+            'headers': json.dumps(action.headers),
+            'query': action.data.get('query'),
+            'operation_name': action.data.get('operation_name'),
+            'variables': json.dumps(action.data.get('variables')),
+            'user': action.metadata.user,
+            'tags': [
+                {
+                    'name': tag.get('name'),
+                    'value': str(tag.get('value')),
+                    'datatype': self._types_map.get(type(
+                        tag.get('value')
+                    ))
+                } for tag in action.metadata.tags
+            ]
+        }
+    
+    def from_schema_record(
+        self,
+        action: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        
+        action_tags: List[Dict[str, Any]] = action.get('tags', [])
+
+        return {
+            'engine': RequestTypes.GRAPHQL,
+            'name': action.get('name'),
+            'url': action.get('url'),
+            'method': action.get('method'),
+            'headers': json.loads(action.get('headers')),
+            'query': action.get('query'),
+            'operation_name': action.get('operation_name'),
+            'variables': json.loads(action.get('variables')),
+            'user': action.get('user'),
+            'tags': [
+                {
+                    'name': tag.get('name'),
+                    'value': self._reverse_types_map.get(
+                        tag.get('datatype')
+                    )(
+                        tag.get('value')
+                    )
+                } for tag in action_tags
+            ]
+        }

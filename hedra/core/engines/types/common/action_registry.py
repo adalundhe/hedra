@@ -58,8 +58,8 @@ class ActionRegistry:
         ]
             
 
-def makeActionRegistry():
+def make_action_registry():
     return ActionRegistry()
 
 
-actions_registry = makeActionRegistry()
+actions_registry = make_action_registry()

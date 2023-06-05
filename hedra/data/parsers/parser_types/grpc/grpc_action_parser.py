@@ -4,8 +4,9 @@ from hedra.core.engines.types.grpc import (
     GRPCAction,
     MercuryGRPCClient
 )
-from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core.engines.types.grpc.protobuf_registry import protobuf_registry
+from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.data.parsers.parser_types.common.base_parser import BaseParser
 from hedra.data.parsers.parser_types.common.parsing import (
@@ -33,7 +34,7 @@ class GRPCActionParser(BaseParser):
         )
 
         self.grpc_options = GRPCOptionsValidator(
-            protobuf_map=options.get('protobuf_map')
+            protobuf_map=protobuf_registry
         )
 
         self.protobuf_map = self.grpc_options.protobuf_map
@@ -46,10 +47,11 @@ class GRPCActionParser(BaseParser):
         
         action_name = action_data.get('name')
         normalized_headers = normalize_headers(action_data)
-        parsed_data = parse_data(action_data)
         tags_data = parse_tags(action_data)
 
-        protobuf = self.protobuf_map[action_name](**parsed_data)
+        protobuf = self.grpc_options.protobuf_map[action_name].ParseFromString(
+            action_data.get('data')
+        )
 
         generator_action = GRPCActionValidator(**{
             **action_data,
@@ -83,7 +85,12 @@ class GRPCActionParser(BaseParser):
             f'{stage}.{generator_action.name}',
             generator_action.name,
             None,
-            sourcefile=generator_action.sourcefile,
+            order=generator_action.order,
+            weight=generator_action.weight,
+            metadata={
+                'user': generator_action.user,
+                'tags': generator_action.tags   
+            }
         )
 
         hook.session = session
