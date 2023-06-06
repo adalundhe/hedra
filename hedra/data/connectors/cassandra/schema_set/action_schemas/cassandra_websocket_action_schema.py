@@ -1,6 +1,9 @@
+import json
 import uuid
 from datetime import datetime
+from hedra.core.engines.types.websocket.action import WebsocketAction
 from hedra.core.engines.types.common.types import RequestTypes
+from typing import Dict, Any, List
 
 
 try:
@@ -41,3 +44,55 @@ class CassandraWebsocketActionSchema:
         )
 
         self.type = RequestTypes.WEBSOCKET
+
+        self._types_map: Dict[type, str] = {
+            str: 'string',
+            int: 'integer',
+            float: 'float',
+            bytes: 'bytes',
+            bool: 'bool'
+        }
+
+        self._reverse_types_map: Dict[str, type] = {
+            mapped_name: mapped_type for mapped_type, mapped_name in self._types_map.items()
+        }
+
+    def from_schema_record(
+        self,
+        action: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        
+        action_tags: List[Dict[str, Any]] = action.get('tags', [])
+        action_data: Dict[str, str] = json.load(action.get('data'))
+
+        data = action_data.get('data')
+        datatype = action_data.get('datatype')
+
+        if datatype == 'bytes':
+            data = data.encode()
+
+        elif datatype == 'integer':
+            data = int(data)
+        
+        elif datatype == 'float':
+            data = float(data)
+
+        return {
+            'engine': RequestTypes.GRAPHQL,
+            'name': action.get('name'),
+            'url': action.get('url'),
+            'method': action.get('method'),
+            'headers': json.loads(action.get('headers')),
+            'data': data,
+            'user': action.get('user'),
+            'tags': [
+                {
+                    'name': tag.get('name'),
+                    'value': self._reverse_types_map.get(
+                        tag.get('datatype')
+                    )(
+                        tag.get('value')
+                    )
+                } for tag in action_tags
+            ]
+        }

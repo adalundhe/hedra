@@ -51,7 +51,8 @@ class CassandraGRPCActionSchema:
             str: 'string',
             int: 'integer',
             float: 'float',
-            bytes: 'bytes'
+            bytes: 'bytes',
+            bool: 'bool'
         }
 
         self._reverse_types_map: Dict[str, type] = {

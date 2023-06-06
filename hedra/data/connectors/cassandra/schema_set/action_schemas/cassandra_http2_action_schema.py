@@ -46,6 +46,18 @@ class CassandraHTTP2ActionSchema:
 
         self.type = RequestTypes.HTTP2
 
+        self._types_map: Dict[type, str] = {
+            str: 'string',
+            int: 'integer',
+            float: 'float',
+            bytes: 'bytes',
+            bool: 'bool'
+        }
+
+        self._reverse_types_map: Dict[str, type] = {
+            mapped_name: mapped_type for mapped_type, mapped_name in self._types_map.items()
+        }
+
     def to_schema_record(
         self,
         action: HTTP2Action
