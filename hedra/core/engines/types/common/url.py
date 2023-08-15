@@ -1,9 +1,10 @@
 import aiodns
 import socket
-import psutil
+from collections import defaultdict
 from ipaddress import ip_address, IPv4Address
 from urllib.parse import urlparse
 from asyncio.events import get_event_loop
+from typing import Dict, List
 from .types import SocketProtocols, SocketTypes
 
 
@@ -49,7 +50,7 @@ class URL:
         if self.loop is None:
             self.loop = get_event_loop()
 
-        infos = {}
+        infos: Dict[str, List] = defaultdict(list)
 
         if self.parsed.hostname is None:
             

@@ -5,7 +5,6 @@ import signal
 import dill
 import pickle
 import warnings
-import traceback
 import asyncio
 import gc
 from collections import defaultdict

@@ -25,13 +25,18 @@ class BatchExecutor:
         max_workers: int = psutil.cpu_count(logical=False),
         start_method: str='spawn'
     ) -> None:
+        
+        cpu_cores = psutil.cpu_count(logical=False)
+        if max_workers > cpu_cores:
+            max_workers = cpu_cores
+
         self.max_workers = max_workers
         self.loop = asyncio.get_event_loop()
         self.start_method = start_method
 
         self.context = multiprocessing.get_context(start_method)
         self.sem = BatchedSemaphore(max_workers)
-        self.pool = ProcessPoolExecutor(max_workers=psutil.cpu_count(logical=False), mp_context=self.context)
+        self.pool = ProcessPoolExecutor(max_workers=max_workers, mp_context=self.context)
         self.shutdown_task = None
         self.batch_by_stages = False
 
