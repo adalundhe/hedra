@@ -16,11 +16,11 @@ from typing_extensions import TypeVarTuple, Unpack
 from hedra.core.engines.client import Client
 from hedra.core.engines.client.config import Config
 from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.engines.types.playwright import (
     MercuryPlaywrightClient,
     ContextConfig
 )
-from hedra.core.engines.types.common.results_set import ResultsSet
 from hedra.core.engines.types.registry import registered_engines
 from hedra.core.hooks.types.condition.decorator import condition
 from hedra.core.hooks.types.context.decorator import context
@@ -39,6 +39,7 @@ from hedra.core.personas.persona_registry import (
     registered_personas, 
     DefaultPersona
 )
+from hedra.data.serializers import Serializer
 from hedra.logging import logging_manager
 from hedra.monitoring import (
     CPUMonitor,
@@ -117,6 +118,7 @@ class Execute(Stage, Generic[Unpack[T]]):
         )
 
         self.stage_retries = self.retries
+        self.serializer = Serializer()
 
     @Internal()
     async def run(self):
@@ -139,6 +141,7 @@ class Execute(Stage, Generic[Unpack[T]]):
             'execute_stage_streamed_analytics',
             'execute_stage_monitors',
             'session_stage_monitors',
+            'execute_stage_loaded_actions'
         ]
         persona_type_name = '-'.join([
             segment.capitalize() for segment in execute_stage_setup_config.persona_type.split('-')
@@ -172,6 +175,42 @@ class Execute(Stage, Generic[Unpack[T]]):
                 'cpu': cpu_monitor,
                 'memory': memory_monitor
             }
+        }
+    
+    @event('get_stage_config')
+    async def collect_loaded_actions(self):
+
+        loaded_actions: List[Union[ActionHook, TaskHook]] = []
+
+        ignore_context_keys = set()
+
+        for context_key, value in self.context.items():
+
+            if context_key != 'execute_stage_setup_hooks':
+
+                if isinstance(value, ActionHook):
+                    ignore_context_keys.add(context_key)
+                    loaded_actions.append(value)
+
+                elif isinstance(value, list):
+                    for item in value:
+                        if isinstance(item, ActionHook):
+                            ignore_context_keys.add(context_key)
+                            loaded_actions.append(item)
+
+                elif isinstance(value, dict):
+                    for item in value.values():
+                        if isinstance(item, ActionHook):
+                            ignore_context_keys.add(context_key)
+                            loaded_actions.append(item)
+
+        
+        self.context.ignore_serialization_filters.extend(
+            list(ignore_context_keys)
+        )
+
+        return {
+            'execute_stage_loaded_actions': loaded_actions
         }
 
     @event('get_stage_config')
@@ -250,6 +289,7 @@ class Execute(Stage, Generic[Unpack[T]]):
             }
 
     @condition(
+        'collect_loaded_actions',
         'get_stage_plugins',
         'get_stage_experiment'
     )
@@ -261,17 +301,23 @@ class Execute(Stage, Generic[Unpack[T]]):
     @event('check_has_multiple_workers')
     async def run_multiple_worker_jobs(
         self,
+        execute_stage_loaded_actions: List[ActionHook]=[],
         execute_stage_has_multiple_workers: bool = False,
         execute_stage_setup_config: Config=None,
         execute_stage_plugins: Dict[str, List[Any]]={},
         execute_stage_setup_by: str=None,
         execute_stage_stream_configs: List[ReporterConfig] = []
     ):
+        loaded_actions: List[str] = []
+        for action_hook in execute_stage_loaded_actions:
+            loaded_actions.append(
+                self.serializer.serialize_action(action_hook)
+            ) 
+
         if execute_stage_has_multiple_workers:
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Starting execution for - {self.workers} workers')
 
             serializable_context = self.context.as_serializable() 
-
             results_sets = await self.executor.execute_stage_batch(
                 execute_actions,
                 [
@@ -286,6 +332,7 @@ class Execute(Stage, Generic[Unpack[T]]):
                         'source_stage_context': {
                             context_key: context_value for context_key, context_value in serializable_context
                         },
+                        'source_stage_loaded_actions': loaded_actions,
                         'source_setup_stage_name': execute_stage_setup_by,
                         'source_stage_id': self.stage_id,
                         'source_stage_plugins': execute_stage_plugins,
@@ -402,10 +449,14 @@ class Execute(Stage, Generic[Unpack[T]]):
     @event('check_has_multiple_workers')
     async def setup_single_worker_job(
         self,
+        execute_stage_loaded_actions: List[ActionHook]=[],
         execute_stage_has_multiple_workers: bool = False,
         execute_stage_setup_config: Config=None,
         execute_stage_extensions: Dict[str, ExtensionPlugin]={}
     ):
+
+
+        self.hooks[HookType.ACTION].extend(execute_stage_loaded_actions)
 
         if execute_stage_has_multiple_workers is False:
 
@@ -445,15 +496,17 @@ class Execute(Stage, Generic[Unpack[T]]):
                     await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Playwright Session - {hook.session.session_id} - Color Scheme: {persona_config.color_scheme}')
 
 
-                    await hook.session.setup(ContextConfig(
-                        browser_type=persona_config.browser_type,
-                        device_type=persona_config.device_type,
-                        locale=persona_config.locale,
-                        geolocation=persona_config.geolocation,
-                        permissions=persona_config.permissions,
-                        color_scheme=persona_config.color_scheme,
-                        options=persona_config.playwright_options
-                    ))
+                    await hook.session.setup(
+                        config=ContextConfig(
+                            browser_type=persona_config.browser_type,
+                            device_type=persona_config.device_type,
+                            locale=persona_config.locale,
+                            geolocation=persona_config.geolocation,
+                            permissions=persona_config.permissions,
+                            color_scheme=persona_config.color_scheme,
+                            options=persona_config.playwright_options
+                        )
+                    )
 
             return {
                 'execute_stage_persona': persona

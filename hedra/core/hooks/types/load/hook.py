@@ -1,25 +1,58 @@
-import psutil
-import asyncio
-import re
-import functools
-from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
 from typing import (
     Callable, 
     Awaitable, 
     Any, 
     Dict, 
     Union, 
-    List, 
     Tuple
 )
+from hedra.core.engines.client.config import Config
+from hedra.core.engines.types.common.action_registry import actions_registry
+from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
-from hedra.core.engines.types.common.results_set import ResultsSet
-from hedra.tools.filesystem import open
+from hedra.data.connectors.aws_lambda.aws_lambda_connector_config import AWSLambdaConnectorConfig
+from hedra.data.connectors.bigtable.bigtable_connector_config import BigTableConnectorConfig
+from hedra.data.connectors.cassandra.cassandra_connector_config import CassandraConnectorConfig
+from hedra.data.connectors.cosmosdb.cosmos_connector_config import CosmosDBConnectorConfig
+from hedra.data.connectors.csv.csv_connector_config import CSVConnectorConfig
+from hedra.data.connectors.google_cloud_storage.google_cloud_storage_connector_config import GoogleCloudStorageConnectorConfig
+from hedra.data.connectors.har.har_connector_config import HARConnectorConfig
+from hedra.data.connectors.json.json_connector_config import JSONConnectorConfig
+from hedra.data.connectors.kafka.kafka_connector_config import KafkaConnectorConfig
+from hedra.data.connectors.mongodb.mongodb_connector_config import MongoDBConnectorConfig
+from hedra.data.connectors.mysql.mysql_connector_config import MySQLConnectorConfig
+from hedra.data.connectors.postgres.postgres_connector_config import PostgresConnectorConfig
+from hedra.data.connectors.redis.redis_connector_config import RedisConnectorConfig
+from hedra.data.connectors.s3.s3_connector_config import S3ConnectorConfig
+from hedra.data.connectors.snowflake.snowflake_connector_config import SnowflakeConnectorConfig
+from hedra.data.connectors.sqlite.sqlite_connector_config import SQLiteConnectorConfig
+from hedra.data.connectors.xml.xml_connector_config import XMLConnectorConfig
+from hedra.data.connectors.connector import Connector
 
 
-RawResultsSet = Dict[str, Dict[str, Union[int, float, List[Any]]]]
+ActionType = (
+    ActionHook,
+    TaskHook
+)
+
+
+def register_loaded_actions(
+        load_result: Union[Dict[str, Any], Any]
+    ):
+        if isinstance(load_result, ActionType):
+            actions_registry[load_result.name] = load_result
+
+        elif isinstance(load_result, list):
+            for item in load_result:
+                if isinstance(item, ActionType):
+                    actions_registry[item.name] = item
+
+        elif isinstance(load_result, dict):
+            for item in load_result.values():
+                if isinstance(item, ActionType):
+                    actions_registry[item.name] = item
 
 
 class LoadHook(Hook):
@@ -30,7 +63,26 @@ class LoadHook(Hook):
         shortname: str, 
         call: Callable[..., Awaitable[Any]], 
         *names: Tuple[str, ...],
-        load_path: str=None,
+        loader: Union[
+            AWSLambdaConnectorConfig,
+            BigTableConnectorConfig,
+            CassandraConnectorConfig,
+            CosmosDBConnectorConfig,
+            CSVConnectorConfig,
+            GoogleCloudStorageConnectorConfig,
+            HARConnectorConfig,
+            JSONConnectorConfig,
+            KafkaConnectorConfig,
+            MongoDBConnectorConfig,
+            MySQLConnectorConfig,
+            PostgresConnectorConfig,
+            RedisConnectorConfig,
+            S3ConnectorConfig,
+            SnowflakeConnectorConfig,
+            SQLiteConnectorConfig,
+            XMLConnectorConfig
+
+        ]=None, 
         order: int=1,
         skip: bool=False
     ) -> None:
@@ -44,88 +96,71 @@ class LoadHook(Hook):
         )
 
         self.names = list(set(names))
-        self.load_path = load_path
-        self.executor = ThreadPoolExecutor(
-            max_workers=psutil.cpu_count(logical=False)
+        self.loader_config = loader
+        self.parser_config: Union[Config, None] = None
+        self.connector: Union[Connector, None] = Connector(
+            self.stage,
+            self.loader_config,
+            self.parser_config
         )
-        self.loop = None
-        self._strip_pattern = re.compile('[^a-z]+'); 
+
+        self.loaded = False
 
     async def call(self, **kwargs) -> None:
 
-        if self.skip:
+        condition_result = await self._execute_call(**kwargs)
+
+        if self.skip or self.loaded or condition_result is False:
             return kwargs
+
+        if self.connector.connected is False:
+            self.connector.selected.stage = self.stage
+            self.connector.selected.parser_config = self.parser_config
+
+            await self.connector.connect()
+
+        hook_args = {
+            name: value for name, value in kwargs.items() if name in self.params
+        }
         
-        execute = await self._execute_call(**kwargs)
-
-        if execute:
-            self.loop = asyncio.get_event_loop()
-            return await self.loop.run_in_executor(
-                self.executor,
-                functools.partial(
-                    self._run,
-                    **kwargs
-                )
-            )
-
-    def _run(self, **kwargs):
-        import asyncio
-        import uvloop
-        uvloop.install()
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-        return loop.run_until_complete(self._load(**kwargs))
-
-    async def _load(self, **kwargs):
-
-        restore_file = await open(self.load_path, 'r')
+        load_result: Union[Dict[str, Any], Any] = await self._call(**{
+            **hook_args,
+            'connector': self.connector
+        })
         
-        file_stem = Path(self.load_path).stem
-        restore_slug = self._strip_pattern.sub('',file_stem.lower())
-        file_data = await restore_file.read()
+        await self.connector.close()
 
-        hook_args = {name: value for name, value in kwargs.items() if name in self.params}
-        hook_args[restore_slug] = file_data
-
-        load_result: Union[Any, dict] = await self._call(**{name: value for name, value in hook_args.items() if name in self.params})
-
-        if restore_slug == 'results':
-
-            for stage_name, stage_data in load_result.items():
-
-                if isinstance(stage_data, ResultsSet) is False:
-                    results_set = ResultsSet(stage_data)
-                    results_set.load_results()
-
-                    load_result[stage_name] = results_set
-
-        self.context[file_data] = load_result
-
-        await restore_file.close()
+        self.loaded = True
 
         if isinstance(load_result, dict):
+
+            for value in load_result.values():
+                register_loaded_actions(value)
+
             return {
                 **kwargs,
                 **load_result
             }
+        
+        register_loaded_actions(load_result)
 
         return {
             **kwargs,
             self.shortname: load_result
         }
-
+    
     def copy(self):
         load_hook = LoadHook(
             self.name,
             self.shortname,
             self._call,
-            self.load_path,
+            *self.names,
+            loader=self.loader_config,
             order=self.order,
-            skip=self.skip,
+            skip=self.skip
         )
 
         load_hook.stage = self.stage
+        load_hook.parser_config = self.parser_config
 
         return load_hook

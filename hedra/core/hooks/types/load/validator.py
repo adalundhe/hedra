@@ -1,7 +1,10 @@
-from typing import Tuple, Optional
+from hedra.data.connectors.aws_lambda.aws_lambda_connector_config import AWSLambdaConnectorConfig
+from hedra.data.connectors.bigtable.bigtable_connector_config import BigTableConnectorConfig
+from typing import Tuple, Optional, Union
+
+
 from pydantic import (
     BaseModel, 
-    Field, 
     StrictStr, 
     StrictInt,
     StrictBool
@@ -10,7 +13,14 @@ from pydantic import (
 
 class LoadHookValidator(BaseModel):
     names: Optional[Tuple[StrictStr, ...]]
-    load_path: StrictStr=Field(..., min_length=1)
+    loader: Union[
+        AWSLambdaConnectorConfig,
+        BigTableConnectorConfig,
+    ]
     order: StrictInt
     skip: StrictBool
+
+    class Config:
+        arbitrary_types_allowed=True
+
 

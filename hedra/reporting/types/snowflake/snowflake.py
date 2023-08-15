@@ -1,6 +1,7 @@
 import asyncio
-import uuid
 import psutil
+import signal
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict
 from hedra.logging import HedraLogger
@@ -17,6 +18,19 @@ from hedra.reporting.system.system_metrics_set import (
     SystemMetricsCollection
 )
 from .snowflake_config import SnowflakeConfig
+
+
+def handle_loop_stop(
+    signame, 
+    executor: ThreadPoolExecutor, 
+    loop: asyncio.AbstractEventLoop
+): 
+    try:
+        executor.shutdown(wait=False, cancel_futures=True) 
+        loop.stop()
+    except Exception:
+        pass
+    
 
 
 try:
@@ -111,6 +125,17 @@ class Snowflake:
     async def connect(self):
 
         try:
+
+            for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
+                self._loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda signame=signame: handle_loop_stop(
+                        signame,
+                        self._executor,
+                        self._loop
+                    )
+                )
+
             await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connecting to Snowflake instance at - Warehouse: {self.warehouse} - Database: {self.database} - Schema: {self.schema}')
             self._engine = await self._loop.run_in_executor(
                 self._executor,
@@ -237,7 +262,7 @@ class Snowflake:
             self._stage_system_metrics_table = stage_system_metrics_table
             await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Created or set Stage System Metrics table - {self.stage_system_metrics_table_name}')
 
-        rows: List[SessionMetricsCollection] = []
+        rows: List[SystemMetricsCollection] = []
             
         for metrics_set in system_metrics_sets:
 
@@ -686,6 +711,8 @@ class Snowflake:
             None,
             self._connection.close
         )
+
+        self._executor.shutdown()
 
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closed session - {self.session_uuid}')
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Closed connection to Snowflake instance at - Warehouse: {self.warehouse} - Database: {self.database} - Schema: {self.schema}')

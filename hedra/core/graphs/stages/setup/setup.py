@@ -19,6 +19,7 @@ from hedra.core.hooks.types.condition.decorator import condition
 from hedra.core.hooks.types.context.decorator import context
 from hedra.core.hooks.types.event.decorator import event
 from hedra.core.hooks.types.transform.decorator import transform
+from hedra.core.engines.types.common.action_registry import actions_registry
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.internal.decorator import Internal
@@ -496,6 +497,8 @@ class Setup(Stage, Generic[Unpack[T]]):
                 hook.session = session
                 hook.action = action  
 
+                actions_registry[hook.name] = action
+
                 return {
                     'setup_stage_actions': setup_stage_actions
                 }
@@ -580,6 +583,8 @@ class Setup(Stage, Generic[Unpack[T]]):
 
             hook.session = session
             hook.action = task  
+
+            actions_registry[hook.name] = task
 
             return {
                 'setup_stage_tasks': setup_stage_tasks

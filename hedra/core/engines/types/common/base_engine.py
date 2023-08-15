@@ -24,6 +24,8 @@ class BaseEngine(Generic[A, R]):
 
         self.waiter: asyncio.Future = None
 
+    def config_to_dict(self):
+        raise NotImplementedError('Cannot call config_to_dict() on base Engine class.')
 
     async def wait_for_active_threshold(self):
         if self.waiter is None:

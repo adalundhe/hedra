@@ -5,11 +5,14 @@ from typing import (
     Any, 
     Callable, 
     Awaitable, 
-    Tuple
+    Tuple,
 )
+from hedra.core.engines.types.common.base_action import BaseAction
+from hedra.core.engines.types.common.base_engine import BaseEngine
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.hook import Hook
 from hedra.core.hooks.types.base.hook_metadata import HookMetadata
+
 
 class ActionHook(Hook):
 
@@ -34,9 +37,9 @@ class ActionHook(Hook):
         )
         
         self.names = list(set(names))
-        self.session: Any = None
-        self.action: Any = None
-        self.checks = []
+        self.session: BaseEngine = None
+        self.action: BaseAction = None
+        self.checks: List[Any] = []
         self.before: List[str] = []
         self.after: List[str] = []
         self.is_notifier = False
@@ -70,3 +73,28 @@ class ActionHook(Hook):
 
     async def call(self, *args, **kwargs):
         return await self._call(*args, **kwargs)
+    
+    def to_dict(self) -> str:
+        return {
+            'name': self.name,
+            'shortname': self.shortname,
+            'skip': self.skip,
+            'hook_type': HookType.ACTION,
+            'names': self.names,
+            'checks': [
+                check if isinstance(check, str) else check.name for check in self.checks
+            ],
+            'channels': [
+                channel if isinstance(channel, str) else channel.name for channel in self.channels
+            ],
+            'notifiers': [
+                notifier if isinstance(notifier, str) else notifier.name for notifier in self.notifiers
+            ],
+            'listeners': [
+                listener if isinstance(listener, str) else listener.name for listener in self.listeners
+            ],
+            'order': self.metadata.order,
+            'weight': self.metadata.weight,
+            'user': self.metadata.user,
+            'tags': self.metadata.tags
+        }

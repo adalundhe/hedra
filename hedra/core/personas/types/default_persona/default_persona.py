@@ -316,7 +316,7 @@ class DefaultPersona:
 
     async def generator(self, total_time):
         elapsed = 0
-        max_pool_size = math.ceil(self.batch.size * (psutil.cpu_count(logical=False) * 2)/self.workers)
+        max_pool_size = math.ceil(self.batch.size * (psutil.cpu_count(logical=False)**2)/self.workers)
         action_idx = 0
 
         start = time.monotonic()

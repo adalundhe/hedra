@@ -31,7 +31,7 @@ class DeferredHeaders(BaseEvent):
         self.encoding = encoding
         self.priority_updated = None
 
-    def parse(self) -> Tuple[int, Dict[str, str]]:
+    def parse(self) -> Tuple[int, Dict[bytes, bytes]]:
         decoder = Decoder()
         decoder.header_table = self.hpack_table
         decoder.header_table_size = self.hpack_table.maxsize
@@ -44,7 +44,7 @@ class DeferredHeaders(BaseEvent):
             return 400, {}
 
         status_code = None
-        headers_dict = {}
+        headers_dict: Dict[bytes, bytes] = {}
         for k, v in headers:
             if k == b":status":
                 status_code = int(v.decode("ascii", errors="ignore"))

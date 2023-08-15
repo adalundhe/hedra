@@ -5,7 +5,6 @@ import signal
 import dill
 import pickle
 import warnings
-import traceback
 import asyncio
 import gc
 from collections import defaultdict
@@ -26,6 +25,8 @@ from hedra.core.personas.persona_registry import registered_personas
 from hedra.core.hooks.types.base.event_graph import EventGraph
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.load.hook import LoadHook
+from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.graphs.stages.base.parallel.partition_method import PartitionMethod
 from hedra.core.graphs.stages.base.stage import Stage
@@ -37,6 +38,7 @@ from hedra.core.graphs.stages.base.import_tools import (
     set_stage_hooks
 )
 from hedra.core.graphs.stages.setup.setup import Setup
+from hedra.data.serializers import Serializer
 from hedra.logging import (
     HedraLogger,
     LoggerTypes,
@@ -65,7 +67,8 @@ async def start_execution(
     source_stage_stream_configs: List[ReporterConfig]=[],
     logfiles_directory: str=None,
     log_level: str=None,
-    extensions: Dict[str, ExtensionPlugin]={}
+    extensions: Dict[str, ExtensionPlugin]={},
+    loaded_actions: List[str]=[]
 ) -> Dict[str, Any]:
 
     current_task = asyncio.current_task()
@@ -99,21 +102,18 @@ async def start_execution(
     persona.stream_reporter_configs = source_stage_stream_configs
     persona.workers = workers
 
-    actions_and_tasks: List[Union[ActionHook, TaskHook]] = setup_stage.context['execute_stage_setup_hooks'].get(source_stage_name)
+    actions_and_tasks: List[Union[ActionHook, TaskHook]] = []
 
-    for extension in extensions.values():
+    serializer = Serializer()
+    if len(loaded_actions) > 0:
+        for serialized_action in loaded_actions:
+            actions_and_tasks.append(
+                serializer.deserialize_action(serialized_action)
+            )
 
-        if extension.extension_type == ExtensionType.GENERATOR:
-            results = await extension.execute(**{
-                'execute_stage_name': setup_execute_stage.name,
-                'execute_stage_hooks': setup_execute_stage.hooks,
-                'persona_config': persona_config
-            })
-
-            execute_stage = results.get('execute_stage_hooks')
-
-            if execute_stage:
-                setup_execute_stage.hooks = results.get('execute_stage')
+    actions_and_tasks.extend(
+        setup_stage.context['execute_stage_setup_hooks'].get(source_stage_name, [])
+    )
 
     execution_hooks_count = len(actions_and_tasks)
     await logger.filesystem.aio['hedra.core'].info(
@@ -133,21 +133,42 @@ async def start_execution(
             await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - Playwright Session - {hook.session.session_id} - Permissions: {persona_config.permissions}')
             await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - Playwright Session - {hook.session.session_id} - Color Scheme: {persona_config.color_scheme}')
 
-            await hook.session.setup(ContextConfig(
-                browser_type=persona_config.browser_type,
-                device_type=persona_config.device_type,
-                locale=persona_config.locale,
-                geolocation=persona_config.geolocation,
-                permissions=persona_config.permissions,
-                color_scheme=persona_config.color_scheme,
-                options=persona_config.playwright_options
-            ))
+            config = hook.session.config
+            if config is None:
+                config = ContextConfig(
+                    browser_type=persona_config.browser_type,
+                    device_type=persona_config.device_type,
+                    locale=persona_config.locale,
+                    geolocation=persona_config.geolocation,
+                    permissions=persona_config.permissions,
+                    color_scheme=persona_config.color_scheme,
+                    options=persona_config.playwright_options
+                )
+
+            await hook.session.setup(
+                config=config
+            )
+
+    for load_hook in setup_execute_stage.hooks[HookType.LOAD]:
+        load_hook: LoadHook = load_hook
+        load_hook.parser_config = setup_stage.config
     
     pipeline_stages = {
         setup_execute_stage.name: setup_execute_stage
     }
+
+    hooks_by_type: Dict[
+        HookType, 
+        Union[
+            List[ActionHook], 
+            List[TaskHook]
+        ]
+    ] = defaultdict(list)
+
+    for hook in actions_and_tasks:
+        hooks_by_type[hook.hook_type].append(hook)
                 
-    persona.setup(setup_execute_stage.hooks, metadata_string)
+    persona.setup(hooks_by_type, metadata_string)
 
     persona.cpu_monitor.stage_type = StageTypes.EXECUTE
     persona.memory_monitor.stage_type = StageTypes.EXECUTE
@@ -273,6 +294,7 @@ def execute_actions(parallel_config: str):
         source_stage_id = parallel_config.get('source_stage_id')
         source_setup_stage_name = parallel_config.get('source_setup_stage_name')
         source_stage_stream_configs = parallel_config.get('source_stage_stream_configs')
+        source_stage_loaded_actions = parallel_config.get('source_stage_loaded_actions')
         partition_method = parallel_config.get('partition_method')
         worker_id = parallel_config.get('worker_id')
         workers = parallel_config.get('workers')
@@ -418,7 +440,8 @@ def execute_actions(parallel_config: str):
                 source_stage_stream_configs=source_stage_stream_configs,
                 logfiles_directory=logfiles_directory,
                 log_level=log_level,
-                extensions=enabled_extensions
+                extensions=enabled_extensions,
+                loaded_actions=source_stage_loaded_actions
             )
         )
 

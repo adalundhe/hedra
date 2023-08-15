@@ -2,33 +2,42 @@ import dill
 import threading
 import os
 import pickle
-import traceback
 from collections import defaultdict
 from typing import Any, Dict, List, Union
 from hedra.core.engines.client.config import Config
-from hedra.core.engines.types.registry import RequestTypes
-from hedra.core.engines.types.playwright import MercuryPlaywrightClient, ContextConfig
-from hedra.core.engines.types.registry import registered_engines
-from hedra.core.graphs.stages.optimize.optimization import Optimizer, DistributionFitOptimizer
-from hedra.core.graphs.stages.base.stage import Stage
-from hedra.core.graphs.stages.setup.setup import Setup
+from hedra.core.engines.types.playwright import (
+    MercuryPlaywrightClient, 
+    ContextConfig
+)
+from hedra.core.engines.types.registry import (
+    registered_engines,
+    RequestTypes
+)
 from hedra.core.graphs.stages.base.exceptions.process_killed_error import ProcessKilledError
-from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.base.import_tools import (
     import_stages, 
     import_plugins,
     set_stage_hooks
 )
-from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.core.graphs.stages.base.stage import Stage
+from hedra.core.graphs.stages.execute import Execute
 from hedra.core.graphs.stages.optimize.optimization.algorithms import registered_algorithms
+from hedra.core.graphs.stages.optimize.optimization import (
+    Optimizer, 
+    DistributionFitOptimizer
+)
+from hedra.core.graphs.stages.setup.setup import Setup
+from hedra.core.graphs.stages.types.stage_types import StageTypes
+from hedra.core.hooks.types.action.hook import ActionHook
 from hedra.core.hooks.types.base.event_graph import EventGraph
 from hedra.core.hooks.types.base.registrar import registrar
 from hedra.core.hooks.types.base.hook_type import HookType
 from hedra.core.hooks.types.base.simple_context import SimpleContext
-from hedra.core.hooks.types.action.hook import ActionHook
+from hedra.core.hooks.types.load.hook import LoadHook
 from hedra.core.hooks.types.task.hook import TaskHook
 from hedra.core.personas.persona_registry import registered_personas
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
+from hedra.data.serializers import Serializer
 from hedra.logging import (
     HedraLogger,
     LoggerTypes
@@ -48,11 +57,12 @@ HooksByType = Dict[HookType, Union[List[ActionHook], List[TaskHook]]]
 
 
 async def setup_action_channels_and_playwright(
-    setup_stage: Setup,
-    execute_stage: Execute,
-    logger: HedraLogger,
-    metadata_string: str,
-    persona_config: Config
+    setup_stage: Setup=None,
+    execute_stage: Execute=None,
+    logger: HedraLogger=None,
+    metadata_string: str=None,
+    persona_config: Config=None,
+    loaded_actions: List[str]=[]
 ) -> Execute:
     setup_stage.context = SimpleContext()
     setup_stage.generation_setup_candidates = 1
@@ -70,14 +80,21 @@ async def setup_action_channels_and_playwright(
     
     stages: Dict[str, Stage] =  setup_stage.context['setup_stage_ready_stages']
     setup_execute_stage: Stage = stages.get(execute_stage.name)
+    setup_execute_stage.logger = logger
 
-    setup_execute_stage_hooks = {}
-    for hook_type in setup_execute_stage.hooks:
-        setup_execute_stage_hooks.update({
-            hook.name: hook for hook in setup_execute_stage.hooks[hook_type]
-        })
 
-    actions_and_tasks: List[Union[ActionHook, TaskHook]] = setup_execute_stage.context['execute_stage_setup_hooks']
+    actions_and_tasks: List[Union[ActionHook, TaskHook]] = []
+
+    serializer = Serializer()
+    if len(loaded_actions) > 0:
+        for serialized_action in loaded_actions:
+            actions_and_tasks.append(
+                serializer.deserialize_action(serialized_action)
+            )
+
+    actions_and_tasks.extend(
+        setup_stage.context['execute_stage_setup_hooks'].get(execute_stage.name, [])
+    )
 
     for hook in actions_and_tasks:
 
@@ -92,15 +109,39 @@ async def setup_action_channels_and_playwright(
             await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - Playwright Session - {hook.session.session_id} - Permissions: {persona_config.permissions}')
             await logger.filesystem.aio['hedra.core'].debug(f'{metadata_string} - Playwright Session - {hook.session.session_id} - Color Scheme: {persona_config.color_scheme}')
 
-            await hook.session.setup(ContextConfig(
-                browser_type=persona_config.browser_type,
-                device_type=persona_config.device_type,
-                locale=persona_config.locale,
-                geolocation=persona_config.geolocation,
-                permissions=persona_config.permissions,
-                color_scheme=persona_config.color_scheme,
-                options=persona_config.playwright_options
-            ))
+            config = hook.session.config
+            if config is None:
+                config = ContextConfig(
+                    browser_type=persona_config.browser_type,
+                    device_type=persona_config.device_type,
+                    locale=persona_config.locale,
+                    geolocation=persona_config.geolocation,
+                    permissions=persona_config.permissions,
+                    color_scheme=persona_config.color_scheme,
+                    options=persona_config.playwright_options
+                )
+
+            await hook.session.setup(
+                config=config
+            )
+
+    hooks_by_type: Dict[
+        HookType, 
+        Union[
+            List[ActionHook], 
+            List[TaskHook]
+        ]
+    ] = defaultdict(list)
+
+    for hook in actions_and_tasks:
+        hooks_by_type[hook.hook_type].append(hook)
+
+    setup_execute_stage.hooks[HookType.ACTION] = hooks_by_type[HookType.ACTION]
+    setup_execute_stage.hooks[HookType.TASK] = hooks_by_type[HookType.TASK]
+
+    for load_hook in setup_execute_stage.hooks[HookType.LOAD]:
+        load_hook: LoadHook = load_hook
+        load_hook.parser_config = setup_stage.config
 
     return setup_execute_stage
 
@@ -198,6 +239,7 @@ def optimize_stage(serialized_config: str):
         optimize_stage_workers: int = optimization_config.get('optimize_stage_workers')
         time_limit: int = optimization_config.get('time_limit')
         batch_size: int = optimization_config.get('execute_stage_batch_size')
+        execute_stage_loaded_actions = optimization_config.get('execute_stage_loaded_actions')
 
         metadata_string = f'Graph - {graph_name}:{graph_id} - thread:{thread_id} - process:{process_id} - Stage: {source_stage_name}:{source_stage_id} - '
         discovered: Dict[str, Stage] = import_stages(graph_path)
@@ -274,7 +316,8 @@ def optimize_stage(serialized_config: str):
             logger=logger,
             metadata_string=metadata_string,
             persona_config=execute_stage_config,
-            execute_stage=execute_stage
+            execute_stage=execute_stage,
+            loaded_actions=execute_stage_loaded_actions
         ))
 
         pipeline_stages = {

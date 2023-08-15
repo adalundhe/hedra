@@ -13,6 +13,7 @@ from hedra.core.engines.types.task import TaskResult
 from hedra.core.engines.types.udp import UDPResult
 from hedra.core.engines.types.websocket import WebsocketResult
 from hedra.core.personas.streaming.stream_analytics import StreamAnalytics
+from hedra.data.serializers import Serializer
 from hedra.monitoring import (
     CPUMonitor,
     MemoryMonitor
@@ -51,7 +52,7 @@ class ResultsSet:
         self.stage_optimized = execution_results.get('stage_optimized', False)
         self.stage_persona_type = execution_results.get('stage_persona_type', 'default')
         self.stage_workers = execution_results.get(
-            'stage_persona_type',
+            'stage_workers',
             psutil.cpu_count(logical=False)
         )
 
@@ -59,6 +60,7 @@ class ResultsSet:
 
         self.serialized_results: List[Dict[str, Any]] = execution_results.get('serialized_results', [])
         self.experiment = execution_results.get('experiment')
+        self.serializer = Serializer()
 
         self.types = {
             RequestTypes.GRAPHQL: GraphQLResult,
@@ -81,15 +83,14 @@ class ResultsSet:
         return {
             'total_elapsed': self.total_elapsed,
             'total_results': self.total_results,
-            'results': [result.to_dict() for result in self.results]
+            'results': [
+                self.serializer.serialize_result(result) for result in self.results
+            ]
         }
     
     def load_results(self):
         self.results = [
-            self.types.get(
-                result.get('type'), 
-                HTTPResult
-            ).from_dict(result) for result in self.serialized_results
+            self.serializer.deserialize_result(result) for result in self.serialized_results
         ]
 
     def group(self) -> Dict[str, List[BaseResult]]:

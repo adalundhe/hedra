@@ -49,7 +49,8 @@ class HTTPResult(BaseResult):
         self.query = action.url.query
         self.hostname = action.url.hostname
 
-        self.headers: Dict[str, Union[str, int, float]] = {}
+        self.headers: Dict[bytes, bytes] = {}
+
         self.body = bytearray()
         self.response_code = None
         self._version = None
@@ -148,63 +149,3 @@ class HTTPResult(BaseResult):
     @reason.setter
     def reason(self, new_reason):
         self._reason = new_reason
-
-    def to_dict(self):
-
-        encoded_headers = {
-            str(k.decode()): str(v.decode()) for k, v in self.headers.items()
-        }
-
-        base_result_dict = super().to_dict()
-
-        data = self.data
-        if isinstance(data, bytes) or isinstance(data, bytearray):
-            data = str(data.decode())
-        
-        return {
-            'url': self.url,
-            'method': self.method,
-            'path': self.path,
-            'params': self.params,
-            'query': self.query,
-            'type': self.type,
-            'headers': encoded_headers,
-            'data': data,
-            'tags': self.tags,
-            'user': self.user,
-            'error': str(self.error),
-            'status': self.status,
-            'reason': self.reason,
-            **base_result_dict
-        }
-
-    @classmethod
-    def from_dict(
-        cls, 
-        results_dict: Dict[str, Union[int, float, str,]]
-    ) -> HTTPResult:
-
-        action = HTTPAction(
-            results_dict.get('name'),
-            results_dict.get('url'),
-            method=results_dict.get('method'),
-            user=results_dict.get('user'),
-            tags=results_dict.get('tags'),
-        )
-
-        response = HTTPResult(action, error=results_dict.get('error'))
-        
-
-        response.headers.update(results_dict.get('headers', {}))
-        response.data = results_dict.get('data')
-        response.status = results_dict.get('status')
-        response.reason = results_dict.get('reason')
-        response.checks = results_dict.get('checks')
-     
-        response.wait_start = results_dict.get('wait_start')
-        response.start = results_dict.get('start')
-        response.connect_end = results_dict.get('connect_end')
-        response.write_end = results_dict.get('write_end')
-        response.complete = results_dict.get('complete')
-
-        return response

@@ -1,6 +1,7 @@
 import asyncio
 import functools
 import json
+import signal
 import uuid
 import psutil
 from typing import List, Dict, Union
@@ -20,6 +21,18 @@ try:
 except Exception:
     boto3 = None
     has_connector=False
+
+
+def handle_loop_stop(
+    signame, 
+    executor: ThreadPoolExecutor, 
+    loop: asyncio.AbstractEventLoop
+): 
+    try:
+        executor.shutdown(wait=False, cancel_futures=True) 
+        loop.stop()
+    except Exception:
+        pass
 
 
 class AWSLambda:
@@ -54,6 +67,16 @@ class AWSLambda:
         self.logger.initialize()
 
     async def connect(self):
+
+        for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
+            self._loop.add_signal_handler(
+                getattr(signal, signame),
+                lambda signame=signame: handle_loop_stop(
+                    signame,
+                    self._executor,
+                    self._loop
+                )
+            )
 
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Opening session - {self.session_uuid}')
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opening amd authorizing connection to AWS - Region: {self.region_name}')
@@ -300,4 +323,5 @@ class AWSLambda:
             
 
     async def close(self):
+        self._executor.shutdown(cancel_futures=True)
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')

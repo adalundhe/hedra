@@ -47,15 +47,3 @@ class Task(BaseAction):
         self.args = inspect.signature(task_action)
         self.params = self.args.parameters
         self.task_args: Dict[str, Any] = {}
-
-    def to_serializable(self):
-
-        return {
-            'name': self.name,
-            'type': self.type,
-            'metadata': {
-                'user': self.metadata.user,
-                'tags': self.metadata.tags
-            },
-            'hooks': self.hooks.to_serializable()
-        }

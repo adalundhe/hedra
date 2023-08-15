@@ -18,6 +18,7 @@ from hedra.core.graphs.stages.error import Error
 from hedra.core.graphs.stages.types.stage_types import StageTypes
 from hedra.core.hooks.types.base.registrar import registrar
 from hedra.core.hooks.types.base.hook import Hook, HookType
+from hedra.core.hooks.types.load.hook import LoadHook
 from hedra.core.graphs.stages.base.parallel.batch_executor import BatchExecutor
 from hedra.core.hooks.types.base.simple_context import SimpleContext
 from hedra.core.graphs.transitions.exceptions.exceptions import (
@@ -72,6 +73,7 @@ class TransitionAssembler:
         self.execute_stages: List[Stage] = []
         self.streaming_submit_stages: List[Stage] = []
         self.executors: List[BatchExecutor] = []
+        self.all_paths: Dict[str, List[str]] = {}
 
         self._graph_metadata_log_string = f'Graph - {self.graph_name}:{self.graph_id} - thread:{self._thread_id} - process:{self._process_id} - '
 
@@ -303,7 +305,7 @@ class TransitionAssembler:
             for stage in self.instances_by_type[stage_type]:
                 stages_by_type[stage_type][stage.name] = stage
 
-        all_paths = {}
+        self.all_paths: Dict[str, List[str]] = {}
         
         for execute_stage in self.execute_stages:
 
@@ -346,7 +348,7 @@ class TransitionAssembler:
                     for path in paths:
                         stage_paths.extend(path)
                     
-                    all_paths[stage_name] = stage_paths
+                    self.all_paths[stage_name] = stage_paths
                     
                     path_lengths = networkx.all_pairs_shortest_path_length(graph)
 
@@ -360,11 +362,51 @@ class TransitionAssembler:
 
         for stage in self.generated_stages.values():
             for neighbor in self.adjacency_list[stage.name]:
-                self.edges_by_name[(stage.name, neighbor.edge.destination.name)].all_paths = all_paths
-
+                self.edges_by_name[(stage.name, neighbor.edge.destination.name)].all_paths = self.all_paths
 
         self.logging.hedra.sync.debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')
         self.logging.filesystem.sync['hedra.core'].debug(f'{self._graph_metadata_log_string} - Mapped stages to requisite Setup stages')
+
+    def apply_config_to_load_hooks(
+        self,
+        graph: networkx.DiGraph
+    ):
+
+        setup_stages = self.instances_by_type.get(StageTypes.SETUP)
+
+        for stage in setup_stages:
+            for load_hook in stage.hooks[HookType.LOAD]:
+                load_hook: LoadHook = load_hook
+
+                load_hook.parser_config = stage.config
+
+        non_setup_stages: List[Stage] = []
+        for stage in self.generated_stages.values():
+            if stage not in setup_stages:
+                non_setup_stages.append(stage)
+
+        path_lengths = dict(networkx.all_pairs_shortest_path_length(graph))
+
+        for stage in non_setup_stages:
+
+            setup_to_stage_path_lengths: Dict[str, int] = {}
+
+            for setup_stage in setup_stages:
+                if networkx.has_path(graph, setup_stage.name, stage.name):
+                    path_length = path_lengths[setup_stage.name][stage.name]
+                    setup_to_stage_path_lengths[setup_stage.name] = path_length
+
+            if len(setup_to_stage_path_lengths):
+                minimum_distance_setup_stage = min(
+                    setup_to_stage_path_lengths,
+                    key=lambda stage_name: setup_to_stage_path_lengths.get(stage_name)
+                )
+
+                setup_stage = self.generated_stages.get(minimum_distance_setup_stage)
+
+                for load_hook in stage.hooks[HookType.LOAD]:
+                    load_hook.parser_config = setup_stage.config
+
     
     def create_error_transition(
         self, 

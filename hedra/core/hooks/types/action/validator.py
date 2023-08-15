@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Union, Tuple
+from typing import Optional, Dict, Union, Tuple, Any
 from pydantic import (
     BaseModel, 
     StrictStr, 
@@ -22,5 +22,4 @@ class ActionHookValidator(BaseModel):
     @validator('weight', 'order')
     def validate_weight_and_order(cls, val):
         assert val > 0, "Order and weight values must be greater than zero!"
-
         return val

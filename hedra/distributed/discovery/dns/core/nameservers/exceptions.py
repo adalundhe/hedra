@@ -1,0 +1,2 @@
+class NoNameServer(Exception):
+    pass

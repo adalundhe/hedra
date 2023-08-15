@@ -1,5 +1,6 @@
 import asyncio
 import time
+import traceback
 import uuid
 from typing import (
     Dict, 
@@ -76,6 +77,17 @@ class MercuryHTTPClient(BaseEngine[Union[A, HTTPAction], Union[R, HTTPResult]]):
         self.waiter = None
 
         self.ssl_context = get_default_ssl_context()
+
+    def config_to_dict(self):
+        return {
+            'concurrency': self.pool.size,
+            'timeouts': {
+                'connect_timeout': self.timeouts.connect_timeout,
+                'socket_read_timeout': self.timeouts.socket_read_timeout,
+                'total_timeout': self.timeouts.total_timeout
+            },
+            'reset_connections': self.pool.reset_connections
+        }
 
     async def set_pool(self, concurrency: int):
         self.sem = asyncio.Semaphore(value=concurrency)

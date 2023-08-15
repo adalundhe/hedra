@@ -2,6 +2,7 @@ import asyncio
 import uuid
 import functools
 import json
+import signal
 import psutil
 from datetime import datetime
 from typing import List, Dict
@@ -18,6 +19,7 @@ from hedra.reporting.system.system_metrics_set import (
 from concurrent.futures import ThreadPoolExecutor
 from .s3_config import S3Config
 
+
 try:
     import boto3
     has_connector = True
@@ -25,6 +27,18 @@ try:
 except Exception:
     boto3 = None
     has_connector = False
+
+
+def handle_loop_stop(
+    signame, 
+    executor: ThreadPoolExecutor, 
+    loop: asyncio.AbstractEventLoop
+): 
+    try:
+        executor.shutdown(wait=False, cancel_futures=True) 
+        loop.stop()
+    except Exception:
+        pass
 
 
 class S3:
@@ -61,6 +75,17 @@ class S3:
 
     async def connect(self):
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Connecting to AWS S3 - Region: {self.region_name}')
+        
+        for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
+            self._loop.add_signal_handler(
+                getattr(signal, signame),
+                lambda signame=signame: handle_loop_stop(
+                    signame,
+                    self._executor,
+                    self._loop
+                )
+            )
+
         self.client = await self._loop.run_in_executor(
             self._executor,
             functools.partial(
@@ -586,3 +611,4 @@ class S3:
 
     async def close(self):
         await self.logger.filesystem.aio['hedra.reporting'].debug(f'{self.metadata_string} - Closing session - {self.session_uuid}')
+        self._executor.shutdown()

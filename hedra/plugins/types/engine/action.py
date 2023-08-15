@@ -40,7 +40,7 @@ class Action(BaseAction[A], Generic[A]):
     def setup(self):
         pass
 
-    def to_serializable(self):
+    def action_to_serializable(self):
         attributes = inspect.getmembers(
             self, 
             lambda attr: not(inspect.isroutine(attr))

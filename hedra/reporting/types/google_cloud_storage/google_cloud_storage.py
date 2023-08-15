@@ -1,6 +1,7 @@
 import asyncio
 import json
 import psutil
+import signal
 import uuid
 from typing import List, Dict
 from concurrent.futures import ThreadPoolExecutor
@@ -15,6 +16,19 @@ from hedra.reporting.system.system_metrics_set import (
     SystemMetricsCollection
 )
 from .google_cloud_storage_config import GoogleCloudStorageConfig
+
+
+def handle_loop_stop(
+    signame, 
+    executor: ThreadPoolExecutor, 
+    loop: asyncio.AbstractEventLoop
+): 
+    try:
+        executor.shutdown(wait=False, cancel_futures=True) 
+        loop.stop()
+    except Exception:
+        pass
+
 
 try:
 
@@ -72,6 +86,17 @@ class GoogleCloudStorage:
         self._loop = asyncio.get_event_loop()
 
     async def connect(self):
+
+        for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
+            self._loop.add_signal_handler(
+                getattr(signal, signame),
+                lambda signame=signame: handle_loop_stop(
+                    signame,
+                    self._executor,
+                    self._loop
+                )
+            )
+
 
         await self.logger.filesystem.aio['hedra.reporting'].info(f'{self.metadata_string} - Opening amd authorizing connection to Google Cloud - Loading account config from - {self.service_account_json_path}')
         self.client = storage.Client.from_service_account_json(self.service_account_json_path)
@@ -549,7 +574,7 @@ class GoogleCloudStorage:
 
             blob = await self._loop.run_in_executor(
                 self._executor,
-                self.metrics_bucket.blob,
+                self._metrics_bucket.blob,
                 f'{metrics_set.name}_custom_{self.session_uuid}'
             )
 

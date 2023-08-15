@@ -88,8 +88,8 @@ setup(
             'aioredis',
             'aiomysql',
             'psycopg2-binary',
-            'aiopg',
             'sqlalchemy',
+            'sqlalchemy[asyncio]',
             'boto3',
             'snowflake-sqlalchemy',
             'snowflake-connector-python',
@@ -102,7 +102,9 @@ setup(
             'opentelemetry-api',
             'datadog_api_client',
             'aiokafka',
-            'haralyzer'
+            'haralyzer',
+            'asyncpg',
+            'xmltodict'
         ],
         'all-engines': [
             'grpcio',
@@ -128,7 +130,7 @@ setup(
             'aioredis',
             'aiomysql',
             'psycopg2-binary',
-            'aiopg',
+            'asyncpg',
             'sqlalchemy',
             'boto3',
             'snowflake-connector-python',
@@ -183,8 +185,9 @@ setup(
         'sql': [
             'aiomysql',
             'psycopg2-binary',
-            'aiopg',
-            'sqlalchemy'
+            'asyncpg',
+            'sqlalchemy',
+            'sqlalchemy[asyncio]'
         ],
         'aws': [
             'boto3'
@@ -210,7 +213,8 @@ setup(
             'google-cloud-storage',
         ],
         'xml': [
-            'dicttoxml'
+            'dicttoxml',
+            'xmltodict'
         ],
         'opentelemetry': [
             'opentelemetry-api'

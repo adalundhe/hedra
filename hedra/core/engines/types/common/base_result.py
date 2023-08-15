@@ -45,19 +45,3 @@ class BaseResult:
         self.connect_end = 0
         self.write_end = 0
         self.complete = 0
-
-    def to_dict(self):
-        return {
-            'name': self.name,
-            'error': str(self.error),
-            'source': self.source,
-            'user': self.user,
-            'tags': self.tags,
-            'type': self.type,
-            'wait_start': float(self.wait_start),
-            'start': float(self.start),
-            'connect_end': float(self.connect_end),
-            'write_end': float(self.write_end),
-            'complete': float(self.complete),
-            'checks': self.checks
-        }
