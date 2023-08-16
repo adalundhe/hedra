@@ -60,7 +60,11 @@ setup(
         'pydantic',
         'GitPython',
         'tabulate',
-        'plotille'
+        'plotille',
+        'python3-dtls',
+        'zstandard',
+        'cryptography',
+        'python-dotenv'
     ],
     entry_points = {
         'console_scripts': [
