@@ -1,1 +1,0 @@
-from .election_manager import ElectionManager
