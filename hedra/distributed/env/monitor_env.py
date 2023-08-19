@@ -1,4 +1,3 @@
-from ipaddress import IPv4Address
 from pydantic import (
     BaseModel,
     StrictStr,
@@ -30,6 +29,8 @@ class MonitorEnv(BaseModel):
     MERCURY_SYNC_REGISTRATION_TIMEOUT: StrictStr='1m'
     MERCURY_SYNC_HEALTH_POLL_INTERVAL: StrictFloat='1s'
     MERCURY_SYNC_INDIRECT_CHECK_NODES: StrictInt=3
+    MERCURY_SYNC_FAILED_NODES_MAX_AGE: StrictStr='1m'
+    MERCURY_SYNC_REMOVED_NODES_MAX_AGE: StrictStr='2m'
 
     @classmethod
     def types_map(self) -> Dict[str, Callable[[str], PrimaryType]]:
@@ -46,5 +47,7 @@ class MonitorEnv(BaseModel):
             'MERCURY_SYNC_BOOT_WAIT': str,
             'MERCURY_SYNC_REGISTRATION_TIMEOUT': str,
             'MERCURY_SYNC_HEALTH_POLL_INTERVAL': str,
-            'MERCURY_SYNC_INDIRECT_CHECK_NODES': int
+            'MERCURY_SYNC_INDIRECT_CHECK_NODES': int,
+            'MERCURY_SYNC_FAILED_NODES_MAX_AGE': str,
+            'MERCURY_SYNC_REMOVED_NODES_MAX_AGE': str
         }

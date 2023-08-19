@@ -19,20 +19,8 @@ from hedra.logging import (
     HedraLogger,
     logging_manager
 )
+from hedra.tools.helpers import cancel
 from typing import Optional, Dict, Tuple, List, Deque, Union
-
-
-async def cancel(pending_item: asyncio.Task) -> None:
-    pending_item.cancel()
-    if not pending_item.cancelled():
-        try:
-            await pending_item
-
-        except asyncio.CancelledError:
-            pass
-
-        except asyncio.IncompleteReadError:
-            pass
 
 
 class Monitor(Controller):
@@ -162,6 +150,17 @@ class Monitor(Controller):
             'suspect',
             'failed'
         ]
+
+        self.failed_nodes: List[Tuple[str, int, float]] = []
+        self.removed_nodes: List[Tuple[str, int, float]] = []
+
+        self._failed_max_age = TimeParser(
+            monitor_env.MERCURY_SYNC_FAILED_NODES_MAX_AGE
+        ).time
+
+        self._removed_max_age = TimeParser(
+            monitor_env.MERCURY_SYNC_REMOVED_NODES_MAX_AGE
+        ).time
 
     @server()
     async def deregister_node(
@@ -832,13 +831,22 @@ class Monitor(Controller):
             error=error_context
         )
     
-    async def start(self):
+    async def start(
+        self,
+        boot_wait: Optional[float]=None,
+        skip_boot_wait: bool=False
+    ):
+        
+        if boot_wait is None:
+            boot_wait = self.boot_wait
 
         await self._logger.filesystem.aio.create_logfile('hedra.distributed.log')
         self._logger.filesystem.create_filelogger('hedra.distributed.log')
 
         await self.start_server()
-        await asyncio.sleep(self.boot_wait)
+
+        if skip_boot_wait is False:
+            await asyncio.sleep(boot_wait)
 
     async def register(
         self,
@@ -884,7 +892,7 @@ class Monitor(Controller):
             self.start_health_monitor()
         )
         
-        self.confirmation_task = asyncio.create_task(
+        self._cleanup_task = asyncio.create_task(
             self.cleanup_pending_checks()
         )
 
@@ -1170,6 +1178,12 @@ class Monitor(Controller):
 
         if self._node_statuses[(suspect_host, suspect_port)] == 'suspect':
             self._node_statuses[(suspect_host, suspect_port)] = 'failed'
+
+            self.failed_nodes.append((
+                suspect_host,
+                suspect_port,
+                time.monotonic()
+            ))
 
             await self._logger.distributed.aio.info(f'Node - {suspect_host}:{suspect_port} - marked failed for source - {self.host}:{self.port}')
             await self._logger.filesystem.aio['hedra.distributed'].info(f'Node - {suspect_host}:{suspect_port} - marked suspect for source - {self.host}:{self.port}')
@@ -1622,6 +1636,21 @@ class Monitor(Controller):
 
                     self._tasks_queue.remove(pending_check)
                     pending_checks_count += 1
+
+            for node in list(self.failed_nodes):
+
+                _, _, age = node
+                failed_elapsed = time.monotonic() - age
+                removed_elapsed = time.monotonic() - age
+
+                if node not in self.removed_nodes:
+                    self.removed_nodes.append(node)
+
+                if failed_elapsed >= self._failed_max_age:
+                    self.failed_nodes.remove(node)
+
+                elif removed_elapsed >= self._removed_max_age:
+                    self.removed_nodes.remove(node)
 
             await self._logger.distributed.aio.debug(f'Cleaned up - {pending_checks_count} - for source - {self.host}:{self.port}')
             await self._logger.filesystem.aio['hedra.distributed'].debug(f'Cleaned up - {pending_checks_count} - for source - {self.host}:{self.port}')
