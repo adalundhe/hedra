@@ -82,7 +82,6 @@ async def run(
     tcp_connection: MercurySyncTCPConnection,
     config: Dict[str, Union[int, socket.socket, str]]={}
 ):
-    engine_type = config.get('engine_type')
     loop = asyncio.get_event_loop()
     
     waiter = loop.create_future()
@@ -201,6 +200,7 @@ class Controller(Generic[*P]):
         self._cleanup_task: Union[asyncio.Task, None] = None
         self._plugin_factory = plugins
         self._waiter: Union[asyncio.Future, None] = None
+        self.is_plugin = False
 
         self._plugins: Dict[str, PluginGroup[*P]] = {}
 
@@ -462,6 +462,31 @@ class Controller(Generic[*P]):
                 worker_socket=tcp_worker_socket
             )
 
+    async def use_server(
+        self,
+        udp_worker_transport: asyncio.DatagramTransport,
+        tcp_worker_server: asyncio.Server,
+        cert_path: Optional[str]=None,
+        key_path: Optional[str]=None
+    ):
+        
+        for udp_connection, tcp_connection in zip(
+            self._udp_pool,
+            self._tcp_pool
+        ):
+            await udp_connection.connect_async(
+                cert_path=cert_path,
+                key_path=key_path,
+                worker_transport=udp_worker_transport
+            )
+
+            await tcp_connection.connect_async(
+                cert_path=cert_path,
+                key_path=key_path,
+                worker_server=tcp_worker_server
+            )
+
+
     async def start_server(
       self,
       cert_path: Optional[str]=None,
@@ -481,24 +506,25 @@ class Controller(Generic[*P]):
                 mp_context=mp.get_context(method='spawn')
             )
 
-        udp_socket = bind_udp_socket(self.host, self.port)
-        tcp_socket = bind_tcp_socket(self.host, self.port + 1)
-
-        stdin_fileno: Optional[int]
-        try:
-            stdin_fileno = sys.stdin.fileno()
-        except OSError:
-            stdin_fileno = None
-
-        config = {
-            "udp_socket": udp_socket,
-            "tcp_socket": tcp_socket,
-            "stdin_fileno": stdin_fileno,
-            "cert_path": cert_path,
-            "key_path": key_path
-        }
-
         if self.engine_type == 'process':
+
+            udp_socket = bind_udp_socket(self.host, self.port)
+            tcp_socket = bind_tcp_socket(self.host, self.port + 1)
+
+            stdin_fileno: Optional[int]
+            try:
+                stdin_fileno = sys.stdin.fileno()
+            except OSError:
+                stdin_fileno = None
+
+            config = {
+                "udp_socket": udp_socket,
+                "tcp_socket": tcp_socket,
+                "stdin_fileno": stdin_fileno,
+                "cert_path": cert_path,
+                "key_path": key_path
+            }
+
 
             for signame in ('SIGINT', 'SIGTERM', 'SIG_IGN'):
                 loop.add_signal_handler(
@@ -559,7 +585,18 @@ class Controller(Generic[*P]):
 
         await asyncio.gather(*pool)
 
+        connections = list(zip(
+            self._udp_pool,
+            self._tcp_pool
+        ))
+
         for idx in range(self._workers):
+
+            udp_connection, tcp_connection = connections[idx]
+
+            transport = udp_connection._transport
+            server = tcp_connection._server
+            
             for plugin_name in self._plugins:
 
                 plugin: Union[
@@ -567,31 +604,15 @@ class Controller(Generic[*P]):
                     Controller
                 ] = self._plugins[plugin_name].at(idx)
 
-                if isinstance(plugin, Service):
+                if isinstance(plugin, Controller):
 
-                    await plugin.use_server_socket(
-                        udp_socket,
-                        tcp_socket,
+                    await plugin.use_server(
+                        transport,
+                        server,
                         cert_path=cert_path,
                         key_path=key_path
                     )
 
-        for plugin_name in self._plugins:
-
-            plugin: Union[
-                Service,
-                Controller
-            ] = self._plugins[plugin_name].at(idx)
-
-            if isinstance(plugin, Controller):
-
-                await plugin.use_server_socket(
-                    udp_socket,
-                    tcp_socket,
-                    cert_path=cert_path,
-                    key_path=key_path
-                )
-        
         await self._copy_to_plugins()
 
 
@@ -722,8 +743,6 @@ class Controller(Generic[*P]):
                 
                 plugin._events.update(self._events)
                 plugin._parsers.update(self._parsers)
-
-
 
     async def extend_client(
         self,

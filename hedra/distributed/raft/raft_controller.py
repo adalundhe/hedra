@@ -40,13 +40,13 @@ from .errors import InvalidTermError
 from .log_queue import LogQueue
 
 
-class RaftManager(Controller[Monitor]):
+class RaftController(Controller[Monitor]):
 
     def __init__(
         self,
         host: str,
         port: int,
-        env: Env,
+        env: Optional[Env]=None,
         cert_path: Optional[str]=None,
         key_path: Optional[str]=None,
         workers: int=0,
@@ -107,9 +107,10 @@ class RaftManager(Controller[Monitor]):
         self._term_leaders: List[Tuple[str, int]] = [
             (self.host, self.port)
         ]
+        
         self._running = False
 
-        self._logs: Dict[int, Dict[int, Any]] = LogQueue()
+        self._logs = LogQueue()
         self._previous_entry_index = 0
         self._last_timestamp = 0
         self._last_commit_timestamp = 0
@@ -132,12 +133,12 @@ class RaftManager(Controller[Monitor]):
             cert_path=cert_path,
             key_path=key_path
         )
+
+        for monitor in self._plugins['monitor'].each():
+            await monitor.start()
         
         await asyncio.gather(*[
-            monitor.start(   
-                cert_path=cert_path,
-                key_path=key_path
-            ) for monitor in self._plugins['monitor'].each()
+            monitor.start() for monitor in self._plugins['monitor'].each()
         ])
 
         self._timeout = random.uniform(
@@ -172,42 +173,64 @@ class RaftManager(Controller[Monitor]):
         elected_host: Union[str, None] = None
         elected_port: Union[int, None] = None
 
-        if self._election_status in [ElectionState.ACTIVE, ElectionState.PENDING] and term_number > self._term_number:
+        if self._election_status in [ElectionState.ACTIVE, ElectionState.PENDING]:
+            # There is already an election in play
+            election_result = RaftMessage(
+                host=source_host,
+                port=source_port,
+                election_status=ElectionState.PENDING,
+                term_number=term_number
+            )
+            
+
+        elif term_number > self._term_number:
+
+            self._election_status = ElectionState.ACTIVE
             # The requesting node is ahead. They're elected the leader by default.
             elected_host = source_host
             elected_port = source_port
-            
-        elif term_number == self._term_number:
-            # The rterm numbers match, we can elect a candidate.
+            self._term_number = term_number
 
+        elif term_number == self._term_number:
+            # The term numbers match, we can choose a candidate.
+
+            self._election_status = ElectionState.ACTIVE
             members: List[Tuple[str, int]] = []
 
             for monitor in self._plugins['monitor'].each():
                 members.extend([
-                    address for address, status in monitor._node_statuses.items() if status  == 'healthy'
+                    address for address, status in monitor._node_statuses.items() if status == 'healthy'
                 ])
 
             elected_host, elected_port = random.choice(
                 list(set(members))
             )
+
+        else:
+
+            election_result = RaftMessage(
+                host=source_host,
+                port=source_port,
+                election_status=ElectionState.REJECTED,
+                term_number=term_number
+            )
+            
         
         if elected_host == source_host and elected_port == source_port:
             
             election_result = RaftMessage(
                 host=source_host,
                 port=source_port,
-                election_status="ACCEPTED",
+                election_status=ElectionState.ACCEPTED,
                 term_number=term_number
             )
-            
-            self._raft_node_status = NodeState.FOLLOWER
         
-        else:
+        elif elected_host is not None and elected_port is not None:
 
             election_result = RaftMessage(
                 host=source_host,
                 port=source_port,
-                election_status="REJECTED",
+                election_status=ElectionState.REJECTED,
                 term_number=term_number
             )
 
@@ -218,7 +241,7 @@ class RaftManager(Controller[Monitor]):
         self,
         shard_id: int,
         message: RaftMessage
-    ):
+    ) -> Call[RaftMessage]:
         entries_count = len(message.entries)
 
         if entries_count < 0:
@@ -255,7 +278,7 @@ class RaftManager(Controller[Monitor]):
                 raft_node_status=self._raft_node_status,
                 error=str(error),
                 elected_leader=elected_leader,
-                updated_term=self._term_number
+                term_number=self._term_number
             )
 
         return RaftMessage(
@@ -324,7 +347,7 @@ class RaftManager(Controller[Monitor]):
 
         if response.error and elected_leader != response.elected_leader:
             self._term_leaders.append(response.elected_leader)
-            self._term_number = response.updated_term
+            self._term_number = response.term_number
 
     async def _start_suspect_monitor(self):
 
@@ -381,10 +404,12 @@ class RaftManager(Controller[Monitor]):
             ):
 
                 try:
+                    response: Tuple[int, RaftMessage] = await vote_result
+
                     (
                         _, 
                         result
-                    ): Tuple[int, RaftMessage] = await vote_result
+                    ) = response
 
                     if result.election_status == ElectionState.ACCEPTED:
                         accepted_count += 1
@@ -427,3 +452,10 @@ class RaftManager(Controller[Monitor]):
             await asyncio.sleep(
                 self._logs_update_poll_interval
             )
+
+    async def leave(self):
+        await asyncio.gather(*[
+            monitor.leave() for monitor in self._plugins['monitor'].each() if isinstance(monitor, Monitor)
+        ])
+
+        await self.close()

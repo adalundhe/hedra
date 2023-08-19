@@ -10,7 +10,6 @@ class LogQueue:
         self.logs: List[Entry] = []
         self._timestamps: List[int] = []
         self.timestamp_index_map = {}
-        self.size = 0
         self.term = 0
         self.commit_index = 0
 

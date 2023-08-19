@@ -1,8 +1,7 @@
-from hedra.distributed.models.message import Message
 from typing import TypeVar, Tuple
 
 
-T = TypeVar('T', bound=(Message,))
+T = TypeVar('T')
 
 
 Call = Tuple[int, T]

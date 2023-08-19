@@ -1,3 +1,4 @@
+import os
 from pydantic import (
     BaseModel,
     StrictStr,
@@ -55,6 +56,7 @@ class Env(BaseModel):
     MERCURY_SYNC_MAX_CONCURRENCY: StrictInt=2048
     MERCURY_SYNC_AUTH_SECRET: StrictStr
     MERCURY_SYNC_MULTICAST_GROUP: IPvAnyAddress='224.1.1.1'
+    MERCURY_SYNC_LOGS_DIRECTORY: StrictStr=os.getcwd()
 
     @classmethod
     def types_map(self) -> Dict[str, Callable[[str], PrimaryType]]:
@@ -80,5 +82,6 @@ class Env(BaseModel):
             'MERCURY_SYNC_CLEANUP_INTERVAL': str,
             'MERCURY_SYNC_MAX_CONCURRENCY': int,
             'MERCURY_SYNC_AUTH_SECRET': str,
-            'MERCURY_SYNC_MULTICAST_GROUP': str
+            'MERCURY_SYNC_MULTICAST_GROUP': str,
+            'MERCURY_SYNC_LOGS_DIRECTORY': str
         }

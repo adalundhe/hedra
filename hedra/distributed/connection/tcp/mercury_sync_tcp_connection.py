@@ -146,7 +146,8 @@ class MercurySyncTCPConnection:
         self,
         cert_path: Optional[str]=None,
         key_path: Optional[str]=None,
-        worker_socket: Optional[socket.socket]=None
+        worker_socket: Optional[socket.socket]=None,
+        worker_server: Optional[asyncio.Server]=None
     ):
 
         try:
@@ -181,12 +182,23 @@ class MercurySyncTCPConnection:
 
             self.server_socket.setblocking(False)
 
-        elif self.connected is False:
+        elif self.connected is False and worker_socket:
             self.server_socket = worker_socket
             host, port = worker_socket.getsockname()
 
             self.host = host
             self.port = port
+
+        elif self.connected is False and worker_server:
+            self._server = worker_server
+
+            server_socket, _ = worker_server.sockets
+            host, port = server_socket.getsockname()
+            self.host = host
+            self.port = port
+
+            self.connected = True
+            self._cleanup_task = self._loop.create_task(self._cleanup())
 
         if self.connected is False:
 

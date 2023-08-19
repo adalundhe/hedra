@@ -3,19 +3,20 @@ import os
 import json
 import inspect
 import uvloop
-uvloop.install()
 import sys
 import importlib
 import ntpath
 from pathlib import Path
 from hedra.core.graphs.stages.base.stage import Stage
 from hedra.core.graphs.graph import Graph
-from hedra.logging import HedraLogger
 from hedra.logging import (
     HedraLogger,
     LoggerTypes,
     logging_manager
 )
+
+
+uvloop.install()
 
 
 def check_graph(path: str, log_level: str):

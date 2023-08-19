@@ -11,7 +11,8 @@ HealthStatus = Literal[
     "waiting",
     "healthy", 
     "suspect", 
-    "failed"
+    "failed",
+    "inactive"
 ]
 
 class HealthCheck(Message):

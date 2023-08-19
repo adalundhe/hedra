@@ -79,7 +79,8 @@ class MercurySyncHTTPConnection(MercurySyncTCPConnection):
         self, 
         cert_path: Optional[str] = None, 
         key_path: Optional[str] = None, 
-        worker_socket: Optional[socket.socket] = None
+        worker_socket: Optional[socket.socket] = None,
+        worker_server: Optional[asyncio.Server]=None
     ):
         self._backoff_sem = asyncio.Semaphore(
             self._rate_limiting_backoff_rate
