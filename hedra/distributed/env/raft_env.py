@@ -21,5 +21,6 @@ class RaftEnv(BaseModel):
     def types_map(self) -> Dict[str, Callable[[str], PrimaryType]]:
         return {
             'MERCURY_SYNC_RAFT_ELECTION_MAX_TIMEOUT': str,
+            'MERCURY_SYNC_RAFT_ELECTION_POLL_INTERVAL': str,
             'MERCURY_SYNC_RAFT_LOGS_UPDATE_POLL_INTERVAL': str
         }

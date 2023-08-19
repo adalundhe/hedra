@@ -10,12 +10,9 @@ class LogQueue:
         self.logs: List[Entry] = []
         self._timestamps: List[int] = []
         self.timestamp_index_map = {}
-        self.term = 0
+        self._term = 0
+        self.size = 0
         self.commit_index = 0
-
-    @property
-    def size(self):
-        return len(self.logs)
 
     def get(self, shard_id: int):
         flake = Snowflake.parse(shard_id)

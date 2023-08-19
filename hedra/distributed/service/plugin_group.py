@@ -27,3 +27,4 @@ class PluginGroup(Generic[*P]):
     
     def at(self, idx: int) -> Union[*P]:
         return self._services[idx]
+    

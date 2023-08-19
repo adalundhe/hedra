@@ -1,6 +1,7 @@
 
 from __future__ import annotations
 import asyncio
+import traceback
 import pickle
 import socket
 import ssl
@@ -379,6 +380,7 @@ class MercurySyncUDPConnection:
         incoming_host, incoming_port = addr
 
         if message_type == 'request':
+
             self._pending_responses.append(
                 asyncio.create_task(
                     self._read(
@@ -434,6 +436,7 @@ class MercurySyncUDPConnection:
         coroutine: Coroutine,
         addr: Tuple[str, int]
     ) -> Coroutine[Any, Any, None]:
+        
         response: Message = await coroutine
 
         item = pickle.dumps(

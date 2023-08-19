@@ -15,5 +15,4 @@ class RaftMessage(Message):
     election_status: ElectionState
     raft_node_status: NodeState
     entries: Optional[List[Entry]]
-    term_number: Optional[StrictInt]
-
+    term_number: StrictInt

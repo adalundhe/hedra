@@ -29,7 +29,7 @@ class Monitor(Controller):
         self,
         host: str,
         port: int,
-        env: Env,
+        env: Optional[Env]=None,
         cert_path: Optional[str]=None,
         key_path: Optional[str]=None,
         logs_directory: Optional[str]=None,
@@ -869,13 +869,11 @@ class Monitor(Controller):
         await asyncio.wait_for(
             asyncio.create_task(
                 self.start_client(
-                    HealthCheck(
-                        host=host,
-                        port=port,
-                        source_host=self.host,
-                        source_port=self.port,
-                        status=self.status
-                    ),
+                    {
+                        (host, port): [
+                            HealthCheck
+                        ]
+                    },
                     cert_path=self.cert_path,
                     key_path=self.key_path
                 )
@@ -1186,7 +1184,7 @@ class Monitor(Controller):
             ))
 
             await self._logger.distributed.aio.info(f'Node - {suspect_host}:{suspect_port} - marked failed for source - {self.host}:{self.port}')
-            await self._logger.filesystem.aio['hedra.distributed'].info(f'Node - {suspect_host}:{suspect_port} - marked suspect for source - {self.host}:{self.port}')
+            await self._logger.filesystem.aio['hedra.distributed'].info(f'Node - {suspect_host}:{suspect_port} - marked failed for source - {self.host}:{self.port}')
         
         self._investigating_nodes[(suspect_host, suspect_port)] = {}
         self._confirmed_suspicions[(suspect_host, suspect_port)] = 0

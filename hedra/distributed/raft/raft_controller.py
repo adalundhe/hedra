@@ -1,14 +1,12 @@
 import asyncio
-import time
+import traceback
 import random
 from collections import (
     defaultdict,
-    deque,
-    OrderedDict
+    deque
 )
 from hedra.distributed.env import (
     Env, 
-    MonitorEnv,
     RaftEnv,
     load_env
 )
@@ -19,10 +17,10 @@ from hedra.distributed.models.raft.raft_message import (
     RaftMessage
 )
 from hedra.distributed.types import Call
+from hedra.distributed.models.healthcheck import HealthCheck
 from hedra.distributed.models.raft.election_state import ElectionState
 from hedra.distributed.models.raft.logs import Entry, NodeState
 from hedra.distributed.monitoring import Monitor
-from hedra.distributed.service.controller import Controller
 from hedra.distributed.snowflake.snowflake_generator import (
     SnowflakeGenerator
 )
@@ -45,7 +43,7 @@ from .constants import FLEXIBLE_PAXOS_QUORUM
 from .log_queue import LogQueue
 
 
-class RaftController(Controller[Monitor]):
+class RaftController(Monitor):
 
     def __init__(
         self,
@@ -58,12 +56,6 @@ class RaftController(Controller[Monitor]):
         workers: int=0,
     ) -> None:
         
-        if workers <= 1:
-            engine = 'async'
-
-        else:
-            engine = 'process'
-
         if env is None:
             env = load_env(Env)
 
@@ -75,14 +67,11 @@ class RaftController(Controller[Monitor]):
         super().__init__(
             host,
             port,
+            env=env,
             cert_path=cert_path,
             key_path=key_path,
             workers=workers,
-            env=env,
-            engine=engine,
-            plugins={
-                'monitor': Monitor
-            }
+            logs_directory=logs_directory
         )
 
         self._term_number = 0
@@ -113,9 +102,7 @@ class RaftController(Controller[Monitor]):
         self._raft_node_status = NodeState.FOLLOWER
         self._active_election_waiter: Union[asyncio.Future, None] = None
         self._latest_election: Dict[int, int] = {}
-        self._term_leaders: List[Tuple[str, int]] = [
-            (self.host, self.port)
-        ]
+        self._term_leaders: List[Tuple[str, int]] = []
         
         self._running = False
 
@@ -137,10 +124,9 @@ class RaftController(Controller[Monitor]):
         self._logger = HedraLogger()
         self._logger.initialize()
 
-        monitor_env: MonitorEnv = load_env(MonitorEnv)
 
-        self.boot_wait = TimeParser(
-            monitor_env.MERCURY_SYNC_BOOT_WAIT
+        self._election_poll_interval = TimeParser(
+            raft_env.MERCURY_SYNC_RAFT_ELECTION_POLL_INTERVAL
         ).time
 
         self._cleanup_interval = TimeParser(
@@ -148,56 +134,106 @@ class RaftController(Controller[Monitor]):
         ).time
 
         self._pending_election_waiter: Union[asyncio.Future, None]  = None
-        
-    async def start(
-        self,
-        cert_path: Optional[str]=None,
-        key_path: Optional[str]=None
-    ):
 
-        self._running = True
-        
-        await self._logger.filesystem.aio.create_logfile('hedra.distributed.log')
-        self._logger.filesystem.create_filelogger('hedra.distributed.log')
-
-        loop = asyncio.get_event_loop()
-        self._last_commit_timestamp = loop.time()
-
-        await self.start_server(
-            cert_path=cert_path,
-            key_path=key_path
-        )
-
-        await asyncio.sleep(self.boot_wait)
-        
-        await asyncio.gather(*[
-            monitor.start(
-                skip_boot_wait=True
-            ) for monitor in self._plugins['monitor'].each()
-        ])
-
-        self._timeout = random.uniform(
+        self._election_timeout = random.uniform(
             self._min_election_timeout,
             self._max_election_timeout
         )
 
+        self._raft_cleanup_task: Union[asyncio.Future, None] = None
+        
+    async def start(
+        self,
+        boot_wait: Optional[float]=None,
+        skip_boot_wait: bool=False
+    ):
+        
+        if boot_wait is None:
+            boot_wait = self.boot_wait
+
+        await self._logger.filesystem.aio.create_logfile('hedra.distributed.log')
+        self._logger.filesystem.create_filelogger('hedra.distributed.log')
+
+        await self.start_server()
+
+        if skip_boot_wait is False:
+            await asyncio.sleep(boot_wait)
+
+        loop = asyncio.get_event_loop()
+        self._last_commit_timestamp = loop.time()
+
     async def register(
         self,
         host: str,
-        port: int         
+        port: int
     ):
-        await asyncio.gather(*[
-            monitor.register(
-                host,
-                port
-            ) for monitor in self._plugins['monitor'].each()
-        ])
+    
+        await self._logger.distributed.aio.info(f'Initializing node - {self.host}:{self.port}')
+        await self._logger.filesystem.aio['hedra.distributed'].info(f'Initializing node - {self.host}:{self.port}')
+
+        
+        self.bootstrap_host = host
+        self.bootstrap_port = port
+
+
+        await self._logger.distributed.aio.info(f'Connecting to node node - {self.bootstrap_host}:{self.bootstrap_port}')
+        await self._logger.filesystem.aio['hedra.distributed'].info(f'Connecting to node node - {self.bootstrap_host}:{self.bootstrap_port}')
+
+        
+        await asyncio.wait_for(
+            asyncio.create_task(
+                self.start_client(
+                    {
+                        (host, port): [
+                            HealthCheck,
+                            RaftMessage
+                        ]
+                    },
+                    cert_path=self.cert_path,
+                    key_path=self.key_path
+                )
+            ),
+            timeout=self.registration_timeout
+        )
+
+        self._node_statuses[(host, port)] = 'healthy'
+
+        self.status = 'healthy'
+        self._running = True
+        
+        self._healthchecks[(host, port)] = asyncio.create_task(
+            self.start_health_monitor()
+        )
+        
+        self._cleanup_task = asyncio.create_task(
+            self.cleanup_pending_checks()
+        )
+
+        self._udp_sync_task = asyncio.create_task(
+            self._run_udp_state_sync()
+        )
+
+        self._tcp_sync_task = asyncio.create_task(
+            self._run_tcp_state_sync()
+        )
+
+        await self._logger.distributed.aio.info(f'Initialized node - {self.host}:{self.port}')
+        await self._logger.filesystem.aio['hedra.distributed'].info(f'Initialized node - {self.host}:{self.port}')
+
+        self._tasks_queue.append(
+            asyncio.create_task(
+                self.run_election(
+                    host,
+                    port
+                )
+            )
+        )
 
         self._raft_monitor_task = asyncio.create_task(
             self._run_raft_monitor()
         )
         
-        self._cleanup_task = asyncio.create_task(
+        self._raft_cleanup_task = asyncio.create_task(
             self._cleanup_pending_raft_tasks()
         )
 
@@ -207,7 +243,7 @@ class RaftController(Controller[Monitor]):
         shard_id: int,
         raft_message: RaftMessage
     ) -> Call[RaftMessage]:
-          
+
         source_host = raft_message.source_host
         source_port = raft_message.source_port
 
@@ -221,7 +257,10 @@ class RaftController(Controller[Monitor]):
             election_result = RaftMessage(
                 host=source_host,
                 port=source_port,
-                election_status=ElectionState.PENDING,
+                source_host=self.host,
+                source_port=self.port,
+                election_status=ElectionState.REJECTED,
+                raft_node_status=self._raft_node_status,
                 term_number=term_number
             )
             
@@ -238,12 +277,9 @@ class RaftController(Controller[Monitor]):
             # The term numbers match, we can choose a candidate.
 
             self._election_status = ElectionState.ACTIVE
-            members: List[Tuple[str, int]] = []
-
-            for monitor in self._plugins['monitor'].each():
-                members.extend([
-                    address for address, status in monitor._node_statuses.items() if status == 'healthy'
-                ])
+            members: List[Tuple[str, int]] = [
+                address for address, status in self._node_statuses.items() if status == 'healthy'
+            ]
 
             elected_host, elected_port = random.choice(
                 list(set(members))
@@ -254,7 +290,10 @@ class RaftController(Controller[Monitor]):
             election_result = RaftMessage(
                 host=source_host,
                 port=source_port,
+                source_host=self.host,
+                source_port=self.port,
                 election_status=ElectionState.REJECTED,
+                raft_node_status=self._raft_node_status,
                 term_number=term_number
             )
             
@@ -264,7 +303,10 @@ class RaftController(Controller[Monitor]):
             election_result = RaftMessage(
                 host=source_host,
                 port=source_port,
+                source_host=self.host,
+                source_port=self.port,
                 election_status=ElectionState.ACCEPTED,
+                raft_node_status=self._raft_node_status,
                 term_number=term_number
             )
         
@@ -273,7 +315,10 @@ class RaftController(Controller[Monitor]):
             election_result = RaftMessage(
                 host=source_host,
                 port=source_port,
+                source_host=self.host,
+                source_port=self.port,
                 election_status=ElectionState.REJECTED,
+                raft_node_status=self._raft_node_status,
                 term_number=term_number
             )
 
@@ -285,6 +330,7 @@ class RaftController(Controller[Monitor]):
         shard_id: int,
         message: RaftMessage
     ) -> Call[RaftMessage]:
+        
         entries_count = len(message.entries)
 
         if entries_count < 0:
@@ -293,6 +339,7 @@ class RaftController(Controller[Monitor]):
                 port=message.port,
                 source_host=self.host,
                 source_port=self.port,
+                term_number=self._term_number,
                 election_status=self._election_status,
                 raft_node_status=self._raft_node_status
             )
@@ -306,11 +353,30 @@ class RaftController(Controller[Monitor]):
             )
         )
 
+        current_leader_host, current_leader_port = self._get_current_term_leader()
+
+        leader_host = current_leader_host
+        leader_port = current_leader_port
+
+        if len(entries) > 0 and message.term_number > self._term_number:
+            self._term_number = message.term_number
+
+            last_entry = entries[-1]
+
+            leader_host = last_entry.leader_host
+            leader_port = last_entry.leader_port
+
+
+        if leader_host != current_leader_host and leader_port != current_leader_port:
+            self._term_leaders.append((
+                leader_host,
+                leader_port
+            ))
+
         error = self._logs.update(entries)
+        elected_leader = self._get_current_term_leader()
 
         if isinstance(error, Exception):
-
-            elected_leader = self._term_leaders[-1]
 
             return RaftMessage(
                 host=message.host,
@@ -329,6 +395,8 @@ class RaftController(Controller[Monitor]):
             port=message.port,
             source_host=self.host,
             source_port=self.port,
+            elected_leader=elected_leader,
+            term_number=self._term_number,
             election_status=self._election_status,
             raft_node_status=self._raft_node_status
         )
@@ -339,12 +407,12 @@ class RaftController(Controller[Monitor]):
         host: str,
         port: int
     ) -> Call[RaftMessage]:
-        
         return RaftMessage(
             host=host,
             port=port,
             source_host=self.host,
             source_port=self.port,
+            term_number=self._term_number,
             election_status=self._election_status,
             raft_node_status=self._raft_node_status
         )
@@ -357,17 +425,22 @@ class RaftController(Controller[Monitor]):
         entries: List[Dict[str, Any]]
     ) -> Call[RaftMessage]:
         
+        leader_host, leader_port = self._get_current_term_leader()
+
         return RaftMessage(
             host=host,
             port=port,
             source_host=self.host,
             source_port=self.port,
+            term_number=self._term_number,
             election_status=self._election_status,
             raft_node_status=self._raft_node_status,
             entries=[
                 Entry(
                     entry_id=self._entry_id_generator.generate(),
                     term=self._term_number,
+                    leader_host=leader_host,
+                    leader_port=leader_port,
                     **entry
                 ) for entry in entries
             ]
@@ -379,107 +452,213 @@ class RaftController(Controller[Monitor]):
         port: int,
         entries: List[Dict[str, Any]]
     ):
+        shard_id: Union[int, None] = None
+        update_response: Union[RaftMessage, None] = None
+
+        await self._logger.distributed.aio.debug(f'Running UDP logs update for node - {host}:{port} - for source - {self.host}:{self.port}')
+        await self._logger.filesystem.aio['hedra.distributed'].debug(f'Running UDP logs update for node - {host}:{port} - for source - {self.host}:{self.port}')
+
         
-        _, response = await self.submit_log_update(
-            host,
-            port,
-            entries
+        for idx in range(self._poll_retries):
+
+            try:
+
+                response = await self.submit_log_update(
+                    host,
+                    port,
+                    entries
+                )
+
+                shard_id, update_response = response
+                source_host, source_port = update_response.source_host, update_response.source_port
+
+                self._node_statuses[(source_host, source_port)] = "healthy"
+
+                self._local_health_multiplier = max(
+                    0, 
+                    self._local_health_multiplier - 1
+                )
+
+                elected_leader_host, elected_leader_port = update_response.elected_leader
+                current_leader_host, current_leader_port = self._get_current_term_leader()
+
+                elected_leader_matches = current_leader_host == elected_leader_host and current_leader_port == elected_leader_port
+
+                if update_response.error and elected_leader_matches is False:
+                    self._term_leaders.append(update_response.elected_leader)
+                    self._term_number = update_response.term_number
+
+                return shard_id, update_response
+            
+            except asyncio.TimeoutError:
+                self._local_health_multiplier = min(
+                    self._local_health_multiplier, 
+                    self._max_poll_multiplier
+                ) + 1
+
+        check_host = host
+        check_port = port
+
+        if update_response is None and self._node_statuses.get((check_host, check_port)) == 'healthy':
+
+            await self._logger.distributed.aio.debug(f'Node - {check_host}:{check_port} - failed to respond over - {self._poll_retries} - retries and is now suspect for source - {self.host}:{self.port}')
+            await self._logger.filesystem.aio['hedra.distributed'].info(f'Node - {check_host}:{check_port} - failed to respond over - {self._poll_retries} - retries and is now suspect for source - {self.host}:{self.port}')
+
+            self._node_statuses[(check_host, check_port)] = 'suspect'
+
+            self._suspect_nodes.append((
+                check_host,
+                check_port
+            ))
+
+            self._suspect_tasks[(host, port)] = asyncio.create_task(
+                self._start_suspect_monitor()
+            )
+
+        else:
+            await self._logger.distributed.aio.debug(f'Node - {check_host}:{check_port} - responded on try - {idx}/{self._poll_interval} - for source - {self.host}:{self.port}')
+            await self._logger.filesystem.aio['hedra.distributed'].debug(f'Node - {check_host}:{check_port} - responded on try - {idx}/{self._poll_interval} - for source - {self.host}:{self.port}')
+
+    def _get_current_term_leader(self):
+
+        current_leader_index = max(
+            self._term_number - 1,
+            0
         )
 
-        elected_leader = self._term_leaders[-1]
+        if current_leader_index < len(self._term_leaders):
+            current_leader_host, current_leader_port = self._term_leaders[current_leader_index]
 
-        if response.error and elected_leader != response.elected_leader:
-            self._term_leaders.append(response.elected_leader)
-            self._term_number = response.term_number
+        elif len(self._term_leaders) > 0:
+            current_leader_host, current_leader_port = self._term_leaders[-1]
 
-    async def run_election(self):
+        else:
+            current_leader_host = self.host
+            current_leader_port = self.port
+
+        return (
+            current_leader_host,
+            current_leader_port
+        )
+
+    async def run_election(
+        self,
+        host: str,
+        port: int
+    ):
         # Trigger new election
         self._term_number += 1
         
         self._term_votes[self._term_number][(self.host, self.port)] += 1
 
-        members: List[Tuple[str, int]] = []
+        self._election_status = ElectionState.ACTIVE
 
-        for monitor in self._plugins['monitor'].each():
-            members.extend([
-                address for address, status in monitor._node_statuses.items() if status  == 'healthy'
-            ])
 
-        members = list(set(members))
+        while len(self._term_leaders) < self._term_number:
 
-        election_timeout = random.uniform(
-            self._min_election_timeout,
-            self._max_election_timeout
-        )
+            members: List[Tuple[str, int]] = [
+                address for address, status in self._node_statuses.items() if status  == 'healthy'
+            ]
 
-        vote_requests = [
-            asyncio.create_task(
-                self.request_vote(
-                    member_host,
-                    member_port
-                )
-            ) for member_host, member_port in members
-        ]
+            members = list(set(members))
 
-        accepted_count = 0
+            election_timeout = random.uniform(
+                self._min_election_timeout,
+                self._max_election_timeout
+            )
 
-        for vote_result in asyncio.as_completed(
-            vote_requests, 
-            timeout=election_timeout
-        ):
+            vote_requests = [
+                asyncio.create_task(
+                    self.request_vote(
+                        member_host,
+                        member_port
+                    )
+                ) for member_host, member_port in members
+            ]
 
-            try:
-                response: Tuple[int, RaftMessage] = await vote_result
+            for vote_result in asyncio.as_completed(
+                vote_requests, 
+                timeout=election_timeout
+            ):
 
-                (
-                    _, 
-                    result
-                ) = response
+                try:
+                    response: Tuple[int, RaftMessage] = await vote_result
 
-                if result.election_status == ElectionState.ACCEPTED:
-                    accepted_count += 1
+                    (
+                        _, 
+                        result
+                    ) = response
 
-            except asyncio.TimeoutError:
-                pass
-    
-        quorum_count = int(
-            len(members) * (1 - FLEXIBLE_PAXOS_QUORUM) + 1
-        )
+                    if result.election_status == ElectionState.ACCEPTED:
+                        self._term_votes[self._term_number][(self.host, self.port)] += 1
 
-        if accepted_count >= quorum_count:
-            self._raft_node_status = NodeState.LEADER
+                except asyncio.TimeoutError:
+                    pass
+        
+            quorum_count = int(
+                len(members) * (1 - FLEXIBLE_PAXOS_QUORUM) + 1
+            )
+
+            if quorum_count <= 1:
+                quorum_count = len(members)
+
+            accepted_count = self._term_votes[self._term_number][(self.host, self.port)]
+
+            if accepted_count >= quorum_count:
+
+                # We're the leader!
+
+                self._raft_node_status = NodeState.LEADER
+                self._term_leaders.append((self.host, self.port))
+
+                for host, port in members:
+                    self._tasks_queue.append(
+                        asyncio.create_task(
+                            self._update_logs(
+                                host,
+                                port,
+                                [
+                                    {
+                                        'key': 'election_update',
+                                        'value': f'Election complete! Elected - {self.host}:{self.port}'
+                                    }
+                                ]
+                            )
+                        )
+                    )
+
+            await asyncio.sleep(self._election_poll_interval)
 
     async def _run_raft_monitor(self):
 
         while self._running:
 
-            members: List[Tuple[str, int]] = []
-
-            for monitor in self._plugins['monitor'].each():
-                members.extend([
-                    address for address, status in monitor._node_statuses.items() if status == 'healthy'
-                ])
-
-            members = list(set(members))
+            members: List[Tuple[str, int]] = [
+                address for address, status in self._node_statuses.items() if status == 'healthy'
+            ]
 
             if self._raft_node_status == NodeState.LEADER:
                 for host, port in members:
             
                     self._tasks_queue.append(
                         asyncio.create_task(
-                            self.submit_log_update(
+                            self._update_logs(
                                 host,
-                                port
+                                port,
+                                [
+                                    {
+                                        'key': 'logs_update',
+                                        'value': f'Node - {self.host}:{self.port} - submitted log update'
+                                    }
+                                ]
                             )
                         )
                     )
 
             else:
                 failed_members = list(set([
-                    node for node in monitor.failed_nodes if node not in monitor.removed_nodes
+                    node for node in self.failed_nodes if node not in self.removed_nodes
                 ]))
-
-                print(failed_members)
 
                 if len(failed_members) > 0:
                     self._tasks_queue.append(
@@ -519,21 +698,17 @@ class RaftController(Controller[Monitor]):
             await self._logger.distributed.aio.debug(f'Cleaned up - {pending_count} - for source - {self.host}:{self.port}')
             await self._logger.filesystem.aio['hedra.distributed'].debug(f'Cleaned up - {pending_count} - for source - {self.host}:{self.port}')
 
-            await asyncio.sleep(self._cleanup_interval)
+            await asyncio.sleep(self._logs_update_poll_interval)
 
     async def leave(self):
         await self._logger.distributed.aio.debug(f'Shutdown requested for RAFT source - {self.host}:{self.port}')
         await self._logger.filesystem.aio['hedra.distributed'].debug(f'Shutdown requested for RAFT source - {self.host}:{self.port}')
 
-        await asyncio.gather(*[
-            monitor.leave() for monitor in self._plugins['monitor'].each() if isinstance(monitor, Monitor)
-        ])
-
-        self._running = False
-
         await cancel(self._raft_monitor_task)
+        await cancel(self._raft_cleanup_task)
 
-        await self.close()
+        await self._submit_leave_requests()
+        await self._shutdown()
 
         await self._logger.distributed.aio.debug(f'Shutdown complete for RAFT source - {self.host}:{self.port}')
         await self._logger.filesystem.aio['hedra.distributed'].debug(f'Shutdown complete for RAFT source - {self.host}:{self.port}')
