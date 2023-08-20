@@ -373,6 +373,8 @@ class RaftController(Monitor):
                 leader_port
             ))
 
+            self._raft_node_status = NodeState.FOLLOWER
+
         error = self._logs.update(entries)
         elected_leader = self._get_current_term_leader()
 
@@ -516,6 +518,7 @@ class RaftController(Monitor):
             )
 
         else:
+
             await self._logger.distributed.aio.debug(f'Node - {check_host}:{check_port} - responded on try - {idx}/{self._poll_interval} - for source - {self.host}:{self.port}')
             await self._logger.filesystem.aio['hedra.distributed'].debug(f'Node - {check_host}:{check_port} - responded on try - {idx}/{self._poll_interval} - for source - {self.host}:{self.port}')
 
@@ -552,6 +555,7 @@ class RaftController(Monitor):
         self._term_votes[self._term_number][(self.host, self.port)] += 1
 
         self._election_status = ElectionState.ACTIVE
+        self._raft_node_status = NodeState.CANDIDATE
 
 
         while len(self._term_leaders) < self._term_number:
@@ -629,6 +633,9 @@ class RaftController(Monitor):
 
             await asyncio.sleep(self._election_poll_interval)
 
+        if self._raft_node_status != NodeState.LEADER:
+            self._raft_node_status = NodeState.FOLLOWER
+
     async def _run_raft_monitor(self):
 
         while self._running:
@@ -666,6 +673,11 @@ class RaftController(Monitor):
                             self.run_election()
                         )
                     )
+
+            current_leader_host, current_leader_port = self._get_current_term_leader()
+
+            await self._logger.distributed.aio.debug(f'Source - {self.host}:{self.port} - has node {current_leader_host}:{current_leader_port} - as leader for term - {self._term_number}')
+            await self._logger.filesystem.aio['hedra.distributed'].info(f'Source - {self.host}:{self.port} - has node {current_leader_host}:{current_leader_port} - as leader for term - {self._term_number}')
 
             await asyncio.sleep(
                 self._logs_update_poll_interval
