@@ -1010,21 +1010,21 @@ class Monitor(Controller):
                     self._max_poll_multiplier
                 ) + 1
 
-            if healthcheck is None and self._node_statuses.get((host, port)) == 'healthy':
+        if healthcheck is None and self._node_statuses.get((host, port)) == 'healthy':
 
-                await self._logger.distributed.aio.debug(f'Indirect check request to - {target_host}:{target_port} -for node - {host}:{port} - from source - {self.host}:{self.port} - failed and - {target_host}:{target_port} - is now suspect')
-                await self._logger.filesystem.aio['hedra.distributed'].info(f'Indirect check request to - {target_host}:{target_port} -for node - {host}:{port} - from source - {self.host}:{self.port} - failed and - {target_host}:{target_port} - is now suspect')
+            await self._logger.distributed.aio.debug(f'Indirect check request to - {target_host}:{target_port} -for node - {host}:{port} - from source - {self.host}:{self.port} - failed and - {target_host}:{target_port} - is now suspect')
+            await self._logger.filesystem.aio['hedra.distributed'].info(f'Indirect check request to - {target_host}:{target_port} -for node - {host}:{port} - from source - {self.host}:{self.port} - failed and - {target_host}:{target_port} - is now suspect')
 
-                self._node_statuses[(host, port)] = 'suspect'
+            self._node_statuses[(host, port)] = 'suspect'
 
-                self._suspect_nodes.append((
-                    host,
-                    port
-                ))
+            self._suspect_nodes.append((
+                host,
+                port
+            ))
 
-                self._suspect_tasks[(host, port)] = asyncio.create_task(
-                    self._start_suspect_monitor()
-                )
+            self._suspect_tasks[(host, port)] = asyncio.create_task(
+                self._start_suspect_monitor()
+            )
 
     async def _run_healthcheck(
         self, 
