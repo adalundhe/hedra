@@ -463,6 +463,7 @@ class RaftController(Monitor):
             port=port,
             source_host=self.host,
             source_port=self.port,
+            status=self.status,
             term_number=self._term_number,
             election_status=self._election_status,
             raft_node_status=self._raft_node_status,
@@ -492,40 +493,45 @@ class RaftController(Monitor):
         
         for idx in range(self._poll_retries):
 
-            try:
+            if self._node_statuses[(host, port)] == 'healthy':
 
-                response = await self.submit_log_update(
-                    host,
-                    port,
-                    entries
-                )
+                try:
 
-                shard_id, update_response = response
-                source_host, source_port = update_response.source_host, update_response.source_port
+                    response = await asyncio.wait_for(
+                        self.submit_log_update(
+                            host,
+                            port,
+                            entries
+                        ),
+                        timeout=self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1)
+                    )
 
-                self._node_statuses[(source_host, source_port)] = update_response.status
+                    shard_id, update_response = response
+                    source_host, source_port = update_response.source_host, update_response.source_port
 
-                self._local_health_multiplier = max(
-                    0, 
-                    self._local_health_multiplier - 1
-                )
+                    self._node_statuses[(source_host, source_port)] = update_response.status
 
-                elected_leader_host, elected_leader_port = update_response.elected_leader
-                current_leader_host, current_leader_port = self._get_current_term_leader()
+                    self._local_health_multipliers[(host, port)] = max(
+                        0, 
+                        self._local_health_multipliers[(host, port)] - 1
+                    )
 
-                elected_leader_matches = current_leader_host == elected_leader_host and current_leader_port == elected_leader_port
+                    elected_leader_host, elected_leader_port = update_response.elected_leader
+                    current_leader_host, current_leader_port = self._get_current_term_leader()
 
-                if update_response.error and elected_leader_matches is False:
-                    self._term_leaders.append(update_response.elected_leader)
-                    self._term_number = update_response.term_number
+                    elected_leader_matches = current_leader_host == elected_leader_host and current_leader_port == elected_leader_port
 
-                return shard_id, update_response
-            
-            except asyncio.TimeoutError:
-                self._local_health_multiplier = min(
-                    self._local_health_multiplier, 
-                    self._max_poll_multiplier
-                ) + 1
+                    if update_response.error and elected_leader_matches is False:
+                        self._term_leaders.append(update_response.elected_leader)
+                        self._term_number = update_response.term_number
+
+                    return shard_id, update_response
+                
+                except asyncio.TimeoutError:
+                    self._local_health_multipliers[(host, port)] = min(
+                        self._local_health_multipliers[(host, port)], 
+                        self._max_poll_multiplier
+                    ) + 1
 
         check_host = host
         check_port = port
