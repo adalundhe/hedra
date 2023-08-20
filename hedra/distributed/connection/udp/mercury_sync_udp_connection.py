@@ -491,9 +491,12 @@ class MercurySyncUDPConnection:
                 except asyncio.CancelledError:
                     pass
 
+                except Exception:
+                    pass
+
                 try:
 
                     await self._cleanup_task
 
-                except asyncio.CancelledError:
+                except Exception:
                     pass

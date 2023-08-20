@@ -287,8 +287,12 @@ class Monitor(Controller):
 
         if target_last_updated > local_last_updated:
             self._node_statuses[(update_node_host, update_node_port)] = update_status
-        
 
+        self._local_health_multipliers[(update_node_host, update_node_port)] = max(
+            self._local_health_multipliers[(update_node_host, update_node_port)] - 1, 
+            0
+        )
+        
         await self._logger.distributed.aio.debug(f'Node - {update_node_host}:{update_node_port} - updated status to - {update_status} - for source - {self.host}:{self.port}')
         await self._logger.filesystem.aio['hedra.distributed'].debug(f'Node - {update_node_host}:{update_node_port} - updated status to - {update_status} - for source - {self.host}:{self.port}')
 
@@ -395,9 +399,14 @@ class Monitor(Controller):
                 error=self.error_context
             )
 
-        except asyncio.TimeoutError:
+        except Exception:
 
             if self._node_statuses[(target_host, target_port)] != 'failed':
+
+                await self._refresh_after_timeout(
+                    target_host,
+                    target_port
+                )
 
                 await self._logger.distributed.aio.debug(f'Suspect node - {target_host}:{target_port} - failed to respond to an indirect check from source - {self.host}:{self.port} - for node - {source_host}:{source_port}')
                 await self._logger.filesystem.aio['hedra.distributed'].debug(f'Suspect node - {target_host}:{target_port} - failed to respond to an indirect check from source - {self.host}:{self.port} - for node - {source_host}:{source_port}')
@@ -654,7 +663,13 @@ class Monitor(Controller):
 
                 return shard_id, healthcheck
 
-            except (asyncio.TimeoutError, RuntimeError):
+            except Exception:
+
+                await self._refresh_after_timeout(
+                    host,
+                    port
+                )
+
                 self._local_health_multipliers[(host, port)] = min(
                     self._local_health_multipliers[(host, port)], 
                     self._max_poll_multiplier
@@ -684,8 +699,8 @@ class Monitor(Controller):
             )
 
         else:
-            await self._logger.distributed.aio.debug(f'Node - {check_host}:{check_port} - responded on try - {idx}/{self._poll_interval} - for source - {self.host}:{self.port}')
-            await self._logger.filesystem.aio['hedra.distributed'].debug(f'Node - {check_host}:{check_port} - responded on try - {idx}/{self._poll_interval} - for source - {self.host}:{self.port}')
+            await self._logger.distributed.aio.debug(f'Node - {check_host}:{check_port} - responded on try - {idx}/{self._poll_retries} - for source - {self.host}:{self.port}')
+            await self._logger.filesystem.aio['hedra.distributed'].debug(f'Node - {check_host}:{check_port} - responded on try - {idx}/{self._poll_retries} - for source - {self.host}:{self.port}')
 
         return shard_id, healthcheck
     
@@ -918,10 +933,10 @@ class Monitor(Controller):
     ):
         nodes_count = len(self._node_statuses) + 1
 
-        poll_interval = self._poll_interval * (self._local_health_multipliers[suspect_node_address] + 1)
+        poll_timeout = self._poll_timeout * (self._local_health_multipliers[suspect_node_address] + 1)
 
         return round(
-            self.min_suspect_multiplier * math.log10(nodes_count) * poll_interval,
+            self.min_suspect_multiplier * math.log10(nodes_count) * poll_timeout,
             2
         )
 
@@ -994,37 +1009,17 @@ class Monitor(Controller):
 
                 self._node_statuses[(source_host, source_port)] = healthcheck.status
 
-                self._local_health_multipliers[(host, port)] = max(
-                    0, 
-                    self._local_health_multipliers[(host, port)] - 1
-                )
-
                 await self._logger.distributed.aio.debug(f'Completed indirect check request to - {target_host}:{target_port} -for node - {host}:{port} - from source - {self.host}:{self.port} - on try - {idx}/{self._poll_retries}')
                 await self._logger.filesystem.aio['hedra.distributed'].info(f'Completed indirect check request to - {target_host}:{target_port} -for node - {host}:{port} - from source - {self.host}:{self.port} - on try - {idx}/{self._poll_retries}')
 
                 return shard_id, healthcheck
 
-            except asyncio.TimeoutError:
-                self._local_health_multipliers[(host, port)] = min(
-                    self._local_health_multipliers[(host, port)], 
-                    self._max_poll_multiplier
-                ) + 1
-
-        if healthcheck is None and self._node_statuses.get((host, port)) == 'healthy':
-
-            await self._logger.distributed.aio.debug(f'Indirect check request to - {target_host}:{target_port} -for node - {host}:{port} - from source - {self.host}:{self.port} - failed and - {target_host}:{target_port} - is now suspect')
-            await self._logger.filesystem.aio['hedra.distributed'].info(f'Indirect check request to - {target_host}:{target_port} -for node - {host}:{port} - from source - {self.host}:{self.port} - failed and - {target_host}:{target_port} - is now suspect')
-
-            self._node_statuses[(host, port)] = 'suspect'
-
-            self._suspect_nodes.append((
-                host,
-                port
-            ))
-
-            self._suspect_tasks[(host, port)] = asyncio.create_task(
-                self._start_suspect_monitor()
-            )
+            except Exception:
+                
+                await self._refresh_after_timeout(
+                    host,
+                    port
+                )
 
     async def _run_healthcheck(
         self, 
@@ -1068,12 +1063,18 @@ class Monitor(Controller):
                         self._local_health_multipliers[(host, port)] - 1
                     )
 
-                    await self._logger.distributed.aio.debug(f'Node - {host}:{port} - responded on try - {idx}/{self._poll_interval} - for source - {self.host}:{self.port}')
-                    await self._logger.filesystem.aio['hedra.distributed'].debug(f'Node - {host}:{port} - responded on try - {idx}/{self._poll_interval} - for source - {self.host}:{self.port}')
+                    await self._logger.distributed.aio.debug(f'Node - {host}:{port} - responded on try - {idx}/{self._poll_retries} - for source - {self.host}:{self.port}')
+                    await self._logger.filesystem.aio['hedra.distributed'].debug(f'Node - {host}:{port} - responded on try - {idx}/{self._poll_retries} - for source - {self.host}:{self.port}')
 
                     return shard_id, healthcheck
 
-                except asyncio.TimeoutError:
+                except Exception:
+
+                    await self._refresh_after_timeout(
+                        host,
+                        port
+                    )
+
                     self._local_health_multipliers[(host, port)] = min(
                         self._local_health_multipliers[(host, port)], 
                         self._max_poll_multiplier
@@ -1103,6 +1104,25 @@ class Monitor(Controller):
             )
         
         return shard_id, healthcheck
+    
+    async def _refresh_after_timeout(
+        self,
+        host: str,
+        port: int
+    ):
+        try:
+            await self.refresh_clients(
+                HealthCheck(
+                    host=host,
+                    port=port,
+                    source_host=self.host,
+                    source_port=self.port,
+                    status=self.status
+                )
+            )
+
+        except Exception:
+            pass
 
     async def _start_suspect_monitor(self):
 
@@ -1115,7 +1135,7 @@ class Monitor(Controller):
 
         if status == 'suspect':
 
-            await self._logger.distributed.aio.info(f'Node - {suspect_host}:{suspect_port} - marked suspect for source {self.host}:{self.port}')
+            await self._logger.distributed.aio.debug(f'Node - {suspect_host}:{suspect_port} - marked suspect for source {self.host}:{self.port}')
             await self._logger.filesystem.aio['hedra.distributed'].info(f'Node - {suspect_host}:{suspect_port} - marked suspect for source {self.host}:{self.port}')
             
         suspicion_timeout = self._calculate_suspicion_timeout(address)
@@ -1178,7 +1198,7 @@ class Monitor(Controller):
 
                 self._node_statuses[(suspect_host, suspect_port)] = 'healthy'
 
-                await self._logger.distributed.aio.debug(f'Node - {suspect_host}:{suspect_port} - successfully responded to one or more probes for source - {self.host}:{self.port}')
+                await self._logger.distributed.aio.info(f'Node - {suspect_host}:{suspect_port} - successfully responded to one or more probes for source - {self.host}:{self.port}')
                 await self._logger.filesystem.aio['hedra.distributed'].info(f'Node - {suspect_host}:{suspect_port} - failed to respond for source - {self.host}:{self.port}. Setting next timeout as - {suspicion_timeout}')
 
                 break
@@ -1523,11 +1543,13 @@ class Monitor(Controller):
         port: int
     ):
         updates = [
-            self._push_tcp_status_update(
-                host=host,
-                port=port,
-                target_host=node_host,
-                target_port=node_port
+            asyncio.create_task(
+                self._push_tcp_status_update(
+                    host=host,
+                    port=port,
+                    target_host=node_host,
+                    target_port=node_port
+                )
             ) for node_host, node_port in self._node_statuses if self._node_statuses.get((
                 node_host,
                 node_port
@@ -1577,8 +1599,12 @@ class Monitor(Controller):
 
                 return shard_id, healthcheck
 
-            except asyncio.TimeoutError:
-                pass
+            except Exception:
+                
+                await self._refresh_after_timeout(
+                    host,
+                    port
+                )
 
         return shard_id, healthcheck
 
@@ -1595,29 +1621,44 @@ class Monitor(Controller):
         await self._logger.distributed.aio.debug(f'Pushing TCP health update for source - {host}:{port} - to node - {self.host}:{self.port}')
         await self._logger.filesystem.aio['hedra.distributed'].debug(f'Pushing TCP health update for source - {host}:{port} - to node - {self.host}:{self.port}')
         
-        try:
-            
-            response: Tuple[int, HealthCheck] = await asyncio.wait_for(
-                self.push_tcp_status_update(
+        for _ in range(self._poll_retries):
+            try:
+                
+                response: Tuple[int, HealthCheck] = await asyncio.wait_for(
+                    self.push_tcp_status_update(
+                        host,
+                        port,
+                        self.status,
+                        target_host=target_host,
+                        target_port=target_port,
+                        error_context=self.error_context
+                    ),
+                    timeout=self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1)
+                )
+
+                self._local_health_multipliers[(host, port)] = max(
+                    0, 
+                    self._local_health_multipliers[(host, port)] - 1
+                )
+
+                shard_id, healthcheck = response
+                source_host, source_port = healthcheck.source_host, healthcheck.source_port
+
+                self._node_statuses[(source_host, source_port)] = healthcheck.status
+
+                return shard_id, healthcheck
+
+            except Exception:
+                
+                await self._refresh_after_timeout(
                     host,
-                    port,
-                    self.status,
-                    target_host=target_host,
-                    target_port=target_port,
-                    error_context=self.error_context
-                ),
-                timeout=self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1)
-            )
+                    port
+                )
 
-            shard_id, healthcheck = response
-            source_host, source_port = healthcheck.source_host, healthcheck.source_port
-
-            self._node_statuses[(source_host, source_port)] = healthcheck.status
-
-            return shard_id, healthcheck
-
-        except asyncio.TimeoutError:
-            pass
+                self._local_health_multipliers[(host, port)] = min(
+                    self._local_health_multipliers[(host, port)], 
+                    self._max_poll_multiplier
+                ) + 1
 
         return shard_id, healthcheck
 
@@ -1648,8 +1689,12 @@ class Monitor(Controller):
 
             self._node_statuses[(host, port)] = healthcheck.status
 
-        except asyncio.TimeoutError:
-            pass
+        except Exception:
+            
+            await self._refresh_after_timeout(
+                host,
+                port
+            )
 
     async def cleanup_pending_checks(self):
 
@@ -1665,11 +1710,7 @@ class Monitor(Controller):
                     try:
                         await pending_check
 
-                    except (
-                        ConnectionRefusedError,
-                        ConnectionAbortedError,
-                        ConnectionResetError
-                    ):
+                    except Exception:
                         pass
 
                     self._tasks_queue.remove(pending_check)

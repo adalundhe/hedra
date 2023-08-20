@@ -404,6 +404,11 @@ class RaftController(Monitor):
         error = self._logs.update(entries)
         elected_leader = self._get_current_term_leader()
 
+        self._local_health_multipliers[(source_host, source_port)] = max(
+            0, 
+            self._local_health_multipliers[(source_host, source_port)] - 1
+        )
+
         if isinstance(error, Exception):
 
             return RaftMessage(
@@ -528,6 +533,12 @@ class RaftController(Monitor):
                     return shard_id, update_response
                 
                 except asyncio.TimeoutError:
+
+                    await self._refresh_after_timeout(
+                        host,
+                        port
+                    )
+
                     self._local_health_multipliers[(host, port)] = min(
                         self._local_health_multipliers[(host, port)], 
                         self._max_poll_multiplier
