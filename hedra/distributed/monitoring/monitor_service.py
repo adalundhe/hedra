@@ -392,23 +392,25 @@ class Monitor(Controller):
 
         except asyncio.TimeoutError:
 
-            await self._logger.distributed.aio.debug(f'Suspect node - {target_host}:{target_port} - failed to respond to an indirect check from source - {self.host}:{self.port} - for node - {source_host}:{source_port}')
-            await self._logger.filesystem.aio['hedra.distributed'].debug(f'Suspect node - {target_host}:{target_port} - failed to respond to an indirect check from source - {self.host}:{self.port} - for node - {source_host}:{source_port}')
+            if self._node_statuses[(target_host, target_port)] != 'failed':
 
-            self._local_health_multiplier = min(
-                self._local_health_multiplier, 
-                self._max_poll_multiplier
-            ) + 1
+                await self._logger.distributed.aio.debug(f'Suspect node - {target_host}:{target_port} - failed to respond to an indirect check from source - {self.host}:{self.port} - for node - {source_host}:{source_port}')
+                await self._logger.filesystem.aio['hedra.distributed'].debug(f'Suspect node - {target_host}:{target_port} - failed to respond to an indirect check from source - {self.host}:{self.port} - for node - {source_host}:{source_port}')
 
-            # Our suspicion is correct!
-            return HealthCheck(
-                host=healthcheck.source_host,
-                port=healthcheck.source_port,
-                source_host=target_host,
-                source_port=target_port,
-                target_status='suspect', 
-                status=self.status
-            )
+                self._local_health_multiplier = min(
+                    self._local_health_multiplier, 
+                    self._max_poll_multiplier
+                ) + 1
+
+                # Our suspicion is correct!
+                return HealthCheck(
+                    host=healthcheck.source_host,
+                    port=healthcheck.source_port,
+                    source_host=target_host,
+                    source_port=target_port,
+                    target_status='suspect', 
+                    status=self.status
+                )
     
     @server()
     async def update_acknowledged(
@@ -1093,17 +1095,19 @@ class Monitor(Controller):
         
         address = self._suspect_nodes.pop()
         suspect_host, suspect_port = address
+        status = self._node_statuses[(suspect_host, suspect_port)] 
 
-        await self._logger.distributed.aio.info(f'Node - {suspect_host}:{suspect_port} - marked suspect for source {self.host}:{self.port}')
-        await self._logger.filesystem.aio['hedra.distributed'].info(f'Node - {suspect_host}:{suspect_port} - marked suspect for source {self.host}:{self.port}')
-        
+        if status == 'suspect':
+
+            await self._logger.distributed.aio.info(f'Node - {suspect_host}:{suspect_port} - marked suspect for source {self.host}:{self.port}')
+            await self._logger.filesystem.aio['hedra.distributed'].info(f'Node - {suspect_host}:{suspect_port} - marked suspect for source {self.host}:{self.port}')
+            
         suspicion_timeout = self._calculate_suspicion_timeout(address)
-
 
         elapsed = 0
         start = time.monotonic()
 
-        while elapsed < suspicion_timeout and self._node_statuses[(suspect_host, suspect_port)] == 'suspect':
+        while elapsed < suspicion_timeout and status == 'suspect':
 
             self._tasks_queue.append(
                 asyncio.create_task(
@@ -1165,7 +1169,10 @@ class Monitor(Controller):
             
             await asyncio.sleep(
                 self._poll_interval * (self._local_health_multiplier + 1)
-            ) 
+            )
+
+            
+            status = self._node_statuses[(suspect_host, suspect_port)] 
 
             elapsed = time.monotonic() - start
             suspicion_timeout = self._calculate_suspicion_timeout(address)
@@ -1176,6 +1183,23 @@ class Monitor(Controller):
 
         if self._node_statuses[(suspect_host, suspect_port)] == 'suspect':
             self._node_statuses[(suspect_host, suspect_port)] = 'failed'
+
+            monitors = [
+                address for address, status in self._node_statuses.items() if status in self._healthy_statuses
+            ]
+
+            active_nodes_count = len(monitors)
+
+            if active_nodes_count > 0:
+
+                self._tasks_queue.extend([
+                    asyncio.create_task(
+                        self._push_state_to_node(
+                            host=host,
+                            port=port
+                        )
+                    ) for host, port in monitors
+                ])
 
             self.failed_nodes.append((
                 suspect_host,
@@ -1188,7 +1212,7 @@ class Monitor(Controller):
         
         self._investigating_nodes[(suspect_host, suspect_port)] = {}
         self._confirmed_suspicions[(suspect_host, suspect_port)] = 0
-            
+        
     def _get_confirmation_members(self, suspect_address: Tuple[str, int]) -> List[Tuple[str, int]]:
 
         confirmation_members = [

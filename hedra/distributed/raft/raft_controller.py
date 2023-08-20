@@ -259,6 +259,7 @@ class RaftController(Monitor):
                 port=source_port,
                 source_host=self.host,
                 source_port=self.port,
+                status=self.status,
                 election_status=ElectionState.REJECTED,
                 raft_node_status=self._raft_node_status,
                 term_number=term_number
@@ -292,6 +293,7 @@ class RaftController(Monitor):
                 port=source_port,
                 source_host=self.host,
                 source_port=self.port,
+                status=self.status,
                 election_status=ElectionState.REJECTED,
                 raft_node_status=self._raft_node_status,
                 term_number=term_number
@@ -305,6 +307,7 @@ class RaftController(Monitor):
                 port=source_port,
                 source_host=self.host,
                 source_port=self.port,
+                status=self.status,
                 election_status=ElectionState.ACCEPTED,
                 raft_node_status=self._raft_node_status,
                 term_number=term_number
@@ -317,6 +320,7 @@ class RaftController(Monitor):
                 port=source_port,
                 source_host=self.host,
                 source_port=self.port,
+                status=self.status,
                 election_status=ElectionState.REJECTED,
                 raft_node_status=self._raft_node_status,
                 term_number=term_number
@@ -339,6 +343,7 @@ class RaftController(Monitor):
                 port=message.port,
                 source_host=self.host,
                 source_port=self.port,
+                status=self.status,
                 term_number=self._term_number,
                 election_status=self._election_status,
                 raft_node_status=self._raft_node_status
@@ -375,6 +380,27 @@ class RaftController(Monitor):
 
             self._raft_node_status = NodeState.FOLLOWER
 
+        source_host = message.source_host
+        source_port = message.source_port
+
+        suspect_tasks = dict(self._suspect_tasks)
+        suspect_task = suspect_tasks.pop((source_host, source_port), None)
+
+        if suspect_task:
+
+            await self._logger.distributed.aio.debug(f'Node - {source_host}:{source_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
+            await self._logger.filesystem.aio['hedra.distributed'].debug(f'Node - {source_host}:{source_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
+
+            self._tasks_queue.append(
+                asyncio.create_task(
+                    cancel(suspect_task)
+                )
+            )
+
+            del self._suspect_tasks[(source_host, source_port)]
+
+            self._suspect_tasks = suspect_tasks
+
         error = self._logs.update(entries)
         elected_leader = self._get_current_term_leader()
 
@@ -385,6 +411,7 @@ class RaftController(Monitor):
                 port=message.port,
                 source_host=self.host,
                 source_port=self.port,
+                status=self.status,
                 election_status=self._election_status,
                 raft_node_status=self._raft_node_status,
                 error=str(error),
@@ -397,6 +424,7 @@ class RaftController(Monitor):
             port=message.port,
             source_host=self.host,
             source_port=self.port,
+            status=self.status,
             elected_leader=elected_leader,
             term_number=self._term_number,
             election_status=self._election_status,
@@ -414,6 +442,7 @@ class RaftController(Monitor):
             port=port,
             source_host=self.host,
             source_port=self.port,
+            status=self.status,
             term_number=self._term_number,
             election_status=self._election_status,
             raft_node_status=self._raft_node_status
@@ -474,7 +503,7 @@ class RaftController(Monitor):
                 shard_id, update_response = response
                 source_host, source_port = update_response.source_host, update_response.source_port
 
-                self._node_statuses[(source_host, source_port)] = "healthy"
+                self._node_statuses[(source_host, source_port)] = update_response.status
 
                 self._local_health_multiplier = max(
                     0, 
