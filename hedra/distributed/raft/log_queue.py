@@ -84,23 +84,39 @@ class LogQueue:
                     # I.e. if the last idx < timestamp is 4 we insert at 5.
                     #
 
-                    insert_index: int = [
+                    previous_timestamps = [
                         idx for idx, timestamp in enumerate(self._timestamps) if timestamp < entry_timestamp
-                    ].pop() + 1
+                    ]
 
-                    next_logs = self.logs[insert_index:]
-                    next_timestamps = self._timestamps[insert_index:]
+                    if len(previous_timestamps) > 0:
 
-                    previous_logs = self.logs[:insert_index - 1]
-                    previous_timestamps = self._timestamps[:insert_index - 1]
-                    
-                    self.timestamp_index_map[entry_timestamp] = insert_index
+                        insert_index: int = [
+                            idx for idx, timestamp in enumerate(self._timestamps) if timestamp < entry_timestamp
+                        ].pop() + 1
+
+                        next_logs = self.logs[insert_index:]
+                        next_timestamps = self._timestamps[insert_index:]
+
+                        previous_logs = self.logs[:insert_index - 1]
+                        previous_timestamps = self._timestamps[:insert_index - 1]
+
+                    else:
+                        
+                        insert_index = 0
+
+                        next_logs = self.logs
+                        next_timestamps = self._timestamps
+
+                        previous_logs = []
+                        previous_timestamps = []
                 
                     previous_logs.append(entry)
                     previous_timestamps.append(entry_timestamp)
 
                     previous_logs.extend(next_logs)
                     previous_timestamps.extend(next_timestamps)
+
+                    self.timestamp_index_map[entry_timestamp] = insert_index
 
                     for timestamp in next_timestamps:
                         self.timestamp_index_map[timestamp] += 1

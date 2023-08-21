@@ -57,6 +57,8 @@ class Env(BaseModel):
     MERCURY_SYNC_AUTH_SECRET: StrictStr
     MERCURY_SYNC_MULTICAST_GROUP: IPvAnyAddress='224.1.1.1'
     MERCURY_SYNC_LOGS_DIRECTORY: StrictStr=os.getcwd()
+    MERCURY_SYNC_REQUEST_TIMEOUT: StrictStr='30s'
+    MERCURY_SYNC_LOG_LEVEL: StrictStr='info'
 
     @classmethod
     def types_map(self) -> Dict[str, Callable[[str], PrimaryType]]:
@@ -83,5 +85,7 @@ class Env(BaseModel):
             'MERCURY_SYNC_MAX_CONCURRENCY': int,
             'MERCURY_SYNC_AUTH_SECRET': str,
             'MERCURY_SYNC_MULTICAST_GROUP': str,
-            'MERCURY_SYNC_LOGS_DIRECTORY': str
+            'MERCURY_SYNC_LOGS_DIRECTORY': str,
+            'MERCURY_SYNC_REQUEST_TIMEOUT': str,
+            'MERCURY_SYNC_LOG_LEVEL': str
         }

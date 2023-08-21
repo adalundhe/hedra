@@ -60,6 +60,9 @@ class MercurySyncUDPConnection:
         self._udp_cert_path: Union[str, None] = None
         self._udp_key_path: Union[str, None] = None
         self._udp_ssl_context: Union[ssl.SSLContext, None] = None
+        self._request_timeout = TimeParser(
+            env.MERCURY_SYNC_REQUEST_TIMEOUT
+        ).time
 
         self._encryptor = AESGCMFernet(env)
         self._semaphore: Union[asyncio.Semaphore, None] = None
@@ -254,11 +257,7 @@ class MercurySyncUDPConnection:
                         asyncio.InvalidStateError,
                         AttributeError
                     ):
-                        await self.close()
-                        await self.connect_async(
-                            cert_path=self._udp_cert_path,
-                            key_path=self._udp_key_path
-                        )
+                        await self._reset_connection()
 
                     if len(self._pending_responses) > 0:
                         self._pending_responses.pop()
@@ -285,19 +284,34 @@ class MercurySyncUDPConnection:
         waiter = self._loop.create_future()
         self._waiters[event_name].append(waiter)
 
-        (
-            _,
-            shard_id,
-            _,
-            response_data,
-            _, 
-            _
-        ) = await waiter
+        try:
+            (
+                _,
+                shard_id,
+                _,
+                response_data,
+                _, 
+                _
+            ) = await asyncio.wait_for(
+                waiter,
+                timeout=self._request_timeout
+            )
 
-        return (
-            shard_id,
-            response_data
-        )
+            return (
+                shard_id,
+                response_data
+            )
+        
+        except asyncio.TimeoutError:
+
+            return (
+                self.id_generator.generate(),
+                Message(
+                    host=self.host,
+                    port=self.port,
+                    error='Request timed out.'
+                )
+            )
     
     async def send_bytes(
         self,
@@ -310,7 +324,16 @@ class MercurySyncUDPConnection:
 
         waiter = self._loop.create_future()
         self._waiters[event_name].append(waiter)
-        return await waiter
+        
+        try:
+
+            return await asyncio.wait_for(
+                waiter,
+                timeout=self._request_timeout
+            )
+        
+        except asyncio.TimeoutError:
+            return b'Request timed out.'
 
     async def stream(
         self, 
@@ -334,24 +357,40 @@ class MercurySyncUDPConnection:
         waiter = self._loop.create_future()
         self._waiters[event_name].append(waiter)
 
-        await waiter
+        try:
 
-        for item in self.queue[event_name]:
-            (
-                _,
-                shard_id,
-                _,
-                response_data,
-                _, 
-                _
-            ) = item
-
-            yield(
-                shard_id,
-                response_data
+            await asyncio.wait_for(
+                waiter,
+                timeout=self._request_timeout
             )
 
-        self.queue.clear()
+            for item in self.queue[event_name]:
+                (
+                    _,
+                    shard_id,
+                    _,
+                    response_data,
+                    _, 
+                    _
+                ) = item
+
+                yield (
+                    shard_id,
+                    response_data
+                )
+
+            self.queue.clear()
+
+        except asyncio.TimeoutError:
+
+            yield (
+                self.id_generator.generate(),
+                Message(
+                    host=self.host,
+                    port=self.port,
+                    error='Request timed out.'
+                )
+            )
 
     def read(
         self,
@@ -411,7 +450,7 @@ class MercurySyncUDPConnection:
         else:
 
             event_waiter = self._waiters[event_name]
-      
+    
             if bool(event_waiter):
                 waiter = event_waiter.pop()
                 
@@ -429,6 +468,18 @@ class MercurySyncUDPConnection:
                 except asyncio.InvalidStateError:
                     pass
 
+    async def _reset_connection(self):
+        
+        try:
+
+            await self.close()
+            await self.connect_async(
+                cert_path=self._udp_cert_path,
+                key_path=self._udp_key_path
+            )
+
+        except Exception:
+            pass
 
     async def _read(
         self,
@@ -437,30 +488,9 @@ class MercurySyncUDPConnection:
         addr: Tuple[str, int]
     ) -> Coroutine[Any, Any, None]:
         
-        response: Message = await coroutine
-
-        item = pickle.dumps(
-            (
-                'response', 
-                self.id_generator.generate(),
-                event_name,
-                response.to_data()
-            ),
-            protocol=pickle.HIGHEST_PROTOCOL
-        )
-
-        encrypted_message = self._encryptor.encrypt(item)
-        compressed = self._compressor.compress(encrypted_message)
-
-        self._transport.sendto(compressed, addr)
-
-    async def _read_iterator(
-        self,
-        event_name: str,
-        coroutine: AsyncIterable[Message],
-        addr: Tuple[str, int]    
-    ) -> Coroutine[Any, Any, None]:
-        async for response in coroutine:
+        try:
+        
+            response: Message = await coroutine
 
             item = pickle.dumps(
                 (
@@ -474,7 +504,39 @@ class MercurySyncUDPConnection:
 
             encrypted_message = self._encryptor.encrypt(item)
             compressed = self._compressor.compress(encrypted_message)
+
             self._transport.sendto(compressed, addr)
+
+        except Exception:
+            await self._reset_connection()
+
+
+    async def _read_iterator(
+        self,
+        event_name: str,
+        coroutine: AsyncIterable[Message],
+        addr: Tuple[str, int]    
+    ) -> Coroutine[Any, Any, None]:
+        async for response in coroutine:
+
+            try:
+
+                item = pickle.dumps(
+                    (
+                        'response', 
+                        self.id_generator.generate(),
+                        event_name,
+                        response.to_data()
+                    ),
+                    protocol=pickle.HIGHEST_PROTOCOL
+                )
+
+                encrypted_message = self._encryptor.encrypt(item)
+                compressed = self._compressor.compress(encrypted_message)
+                self._transport.sendto(compressed, addr)
+
+            except Exception:
+                await self._reset_connection()
 
     async def close(self) -> None:
         self._running = False

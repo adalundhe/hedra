@@ -601,99 +601,68 @@ class Controller(Generic[*P]):
         key_path: Optional[str]=None    
     ) -> int:
 
-        remote_pool: List[Message] = []
-        pool_range = self._workers * 2
 
-        for idx in range(0, pool_range, 2):
-            remote_copy = Message(**{
-                'host': remote.host,
-                'port': remote.port + idx
-            })
+        try:
 
-            remote_pool.append(remote_copy)
+            for _ in range(self._workers):
 
-        port = max(self.port, remote.port) + pool_range
+                udp_connection = MercurySyncUDPConnection(
+                    self.host,
+                    self.port,
+                    self._instance_id,
+                    env=self._env
+                )
 
-        udp_pool = [
-            MercurySyncUDPConnection(
-                self.host,
-                port + idx,
-                instance_id,
-                env=self._env
-            ) for instance_id, idx in zip(
-                self.instance_ids,
-                range(0, pool_range, 2)
-            )
-        ]
+                tcp_connection = MercurySyncTCPConnection(
+                    self.host,
+                    self.port + 1,
+                    self._instance_id,
+                    env=self._env
+                )
+                
+                tcp_connection.parsers.update(self._parsers)
+                udp_connection.parsers.update(self._parsers)
 
-        tcp_pool = [
-            MercurySyncTCPConnection(
-                self.host,
-                port + idx + 1,
-                instance_id,
-                env=self._env
-            ) for instance_id, idx in zip(
-                self.instance_ids,
-                range(0, pool_range, 2)
-            )
-        ]
+                tcp_connection.events.update(self._events)
+                udp_connection.events.update(self._events)
+        
+                await udp_connection.connect_async(
+                    cert_path=cert_path,
+                    key_path=key_path
+                )
 
-        for tcp_connection, udp_connection in zip(
-            udp_pool,
-            tcp_pool
-        ):
-            
-            tcp_connection.parsers.update(self._parsers)
-            udp_connection.parsers.update(self._parsers)
+                await tcp_connection.connect_async(
+                    cert_path=cert_path,
+                    key_path=key_path
+                )
 
-            tcp_connection.events.update(self._events)
-            udp_connection.events.update(self._events)
-            
+                self._host_map[remote.__class__.__name__][udp_connection] = (
+                    remote.host, 
+                    remote.port
+                )
 
-        for udp_connection, tcp_connection, remote_copy in zip(
-            udp_pool,
-            tcp_pool,
-            remote_pool
-        ):
-      
-            await udp_connection.connect_async(
-                cert_path=cert_path,
-                key_path=key_path
-            )
+                self._host_map[remote.__class__.__name__][tcp_connection] = (
+                    remote.host, 
+                    remote.port
+                )
 
-            await tcp_connection.connect_async(
-                cert_path=cert_path,
-                key_path=key_path
-            )
+                await self._udp_queue[(remote.host, remote.port)].put(udp_connection)
+                await self._tcp_queue[(remote.host, remote.port)].put(tcp_connection)
 
-            self._host_map[remote.__class__.__name__][udp_connection] = (
-                remote_copy.host, 
-                remote_copy.port
-            )
+                await tcp_connection.connect_client(
+                    (remote.host, remote.port + 1),
+                    cert_path=cert_path,
+                    key_path=key_path
+                )
 
-            self._host_map[remote.__class__.__name__][tcp_connection] = (
-                remote_copy.host, 
-                remote_copy.port
-            )
+                self._udp_pool.append(udp_connection)
+                self._tcp_pool.append(tcp_connection)
+                
 
+        except Exception:
+            pass
 
-            await self._udp_queue[(remote.host, remote.port)].put(udp_connection)
-            await self._tcp_queue[(remote.host, remote.port)].put(tcp_connection)
-
-        for tcp_connection, remote_copy in zip(
-            tcp_pool,
-            remote_pool
-        ):
-            await tcp_connection.connect_client(
-                (remote_copy.host, remote_copy.port + 1),
-                cert_path=cert_path,
-                key_path=key_path
-            )
-            
-        self._udp_pool.extend(udp_pool)
-        self._tcp_pool.extend(tcp_pool)
-
-        return port
+        return remote.port
     
     async def refresh_clients(
         self,
@@ -764,6 +733,9 @@ class Controller(Generic[*P]):
             message.to_data(),
             address
         )
+
+        if isinstance(data, Message):
+            return shard_id, data
 
         response_data = self._response_parsers.get(event_name)(
             **data

@@ -118,7 +118,7 @@ class RaftController(Monitor):
 
         logging_manager.logfiles_directory = logs_directory
         logging_manager.update_log_level(
-            'info'
+            env.MERCURY_SYNC_LOG_LEVEL
         )
 
         self._logger = HedraLogger()
@@ -151,8 +151,8 @@ class RaftController(Monitor):
         if boot_wait is None:
             boot_wait = self.boot_wait
 
-        await self._logger.filesystem.aio.create_logfile('hedra.distributed.log')
-        self._logger.filesystem.create_filelogger('hedra.distributed.log')
+        await self._logger.filesystem.aio.create_logfile(f'hedra.distributed.{self._instance_id}.log')
+        self._logger.filesystem.create_filelogger(f'hedra.distributed.{self._instance_id}.log')
 
         await self.start_server()
 
@@ -168,16 +168,14 @@ class RaftController(Monitor):
         port: int
     ):
     
-        await self._logger.distributed.aio.info(f'Initializing node - {self.host}:{self.port}')
-        await self._logger.filesystem.aio['hedra.distributed'].info(f'Initializing node - {self.host}:{self.port}')
-
-        
+        await self._logger.distributed.aio.info(f'Initializing node - {self.host}:{self.port} - with id - {self._instance_id}')
+        await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Initializing node - {self.host}:{self.port} - with id - {self._instance_id}')
+   
         self.bootstrap_host = host
         self.bootstrap_port = port
 
-
         await self._logger.distributed.aio.info(f'Connecting to node node - {self.bootstrap_host}:{self.bootstrap_port}')
-        await self._logger.filesystem.aio['hedra.distributed'].info(f'Connecting to node node - {self.bootstrap_host}:{self.bootstrap_port}')
+        await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Connecting to node node - {self.bootstrap_host}:{self.bootstrap_port}')
 
         
         await asyncio.wait_for(
@@ -218,14 +216,11 @@ class RaftController(Monitor):
         )
 
         await self._logger.distributed.aio.info(f'Initialized node - {self.host}:{self.port}')
-        await self._logger.filesystem.aio['hedra.distributed'].info(f'Initialized node - {self.host}:{self.port}')
+        await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Initialized node - {self.host}:{self.port}')
 
         self._tasks_queue.append(
             asyncio.create_task(
-                self.run_election(
-                    host,
-                    port
-                )
+                self.run_election()
             )
         )
 
@@ -389,7 +384,7 @@ class RaftController(Monitor):
         if suspect_task:
 
             await self._logger.distributed.aio.debug(f'Node - {source_host}:{source_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
-            await self._logger.filesystem.aio['hedra.distributed'].debug(f'Node - {source_host}:{source_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
+            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Node - {source_host}:{source_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
 
             self._tasks_queue.append(
                 asyncio.create_task(
@@ -493,56 +488,54 @@ class RaftController(Monitor):
         update_response: Union[RaftMessage, None] = None
 
         await self._logger.distributed.aio.debug(f'Running UDP logs update for node - {host}:{port} - for source - {self.host}:{self.port}')
-        await self._logger.filesystem.aio['hedra.distributed'].debug(f'Running UDP logs update for node - {host}:{port} - for source - {self.host}:{self.port}')
+        await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Running UDP logs update for node - {host}:{port} - for source - {self.host}:{self.port}')
 
         
         for idx in range(self._poll_retries):
 
-            if self._node_statuses[(host, port)] == 'healthy':
+            try:
 
-                try:
-
-                    response = await asyncio.wait_for(
-                        self.submit_log_update(
-                            host,
-                            port,
-                            entries
-                        ),
-                        timeout=self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1)
-                    )
-
-                    shard_id, update_response = response
-                    source_host, source_port = update_response.source_host, update_response.source_port
-
-                    self._node_statuses[(source_host, source_port)] = update_response.status
-
-                    self._local_health_multipliers[(host, port)] = max(
-                        0, 
-                        self._local_health_multipliers[(host, port)] - 1
-                    )
-
-                    elected_leader_host, elected_leader_port = update_response.elected_leader
-                    current_leader_host, current_leader_port = self._get_current_term_leader()
-
-                    elected_leader_matches = current_leader_host == elected_leader_host and current_leader_port == elected_leader_port
-
-                    if update_response.error and elected_leader_matches is False:
-                        self._term_leaders.append(update_response.elected_leader)
-                        self._term_number = update_response.term_number
-
-                    return shard_id, update_response
-                
-                except asyncio.TimeoutError:
-
-                    await self._refresh_after_timeout(
+                response = await asyncio.wait_for(
+                    self.submit_log_update(
                         host,
-                        port
-                    )
+                        port,
+                        entries
+                    ),
+                    timeout=self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1)
+                )
 
-                    self._local_health_multipliers[(host, port)] = min(
-                        self._local_health_multipliers[(host, port)], 
-                        self._max_poll_multiplier
-                    ) + 1
+                shard_id, update_response = response
+                source_host, source_port = update_response.source_host, update_response.source_port
+
+                self._node_statuses[(source_host, source_port)] = update_response.status
+
+                self._local_health_multipliers[(host, port)] = max(
+                    0, 
+                    self._local_health_multipliers[(host, port)] - 1
+                )
+
+                elected_leader_host, elected_leader_port = update_response.elected_leader
+                current_leader_host, current_leader_port = self._get_current_term_leader()
+
+                elected_leader_matches = current_leader_host == elected_leader_host and current_leader_port == elected_leader_port
+
+                if update_response.error and elected_leader_matches is False:
+                    self._term_leaders.append(update_response.elected_leader)
+                    self._term_number = update_response.term_number
+
+                return shard_id, update_response
+            
+            except asyncio.TimeoutError:
+
+                await self._refresh_after_timeout(
+                    host,
+                    port
+                )
+
+                self._local_health_multipliers[(host, port)] = min(
+                    self._local_health_multipliers[(host, port)], 
+                    self._max_poll_multiplier
+                ) + 1
 
         check_host = host
         check_port = port
@@ -550,7 +543,7 @@ class RaftController(Monitor):
         if update_response is None and self._node_statuses.get((check_host, check_port)) == 'healthy':
 
             await self._logger.distributed.aio.debug(f'Node - {check_host}:{check_port} - failed to respond over - {self._poll_retries} - retries and is now suspect for source - {self.host}:{self.port}')
-            await self._logger.filesystem.aio['hedra.distributed'].info(f'Node - {check_host}:{check_port} - failed to respond over - {self._poll_retries} - retries and is now suspect for source - {self.host}:{self.port}')
+            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Node - {check_host}:{check_port} - failed to respond over - {self._poll_retries} - retries and is now suspect for source - {self.host}:{self.port}')
 
             self._node_statuses[(check_host, check_port)] = 'suspect'
 
@@ -566,7 +559,7 @@ class RaftController(Monitor):
         else:
 
             await self._logger.distributed.aio.debug(f'Node - {check_host}:{check_port} - responded on try - {idx}/{self._poll_interval} - for source - {self.host}:{self.port}')
-            await self._logger.filesystem.aio['hedra.distributed'].debug(f'Node - {check_host}:{check_port} - responded on try - {idx}/{self._poll_interval} - for source - {self.host}:{self.port}')
+            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Node - {check_host}:{check_port} - responded on try - {idx}/{self._poll_interval} - for source - {self.host}:{self.port}')
 
     def _get_current_term_leader(self):
 
@@ -590,11 +583,7 @@ class RaftController(Monitor):
             current_leader_port
         )
 
-    async def run_election(
-        self,
-        host: str,
-        port: int
-    ):
+    async def run_election(self):
         # Trigger new election
         self._term_number += 1
         
@@ -723,7 +712,7 @@ class RaftController(Monitor):
             current_leader_host, current_leader_port = self._get_current_term_leader()
 
             await self._logger.distributed.aio.debug(f'Source - {self.host}:{self.port} - has node {current_leader_host}:{current_leader_port} - as leader for term - {self._term_number}')
-            await self._logger.filesystem.aio['hedra.distributed'].info(f'Source - {self.host}:{self.port} - has node {current_leader_host}:{current_leader_port} - as leader for term - {self._term_number}')
+            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - has node {current_leader_host}:{current_leader_port} - as leader for term - {self._term_number}')
 
             await asyncio.sleep(
                 self._logs_update_poll_interval
@@ -732,7 +721,7 @@ class RaftController(Monitor):
     async def _cleanup_pending_raft_tasks(self):
 
         await self._logger.distributed.aio.debug(f'Running cleanup for source - {self.host}:{self.port}')
-        await self._logger.filesystem.aio['hedra.distributed'].debug(f'Running cleanup for source - {self.host}:{self.port}')
+        await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Running cleanup for source - {self.host}:{self.port}')
 
         while self._running:
 
@@ -754,13 +743,13 @@ class RaftController(Monitor):
                     pending_count += 1
 
             await self._logger.distributed.aio.debug(f'Cleaned up - {pending_count} - for source - {self.host}:{self.port}')
-            await self._logger.filesystem.aio['hedra.distributed'].debug(f'Cleaned up - {pending_count} - for source - {self.host}:{self.port}')
+            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Cleaned up - {pending_count} - for source - {self.host}:{self.port}')
 
             await asyncio.sleep(self._logs_update_poll_interval)
 
     async def leave(self):
         await self._logger.distributed.aio.debug(f'Shutdown requested for RAFT source - {self.host}:{self.port}')
-        await self._logger.filesystem.aio['hedra.distributed'].debug(f'Shutdown requested for RAFT source - {self.host}:{self.port}')
+        await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Shutdown requested for RAFT source - {self.host}:{self.port}')
 
         await cancel(self._raft_monitor_task)
         await cancel(self._raft_cleanup_task)
@@ -769,4 +758,4 @@ class RaftController(Monitor):
         await self._shutdown()
 
         await self._logger.distributed.aio.debug(f'Shutdown complete for RAFT source - {self.host}:{self.port}')
-        await self._logger.filesystem.aio['hedra.distributed'].debug(f'Shutdown complete for RAFT source - {self.host}:{self.port}')
+        await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Shutdown complete for RAFT source - {self.host}:{self.port}')
