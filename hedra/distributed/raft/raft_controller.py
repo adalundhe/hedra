@@ -81,6 +81,8 @@ class RaftController(Monitor):
             )
         )
 
+        self._initial_expected_nodes = raft_env.MERCURY_SYNC_RAFT_EXPECTED_NODES
+
         self._max_election_timeout = TimeParser(
             raft_env.MERCURY_SYNC_RAFT_ELECTION_MAX_TIMEOUT
         ).time
@@ -133,6 +135,10 @@ class RaftController(Monitor):
             env.MERCURY_SYNC_CLEANUP_INTERVAL
         ).time
 
+        self.registration_timeout = TimeParser(
+            raft_env.MERCURY_SYNC_RAFT_REGISTRATION_TIMEOUT
+        ).time
+
         self._pending_election_waiter: Union[asyncio.Future, None]  = None
 
         self._election_timeout = random.uniform(
@@ -142,22 +148,12 @@ class RaftController(Monitor):
 
         self._raft_cleanup_task: Union[asyncio.Future, None] = None
         
-    async def start(
-        self,
-        boot_wait: Optional[float]=None,
-        skip_boot_wait: bool=False
-    ):
-        
-        if boot_wait is None:
-            boot_wait = self.boot_wait
+    async def start(self):
 
         await self._logger.filesystem.aio.create_logfile(f'hedra.distributed.{self._instance_id}.log')
         self._logger.filesystem.create_filelogger(f'hedra.distributed.{self._instance_id}.log')
 
         await self.start_server()
-
-        if skip_boot_wait is False:
-            await asyncio.sleep(boot_wait)
 
         loop = asyncio.get_event_loop()
         self._last_commit_timestamp = loop.time()
@@ -174,35 +170,17 @@ class RaftController(Monitor):
         self.bootstrap_host = host
         self.bootstrap_port = port
 
-        await self._logger.distributed.aio.info(f'Connecting to node node - {self.bootstrap_host}:{self.bootstrap_port}')
-        await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Connecting to node node - {self.bootstrap_host}:{self.bootstrap_port}')
+        max_wait = self.registration_timeout * self._initial_expected_nodes
 
-        
-        await asyncio.wait_for(
-            asyncio.create_task(
-                self.start_client(
-                    {
-                        (host, port): [
-                            HealthCheck,
-                            RaftMessage
-                        ]
-                    },
-                    cert_path=self.cert_path,
-                    key_path=self.key_path
-                )
-            ),
-            timeout=self.registration_timeout
-        )
-
-        self._node_statuses[(host, port)] = 'healthy'
+        await self._register_initial_node()
 
         self.status = 'healthy'
         self._running = True
-        
-        self._healthchecks[(host, port)] = asyncio.create_task(
+
+        self._healthchecks[(self.bootstrap_host, self.bootstrap_port)] = asyncio.create_task(
             self.start_health_monitor()
         )
-        
+
         self._cleanup_task = asyncio.create_task(
             self.cleanup_pending_checks()
         )
@@ -215,9 +193,12 @@ class RaftController(Monitor):
             self._run_tcp_state_sync()
         )
 
-        await self._logger.distributed.aio.info(f'Initialized node - {self.host}:{self.port}')
-        await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Initialized node - {self.host}:{self.port}')
+        await asyncio.wait_for(
+            self._wait_for_nodes(),
+            timeout=max_wait
+        )
 
+        
         self._tasks_queue.append(
             asyncio.create_task(
                 self.run_election()
@@ -231,6 +212,50 @@ class RaftController(Monitor):
         self._raft_cleanup_task = asyncio.create_task(
             self._cleanup_pending_raft_tasks()
         )
+
+    async def _wait_for_nodes(self):
+
+        currently_registered = len(self._node_statuses) + 1
+        poll_interval_offset = 0
+
+        while currently_registered < self._initial_expected_nodes:
+
+            await self._logger.distributed.aio.info(f'Waiting start - {self.host}:{self.port} - with - {currently_registered}/{self._initial_expected_nodes} - registered')
+            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Waiting start - {self.host}:{self.port} - with - {currently_registered}/{self._initial_expected_nodes} - registered')
+
+            await asyncio.sleep(self._poll_interval + poll_interval_offset)
+
+            currently_registered = len(self._node_statuses) + 1
+
+            poll_interval_offset = self._initial_expected_nodes/max(currently_registered, 1)
+
+    async def _register_initial_node(self):
+        await self._logger.distributed.aio.info(f'Connecting to initial node - {self.bootstrap_host}:{self.bootstrap_port}')
+        await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Connecting to initial node - {self.bootstrap_host}:{self.bootstrap_port}')
+  
+        try:
+
+            await asyncio.wait_for(
+                asyncio.create_task(
+                    self.start_client(
+                        {
+                            (self.bootstrap_host, self.bootstrap_port): [
+                                HealthCheck,
+                                RaftMessage
+                            ]
+                        },
+                        cert_path=self.cert_path,
+                        key_path=self.key_path
+                    )
+                ),
+                timeout=self.registration_timeout
+            )
+
+            self._node_statuses[(self.bootstrap_host, self.bootstrap_port)] = 'healthy'
+
+        except Exception:
+            pass
+
 
     @server()
     async def receive_vote_request(
@@ -353,12 +378,20 @@ class RaftController(Monitor):
             )
         )
 
+        entries_count = len(entries)
+
         current_leader_host, current_leader_port = self._get_current_term_leader()
 
         leader_host = current_leader_host
         leader_port = current_leader_port
 
-        if len(entries) > 0 and message.term_number > self._term_number:
+        last_entry = entries[-1]
+
+        leader_host = last_entry.leader_host
+        leader_port = last_entry.leader_port
+
+
+        if entries_count > 0 and message.term_number > len(self._term_leaders):
             self._term_number = message.term_number
 
             last_entry = entries[-1]
@@ -366,12 +399,13 @@ class RaftController(Monitor):
             leader_host = last_entry.leader_host
             leader_port = last_entry.leader_port
 
-
-        if leader_host != current_leader_host and leader_port != current_leader_port:
             self._term_leaders.append((
                 leader_host,
                 leader_port
             ))
+
+            await self._logger.distributed.aio.info(f'Term number for source - {self.host}:{self.port} - was updated to - {self._term_number} - and leader was updated to - {leader_host}:{leader_port}')
+            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Term number for source - {self.host}:{self.port} - was updated to - {self._term_number} - and leader was updated to - {leader_host}:{leader_port}')
 
             self._raft_node_status = NodeState.FOLLOWER
 
@@ -592,7 +626,6 @@ class RaftController(Monitor):
         self._election_status = ElectionState.ACTIVE
         self._raft_node_status = NodeState.CANDIDATE
 
-
         while len(self._term_leaders) < self._term_number:
 
             members: List[Tuple[str, int]] = [
@@ -646,6 +679,9 @@ class RaftController(Monitor):
             if accepted_count >= quorum_count:
 
                 # We're the leader!
+                await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - was elected as leader for term - {self._term_number}')
+                await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - was elected as leader for term - {self._term_number}')
+
 
                 self._raft_node_status = NodeState.LEADER
                 self._term_leaders.append((self.host, self.port))
@@ -669,7 +705,13 @@ class RaftController(Monitor):
             await asyncio.sleep(self._election_poll_interval)
 
         if self._raft_node_status != NodeState.LEADER:
+
+            await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - failed to receive majority votes and is now a follower for term - {self._term_number}')
+            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - failed to receive majority votes and is now a follower for term - {self._term_number}')
+
             self._raft_node_status = NodeState.FOLLOWER
+
+        self._election_status = ElectionState.READY
 
     async def _run_raft_monitor(self):
 
@@ -702,7 +744,7 @@ class RaftController(Monitor):
                     node for node in self.failed_nodes if node not in self.removed_nodes
                 ]))
 
-                if len(failed_members) > 0:
+                if len(failed_members) > 0 and self._election_status == ElectionState.READY:
                     self._tasks_queue.append(
                         asyncio.create_task(
                             self.run_election()
