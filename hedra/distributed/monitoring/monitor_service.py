@@ -1121,7 +1121,7 @@ class Monitor(Controller):
         except Exception:
             pass
 
-    async def _start_suspect_monitor(self):
+    async def _start_suspect_monitor(self) -> Tuple[str, int]:
 
         if len(self._suspect_nodes) < 1:
             return
@@ -1245,6 +1245,11 @@ class Monitor(Controller):
         
         self._investigating_nodes[(suspect_host, suspect_port)] = {}
         self._confirmed_suspicions[(suspect_host, suspect_port)] = 0
+
+        return (
+            suspect_host,
+            suspect_port
+        )
         
     def _get_confirmation_members(self, suspect_address: Tuple[str, int]) -> List[Tuple[str, int]]:
 
