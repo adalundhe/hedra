@@ -13,7 +13,7 @@ from typing import (
 PrimaryType = Union[str, int, float, bytes, bool]
 
 
-class RaftEnv(BaseModel):
+class ReplicationEnv(BaseModel):
     MERCURY_SYNC_RAFT_ELECTION_MAX_TIMEOUT: StrictStr='30s'
     MERCURY_SYNC_RAFT_ELECTION_POLL_INTERVAL: StrictStr='1s'
     MERCURY_SYNC_RAFT_LOGS_UPDATE_POLL_INTERVAL: StrictStr='5s'

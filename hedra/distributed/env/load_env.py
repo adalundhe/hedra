@@ -8,7 +8,7 @@ from typing import (
 )
 from .env import Env
 from .monitor_env import MonitorEnv
-from .raft_env import RaftEnv
+from .replication_env import ReplicationEnv
 from .registrar_env import RegistrarEnv
 
 T = TypeVar('T')
@@ -22,7 +22,7 @@ def load_env(
     env_file: str=None
 ) -> T:
     
-    env_type: Union[Env, MonitorEnv, RaftEnv, RegistrarEnv] = env
+    env_type: Union[Env, MonitorEnv, ReplicationEnv, RegistrarEnv] = env
     envars = env_type.types_map()
     
     if env_file is None:

@@ -4,7 +4,7 @@ from pydantic import (
     StrictInt
 )
 from typing import List, Optional, Tuple
-from .election_state import ElectionState
+from .vote_result import VoteResult
 from .healthcheck import HealthStatus
 from .logs import Entry, NodeState
 
@@ -14,7 +14,7 @@ class RaftMessage(Message):
     source_port: StrictInt
     elected_leader: Optional[Tuple[StrictStr, StrictInt]]
     failed_node: Optional[Tuple[StrictStr, StrictInt]]
-    election_status: ElectionState
+    vote_result: Optional[VoteResult]
     raft_node_status: NodeState
     status: HealthStatus
     entries: Optional[List[Entry]]
