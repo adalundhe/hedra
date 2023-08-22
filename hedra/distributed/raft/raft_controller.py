@@ -147,6 +147,7 @@ class RaftController(Monitor):
         )
 
         self._raft_cleanup_task: Union[asyncio.Future, None] = None
+        self._election_task: Union[asyncio.Task, None] = None 
         
     async def start(self):
 
@@ -197,21 +198,18 @@ class RaftController(Monitor):
             self._wait_for_nodes(),
             timeout=max_wait
         )
-
         
-        self._tasks_queue.append(
-            asyncio.create_task(
-                self.run_election()
-            )
+        self._raft_cleanup_task = asyncio.create_task(
+            self._cleanup_pending_raft_tasks()
         )
 
         self._raft_monitor_task = asyncio.create_task(
             self._run_raft_monitor()
         )
         
-        self._raft_cleanup_task = asyncio.create_task(
-            self._cleanup_pending_raft_tasks()
-        )
+        self._election_task = asyncio.create_task(
+            self.run_election()
+        )   
 
     async def _wait_for_nodes(self):
 
@@ -279,7 +277,7 @@ class RaftController(Monitor):
             elected_host = source_host
             elected_port = source_port
 
-        elif term_number == self._term_number:
+        elif term_number == self._term_number and self._raft_node_status != NodeState.LEADER:
             # The term numbers match, we can choose a candidate.
 
             self._election_status = ElectionState.ACTIVE
@@ -390,6 +388,16 @@ class RaftController(Monitor):
 
 
         if message.term_number > self._term_number:
+
+            if self._election_task:
+                await cancel(self._election_task)
+                self._election_task = None
+
+            suspect_tasks = dict(self._suspect_tasks)
+            suspect_task = suspect_tasks.pop(message.failed_node, None)
+
+            if suspect_task:
+                await cancel(suspect_task)
             
             amount_behind = max(
                 message.term_number - self._term_number - 1,
@@ -510,7 +518,8 @@ class RaftController(Monitor):
         self,
         host: str,
         port: int,
-        entries: List[Dict[str, Any]]
+        entries: List[Dict[str, Any]],
+        failed_node: Optional[Tuple[str, int]]=None
     ) -> Call[RaftMessage]:
         
         leader_host, leader_port = self._get_current_term_leader()
@@ -524,6 +533,7 @@ class RaftController(Monitor):
             term_number=self._term_number,
             election_status=self._election_status,
             raft_node_status=self._raft_node_status,
+            failed_node=failed_node,
             entries=[
                 Entry(
                     entry_id=self._entry_id_generator.generate(),
@@ -536,16 +546,23 @@ class RaftController(Monitor):
         )
     
     async def _start_suspect_monitor(self):
-        await super()._start_suspect_monitor()
-
-        if self._election_status == ElectionState.READY:
-            await self.run_election()
+        suspect_host, suspect_port = await super()._start_suspect_monitor()
+        
+        self._election_task = asyncio.create_task(
+            self.run_election(
+                failed_node=(
+                    suspect_host,
+                    suspect_port
+                )
+            )
+        ) 
     
     async def _update_logs(
         self,
         host: str,
         port: int,
-        entries: List[Dict[str, Any]]
+        entries: List[Dict[str, Any]],
+        failed_node: Optional[Tuple[str, int]]=None
     ):
         shard_id: Union[int, None] = None
         update_response: Union[RaftMessage, None] = None
@@ -562,7 +579,8 @@ class RaftController(Monitor):
                     self.submit_log_update(
                         host,
                         port,
-                        entries
+                        entries,
+                        failed_node=failed_node
                     ),
                     timeout=self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1)
                 )
@@ -646,45 +664,55 @@ class RaftController(Monitor):
             current_leader_port
         )
     
-    async def run_election(self):
+    async def run_election(
+        self,
+        failed_node: Optional[Tuple[str, int]]=None
+    ):
 
-        next_term = self._term_number + 1
         election_timeout = random.uniform(
             self._min_election_timeout,
             self._max_election_timeout
         )
 
-
-        while self._term_number < next_term:
-            await asyncio.wait(
+        _, pending = await asyncio.wait(
+            [
                 asyncio.create_task(
                     self._run_election_term()
-                ),
-                timeout=election_timeout
-            )
+                )
+            ],
+            timeout=election_timeout
+        )
 
-            if self._raft_node_status == NodeState.LEADER:
+        if len(pending) > 0:
+            await asyncio.gather(*[
+                asyncio.create_task(
+                    cancel(pending_task)
+                )  for pending_task in pending
+            ])
 
-                members: List[Tuple[str, int]] = [
-                    address for address, status in self._node_statuses.items() if status  == 'healthy'
-                ]
+        if self._raft_node_status == NodeState.LEADER:
 
-                members = list(set(members))
+            members: List[Tuple[str, int]] = [
+                address for address, status in self._node_statuses.items() if status == 'healthy'
+            ]
 
-                await asyncio.gather(*[
-                    asyncio.create_task(
-                        self._update_logs(
-                            host,
-                            port,
-                            [
-                                {
-                                    'key': 'election_update',
-                                    'value': f'Election complete! Elected - {self.host}:{self.port}'
-                                }
-                            ]
-                        )
-                    ) for host, port in members
-                ])
+            members = list(set(members))
+
+            await asyncio.gather(*[
+                asyncio.create_task(
+                    self._update_logs(
+                        host,
+                        port,
+                        [
+                            {
+                                'key': 'election_update',
+                                'value': f'Election complete! Elected - {self.host}:{self.port}'
+                            }
+                        ],
+                        failed_node=failed_node
+                    )
+                ) for host, port in members
+            ])
 
         self._election_status = ElectionState.READY
 
@@ -704,7 +732,7 @@ class RaftController(Monitor):
             self._raft_node_status = NodeState.CANDIDATE
 
             members: List[Tuple[str, int]] = [
-                address for address, status in self._node_statuses.items() if status  == 'healthy'
+                address for address, status in self._node_statuses.items() if status == 'healthy'
             ]
 
             members = list(set(members))
@@ -718,7 +746,12 @@ class RaftController(Monitor):
                 ) for member_host, member_port in members
             ]
 
-            vote_results: List[Tuple[int, RaftMessage]] = await asyncio.gather(*vote_requests)
+            vote_results: List[Tuple[int, RaftMessage]] = [
+                result for result in await asyncio.gather(*vote_requests) if isinstance(
+                    result,
+                    RaftMessage
+                )
+            ]
 
             for vote_result in vote_results:
 
@@ -853,6 +886,10 @@ class RaftController(Monitor):
 
         await cancel(self._raft_monitor_task)
         await cancel(self._raft_cleanup_task)
+
+        if self._election_task:
+            await cancel(self._election_task)
+            self._election_task = None
 
         await self._submit_leave_requests()
         await self._shutdown()

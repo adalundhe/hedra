@@ -13,6 +13,7 @@ class RaftMessage(Message):
     source_host: StrictStr
     source_port: StrictInt
     elected_leader: Optional[Tuple[StrictStr, StrictInt]]
+    failed_node: Optional[Tuple[StrictStr, StrictInt]]
     election_status: ElectionState
     raft_node_status: NodeState
     status: HealthStatus
