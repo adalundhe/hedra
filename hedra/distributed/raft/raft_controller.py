@@ -154,6 +154,12 @@ class RaftController(Monitor):
         await self._logger.filesystem.aio.create_logfile(f'hedra.distributed.{self._instance_id}.log')
         self._logger.filesystem.create_filelogger(f'hedra.distributed.{self._instance_id}.log')
 
+        await self._logger.distributed.aio.info(f'Starting server for node - {self.host}:{self.port} - with id - {self._instance_id}')
+        await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Starting server for node - {self.host}:{self.port} - with id - {self._instance_id}')
+
+        boot_wait = random.uniform(0.1, self.boot_wait)
+        await asyncio.sleep(boot_wait)
+
         await self.start_server()
 
         loop = asyncio.get_event_loop()
@@ -393,6 +399,12 @@ class RaftController(Monitor):
                 await cancel(self._election_task)
                 self._election_task = None
 
+                next_term = self._term_number + 1
+
+                await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - election for term - {next_term} - was cancelled due to leader reporting for term')
+                await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - election for term - {next_term} - was cancelled due to leader reporting for term')
+
+
             suspect_tasks = dict(self._suspect_tasks)
             suspect_task = suspect_tasks.pop(message.failed_node, None)
 
@@ -555,8 +567,22 @@ class RaftController(Monitor):
                     suspect_port
                 )
             )
-        ) 
-    
+        )
+
+    async def submit_entries(
+        self,
+        host: str,
+        port: int,
+        entries: List[Dict[str, Any]]
+    ):
+        
+        if self._raft_node_status == NodeState.LEADER:
+            await self._update_logs(
+                host,
+                port,
+                entries
+            )
+        
     async def _update_logs(
         self,
         host: str,
