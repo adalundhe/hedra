@@ -621,7 +621,10 @@ class ReplicationController(Monitor):
                         entries,
                         failed_node=failed_node
                     ),
-                    timeout=self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1)
+                    timeout=self._calculate_current_timeout(
+                        host,
+                        port
+                    )
                 )
 
                 shard_id, update_response = response
@@ -685,6 +688,18 @@ class ReplicationController(Monitor):
             await self._logger.distributed.aio.debug(f'Node - {check_host}:{check_port} - responded on try - {idx}/{self._poll_interval} - for source - {self.host}:{self.port}')
             await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Node - {check_host}:{check_port} - responded on try - {idx}/{self._poll_interval} - for source - {self.host}:{self.port}')
 
+    def _calculate_current_timeout(
+        self,
+        host: str,
+        port: int
+    ):
+        
+        monitors = [
+            address for address, status in self._node_statuses.items() if status == 'healthy'
+        ]
+
+        return self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1) * len(monitors)
+
     def _get_current_term_leader(self):
 
         current_leader_index = max(
@@ -733,7 +748,7 @@ class ReplicationController(Monitor):
             quorum_count = max(
                 int(
                     len(members) * FLEXIBLE_PAXOS_QUORUM
-                ),
+                ) + 1,
                 1
             )
 
@@ -831,6 +846,9 @@ class ReplicationController(Monitor):
             if self._term_number == next_term:
                 self._election_status = ElectionState.READY
                 return
+            
+            else:
+                self._raft_node_status = NodeState.CANDIDATE
 
     async def _run_raft_monitor(self):
 

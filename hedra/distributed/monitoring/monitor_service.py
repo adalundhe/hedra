@@ -643,7 +643,10 @@ class Monitor(Controller):
                         target_port=target_port,
                         error_context=self.error_context
                     ),
-                    timeout=self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1)
+                    timeout=self._calculate_current_timeout(
+                        host,
+                        port
+                    )
                 )
 
                 shard_id, healthcheck = response
@@ -934,6 +937,13 @@ class Monitor(Controller):
             self.min_suspect_multiplier * math.log10(nodes_count) * poll_timeout,
             2
         )
+    
+    def _calculate_current_timeout(
+        self,
+        host: str,
+        port: int
+    ):
+        return self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1)
 
     def _calculate_max_suspect_timeout(self, min_suspect_timeout: float):
         
@@ -996,7 +1006,10 @@ class Monitor(Controller):
                         self.status,
                         error_context=self.error_context
                     ),
-                    timeout=self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1)
+                    timeout=self._calculate_current_timeout(
+                        host,
+                        port
+                    )
                 )
 
                 shard_id, healthcheck = response
@@ -1044,7 +1057,10 @@ class Monitor(Controller):
                         target_port=target_port,
                         error_context=self.error_context
                     ),
-                    timeout=self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1)
+                    timeout=self._calculate_current_timeout(
+                        host,
+                        port
+                    )
                 )
 
                 shard_id, healthcheck = response
@@ -1314,7 +1330,10 @@ class Monitor(Controller):
 
         check_tasks: Tuple[List[asyncio.Task], List[asyncio.Task]] = await asyncio.wait(
             requested_checks, 
-            timeout=self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1)
+            timeout=self._calculate_current_timeout(
+                host,
+                port
+            )
         )
 
         completed, pending = check_tasks
@@ -1583,7 +1602,10 @@ class Monitor(Controller):
                         target_port=target_port,
                         error_context=self.error_context
                     ),
-                    timeout=self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1)
+                    timeout=self._calculate_current_timeout(
+                        host,
+                        port
+                    )
                 )
 
                 shard_id, healthcheck = response
@@ -1628,7 +1650,10 @@ class Monitor(Controller):
                         target_port=target_port,
                         error_context=self.error_context
                     ),
-                    timeout=self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1)
+                    timeout=self._calculate_current_timeout(
+                        host,
+                        port
+                    )
                 )
 
                 self._local_health_multipliers[(host, port)] = max(
@@ -1677,7 +1702,10 @@ class Monitor(Controller):
                     health_status=health_status,
                     error_context=error_context
                 ),
-                timeout=self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1)
+                timeout=self._calculate_current_timeout(
+                    host,
+                    port
+                )
             )
 
             _, healthcheck = response
