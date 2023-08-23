@@ -755,18 +755,24 @@ class ReplicationController(Monitor):
 
                     (
                         _, 
-                        result
+                        vote
                     ) = vote_result
 
-                    leader_host, leader_port = result.elected_leader
+                    leader_host, leader_port = vote.elected_leader
 
-                    if result.vote_result == VoteResult.ACCEPTED:
+                    if vote.vote_result == VoteResult.ACCEPTED:
                         self._term_votes[self._term_number][(self.host, self.port)] += 1
 
-                    elif result.error and leader_host and leader_port:
+                    elif vote.error and leader_host and leader_port:
 
-                        self._term_number = result.term_number
+                        self._term_number = vote.term_number
+                        self._term_leaders.append((
+                            leader_host,
+                            leader_port
+                        ))
 
+                        next_term = self._term_number + 1
+                        
                         await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - was behind a term and is now a follower for term - {next_term}')
                         await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - as behind a term and is now a follower for term - {next_term}')
 
