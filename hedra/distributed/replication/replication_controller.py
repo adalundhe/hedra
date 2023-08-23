@@ -321,7 +321,7 @@ class ReplicationController(Monitor):
                 error='Election request term cannot be less than current term.',
                 vote_result=VoteResult.REJECTED,
                 raft_node_status=self._raft_node_status,
-                term_number=term_number
+                term_number=self._term_number
             )
             
         vote_result = VoteResult.REJECTED
