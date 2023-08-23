@@ -737,8 +737,6 @@ class ReplicationController(Monitor):
                 1
             )
 
-            self._raft_node_status = NodeState.CANDIDATE
-
             try:
 
                 election_timeout = random.uniform(
@@ -775,6 +773,7 @@ class ReplicationController(Monitor):
                         ))
 
                         self._raft_node_status = NodeState.FOLLOWER
+                        self._election_status = ElectionState.READY
 
                         await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - was behind a term and is now a follower for term - {self._term_number}')
                         await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - as behind a term and is now a follower for term - {self._term_number}')
@@ -802,6 +801,7 @@ class ReplicationController(Monitor):
 
 
                 self._raft_node_status = NodeState.LEADER
+                self._election_status = ElectionState.READY
                 self._term_leaders.append((self.host, self.port))
                 self._term_number += 1
 
@@ -827,14 +827,21 @@ class ReplicationController(Monitor):
                     ) for host, port in members
                 ])
 
+                return
+
             else:
 
                 self._raft_node_status = NodeState.FOLLOWER
+                self._election_status = ElectionState.READY
 
                 await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - failed to receive majority votes and is now a follower for term - {next_term}')
                 await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - failed to receive majority votes and is now a follower for term - {next_term}')
 
-        self._election_status = ElectionState.READY
+                return
+            
+            self._raft_node_status = NodeState.CANDIDATE
+
+        
 
     async def _run_raft_monitor(self):
 
