@@ -16,7 +16,7 @@ PrimaryType = Union[str, int, float, bytes, bool]
 
 class MonitorEnv(BaseModel):
     MERCURY_SYNC_UDP_SYNC_INTERVAL: StrictStr='5s'
-    MERCURY_SYNC_BOOT_WAIT: StrictStr='3s'
+    MERCURY_SYNC_BOOT_WAIT: StrictStr='1s'
     MERCURY_SYNC_MAX_TIME_IDLE: StrictStr='10s'
     MERCURY_SYNC_IDLE_REBOOT_TIMEOUT: StrictStr='10s'
     MERCURY_SYNC_POLL_RETRIES: StrictInt=3

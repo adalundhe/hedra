@@ -1,6 +1,5 @@
 import asyncio
 import random
-import traceback
 from collections import (
     defaultdict,
     deque
@@ -159,10 +158,10 @@ class ReplicationController(Monitor):
         await self._logger.distributed.aio.info(f'Starting server for node - {self.host}:{self.port} - with id - {self._instance_id}')
         await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Starting server for node - {self.host}:{self.port} - with id - {self._instance_id}')
 
-        boot_wait = random.uniform(0.1, self.boot_wait)
-        await asyncio.sleep(boot_wait)
-
         await self.start_server()
+
+        boot_wait = random.uniform(0.1, self.boot_wait * self._initial_expected_nodes)
+        await asyncio.sleep(boot_wait)
 
         loop = asyncio.get_event_loop()
         self._last_commit_timestamp = loop.time()
@@ -230,7 +229,6 @@ class ReplicationController(Monitor):
                     )
 
                 await asyncio.sleep(self._election_poll_interval)
-
 
     async def _wait_for_nodes(self):
 
@@ -713,62 +711,10 @@ class ReplicationController(Monitor):
         self,
         failed_node: Optional[Tuple[str, int]]=None
     ):
-  
-        self._raft_node_status = NodeState.CANDIDATE
 
-        election_timeout = random.uniform(
-            self._min_election_timeout,
-            self._max_election_timeout
-        )
-
-        try:
-
-            await asyncio.wait_for(         
-                self._run_election_term(),
-                timeout=election_timeout
-            )
-
-        except asyncio.TimeoutError:
-
-            next_term = self._term_number + 1
-
-            await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - timed out for candidate term - {next_term} - reverting to term - {self._term_number}')
-            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - timed out for candidate term - {next_term} - reverting to term - {self._term_number}')
-
-
-        if self._raft_node_status == NodeState.LEADER:
-
-            members: List[Tuple[str, int]] = [
-                address for address, status in self._node_statuses.items() if status == 'healthy'
-            ]
-
-            members = list(set(members))
-
-            await asyncio.gather(*[
-                asyncio.create_task(
-                    self._update_logs(
-                        host,
-                        port,
-                        [
-                            {
-                                'key': 'election_update',
-                                'value': f'Election complete! Elected - {self.host}:{self.port}'
-                            }
-                        ],
-                        failed_node=failed_node
-                    )
-                ) for host, port in members
-            ])
-
-        else:
-
-            self._raft_node_status = NodeState.FOLLOWER
-          
-        self._election_status = ElectionState.READY
-
-    async def _run_election_term(self):
         # Trigger new election
         next_term = self._term_number + 1
+        self._raft_node_status = NodeState.CANDIDATE
 
         while self._term_number < next_term and self._raft_node_status == NodeState.CANDIDATE:
 
@@ -784,25 +730,30 @@ class ReplicationController(Monitor):
 
             members = list(set(members))
 
-            vote_requests = [
-                asyncio.create_task(
+            quorum_count = max(
+                int(
+                    len(members) * FLEXIBLE_PAXOS_QUORUM
+                ),
+                1
+            )
+
+            self._raft_node_status = NodeState.CANDIDATE
+
+            try:
+
+                election_timeout = random.uniform(
+                    self._min_election_timeout,
+                    self._max_election_timeout
+                )
+
+                for result in asyncio.as_completed([
                     self.request_vote(
                         member_host,
                         member_port
-                    )
-                ) for member_host, member_port in members
-            ]
+                    ) for member_host, member_port in members[:quorum_count]
+                ], timeout=election_timeout):
 
-            vote_results: List[Tuple[int, RaftMessage]] = [
-                result for result in await asyncio.gather(*vote_requests) if isinstance(
-                    result,
-                    RaftMessage
-                )
-            ]
-
-            for vote_result in vote_results:
-
-                try:
+                    vote_result: Tuple[int, RaftMessage] = await result
 
                     (
                         _, 
@@ -831,17 +782,17 @@ class ReplicationController(Monitor):
 
                         return
 
-                except asyncio.TimeoutError:
-                    pass
-        
-            quorum_count = max(
-                int(
-                    len(members) * FLEXIBLE_PAXOS_QUORUM
-                ),
-                1
-            )
+            except asyncio.TimeoutError:
+                
+                await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - timed out for candidate term - {next_term} - reverting to term - {self._term_number}')
+                await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - timed out for candidate term - {next_term} - reverting to term - {self._term_number}')
 
+        
             accepted_count = self._term_votes[self._term_number][(self.host, self.port)]
+
+            await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - received - {accepted_count} - votes')
+            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - received - {accepted_count} - votes')
+
 
             if accepted_count >= quorum_count and self._election_status == ElectionState.ACTIVE:
 
@@ -854,12 +805,36 @@ class ReplicationController(Monitor):
                 self._term_leaders.append((self.host, self.port))
                 self._term_number += 1
 
+                members: List[Tuple[str, int]] = [
+                    address for address, status in self._node_statuses.items() if status == 'healthy'
+                ]
+
+                members = list(set(members))
+
+                await asyncio.gather(*[
+                    asyncio.create_task(
+                        self._update_logs(
+                            host,
+                            port,
+                            [
+                                {
+                                    'key': 'election_update',
+                                    'value': f'Election complete! Elected - {self.host}:{self.port}'
+                                }
+                            ],
+                            failed_node=failed_node
+                        )
+                    ) for host, port in members
+                ])
+
             else:
+
+                self._raft_node_status = NodeState.FOLLOWER
 
                 await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - failed to receive majority votes and is now a follower for term - {next_term}')
                 await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - failed to receive majority votes and is now a follower for term - {next_term}')
 
-            await asyncio.sleep(self._election_poll_interval)
+        self._election_status = ElectionState.READY
 
     async def _run_raft_monitor(self):
 
