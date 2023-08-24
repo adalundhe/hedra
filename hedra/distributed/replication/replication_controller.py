@@ -1,5 +1,6 @@
 import asyncio
 import random
+import time
 from collections import (
     defaultdict,
     deque
@@ -352,7 +353,7 @@ class ReplicationController(Monitor):
         
         entries_count = len(message.entries)
 
-        if entries_count < 0:
+        if entries_count < 1:
             return RaftMessage(
                 host=message.host,
                 port=message.port,
@@ -493,7 +494,8 @@ class ReplicationController(Monitor):
             status=self.status,
             elected_leader=elected_leader,
             term_number=self._term_number,
-            raft_node_status=self._raft_node_status
+            raft_node_status=self._raft_node_status,
+            received_timestamp=self._logs.last_timestamp
         )
 
     @client('receive_vote_request')
@@ -517,7 +519,7 @@ class ReplicationController(Monitor):
         self,
         host: str,
         port: int,
-        entries: List[Dict[str, Any]],
+        entries: List[Entry],
         failed_node: Optional[Tuple[str, int]]=None
     ) -> Call[RaftMessage]:
         
@@ -532,15 +534,7 @@ class ReplicationController(Monitor):
             term_number=self._term_number,
             raft_node_status=self._raft_node_status,
             failed_node=failed_node,
-            entries=[
-                Entry(
-                    entry_id=self._entry_id_generator.generate(),
-                    term=self._term_number,
-                    leader_host=leader_host,
-                    leader_port=leader_port,
-                    **entry
-                ) for entry in entries
-            ]
+            entries=entries
         )
     
     async def _start_suspect_monitor(self):
@@ -562,17 +556,29 @@ class ReplicationController(Monitor):
 
     async def submit_entries(
         self,
-        host: str,
-        port: int,
         entries: List[Dict[str, Any]]
     ):
         
         if self._raft_node_status == NodeState.LEADER:
-            await self._update_logs(
-                host,
-                port,
-                entries
-            )
+
+            self._logs.update(entries)
+
+            members = [
+                address for address, status in self._node_statuses.items() if status == 'healthy'
+            ]
+
+            latest_logs = self._logs.latest()
+
+            for host, port in members:
+                self._tasks_queue.append(
+                    asyncio.create_task(
+                        self._update_logs(
+                            host,
+                            port,
+                            latest_logs
+                        )
+                    )
+                )
 
     async def _cancel_election(
         self,
@@ -602,7 +608,7 @@ class ReplicationController(Monitor):
         self,
         host: str,
         port: int,
-        entries: List[Dict[str, Any]],
+        entries: List[Entry],
         failed_node: Optional[Tuple[str, int]]=None
     ):
         shard_id: Union[int, None] = None
@@ -828,21 +834,38 @@ class ReplicationController(Monitor):
 
                 members = list(set(members))
 
-                await asyncio.gather(*[
-                    asyncio.create_task(
-                        self._update_logs(
-                            host,
-                            port,
-                            [
-                                {
-                                    'key': 'election_update',
-                                    'value': f'Election complete! Elected - {self.host}:{self.port}'
-                                }
-                            ],
-                            failed_node=failed_node
-                        )
-                    ) for host, port in members
+                current_leader_host, current_leader_port = self._get_current_term_leader()
+
+                self._logs.update([
+                    Entry.from_data(
+                        entry_id=self._entry_id_generator.generate(),
+                        leader_host=current_leader_host,
+                        leader_port=current_leader_port,
+                        term=self._term_number,
+                        data={
+                            'key': 'election_update',
+                            'value': f'Election complete! Elected - {self.host}:{self.port}'
+                        }
+                    )
                 ])
+
+                members: List[Tuple[str, int]] = [
+                    address for address, status in self._node_statuses.items() if status == 'healthy'
+                ]
+
+                latest_logs = self._logs.latest()
+
+                for host, port in members:
+                    self._tasks_queue.append(
+                        asyncio.create_task(
+                            self._update_logs(
+                                host,
+                                port,
+                                latest_logs,
+                                failed_node=failed_node
+                            )
+                        )
+                    )
 
             else:
 
@@ -872,6 +895,24 @@ class ReplicationController(Monitor):
             ]
 
             if self._raft_node_status == NodeState.LEADER:
+
+                current_leader_host, current_leader_port = self._get_current_term_leader()
+
+                self._logs.update([
+                    Entry.from_data(
+                        entry_id=self._entry_id_generator.generate(),
+                        leader_host=current_leader_host,
+                        leader_port=current_leader_port,
+                        term=self._term_number,
+                        data={
+                            'key': 'logs_update',
+                            'value': f'Node - {self.host}:{self.port} - submitted log update',
+                        }
+                    )
+                ])
+
+                latest_logs = self._logs.latest()
+
                 for host, port in members:
             
                     self._tasks_queue.append(
@@ -879,12 +920,7 @@ class ReplicationController(Monitor):
                             self._update_logs(
                                 host,
                                 port,
-                                [
-                                    {
-                                        'key': 'logs_update',
-                                        'value': f'Node - {self.host}:{self.port} - submitted log update'
-                                    }
-                                ]
+                                latest_logs
                             )
                         )
                     )

@@ -1,7 +1,7 @@
 import asyncio
 from hedra.distributed.models.raft.logs import Entry
 from hedra.distributed.snowflake.snowflake_generator import Snowflake
-from typing import List, Union
+from typing import List, Dict, Union
 from .errors import InvalidTermError
 
 
@@ -9,8 +9,9 @@ class LogQueue:
 
     def __init__(self) -> None:
         self.logs: List[Entry] = []
-        self._timestamps: List[int] = []
-        self.timestamp_index_map = {}
+        self._timestamps: List[float] = []
+        self._commits: List[float] = []
+        self.timestamp_index_map: Dict[float, int] = {}
         self._term = 0
         self.size = 0
         self.commit_index = 0
@@ -26,6 +27,22 @@ class LogQueue:
         self._last_commit_timestamp = self._last_timestamp
 
         self.timestamp_index_map[self._last_timestamp] = logs_index
+        self._timestamps.append(self._last_timestamp)
+        self._commits.append(logs_index)
+
+    @property
+    def last_timestamp(self):
+        return self._timestamps[-1]
+
+    def latest(self):
+        latest_commit_timestamp = self._commits[-1]
+        latest_index = self.timestamp_index_map[latest_commit_timestamp]
+
+        return self.logs[latest_index:]
+    
+    def commit(self, entry: Entry):
+        self._last_commit_timestamp = entry.timestamp
+        self._commits.append(entry.timestamp)
 
     def get(self, shard_id: int):
         flake = Snowflake.parse(shard_id)
