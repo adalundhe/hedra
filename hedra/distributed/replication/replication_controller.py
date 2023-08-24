@@ -230,6 +230,10 @@ class ReplicationController(Monitor):
 
                 await asyncio.sleep(self._election_poll_interval)
 
+            if self._election_task and not self._election_task.done() and not self._election_task.cancelled():
+                await cancel(self._election_task)
+                self._election_task = None
+
     async def _wait_for_nodes(self):
 
         currently_registered = len(self._node_statuses) + 1
@@ -546,8 +550,11 @@ class ReplicationController(Monitor):
     
     async def _start_suspect_monitor(self):
         suspect_host, suspect_port = await super()._start_suspect_monitor()
+
+
+        can_start_election = self._election_task is None or self._election_task.done() or self._election_task.cancelled()
         
-        if self._election_status == ElectionState.READY:
+        if self._election_status == ElectionState.READY and can_start_election:
             self._election_status = ElectionState.ACTIVE
             self._election_task = asyncio.create_task(
                 self.run_election(
@@ -778,7 +785,7 @@ class ReplicationController(Monitor):
                     if vote.vote_result == VoteResult.ACCEPTED:
                         self._term_votes[self._term_number][(self.host, self.port)] += 1
 
-                    elif vote.error and leader_host and leader_port:
+                    elif vote.term_number > self._term_number and leader_host and leader_port:
 
                         self._term_number = vote.term_number
                         self._term_leaders.append((
@@ -791,10 +798,16 @@ class ReplicationController(Monitor):
                         await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - was behind a term and is now a follower for term - {self._term_number}')
                         await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - as behind a term and is now a follower for term - {self._term_number}')
 
+                        return
+
             except asyncio.TimeoutError:
                 
                 await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - timed out for candidate term - {next_term} - reverting to term - {self._term_number}')
                 await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - timed out for candidate term - {next_term} - reverting to term - {self._term_number}')
+
+            except Exception:
+                await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - encountered error for candidate term - {next_term} - reverting to term - {self._term_number}')
+                await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - encountered error for candidate term - {next_term} - reverting to term - {self._term_number}')
 
         
             accepted_count = self._term_votes[self._term_number][(self.host, self.port)]
@@ -842,6 +855,11 @@ class ReplicationController(Monitor):
 
                 await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - failed to receive majority votes and is now a follower for term - {next_term}')
                 await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - failed to receive majority votes and is now a follower for term - {next_term}')
+
+            if self._term_number > next_term:
+                self._term_number = next_term
+                self._election_status = ElectionState.READY
+                return
 
             if self._term_number == next_term:
                 self._election_status = ElectionState.READY
