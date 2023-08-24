@@ -387,8 +387,11 @@ class ReplicationController(Monitor):
 
         if message.term_number > self._term_number:
 
-            await self._cancel_election(message)
-            await self._cancel_suspicion_probe(message)
+            self._tasks_queue.append(
+                asyncio.create_task(
+                    self._cancel_election(message)
+                )
+            )
 
             suspect_tasks = dict(self._suspect_tasks)
             suspect_task = suspect_tasks.pop(message.failed_node, None)
@@ -425,8 +428,11 @@ class ReplicationController(Monitor):
 
         elif leader_host != current_leader_host and leader_port != current_leader_port and self._term_number == message.term_number:
             
-            await self._cancel_election(message)
-            await self._cancel_suspicion_probe(message)
+            self._tasks_queue.append(
+                asyncio.create_task(
+                    self._cancel_election(message)
+                )
+            )
 
             self._election_status = ElectionState.READY
             self._raft_node_status = NodeState.FOLLOWER
@@ -446,23 +452,40 @@ class ReplicationController(Monitor):
         source_host = message.source_host
         source_port = message.source_port
 
-        suspect_tasks = dict(self._suspect_tasks)
-        suspect_task = suspect_tasks.pop((source_host, source_port), None)
+        if message.failed_node and self._suspect_tasks.get(
+                message.failed_node
+            ):
+                
+                node_host, node_port = message.failed_node
+                
+                self._tasks_queue.append(
+                    asyncio.create_task(
+                        self._cancel_suspicion_probe(
+                            node_host,
+                            node_port
+                        )
+                    )
+                )
 
-        if suspect_task:
+                await self._logger.distributed.aio.debug(f'Node - {node_host}:{node_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
+                await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Node - {node_host}:{node_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
 
-            await self._logger.distributed.aio.debug(f'Node - {source_host}:{source_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
-            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Node - {source_host}:{source_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
 
+        if self._suspect_tasks.get((
+            source_host,
+            source_port
+        )):
             self._tasks_queue.append(
                 asyncio.create_task(
-                    cancel(suspect_task)
+                    self._cancel_suspicion_probe(
+                        source_host,
+                        source_port
+                    )
                 )
             )
 
-            del self._suspect_tasks[(source_host, source_port)]
-
-            self._suspect_tasks = suspect_tasks
+            await self._logger.distributed.aio.debug(f'Node - {source_host}:{source_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
+            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Node - {source_host}:{source_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
 
         error = self._logs.update(entries)
         elected_leader = self._get_current_term_leader()
@@ -522,9 +545,6 @@ class ReplicationController(Monitor):
         entries: List[Entry],
         failed_node: Optional[Tuple[str, int]]=None
     ) -> Call[RaftMessage]:
-        
-        leader_host, leader_port = self._get_current_term_leader()
-
         return RaftMessage(
             host=host,
             port=port,
@@ -603,6 +623,9 @@ class ReplicationController(Monitor):
 
         if suspect_task:
             await cancel(suspect_task)
+            del self._suspect_tasks[message.failed_node]
+
+            self._suspect_tasks = suspect_tasks
         
     async def _update_logs(
         self,
@@ -653,7 +676,21 @@ class ReplicationController(Monitor):
                 if update_response.error and elected_leader_matches is False:
 
                     await self._cancel_election(update_response)
-                    await self._cancel_suspicion_probe(update_response)
+
+                    if update_response.failed_node and self._suspect_tasks.get(
+                        update_response.failed_node
+                    ):
+
+                        node_host, node_port = update_response.failed_node
+
+                        self._tasks_queue.append(
+                            asyncio.create_task(
+                                self._cancel_suspicion_probe(
+                                    node_host,
+                                    node_port
+                                )
+                            )
+                        )
 
                     self._term_leaders.append(update_response.elected_leader)
                     self._term_number = update_response.term_number

@@ -185,14 +185,17 @@ class Monitor(Controller):
         await self._logger.distributed.aio.info(f'Node - {source_host}:{source_port} - submitted request to leave to source - {self.host}:{self.port}')
         await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Node - {source_host}:{source_port} - submitted request to leave to source - {self.host}:{self.port}')
 
-        suspect_tasks = dict(self._suspect_tasks)
-        suspect_task = suspect_tasks.pop((source_host, source_port), None)
-
-        if node is not None and suspect_task:
+        if self._suspect_tasks.get((
+            source_host,
+            source_port
+        )):
 
             self._tasks_queue.append(
                 asyncio.create_task(
-                    cancel(suspect_task)
+                    self._cancel_suspicion_probe(
+                        source_host,
+                        source_port
+                    )
                 )
             )
             
@@ -323,9 +326,9 @@ class Monitor(Controller):
             await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Source - {self.host}:{self.port} - received notification it is suspect despite being healthy from node - {source_host}:{source_port}')
 
             self._local_health_multipliers[(source_host, source_port)] = min(
-                self._local_health_multipliers[(source_host, source_port)], 
+                self._local_health_multipliers[(source_host, source_port)] + 1, 
                 self._max_poll_multiplier
-            ) + 1
+            )
 
             self._tasks_queue.append(
                 asyncio.create_task(
@@ -466,23 +469,22 @@ class Monitor(Controller):
 
         local_node_status = self._node_statuses.get((source_host, source_port))
 
-        suspect_tasks = dict(self._suspect_tasks)
-        suspect_task = suspect_tasks.pop((source_host, source_port), None)
-
-        if suspect_task:
+        if self._suspect_tasks.get((
+            source_host,
+            source_port
+        )):
 
             await self._logger.distributed.aio.debug(f'Node - {source_host}:{source_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
             await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Node - {source_host}:{source_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
 
             self._tasks_queue.append(
                 asyncio.create_task(
-                    cancel(suspect_task)
+                    self._cancel_suspicion_probe(
+                        source_host,
+                        source_port
+                    )
                 )
             )
-
-            del self._suspect_tasks[(source_host, source_port)]
-
-            self._suspect_tasks = suspect_tasks
 
 
         if local_node_status is None:
@@ -616,6 +618,22 @@ class Monitor(Controller):
             status=health_status
         )
     
+    async def _cancel_suspicion_probe(
+        self,
+        suspect_host: str,
+        suspect_port: int
+    ):
+        
+        suspect_node = (suspect_host, suspect_port)
+
+        suspect_tasks = dict(self._suspect_tasks)
+        suspect_task = suspect_tasks.pop(suspect_node, None)
+
+        await cancel(suspect_task)
+        del self._suspect_tasks[suspect_node]
+        
+        self._suspect_tasks = suspect_tasks
+
     async def _run_tcp_healthcheck(
         self, 
         host: str, 
