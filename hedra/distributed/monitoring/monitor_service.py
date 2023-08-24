@@ -876,15 +876,12 @@ class Monitor(Controller):
     
         await self._logger.distributed.aio.info(f'Initializing node - {self.host}:{self.port} - with id - {self._instance_id}')
         await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Initializing node - {self.host}:{self.port} - with id - {self._instance_id}')
-
-        
+  
         self.bootstrap_host = host
         self.bootstrap_port = port
 
-
         await self._logger.distributed.aio.info(f'Connecting to node node - {self.bootstrap_host}:{self.bootstrap_port}')
         await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Connecting to node node - {self.bootstrap_host}:{self.bootstrap_port}')
-
         
         await asyncio.wait_for(
             asyncio.create_task(

@@ -110,8 +110,6 @@ class ReplicationController(Monitor):
 
         self._logs = LogQueue()
         self._previous_entry_index = 0
-        self._last_timestamp = 0
-        self._last_commit_timestamp = 0
         self._term_number = 0
 
         self._raft_monitor_task: Union[asyncio.Task, None] = None
@@ -162,9 +160,6 @@ class ReplicationController(Monitor):
 
         boot_wait = random.uniform(0.1, self.boot_wait * self._initial_expected_nodes)
         await asyncio.sleep(boot_wait)
-
-        loop = asyncio.get_event_loop()
-        self._last_commit_timestamp = loop.time()
 
     async def register(
         self,
