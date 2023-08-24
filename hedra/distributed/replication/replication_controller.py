@@ -614,19 +614,6 @@ class ReplicationController(Monitor):
             await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - election for term - {self._term_number} - was cancelled due to leader reporting for term')
             await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - election for term - {self._term_number} - was cancelled due to leader reporting for term')
 
-    async def _cancel_suspicion_probe(
-        self,
-        message: RaftMessage
-    ):
-        suspect_tasks = dict(self._suspect_tasks)
-        suspect_task = suspect_tasks.pop(message.failed_node, None)
-
-        if suspect_task:
-            await cancel(suspect_task)
-            del self._suspect_tasks[message.failed_node]
-
-            self._suspect_tasks = suspect_tasks
-        
     async def _update_logs(
         self,
         host: str,
