@@ -1,11 +1,10 @@
-import time
+from hedra.distributed.snowflake import Snowflake
 from pydantic import (
     BaseModel,
     StrictStr,
-    StrictInt,
-    StrictFloat
+    StrictInt
 )
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 class Entry(BaseModel):
     entry_id: StrictInt
@@ -14,7 +13,18 @@ class Entry(BaseModel):
     term: StrictInt
     leader_host: StrictStr
     leader_port: StrictInt
-    timestamp: StrictFloat=time.monotonic()
+    timestamp: StrictInt
+
+    def __init__(self, *args, **kwargs):
+
+        entry_id: Union[int, None] = kwargs.get('entry_id')
+        if entry_id:
+            kwargs['timestamp'] = Snowflake.parse(entry_id).timestamp
+
+        super().__init__(
+            *args,
+            **kwargs
+        )
 
     def to_data(self):
         return {
@@ -25,17 +35,13 @@ class Entry(BaseModel):
     
     @classmethod
     def from_data(
-        self,
+        cls,
         entry_id: int,
         leader_host: str,
         leader_port: int,
         term: int,
         data: Dict[str, Any]
     ):
-        
-        data_timestamp = data.get('timestamp')
-        if data_timestamp is None:
-            data['timestamp'] = time.monotonic()
 
         return Entry(
             entry_id=entry_id,

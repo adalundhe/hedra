@@ -1,8 +1,7 @@
 from hedra.distributed.models.base.message import Message
 from pydantic import (
     StrictStr,
-    StrictInt,
-    StrictFloat
+    StrictInt
 )
 from typing import List, Optional, Tuple
 from .vote_result import VoteResult
@@ -20,4 +19,4 @@ class RaftMessage(Message):
     status: HealthStatus
     entries: Optional[List[Entry]]
     term_number: StrictInt
-    received_timestamp: Optional[StrictFloat]
+    received_timestamp: Optional[StrictInt]
