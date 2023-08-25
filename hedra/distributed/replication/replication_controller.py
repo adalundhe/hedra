@@ -525,8 +525,19 @@ class ReplicationController(Monitor):
                 received_timestamp=self._logs.last_timestamp
             )
         
-        except Exception:
-            print(traceback.format_exc())
+        except Exception as rpc_error:
+            return RaftMessage(
+                    host=message.host,
+                    port=message.port,
+                    source_host=self.host,
+                    source_port=self.port,
+                    status=self.status,
+                    raft_node_status=self._raft_node_status,
+                    error=str(rpc_error),
+                    elected_leader=elected_leader,
+                    term_number=self._term_number
+                )
+
 
     @client('receive_vote_request')
     async def request_vote(
@@ -986,7 +997,7 @@ class ReplicationController(Monitor):
                         await pending_task
 
                     except Exception:
-                        print(traceback.format_exc())
+                        pass
 
                     self._tasks_queue.remove(pending_task)
                     pending_count += 1

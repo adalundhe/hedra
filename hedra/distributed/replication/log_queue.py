@@ -105,84 +105,79 @@ class LogQueue:
 
             for entry in entries:
 
-                try:
-                    last_queue_timestamp = self._timestamps[-1]  
-                    next_index = self.size
-    
+                last_queue_timestamp = self._timestamps[-1]  
+                next_index = self.size
 
-                    entry_id = Snowflake.parse(entry.entry_id)
-                    entry_timestamp = entry_id.timestamp
+                entry_id = Snowflake.parse(entry.entry_id)
+                entry_timestamp = entry_id.timestamp
 
-                    # We've received a missing entry so insert it in order..
-                    if entry_timestamp < last_queue_timestamp:
+                # We've received a missing entry so insert it in order..
+                if entry_timestamp < last_queue_timestamp:
 
-                        # The insert index is at the index of last timestamp less 
-                        # than the entry timestamp + 1.
-                        #
-                        # I.e. if the last idx < timestamp is 4 we insert at 5.
-                        #
+                    # The insert index is at the index of last timestamp less 
+                    # than the entry timestamp + 1.
+                    #
+                    # I.e. if the last idx < timestamp is 4 we insert at 5.
+                    #
 
-                        previous_timestamps = [
-                            idx for idx, timestamp in enumerate(self._timestamps) if timestamp < entry_timestamp
-                        ]
+                    previous_timestamps = [
+                        idx for idx, timestamp in enumerate(self._timestamps) if timestamp < entry_timestamp
+                    ]
 
-                        if len(previous_timestamps) > 0:
-                            
-                            last_previous_timestamp_idx = previous_timestamps[-1]
+                    if len(previous_timestamps) > 0:
+                        
+                        last_previous_timestamp_idx = previous_timestamps[-1]
 
-                            insert_index: int = last_previous_timestamp_idx + 1
+                        insert_index: int = last_previous_timestamp_idx + 1
 
-                            next_logs = self.logs[insert_index:]
-                            next_timestamps = self._timestamps[insert_index:]
+                        next_logs = self.logs[insert_index:]
+                        next_timestamps = self._timestamps[insert_index:]
 
-                            previous_logs = self.logs[:insert_index]
-                            previous_timestamps = self._timestamps[:insert_index]
+                        previous_logs = self.logs[:insert_index]
+                        previous_timestamps = self._timestamps[:insert_index]
 
-                        else:
-                            
-                            insert_index = 0
-
-                            next_logs = self.logs
-                            next_timestamps = self._timestamps
-
-                            previous_logs = []
-                            previous_timestamps = []
-                    
-                        previous_logs.append(entry)
-                        previous_timestamps.append(entry_timestamp)
-
-                        previous_logs.extend(next_logs)
-                        previous_timestamps.extend(next_timestamps)
-
-                        self.timestamp_index_map[entry_timestamp] = insert_index
-
-                        for timestamp in next_timestamps:
-                            self.timestamp_index_map[timestamp] += 1
-
-                        self.logs = previous_logs
-                        self._timestamps = previous_timestamps
-
-                        self.size += 1
-                    
-                    # We've received entries to append
-                    elif entry_timestamp > last_queue_timestamp:
-                            
-                        self.logs.append(entry)
-                        self._timestamps.append(entry_timestamp)
-                    
-                        self.timestamp_index_map[entry_timestamp] = next_index
-                        self.size += 1
-
-                    # We've receive an entry to replace.
                     else:
                         
-                        next_index = self.timestamp_index_map[entry_timestamp]
+                        insert_index = 0
 
-                        self.logs[next_index] = entry   
-                        self._timestamps[next_index] = entry_timestamp
+                        next_logs = self.logs
+                        next_timestamps = self._timestamps
 
-                except Exception:
-                    print(traceback.format_exc())
+                        previous_logs = []
+                        previous_timestamps = []
+                
+                    previous_logs.append(entry)
+                    previous_timestamps.append(entry_timestamp)
+
+                    previous_logs.extend(next_logs)
+                    previous_timestamps.extend(next_timestamps)
+
+                    self.timestamp_index_map[entry_timestamp] = insert_index
+
+                    for timestamp in next_timestamps:
+                        self.timestamp_index_map[timestamp] += 1
+
+                    self.logs = previous_logs
+                    self._timestamps = previous_timestamps
+
+                    self.size += 1
+                
+                # We've received entries to append
+                elif entry_timestamp > last_queue_timestamp:
+                        
+                    self.logs.append(entry)
+                    self._timestamps.append(entry_timestamp)
+                
+                    self.timestamp_index_map[entry_timestamp] = next_index
+                    self.size += 1
+
+                # We've receive an entry to replace.
+                else:
+                    
+                    next_index = self.timestamp_index_map[entry_timestamp]
+
+                    self.logs[next_index] = entry   
+                    self._timestamps[next_index] = entry_timestamp
             
 
     def prune(self):
