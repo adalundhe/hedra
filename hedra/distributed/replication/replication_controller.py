@@ -414,7 +414,7 @@ class ReplicationController(Monitor):
                 leader_port = last_entry.leader_port
 
                 self._term_number = message.term_number
-                
+
                 for _ in range(amount_behind):
                     self._term_leaders.append((
                         None,
@@ -529,16 +529,64 @@ class ReplicationController(Monitor):
         
         except Exception as rpc_error:
             return RaftMessage(
-                    host=message.host,
-                    port=message.port,
-                    source_host=self.host,
-                    source_port=self.port,
-                    status=self.status,
-                    raft_node_status=self._raft_node_status,
-                    error=str(rpc_error),
-                    elected_leader=elected_leader,
-                    term_number=self._term_number
+                host=message.host,
+                port=message.port,
+                source_host=self.host,
+                source_port=self.port,
+                status=self.status,
+                raft_node_status=self._raft_node_status,
+                error=str(rpc_error),
+                elected_leader=elected_leader,
+                term_number=self._term_number
+            )
+
+    @server()
+    async def receive_forwarded_entries(
+        self,
+        shard_id: int,
+        message: RaftMessage
+    ) -> Call[RaftMessage]:
+        
+        current_leader_host, current_leader_port = self._get_current_term_leader()
+        
+        if self._raft_node_status == NodeState.LEADER and message.entries:
+            
+            entries = message.entries
+
+            entries.append(
+                Entry.from_data(
+                    entry_id=self._entry_id_generator.generate(),
+                    leader_host=current_leader_host,
+                    leader_port=current_leader_port,
+                    term=self._term_number,
+                    data={
+                        'key': 'logs_update',
+                        'value': f'Node - {self.host}:{self.port} - submitted log update',
+                    }
                 )
+            )
+
+            self._tasks_queue.append(
+                asyncio.create_task(
+                    self._submit_logs_to_members(entries)
+                )
+            )
+
+        return RaftMessage(
+            host=message.host,
+            port=message.port,
+            source_host=self.host,
+            source_port=self.port,
+            status=self.status,
+            elected_leader=(
+                current_leader_host,
+                current_leader_port
+            ),
+            term_number=self._term_number,
+            raft_node_status=self._raft_node_status,
+            received_timestamp=self._logs.last_timestamp
+        )
+        
 
 
     @client('receive_vote_request')
@@ -577,6 +625,24 @@ class ReplicationController(Monitor):
             entries=entries
         )
     
+    @client('receive_forwarded_entries')
+    async def forward_entries_to_leader(
+        self,
+        host: str,
+        port: int,
+        entries: List[Entry]
+    ) -> Call[RaftMessage]:
+        return RaftMessage(
+            host=host,
+            port=port,
+            source_host=self.host,
+            source_port=self.port,
+            status=self.status,
+            term_number=self._term_number,
+            raft_node_status=self._raft_node_status,
+            entries=entries
+        )
+    
     async def _start_suspect_monitor(self):
         suspect_host, suspect_port = await super()._start_suspect_monitor()
 
@@ -594,31 +660,104 @@ class ReplicationController(Monitor):
                 )
             )
 
-    async def submit_entries(
+    async def push_entries(
+        self,
+        entries: List[Dict[str, Any]]
+    ) -> List[RaftMessage]:
+
+        entries.append({
+            'key': 'logs_update',
+            'value': f'Node - {self.host}:{self.port} - submitted log update',
+        })
+
+        entries = self._convert_data_to_entries(entries)
+        entries_count = len(entries)
+
+        current_leader_host, current_leader_port = self._get_current_term_leader()
+
+        if self._raft_node_status == NodeState.LEADER:
+            results = await self._submit_logs_to_members(entries)
+
+            results_count = len(results)
+
+            await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - pushed - {entries_count} - entries to - {results_count} - members')
+            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - pushed - {entries_count} - entries to - {results_count} - members')
+
+            return results
+
+        else:
+
+            try:
+
+                result = await asyncio.wait_for(
+                    self.forward_entries_to_leader(
+                        current_leader_host,
+                        current_leader_port,
+                        entries
+                    ),
+                    timeout=self._calculate_current_timeout(
+                        current_leader_host,
+                        current_leader_port
+                    )
+                )
+
+                await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - forwarded - {entries_count} - entries to leader at - {current_leader_host}:{current_leader_port}')
+                await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - forwarded - {entries_count} - entries to leader at - {current_leader_host}:{current_leader_port}')
+
+                return [
+                    result
+                ]
+                
+            except Exception as forward_error:
+                
+                await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - encountered error - {str(forward_error)} - out forwarding - {entries_count} - entries to leader at - {current_leader_host}:{current_leader_port}')
+                await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - encountered error - {str(forward_error)} - out forwarding - {entries_count} - entries to leader at - {current_leader_host}:{current_leader_port}')
+        
+                return [
+                    RaftMessage(
+                        host=current_leader_host,
+                        port=current_leader_port,
+                        source_host=self.host,
+                        source_port=self.port,
+                        elected_leader=(
+                            current_leader_host,
+                            current_leader_port
+                        ),
+                        error=str(forward_error),
+                        raft_node_status=self._raft_node_status,
+                        status=self.status,
+                        term_number=self._term_number
+                    )
+                ]
+            
+    def submit_entries(
         self,
         entries: List[Dict[str, Any]]
     ):
+        self._tasks_queue.append(
+            asyncio.create_task(
+                self.push_entries(entries)
+            )
+        )
+
+    def _convert_data_to_entries(
+        self,
+        entries: List[Dict[str, Any]]
+    ) -> List[Entry]:
         
-        if self._raft_node_status == NodeState.LEADER:
+        current_leader_host, current_leader_port = self._get_current_term_leader()
 
-            self._logs.update(entries)
+        entries = [
+            Entry.from_data(
+                self._entry_id_generator.generate(),
+                current_leader_host,
+                current_leader_port,
+                self._term_number,
+                entry
+            ) for entry in entries
+        ]
 
-            members = [
-                address for address, status in self._node_statuses.items() if status == 'healthy'
-            ]
-
-            latest_logs = self._logs.latest()
-
-            for host, port in members:
-                self._tasks_queue.append(
-                    asyncio.create_task(
-                        self._update_logs(
-                            host,
-                            port,
-                            latest_logs
-                        )
-                    )
-                )
+        return entries
 
     async def _cancel_election(
         self,
@@ -640,7 +779,10 @@ class ReplicationController(Monitor):
         port: int,
         entries: List[Entry],
         failed_node: Optional[Tuple[str, int]]=None
-    ):
+    ) -> Union[
+        Tuple[int, RaftMessage],
+        None
+    ]:
         shard_id: Union[int, None] = None
         update_response: Union[RaftMessage, None] = None
 
@@ -933,14 +1075,26 @@ class ReplicationController(Monitor):
 
         while self._running:
 
+            current_leader_host, current_leader_port = self._get_current_term_leader()
+
             if self._raft_node_status == NodeState.LEADER:
+
                 self._tasks_queue.append(
                     asyncio.create_task(
-                        self._submit_logs_to_members()
+                        self._submit_logs_to_members([
+                            Entry.from_data(
+                                entry_id=self._entry_id_generator.generate(),
+                                leader_host=current_leader_host,
+                                leader_port=current_leader_port,
+                                term=self._term_number,
+                                data={
+                                    'key': 'logs_update',
+                                    'value': f'Node - {self.host}:{self.port} - submitted log update',
+                                }
+                            )
+                        ])
                     )
                 )
-
-            current_leader_host, current_leader_port = self._get_current_term_leader()
 
             await self._logger.distributed.aio.debug(f'Source - {self.host}:{self.port} - has node {current_leader_host}:{current_leader_port} - as leader for term - {self._term_number}')
             await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - has node {current_leader_host}:{current_leader_port} - as leader for term - {self._term_number}')
@@ -949,30 +1103,23 @@ class ReplicationController(Monitor):
                 self._logs_update_poll_interval
             )
 
-    async def _submit_logs_to_members(self):
+    async def _submit_logs_to_members(
+        self,
+        entries: List[Entry]
+    ) -> List[RaftMessage]:
          
         members: List[Tuple[str, int]] = [
             address for address, status in self._node_statuses.items() if status == 'healthy'
         ]
-        
-        current_leader_host, current_leader_port = self._get_current_term_leader()
 
-        self._logs.update([
-            Entry.from_data(
-                entry_id=self._entry_id_generator.generate(),
-                leader_host=current_leader_host,
-                leader_port=current_leader_port,
-                term=self._term_number,
-                data={
-                    'key': 'logs_update',
-                    'value': f'Node - {self.host}:{self.port} - submitted log update',
-                }
-            )
-        ])
+        self._logs.update(entries)
 
         latest_logs = self._logs.latest()
 
-        await asyncio.gather(*[
+        results: List[Tuple[
+            int,
+            RaftMessage
+        ]] = await asyncio.gather(*[
             asyncio.create_task(
                 self._update_logs(
                     host,
@@ -983,6 +1130,8 @@ class ReplicationController(Monitor):
         ])
 
         self._logs.commit()
+
+        return results
 
     async def _cleanup_pending_raft_tasks(self):
 
