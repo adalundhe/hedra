@@ -413,6 +413,8 @@ class ReplicationController(Monitor):
                 leader_host = last_entry.leader_host
                 leader_port = last_entry.leader_port
 
+                self._term_number = message.term_number
+                
                 for _ in range(amount_behind):
                     self._term_leaders.append((
                         None,
