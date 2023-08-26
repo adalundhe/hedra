@@ -148,6 +148,7 @@ class Monitor(Controller):
         self._logger.initialize()
 
         self._healthy_statuses = [
+            'initializing',
             'waiting',
             'healthy'
         ]

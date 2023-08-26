@@ -1013,7 +1013,6 @@ class ReplicationController(Monitor):
             except Exception:
                 await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - encountered error for candidate term - {next_term} - reverting to term - {self._term_number}')
                 await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - encountered error for candidate term - {next_term} - reverting to term - {self._term_number}')
-
         
             accepted_count = self._term_votes[self._term_number][(self.host, self.port)]
 
