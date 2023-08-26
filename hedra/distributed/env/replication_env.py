@@ -20,7 +20,7 @@ class ReplicationEnv(BaseModel):
     MERCURY_SYNC_RAFT_REGISTRATION_TIMEOUT: StrictStr='15s'
     MERCURY_SYNC_RAFT_EXPECTED_NODES: StrictInt=3
     MERCURY_SYNC_RAFT_LOGS_PRUNE_MAX_AGE: StrictStr='1h'
-    MERCURY_SYNC_RAFT_LOGS_PRUNE_MAX_COUNT: StrictInt=10
+    MERCURY_SYNC_RAFT_LOGS_PRUNE_MAX_COUNT: StrictInt=1000
    
     @classmethod
     def types_map(self) -> Dict[str, Callable[[str], PrimaryType]]:
