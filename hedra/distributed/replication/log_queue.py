@@ -209,6 +209,7 @@ class LogQueue:
             self.commit_index = 0
             self._last_timestamp = 0
             self._last_commit_timestamp = 0
+            self.size = 0
 
         else:
 
@@ -225,6 +226,7 @@ class LogQueue:
                 commit for commit in self._commits if commit > self._timestamps[0]
             ]
 
+            self.size -= count
             
 
         
