@@ -105,7 +105,12 @@ class LogQueue:
 
             for entry in entries:
 
-                last_queue_timestamp = self._timestamps[-1]  
+                if len(self._timestamps) > 0:
+                    last_queue_timestamp = self._timestamps[-1]  
+
+                else:
+                    last_queue_timestamp = 0
+
                 next_index = self.size
 
                 entry_id = Snowflake.parse(entry.entry_id)
@@ -210,7 +215,8 @@ class LogQueue:
             pruned_timestamps = self._timestamps[:count]
 
             for timestamp in pruned_timestamps:
-                del self.timestamp_index_map[timestamp]
+                if self.timestamp_index_map.get(timestamp):
+                    del self.timestamp_index_map[timestamp]
 
             self.logs = self.logs[count:]
             self._timestamps = self._timestamps[count:]

@@ -354,6 +354,7 @@ class ReplicationController(Monitor):
         
         try:
             entries_count = len(message.entries)
+            elected_leader = self._get_current_term_leader()
 
             if entries_count < 1:
                 return RaftMessage(
@@ -362,6 +363,7 @@ class ReplicationController(Monitor):
                     source_host=self.host,
                     source_port=self.port,
                     status=self.status,
+                    elected_leader=elected_leader,
                     term_number=self._term_number,
                     election_status=self._election_status,
                     raft_node_status=self._raft_node_status
@@ -494,7 +496,6 @@ class ReplicationController(Monitor):
                 await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Node - {source_host}:{source_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
 
             error = self._logs.update(entries)
-            elected_leader = self._get_current_term_leader()
 
             self._local_health_multipliers[(source_host, source_port)] = max(
                 0, 
