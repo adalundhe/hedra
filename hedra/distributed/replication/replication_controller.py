@@ -297,13 +297,31 @@ class ReplicationController(Monitor):
         elif term_number == self._term_number and self._raft_node_status != NodeState.LEADER:
             # The term numbers match, we can choose a candidate.
 
-            members: List[Tuple[str, int]] = [
-                address for address, status in self._node_statuses.items() if status == 'healthy'
+            instance_address_id_pairs = list(
+                sorted(
+                    self._instance_ids.items(),
+                    key=lambda instance: instance[1]
+                )
+            )
+
+            healthy_instances = [
+                (
+                    address,
+                    instance_id
+                ) for address, instance_id in instance_address_id_pairs if self._node_statuses.get(
+                    address
+                ) in self._healthy_statuses
             ]
 
-            elected_host, elected_port = random.choice(
-                list(set(members))
-            )
+            if len(healthy_instances) > 0:
+
+                max_instance = healthy_instances[-1][0]
+                elected_host, elected_port = max_instance
+
+            else:
+                
+                elected_host = self.host
+                elected_port = self.port
 
         else:
 
@@ -846,7 +864,7 @@ class ReplicationController(Monitor):
 
                 return shard_id, update_response
             
-            except asyncio.TimeoutError:
+            except Exception:
 
                 await self._refresh_after_timeout(
                     host,

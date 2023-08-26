@@ -134,6 +134,7 @@ class Monitor(Controller):
         self._cleanup_task: Union[asyncio.Task, None] = None
         self._investigating_nodes: Dict[Tuple[str, int], Dict[Tuple[str, int]]] = defaultdict(dict)
         self._node_statuses: Dict[Tuple[str, int], HealthStatus] = {}
+        self._instance_ids: Dict[Tuple[str, int], int] = {}
 
         self.bootstrap_host: Union[str, None] = None
         self.bootstrap_port: Union[int, None] = None
@@ -287,6 +288,9 @@ class Monitor(Controller):
                     )
                 )
             )
+
+        snowflake = Snowflake.parse(shard_id)
+        self._instance_ids[(update_node_host, update_node_port)] = snowflake.instance
 
         if target_last_updated > local_last_updated:
             self._node_statuses[(update_node_host, update_node_port)] = update_status
@@ -525,7 +529,7 @@ class Monitor(Controller):
                         )
                     )
                 )
-            )     
+            )   
 
         elif local_node_status in self._unhealthy_statuses:
 
@@ -546,10 +550,12 @@ class Monitor(Controller):
                     )
                 )
             )
-    
 
+        snowflake = Snowflake.parse(shard_id)
+        self._instance_ids[(source_host, source_port)] = snowflake.instance  
+        
         self._node_statuses[(source_host, source_port)] = healthcheck.status
-        self._latest_update[(source_host, source_port)] = Snowflake.parse(shard_id).timestamp
+        self._latest_update[(source_host, source_port)] = snowflake.timestamp
 
         if target_host and target_port: 
             self._node_statuses[(target_host, target_port)] = healthcheck.target_status
