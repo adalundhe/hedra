@@ -629,10 +629,11 @@ class Monitor(Controller):
         suspect_tasks = dict(self._suspect_tasks)
         suspect_task = suspect_tasks.pop(suspect_node, None)
 
-        await cancel(suspect_task)
-        del self._suspect_tasks[suspect_node]
-        
-        self._suspect_tasks = suspect_tasks
+        if suspect_task:
+            await cancel(suspect_task)
+            del self._suspect_tasks[suspect_node]
+            
+            self._suspect_tasks = suspect_tasks
 
     async def _run_tcp_healthcheck(
         self, 
