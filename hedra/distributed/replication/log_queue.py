@@ -33,7 +33,12 @@ class LogQueue:
 
     @property
     def last_timestamp(self):
-        return self._timestamps[-1]
+
+        if len(self._timestamps) > 0:
+            return self._timestamps[-1]
+        
+        else:
+            return 0
 
     def latest(self):
 
