@@ -510,7 +510,6 @@ class MercurySyncUDPConnection:
 
         except Exception:
             pass
-            # print(traceback.format_exc())
             # await self._reset_connection()
 
 

@@ -355,7 +355,10 @@ class Monitor(Controller):
             )
 
         snowflake = Snowflake.parse(shard_id)
-        self._instance_ids[(update_node_host, update_node_port)] = snowflake.instance
+
+        source_host = healthcheck.source_host
+        source_port = healthcheck.source_port
+        self._instance_ids[(source_host, source_port)] = snowflake.instance
 
         if target_last_updated > local_last_updated:
             self._node_statuses[(update_node_host, update_node_port)] = update_status
