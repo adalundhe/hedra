@@ -31,6 +31,7 @@ class MonitorEnv(BaseModel):
     MERCURY_SYNC_INDIRECT_CHECK_NODES: StrictInt=3
     MERCURY_SYNC_FAILED_NODES_MAX_AGE: StrictStr='1m'
     MERCURY_SYNC_REMOVED_NODES_MAX_AGE: StrictStr='2m'
+    MERCURY_SYNC_EXPECTED_NODES: StrictInt=3
 
     @classmethod
     def types_map(self) -> Dict[str, Callable[[str], PrimaryType]]:
@@ -49,5 +50,6 @@ class MonitorEnv(BaseModel):
             'MERCURY_SYNC_HEALTH_POLL_INTERVAL': str,
             'MERCURY_SYNC_INDIRECT_CHECK_NODES': int,
             'MERCURY_SYNC_FAILED_NODES_MAX_AGE': str,
-            'MERCURY_SYNC_REMOVED_NODES_MAX_AGE': str
+            'MERCURY_SYNC_REMOVED_NODES_MAX_AGE': str,
+            'MERCURY_SYNC_EXPECTED_NODES': int
         }

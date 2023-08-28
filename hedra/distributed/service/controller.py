@@ -596,94 +596,103 @@ class Controller(Generic[*P]):
                 
     async def extend_client(
         self,
-        remote: Message,
+        remotes: Dict[
+            Tuple[str, int]: List[Type[Message]]
+        ],
         cert_path: Optional[str]=None,
         key_path: Optional[str]=None    
-    ) -> int:
+    ):
 
 
-        try:
+        for address, message_types in remotes.items():   
 
-            for _ in range(self._workers):
+            host, port = address  
 
-                udp_connection = MercurySyncUDPConnection(
-                    self.host,
-                    self.port,
-                    self._instance_id,
-                    env=self._env
-                )
+            try:
 
-                tcp_connection = MercurySyncTCPConnection(
-                    self.host,
-                    self.port + 1,
-                    self._instance_id,
-                    env=self._env
-                )
-                
-                tcp_connection.parsers.update(self._parsers)
-                udp_connection.parsers.update(self._parsers)
+                for _ in range(self._workers):
 
-                tcp_connection.events.update(self._events)
-                udp_connection.events.update(self._events)
-        
-                await udp_connection.connect_async(
-                    cert_path=cert_path,
-                    key_path=key_path
-                )
+                    udp_connection = MercurySyncUDPConnection(
+                        self.host,
+                        self.port,
+                        self._instance_id,
+                        env=self._env
+                    )
 
-                await tcp_connection.connect_async(
-                    cert_path=cert_path,
-                    key_path=key_path
-                )
+                    tcp_connection = MercurySyncTCPConnection(
+                        self.host,
+                        self.port + 1,
+                        self._instance_id,
+                        env=self._env
+                    )
+                    
+                    tcp_connection.parsers.update(self._parsers)
+                    udp_connection.parsers.update(self._parsers)
 
-                self._host_map[remote.__class__.__name__][udp_connection] = (
-                    remote.host, 
-                    remote.port
-                )
+                    tcp_connection.events.update(self._events)
+                    udp_connection.events.update(self._events)
+            
+                    await udp_connection.connect_async(
+                        cert_path=cert_path,
+                        key_path=key_path
+                    )
 
-                self._host_map[remote.__class__.__name__][tcp_connection] = (
-                    remote.host, 
-                    remote.port
-                )
+                    await tcp_connection.connect_async(
+                        cert_path=cert_path,
+                        key_path=key_path
+                    )
 
-                await self._udp_queue[(remote.host, remote.port)].put(udp_connection)
-                await self._tcp_queue[(remote.host, remote.port)].put(tcp_connection)
+                    await self._udp_queue[(host, port)].put(udp_connection)
+                    await self._tcp_queue[(host, port)].put(tcp_connection)
 
-                await tcp_connection.connect_client(
-                    (remote.host, remote.port + 1),
-                    cert_path=cert_path,
-                    key_path=key_path
-                )
+                    await tcp_connection.connect_client(
+                        (host, port + 1),
+                        cert_path=cert_path,
+                        key_path=key_path
+                    )
 
-                self._udp_pool.append(udp_connection)
-                self._tcp_pool.append(tcp_connection)
-                
+                    self._udp_pool.append(udp_connection)
+                    self._tcp_pool.append(tcp_connection)
 
-        except Exception:
-            pass
+                    for message_type in message_types:
 
-        return remote.port
+                        self._host_map[message_type.__class__.__name__][udp_connection] = (
+                            host, 
+                            port
+                        )
+
+                        self._host_map[message_type.__class__.__name__][tcp_connection] = (
+                            host, 
+                            port
+                        )
+
+            except Exception:
+                pass
     
     async def refresh_clients(
         self,
-        remote: Message,
+        remotes: Dict[
+            Tuple[str, int]: List[Type[Message]]
+        ],
         cert_path: Optional[str]=None,
         key_path: Optional[str]=None    
     ) -> int:
+        
+        for host, port in remotes.keys(): 
 
-        existing_udp_connections = self._udp_queue[(remote.host, remote.port)]
-        existing_tcp_connections = self._tcp_queue[(remote.host, remote.port)]
+            existing_udp_connections = self._udp_queue[(host, port)]
+            existing_tcp_connections = self._tcp_queue[(host, port)]
 
-        while existing_udp_connections.empty() is False:
-            connection: MercurySyncUDPConnection = await existing_udp_connections.get()
-            await connection.close()
+            while existing_udp_connections.empty() is False:
+                connection: MercurySyncUDPConnection = await existing_udp_connections.get()
+                await connection.close()
 
-        while existing_tcp_connections.empty() is False:
-            connection: MercurySyncUDPConnection = await existing_tcp_connections.get()
-            await connection.close()
+            while existing_tcp_connections.empty() is False:
+                connection: MercurySyncUDPConnection = await existing_tcp_connections.get()
+                await connection.close()
 
         return await self.extend_client(
-            remote,
+            remotes,
             cert_path=cert_path,
             key_path=key_path
         )

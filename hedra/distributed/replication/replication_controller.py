@@ -76,14 +76,17 @@ class ReplicationController(Monitor):
             logs_directory=logs_directory
         )
 
+        self._models = [
+            HealthCheck,
+            RaftMessage
+        ]
+
         self._term_number = 0
         self._term_votes = defaultdict(
             lambda: defaultdict(
                 lambda: 0
             )
         )
-
-        self._initial_expected_nodes = replication_env.MERCURY_SYNC_RAFT_EXPECTED_NODES
 
         self._max_election_timeout = TimeParser(
             replication_env.MERCURY_SYNC_RAFT_ELECTION_MAX_TIMEOUT
@@ -174,12 +177,13 @@ class ReplicationController(Monitor):
    
         self.bootstrap_host = host
         self.bootstrap_port = port
-
-        max_wait = self.registration_timeout * self._initial_expected_nodes
+        self.status = 'healthy'
 
         await self._register_initial_node()
 
-        self.status = 'healthy'
+        # max_wait = self.registration_timeout * self._initial_expected_nodes
+
+        # await self._wait_for_nodes()
         self._running = True
 
         self._healthchecks[(self.bootstrap_host, self.bootstrap_port)] = asyncio.create_task(
@@ -198,25 +202,9 @@ class ReplicationController(Monitor):
             self._run_tcp_state_sync()
         )
 
-        await asyncio.wait_for(
-            self._wait_for_nodes(),
-            timeout=max_wait
-        )
-        
-        self._raft_cleanup_task = asyncio.create_task(
-            self._cleanup_pending_raft_tasks()
-        )
-
-        self._raft_monitor_task = asyncio.create_task(
-            self._run_raft_monitor()
-        )
-
-        boot_wait = random.uniform(0.1, self.boot_wait)
-        await asyncio.sleep(boot_wait)
-
         if self._term_number == 0:
 
-            while self._term_number < 1:
+            while len(self._term_leaders) < 1:
 
                 self._election_status = ElectionState.ACTIVE
 
@@ -230,49 +218,16 @@ class ReplicationController(Monitor):
             if self._election_task and not self._election_task.done() and not self._election_task.cancelled():
                 await cancel(self._election_task)
                 self._election_task = None
+        
+        self._raft_cleanup_task = asyncio.create_task(
+            self._cleanup_pending_raft_tasks()
+        )
 
-    async def _wait_for_nodes(self):
+        self._raft_monitor_task = asyncio.create_task(
+            self._run_raft_monitor()
+        )
 
-        currently_registered = len(self._node_statuses) + 1
-        poll_interval_offset = 0
-
-        while currently_registered < self._initial_expected_nodes:
-
-            await self._logger.distributed.aio.info(f'Waiting start - {self.host}:{self.port} - with - {currently_registered}/{self._initial_expected_nodes} - registered')
-            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Waiting start - {self.host}:{self.port} - with - {currently_registered}/{self._initial_expected_nodes} - registered')
-
-            await asyncio.sleep(self._poll_interval + poll_interval_offset)
-
-            currently_registered = len(self._node_statuses) + 1
-
-            poll_interval_offset = self._initial_expected_nodes/max(currently_registered, 1)
-
-    async def _register_initial_node(self):
-        await self._logger.distributed.aio.info(f'Connecting to initial node - {self.bootstrap_host}:{self.bootstrap_port}')
-        await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Connecting to initial node - {self.bootstrap_host}:{self.bootstrap_port}')
-
-        try:
-
-            await asyncio.wait_for(
-                asyncio.create_task(
-                    self.start_client(
-                        {
-                            (self.bootstrap_host, self.bootstrap_port): [
-                                HealthCheck,
-                                RaftMessage
-                            ]
-                        },
-                        cert_path=self.cert_path,
-                        key_path=self.key_path
-                    )
-                ),
-                timeout=self.registration_timeout
-            )
-
-            self._node_statuses[(self.bootstrap_host, self.bootstrap_port)] = 'healthy'
-
-        except Exception:
-            pass
+        self.status = 'healthy'
 
     @server()
     async def receive_vote_request(
@@ -515,9 +470,9 @@ class ReplicationController(Monitor):
 
             error = self._logs.update(entries)
 
-            self._local_health_multipliers[(source_host, source_port)] = max(
-                0, 
-                self._local_health_multipliers[(source_host, source_port)] - 1
+            self._local_health_multipliers[(source_host, source_port)] = self._reduce_health_multiplier(
+                source_host,
+                source_port
             )
 
             if isinstance(error, Exception):
@@ -830,9 +785,9 @@ class ReplicationController(Monitor):
 
                 self._node_statuses[(source_host, source_port)] = update_response.status
 
-                self._local_health_multipliers[(host, port)] = max(
-                    0, 
-                    self._local_health_multipliers[(host, port)] - 1
+                self._local_health_multipliers[(host, port)] = self._reduce_health_multiplier(
+                    host,
+                    port
                 )
 
                 elected_leader_host, elected_leader_port = update_response.elected_leader
@@ -871,10 +826,10 @@ class ReplicationController(Monitor):
                     port
                 )
 
-                self._local_health_multipliers[(host, port)] = min(
-                    self._local_health_multipliers[(host, port)], 
-                    self._max_poll_multiplier
-                ) + 1
+                self._local_health_multipliers[(host, port)] = self._increase_health_multiplier(
+                    host,
+                    port
+                )
 
         check_host = host
         check_port = port
@@ -905,12 +860,15 @@ class ReplicationController(Monitor):
         host: str,
         port: int
     ):
-        
-        monitors = [
-            address for address, status in self._node_statuses.items() if status == 'healthy'
-        ]
 
-        return self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1) * len(monitors)
+        modifier = max(
+            len([
+                address for address, status in self._node_statuses.items() if status == 'healthy' 
+            ]),
+            self._initial_expected_nodes
+        )
+
+        return self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1) * modifier
 
     def _get_current_term_leader(self):
 

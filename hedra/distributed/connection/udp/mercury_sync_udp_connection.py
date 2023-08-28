@@ -257,7 +257,8 @@ class MercurySyncUDPConnection:
                         asyncio.InvalidStateError,
                         AttributeError
                     ):
-                        await self._reset_connection()
+                        pass
+                        # await self._reset_connection()
 
                     if len(self._pending_responses) > 0:
                         self._pending_responses.pop()
@@ -508,7 +509,9 @@ class MercurySyncUDPConnection:
             self._transport.sendto(compressed, addr)
 
         except Exception:
-            await self._reset_connection()
+            pass
+            # print(traceback.format_exc())
+            # await self._reset_connection()
 
 
     async def _read_iterator(
@@ -536,7 +539,8 @@ class MercurySyncUDPConnection:
                 self._transport.sendto(compressed, addr)
 
             except Exception:
-                await self._reset_connection()
+                pass
+                # await self._reset_connection()
 
     async def close(self) -> None:
         self._running = False
