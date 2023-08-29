@@ -12,7 +12,7 @@ from hedra.distributed.env import (
 from hedra.distributed.env.time_parser import TimeParser
 from hedra.distributed.hooks.client_hook import client
 from hedra.distributed.hooks.server_hook import server
-from hedra.distributed.models.healthcheck import HealthCheck, HealthStatus
+from hedra.distributed.models.raft import HealthCheck, HealthStatus
 from hedra.distributed.service.controller import Controller
 from hedra.distributed.snowflake import Snowflake
 from hedra.distributed.types import Call
@@ -74,7 +74,7 @@ class Monitor(Controller):
             monitor_env.MERCURY_SYNC_BOOT_WAIT
         ).time
         
-        self._healthchecks: Dict[str, asyncio.Task] = {}
+        self._healthcheck_task: Union[asyncio.Task, None] = None
         self._registered: Dict[int, Tuple[str, int]] = {}
         self._running = False
 
@@ -118,6 +118,7 @@ class Monitor(Controller):
         self._initial_expected_nodes = monitor_env.MERCURY_SYNC_EXPECTED_NODES
 
         self._confirmed_suspicions: Dict[Tuple[str, int], int] = defaultdict(lambda: 0)
+        self._registered_counts: Dict[Tuple[str, int], int] = defaultdict(lambda: 0)
         self._waiter: Union[asyncio.Future, None] = None
 
         self._tasks_queue: Deque[asyncio.Task] = deque()
@@ -181,76 +182,89 @@ class Monitor(Controller):
         healthcheck: HealthCheck
     ) -> Call[HealthCheck]:
         
-        source_host = healthcheck.source_host
-        source_port = healthcheck.source_port
+        try:
+            source_host = healthcheck.source_host
+            source_port = healthcheck.source_port
 
-        target_host = healthcheck.target_host
-        target_port = healthcheck.target_port
-
-        not_self = self._check_is_not_self(
-            source_host,
-            source_port
-        )
-
-        not_registered = self._check_is_not_registered(
-            source_host,
-            source_port
-        )
-
-        poll_timeout = self.registration_timeout * self._initial_expected_nodes
-
-        if not_self and not_registered: 
-            self._node_statuses[(source_host, source_port)] = 'healthy'
-            self._tasks_queue.append(
-                asyncio.create_task(
-                    asyncio.wait_for(
-                        self.extend_client(
-                            {
-                                (source_host, source_port): self._models
-                            },
-                            cert_path=self.cert_path,
-                            key_path=self.key_path
-                        ),
-                        timeout=self.registration_timeout
-                    )
-                )
+            not_self = self._check_is_not_self(
+                source_host,
+                source_port
             )
 
-
-        not_self = self._check_is_not_self(
-            target_host,
-            target_port
-        )
-
-        not_registered = self._check_is_not_registered(
-            target_host,
-            target_port
-        )
-
-        if target_host and target_port and not_self and not_registered:
-            self._node_statuses[(target_host, target_port)] = 'healthy'
-            self._tasks_queue.append(
-                asyncio.create_task(
-                    asyncio.wait_for(
-                        self.extend_client(
-                            {
-                                (target_host, target_port): self._models
-                            },
-                            cert_path=self.cert_path,
-                            key_path=self.key_path
-                        ),
-                        timeout=poll_timeout
-                    )
-                )
+            not_registered = self._check_is_not_registered(
+                source_host,
+                source_port
             )
 
-        return HealthCheck(
-            host=healthcheck.source_host,
-            port=healthcheck.source_port,
-            source_host=self.host,
-            source_port=self.port,
-            status=self.status
-        )
+            if not_self and not_registered: 
+
+                self._tasks_queue.append(
+                    asyncio.create_task(
+                        self.extend_client({
+                            (source_host, source_port): self._models
+                        })
+                    )
+                )
+
+                self._node_statuses[(source_host, source_port)] = 'healthy'
+
+            snowflake = Snowflake.parse(shard_id)
+            self._instance_ids[(source_host, source_port)] = snowflake.instance 
+
+            if healthcheck.registered_nodes:
+
+                for host, port, instance_id in healthcheck.registered_nodes:
+
+                    not_self = self._check_is_not_self(
+                        host,
+                        port
+                    )
+
+                    not_registered = self._check_is_not_registered(
+                        host,
+                        port
+                    )
+
+                    if not_self and not_registered:
+                    
+                        self._tasks_queue.append(
+                            asyncio.create_task(
+                                self.extend_client({
+                                    (host, port): self._models
+                                })
+                            )
+                        )
+
+                        self._node_statuses[(host, port)] = 'healthy'
+                    
+                    self._instance_ids[(host, port)] = instance_id
+
+
+            self._registered_counts[(source_host, source_port)] = max(
+                healthcheck.registered_count,
+                self._registered_counts[(source_host, source_port)]
+            )
+
+            return HealthCheck(
+                host=source_host,
+                port=source_port,
+                source_host=self.host,
+                source_port=self.port,
+                registered_nodes=[
+                    (
+                        host,
+                        port,
+                        self._instance_ids.get((
+                            host, port
+                        ))
+                    ) for host, port in self._instance_ids
+                ],
+                status=self.status,
+                registered_count=len(self._instance_ids)
+            )
+
+        except Exception:
+            pass
 
     @server()
     async def deregister_node(
@@ -463,17 +477,6 @@ class Monitor(Controller):
             await self._logger.distributed.aio.debug(f'Suspect node - {target_host}:{target_port} - responded to an indirect check from source - {self.host}:{self.port} - for node - {source_host}:{source_port}')
             await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Suspect node - {target_host}:{target_port} - responded to an indirect check from source - {self.host}:{self.port} - for node - {source_host}:{source_port}')
 
-            # We've received a refutation
-            return HealthCheck(
-                host=healthcheck.source_host,
-                port=healthcheck.source_port,
-                target_status=self._node_statuses.get((target_host, target_port)),   
-                source_host=target_host,
-                source_port=target_port,
-                status=self.status,
-                error=self.error_context
-            )
-
         except Exception:
 
             if self._node_statuses[(target_host, target_port)] != 'failed':
@@ -495,7 +498,17 @@ class Monitor(Controller):
                     target_status='suspect', 
                     status=self.status
                 )
-    
+            
+        return HealthCheck(
+            host=healthcheck.source_host,
+            port=healthcheck.source_port,
+            target_status=self._node_statuses.get((target_host, target_port)),   
+            source_host=target_host,
+            source_port=target_port,
+            status=self.status,
+            error=self.error_context
+        )
+
     @server()
     async def update_acknowledged(
         self,
@@ -533,70 +546,79 @@ class Monitor(Controller):
         healthcheck: HealthCheck
     ) -> Call[HealthCheck]:
             
-        update_node_host = healthcheck.source_host
-        update_node_port = healthcheck.source_port
+        try:
+            update_node_host = healthcheck.source_host
+            update_node_port = healthcheck.source_port
 
-        target_host = healthcheck.target_host
-        target_port = healthcheck.target_port
+            local_node_status = self._node_statuses.get((update_node_host, update_node_port))
 
-        if target_host and target_port:
-            update_node_host = target_host
-            update_node_port = target_port
+            if self._suspect_tasks.get((
+                update_node_host,
+                update_node_port
+            )):
 
+                await self._logger.distributed.aio.debug(f'Node - {update_node_host}:{update_node_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
+                await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Node - {update_node_host}:{update_node_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
 
-        local_node_status = self._node_statuses.get((update_node_host, update_node_port))
-
-        if self._suspect_tasks.get((
-            update_node_host,
-            update_node_port
-        )):
-
-            await self._logger.distributed.aio.debug(f'Node - {update_node_host}:{update_node_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
-            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Node - {update_node_host}:{update_node_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
-
-            self._tasks_queue.append(
-                asyncio.create_task(
-                    self._cancel_suspicion_probe(
-                        update_node_host,
-                        update_node_port
+                self._tasks_queue.append(
+                    asyncio.create_task(
+                        self._cancel_suspicion_probe(
+                            update_node_host,
+                            update_node_port
+                        )
                     )
                 )
+
+            snowflake = Snowflake.parse(shard_id)
+            
+            self._node_statuses[(update_node_host, update_node_port)] = healthcheck.status
+            self._latest_update[(update_node_host, update_node_port)] = snowflake.timestamp
+
+            return HealthCheck(
+                host=healthcheck.source_host,
+                port=healthcheck.source_port,
+                source_host=self.host,
+                source_port=self.port,
+                source_status=local_node_status,
+                error=self.error_context,
+                status=self.status
             )
-
-        snowflake = Snowflake.parse(shard_id)
-        self._instance_ids[(update_node_host, update_node_port)] = snowflake.instance  
         
-        self._node_statuses[(update_node_host, update_node_port)] = healthcheck.status
-        self._latest_update[(update_node_host, update_node_port)] = snowflake.timestamp
-
-        return HealthCheck(
-            host=healthcheck.source_host,
-            port=healthcheck.source_port,
-            source_host=self.host,
-            source_port=self.port,
-            source_status=local_node_status,
-            error=self.error_context,
-            status=self.status
-        )
+        except Exception:
+            return HealthCheck(
+                host=healthcheck.source_host,
+                port=healthcheck.source_port,
+                source_host=self.host,
+                source_port=self.port,
+                source_status=local_node_status,
+                error=self.error_context,
+                status=self.status
+            )
     
     @client('register_node')
     async def submit_registration(
         self,
         host: str,
-        port: int,
-        health_status: HealthStatus,
-        target_host: Optional[str]=None,
-        target_port: Optional[int]=None,
-    ) -> Call[HealthCheck]:
+        port: int
+    ) -> Call[HealthCheck]:    
         return HealthCheck(
             host=host,
             port=port,
             source_host=self.host,
             source_port=self.port,
-            target_host=target_host,
-            target_port=target_port,
+            registered_nodes=[
+                (
+                    host,
+                    port,
+                    self._instance_ids.get((
+                        host,
+                        port
+                    ))
+                ) for host, port in self._instance_ids
+            ],
+            registered_count=len(self._instance_ids),
             error=self.error_context,
-            status=health_status
+            status=self.status
         )
 
     @client('update_node_health')
@@ -664,13 +686,13 @@ class Monitor(Controller):
         suspect_node = (suspect_host, suspect_port)
 
         suspect_tasks = dict(self._suspect_tasks)
-        suspect_task = suspect_tasks.pop(suspect_node, None)
+        suspect_task = suspect_tasks.get(suspect_node)
 
-        if suspect_task:
+        if suspect_task is not None:
             await cancel(suspect_task)
-            del self._suspect_tasks[suspect_node]
+            del suspect_tasks[suspect_node]
             
-            self._suspect_tasks = suspect_tasks
+        self._suspect_tasks = suspect_tasks
 
     async def _run_tcp_healthcheck(
         self, 
@@ -718,12 +740,6 @@ class Monitor(Controller):
                 return shard_id, healthcheck
 
             except Exception:
-
-                await self._refresh_after_timeout(
-                    host,
-                    port
-                )
-
                 self._local_health_multipliers[(host, port)] = self._increase_health_multiplier(
                     host,
                     port
@@ -938,7 +954,7 @@ class Monitor(Controller):
         self._running = True
         
         
-        self._healthchecks[(host, port)] = asyncio.create_task(
+        self._healthcheck_task = asyncio.create_task(
             self.start_health_monitor()
         )
         
@@ -957,6 +973,9 @@ class Monitor(Controller):
         await self._logger.distributed.aio.info(f'Initialized node - {self.host}:{self.port}')
         await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Initialized node - {self.host}:{self.port}')
 
+
+        self.status = 'healthy'
+
     async def _register_initial_node(self):
         await self._logger.distributed.aio.info(f'Connecting to initial node - {self.bootstrap_host}:{self.bootstrap_port}')
         await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Connecting to initial node - {self.bootstrap_host}:{self.bootstrap_port}')
@@ -965,15 +984,15 @@ class Monitor(Controller):
 
         try:
 
+            self._node_statuses[(self.bootstrap_host, self.bootstrap_port)] = 'healthy'
+            
             await asyncio.wait_for(
-                asyncio.create_task(
-                    self.start_client(
-                        {
-                            (self.bootstrap_host, self.bootstrap_port): self._models
-                        },
-                        cert_path=self.cert_path,
-                        key_path=self.key_path
-                    )
+                self.start_client(
+                    {
+                        (self.bootstrap_host, self.bootstrap_port): self._models
+                    },
+                    cert_path=self.cert_path,
+                    key_path=self.key_path
                 ),
                 timeout=poll_timeout
             )
@@ -982,11 +1001,10 @@ class Monitor(Controller):
 
                 try:
 
-                    _, response = await asyncio.wait_for(
+                    shard_id, response = await asyncio.wait_for(
                         self.submit_registration(
                             self.bootstrap_host,
-                            self.bootstrap_port,
-                            self.status
+                            self.bootstrap_port
                         ),
                         timeout=poll_timeout
                     )
@@ -994,10 +1012,12 @@ class Monitor(Controller):
                     source_host = response.source_host
                     source_port = response.source_port
 
-                    self._node_statuses[(source_host, source_port)] = 'healthy'
+                    self._instance_ids[(source_host, source_port)] = Snowflake.parse(shard_id).instance
 
                 except Exception:
                     pass
+
+                await asyncio.sleep(self._poll_interval)
 
         except Exception:
             pass
@@ -1058,7 +1078,14 @@ class Monitor(Controller):
             self._initial_expected_nodes
         )
 
-        return self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1) * modifier
+        return self._poll_timeout + (self._local_health_multipliers[(host, port)] + 1) * modifier
+    
+    def _calculate_current_poll_interval(
+        self,
+        host: str,
+        port: int
+    ) -> float:
+        return self._poll_interval * (self._local_health_multipliers[(host, port)] + 1)
 
     def _calculate_max_suspect_timeout(self, min_suspect_timeout: float):
         
@@ -1107,7 +1134,7 @@ class Monitor(Controller):
         return self._node_statuses.get((
             host,
             port
-        )) not in self._healthy_statuses
+        )) is None
     
     async def _acknowledge_indirect_probe(
         self,
@@ -1156,11 +1183,7 @@ class Monitor(Controller):
                 return shard_id, healthcheck
 
             except Exception:
-                
-                await self._refresh_after_timeout(
-                    host,
-                    port
-                )
+                pass              
 
     async def _run_healthcheck(
         self, 
@@ -1178,12 +1201,12 @@ class Monitor(Controller):
 
         for idx in range(self._poll_retries):
 
-            try:
+            timeout = self._calculate_current_timeout(
+                host,
+                port
+            )
 
-                timeout = self._calculate_current_timeout(
-                    host,
-                    port
-                )
+            try:
 
                 response: Tuple[int, HealthCheck] = await asyncio.wait_for(
                     self.push_health_update(
@@ -1217,17 +1240,10 @@ class Monitor(Controller):
                 await self._logger.distributed.aio.debug(f'Node - {host}:{port} - failed for source node - {self.host}:{self.port} - on attempt - {idx}/{self._poll_retries}')
                 await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Node - {host}:{port} - failed for source node - {self.host}:{self.port} - on attempt - {idx}/{self._poll_retries}')
 
-                if self._node_statuses.get((host, port)) == 'healthy':
-
-                    await self._refresh_after_timeout(
-                        host,
-                        port
-                    )
-
-                    self._local_health_multipliers[(host, port)] = self._increase_health_multiplier(
-                        host,
-                        port
-                    )
+                self._local_health_multipliers[(host, port)] = self._increase_health_multiplier(
+                    host,
+                    port
+                )
 
         check_host = host
         check_port = port
@@ -1253,21 +1269,6 @@ class Monitor(Controller):
             )
         
         return shard_id, healthcheck
-    
-    async def _refresh_after_timeout(
-        self,
-        host: str,
-        port: int
-    ):
-        try:
-            await self.refresh_clients(
-                {
-                    (host, port): self._models
-                }
-            )
-
-        except Exception:
-            pass
 
     async def _start_suspect_monitor(self) -> Tuple[str, int]:
 
@@ -1349,7 +1350,10 @@ class Monitor(Controller):
                 break
             
             await asyncio.sleep(
-                self._poll_interval * (self._local_health_multipliers[(suspect_host, suspect_port)] + 1)
+                self._calculate_current_poll_interval(
+                    suspect_host,
+                    suspect_port
+                )
             )
 
             
@@ -1479,7 +1483,13 @@ class Monitor(Controller):
             result for result in results if isinstance(
                 result,
                 tuple
-            ) and isinstance(result[0], int)
+            ) and isinstance(
+                result[0], 
+                int
+            ) and isinstance(
+                result[1],
+                HealthCheck
+            )
         ]
 
         errors = [
@@ -1584,7 +1594,10 @@ class Monitor(Controller):
                 )
 
             await asyncio.sleep(
-                self._poll_interval * (self._local_health_multipliers[(host, port)] + 1)
+                self._calculate_current_poll_interval(
+                    host,
+                    port
+                )
             )
 
     async def leave(self):
@@ -1726,6 +1739,11 @@ class Monitor(Controller):
 
             try:
 
+                timeout = self._calculate_current_timeout(
+                    host,
+                    port
+                )
+
                 response: Tuple[int, HealthCheck] = await asyncio.wait_for(
                     self.push_status_update(
                         host,
@@ -1735,10 +1753,7 @@ class Monitor(Controller):
                         target_port=target_port,
                         error_context=self.error_context
                     ),
-                    timeout=self._calculate_current_timeout(
-                        host,
-                        port
-                    )
+                    timeout=timeout
                 )
 
                 shard_id, healthcheck = response
@@ -1749,8 +1764,8 @@ class Monitor(Controller):
                 return shard_id, healthcheck
 
             except Exception:
-                
-                await self._refresh_after_timeout(
+
+                self._local_health_multipliers[(host, port)] = self._increase_health_multiplier(
                     host,
                     port
                 )
@@ -1801,11 +1816,6 @@ class Monitor(Controller):
                 return shard_id, healthcheck
 
             except Exception:
-                
-                await self._refresh_after_timeout(
-                    host,
-                    port
-                )
 
                 self._local_health_multipliers[(host, port)] = self._increase_health_multiplier(
                     host,
@@ -1845,11 +1855,7 @@ class Monitor(Controller):
             self._node_statuses[(host, port)] = healthcheck.status
 
         except Exception:
-            
-            await self._refresh_after_timeout(
-                host,
-                port
-            )
+            pass          
 
     async def cleanup_pending_checks(self):
 
@@ -1902,9 +1908,8 @@ class Monitor(Controller):
             cancel(check) for check in self._tasks_queue
         ])
 
-        await asyncio.gather(*[
-            cancel(remote_check) for remote_check in self._healthchecks.values()
-        ])
+        if self._healthcheck_task:
+            await cancel(self._healthcheck_task)
 
         if self._local_health_monitor:
             await cancel(self._local_health_monitor)

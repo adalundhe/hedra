@@ -571,21 +571,32 @@ class Controller(Generic[*P]):
                 self._udp_pool,
                 self._tcp_pool
             ):
+                
+                await udp_connection.connect_async(
+                    cert_path=cert_path,
+                    key_path=key_path
+                )
 
+                await tcp_connection.connect_async(
+                    cert_path=cert_path,
+                    key_path=key_path
+                )
+            
+                # for message_type in message_types:
+
+                #     self._host_map[message_type.__name__][udp_connection] = (
+                #         host, 
+                #         port
+                #     )
+
+                #     self._host_map[message_type.__name__][tcp_connection] = (
+                #         host, 
+                #         port
+                #     )
+
+                
                 await self._udp_queue[(host, port)].put(udp_connection)
                 await self._tcp_queue[(host, port)].put(tcp_connection)
-
-                for message_type in message_types:
-
-                    self._host_map[message_type.__name__][udp_connection] = (
-                        host, 
-                        port
-                    )
-
-                    self._host_map[message_type.__name__][tcp_connection] = (
-                        host, 
-                        port
-                    )
 
             for tcp_connection in self._tcp_pool:
                 await tcp_connection.connect_client(
@@ -610,14 +621,17 @@ class Controller(Generic[*P]):
 
             try:
 
-                for _ in range(self._workers):
+                for udp_connection, tcp_connection in zip(
+                    self._udp_pool,
+                    self._tcp_pool
+                ):
 
-                    udp_connection = MercurySyncUDPConnection(
-                        self.host,
-                        self.port,
-                        self._instance_id,
-                        env=self._env
-                    )
+                    # udp_connection = MercurySyncUDPConnection(
+                    #     self.host,
+                    #     self.port,
+                    #     self._instance_id,
+                    #     env=self._env
+                    # )
 
                     tcp_connection = MercurySyncTCPConnection(
                         self.host,
@@ -627,15 +641,15 @@ class Controller(Generic[*P]):
                     )
                     
                     tcp_connection.parsers.update(self._parsers)
-                    udp_connection.parsers.update(self._parsers)
+                    # udp_connection.parsers.update(self._parsers)
 
                     tcp_connection.events.update(self._events)
-                    udp_connection.events.update(self._events)
+                    # udp_connection.events.update(self._events)
             
-                    await udp_connection.connect_async(
-                        cert_path=cert_path,
-                        key_path=key_path
-                    )
+                    # await udp_connection.connect_async(
+                    #     cert_path=cert_path,
+                    #     key_path=key_path
+                    # )
 
                     await tcp_connection.connect_async(
                         cert_path=cert_path,
@@ -645,13 +659,9 @@ class Controller(Generic[*P]):
                     await self._udp_queue[(host, port)].put(udp_connection)
                     await self._tcp_queue[(host, port)].put(tcp_connection)
 
-                    await tcp_connection.connect_client(
-                        (host, port + 1),
-                        cert_path=cert_path,
-                        key_path=key_path
-                    )
+                    
 
-                    self._udp_pool.append(udp_connection)
+                    # self._udp_pool.append(udp_connection)
                     self._tcp_pool.append(tcp_connection)
 
                     for message_type in message_types:
@@ -727,20 +737,20 @@ class Controller(Generic[*P]):
     ):
         connection: MercurySyncUDPConnection = await self._udp_queue[(message.host, message.port)].get()
 
-        (host, port) = self._host_map.get(message.__class__.__name__).get(
-            connection,
-            (message.host, message.port)
-        )
+        # (host, port) = self._host_map.get(message.__class__.__name__).get(
+        #     connection,
+        #     (message.host, message.port)
+        # )
 
-        address = (
-            host,
-            port
-        )
+        # address = (
+        #     host,
+        #     port
+        # )
 
         shard_id, data = await connection.send(
             event_name,
             message.to_data(),
-            address
+            (message.host, message.port)
         )
 
         if isinstance(data, Message):
@@ -760,20 +770,20 @@ class Controller(Generic[*P]):
         message: Message
     ):
         connection: MercurySyncTCPConnection = await self._tcp_queue[(message.host, message.port)].get()
-        (host, port) = self._host_map.get(message.__class__.__name__).get(
-            connection,
-            (message.host, message.port)
-        )
+        # (host, port) = self._host_map.get(message.__class__.__name__).get(
+        #     connection,
+        #     (message.host, message.port)
+        # )
 
-        address = (
-            host,
-            port + 1
-        )
+        # address = (
+        #     host,
+        #     port + 1
+        # )
 
         shard_id, data = await connection.send(
             event_name,
             message.to_data(),
-            address
+            (message.host, message.port + 1)
         )
 
         response_data = self._response_parsers.get(event_name)(

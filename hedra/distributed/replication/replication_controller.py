@@ -1,6 +1,5 @@
 import asyncio
 import random
-import traceback
 from collections import (
     defaultdict,
     deque
@@ -182,10 +181,11 @@ class ReplicationController(Monitor):
         self.status = 'healthy'
 
         await self._register_initial_node()
+        await self._run_registration()
 
         self._running = True
 
-        self._healthchecks[(self.bootstrap_host, self.bootstrap_port)] = asyncio.create_task(
+        self._healthcheck_task = asyncio.create_task(
             self.start_health_monitor()
         )
 
@@ -201,15 +201,12 @@ class ReplicationController(Monitor):
             self._run_tcp_state_sync()
         )
 
-        while len(self._instance_ids) < self._initial_expected_nodes:
-            await asyncio.sleep(self._poll_interval)
+        boot_wait = random.uniform(0.1, self.boot_wait * self._initial_expected_nodes)
+        await asyncio.sleep(boot_wait)
 
         if self._term_number == 0:
-
             self._election_status = ElectionState.ACTIVE
-            self._election_task = asyncio.create_task(
-                    self.run_election()
-                )
+            await self.run_election()
 
         self._raft_cleanup_task = asyncio.create_task(
             self._cleanup_pending_raft_tasks()
@@ -220,6 +217,76 @@ class ReplicationController(Monitor):
         )
 
         self.status = 'healthy'
+
+    async def _run_registration(self):
+
+        last_registered_count = -1
+        poll_timeout = self.registration_timeout * self._initial_expected_nodes
+        
+        while self._check_all_nodes_registered() is False:
+
+            monitors = [
+                address for address in self._node_statuses.keys()
+            ]
+
+            active_nodes_count = len(monitors)
+            registered_count = self._calculate_all_registered_nodes()
+
+            if registered_count > last_registered_count:
+                await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - reporting - {registered_count}/{self._initial_expected_nodes} - as fully registered')
+                await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - reporting - {registered_count}/{self._initial_expected_nodes} - as fully registered')
+
+                last_registered_count = registered_count
+
+            if active_nodes_count > 0:
+
+                for host, port in monitors:
+                    self._tasks_queue.append(
+                        asyncio.create_task(
+                            asyncio.wait_for(
+                                self._submit_registration(
+                                    host,
+                                    port
+                                ),
+                                timeout=poll_timeout
+                            )
+                        )
+                    )
+
+                    await asyncio.sleep(self._poll_interval)
+
+            await asyncio.sleep(self._poll_interval)
+
+    def _calculate_all_registered_nodes(self) -> int:
+        self._registered_counts[(self.host, self.port)] = len(self._instance_ids)
+        return len([
+            count for count in self._registered_counts.values() if count == self._initial_expected_nodes
+        ])
+
+    def _check_all_nodes_registered(self) -> bool:
+        return self._calculate_all_registered_nodes() == self._initial_expected_nodes
+
+    async def _submit_registration(
+        self,
+        host: str,
+        port: int
+    ):
+        shard_id, response = await self.submit_registration(
+            host,
+            port
+        )
+
+        if isinstance(response, HealthCheck):
+            source_host = response.source_host
+            source_port = response.source_port
+
+            self._instance_ids[(source_host, source_port)] = Snowflake.parse(shard_id).instance
+            self._node_statuses[(source_host, source_port)] = 'healthy'
+
+            self._registered_counts[(source_host, source_port)] = max(
+                response.registered_count,
+                self._registered_counts[(source_host, source_port)]
+            )
 
     @server()
     async def receive_vote_request(
@@ -293,43 +360,37 @@ class ReplicationController(Monitor):
         message: RaftMessage
     ) -> Call[RaftMessage]:
         
-        try:
-            entries_count = len(message.entries)
-            elected_leader = self._get_current_term_leader()
+        entries_count = len(message.entries)
 
-            if entries_count < 1:
-                return RaftMessage(
-                    host=message.host,
-                    port=message.port,
-                    source_host=self.host,
-                    source_port=self.port,
-                    status=self.status,
-                    elected_leader=elected_leader,
-                    term_number=self._term_number,
-                    election_status=self._election_status,
-                    raft_node_status=self._raft_node_status
-                )
-            
-            # We can use the Snowflake ID to sort since all records come from the 
-            # leader.
-            entries: List[Entry] = list(
-                sorted(
-                    message.entries,
-                    key=lambda entry: Snowflake.parse(
-                        entry.entry_id
-                    ).timestamp
-                )
+        if entries_count < 1:
+            return RaftMessage(
+                host=message.host,
+                port=message.port,
+                source_host=self.host,
+                source_port=self.port,
+                status=self.status,
+                term_number=self._term_number,
+                election_status=self._election_status,
+                raft_node_status=self._raft_node_status
             )
+        
+        # We can use the Snowflake ID to sort since all records come from the 
+        # leader.
+        entries: List[Entry] = list(
+            sorted(
+                message.entries,
+                key=lambda entry: Snowflake.parse(
+                    entry.entry_id
+                ).timestamp
+            )
+        )
 
-            current_leader_host, current_leader_port = self._get_current_term_leader()
+        last_entry = entries[-1]
 
-            leader_host = current_leader_host
-            leader_port = current_leader_port
-
-            last_entry = entries[-1]
-
-            leader_host = last_entry.leader_host
-            leader_port = last_entry.leader_port
+        leader_host = last_entry.leader_host
+        leader_port = last_entry.leader_port
+        
+        try:
 
 
             if message.term_number > self._term_number:
@@ -339,12 +400,6 @@ class ReplicationController(Monitor):
                         self._cancel_election(message)
                     )
                 )
-
-                suspect_tasks = dict(self._suspect_tasks)
-                suspect_task = suspect_tasks.pop(message.failed_node, None)
-
-                if suspect_task:
-                    await cancel(suspect_task)
                 
                 amount_behind = max(
                     message.term_number - self._term_number - 1,
@@ -364,16 +419,33 @@ class ReplicationController(Monitor):
                         None
                     ))
 
+                await self._logger.distributed.aio.info(f'Term number for source - {self.host}:{self.port} - was updated to - {self._term_number} - and leader was updated to - {leader_host}:{leader_port}')
+                await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Term number for source - {self.host}:{self.port} - was updated to - {self._term_number} - and leader was updated to - {leader_host}:{leader_port}')
+
+
                 self._term_leaders.append((
                     leader_host,
                     leader_port
                 ))
-                
-                await self._logger.distributed.aio.info(f'Term number for source - {self.host}:{self.port} - was updated to - {self._term_number} - and leader was updated to - {leader_host}:{leader_port}')
-                await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Term number for source - {self.host}:{self.port} - was updated to - {self._term_number} - and leader was updated to - {leader_host}:{leader_port}')
 
                 self._election_status = ElectionState.READY
                 self._raft_node_status = NodeState.FOLLOWER
+
+                return RaftMessage(
+                    host=message.source_host,
+                    port=message.source_port,
+                    source_host=self.host,
+                    source_port=self.port,
+                    elected_leader=(
+                        leader_host,
+                        leader_port
+                    ),
+                    status=self.status,
+                    error='Election request term cannot be less than current term.',
+                    vote_result=VoteResult.REJECTED,
+                    raft_node_status=self._raft_node_status,
+                    term_number=self._term_number
+                )
 
             source_host = message.source_host
             source_port = message.source_port
@@ -423,24 +495,30 @@ class ReplicationController(Monitor):
             if isinstance(error, Exception):
 
                 return RaftMessage(
-                    host=message.host,
-                    port=message.port,
+                    host=message.source_host,
+                    port=message.source_port,
                     source_host=self.host,
                     source_port=self.port,
                     status=self.status,
                     raft_node_status=self._raft_node_status,
                     error=str(error),
-                    elected_leader=elected_leader,
+                    elected_leader=(
+                        leader_host,
+                        leader_port
+                    ),
                     term_number=self._term_number
                 )
 
             return RaftMessage(
-                host=message.host,
-                port=message.port,
+                host=message.source_host,
+                port=message.source_port,
                 source_host=self.host,
                 source_port=self.port,
                 status=self.status,
-                elected_leader=elected_leader,
+                elected_leader=(
+                    leader_host,
+                    leader_port
+                ),
                 term_number=self._term_number,
                 raft_node_status=self._raft_node_status,
                 received_timestamp=self._logs.last_timestamp
@@ -448,14 +526,17 @@ class ReplicationController(Monitor):
         
         except Exception as rpc_error:
             return RaftMessage(
-                host=message.host,
-                port=message.port,
+                host=message.source_host,
+                port=message.source_port,
                 source_host=self.host,
                 source_port=self.port,
                 status=self.status,
                 raft_node_status=self._raft_node_status,
                 error=str(rpc_error),
-                elected_leader=elected_leader,
+                elected_leader=(
+                    leader_host,
+                    leader_port
+                ),
                 term_number=self._term_number
             )
 
@@ -466,8 +547,6 @@ class ReplicationController(Monitor):
         message: RaftMessage
     ) -> Call[RaftMessage]:
         
-        current_leader_host, current_leader_port = self._get_current_term_leader()
-        
         if self._raft_node_status == NodeState.LEADER and message.entries:
             
             entries = message.entries
@@ -475,8 +554,8 @@ class ReplicationController(Monitor):
             entries.append(
                 Entry.from_data(
                     entry_id=self._entry_id_generator.generate(),
-                    leader_host=current_leader_host,
-                    leader_port=current_leader_port,
+                    leader_host=self.host,
+                    leader_port=self.port,
                     term=self._term_number,
                     data={
                         'key': 'logs_update',
@@ -497,10 +576,6 @@ class ReplicationController(Monitor):
             source_host=self.host,
             source_port=self.port,
             status=self.status,
-            elected_leader=(
-                current_leader_host,
-                current_leader_port
-            ),
             term_number=self._term_number,
             raft_node_status=self._raft_node_status,
             received_timestamp=self._logs.last_timestamp
@@ -565,17 +640,12 @@ class ReplicationController(Monitor):
     async def _start_suspect_monitor(self):
         suspect_host, suspect_port = await super()._start_suspect_monitor()
 
-
-        can_start_election = self._election_task is None or self._election_task.done() or self._election_task.cancelled()
-        
-        if self._election_status == ElectionState.READY and can_start_election:
+        if self._election_status == ElectionState.READY:
             self._election_status = ElectionState.ACTIVE
-            self._election_task = asyncio.create_task(
-                self.run_election(
-                    failed_node=(
-                        suspect_host,
-                        suspect_port
-                    )
+            await self.run_election(
+                failed_node=(
+                    suspect_host,
+                    suspect_port
                 )
             )
 
@@ -592,8 +662,6 @@ class ReplicationController(Monitor):
         entries = self._convert_data_to_entries(entries)
         entries_count = len(entries)
 
-        current_leader_host, current_leader_port = self._get_current_term_leader()
-
         if self._raft_node_status == NodeState.LEADER:
             results = await self._submit_logs_to_members(entries)
 
@@ -607,6 +675,8 @@ class ReplicationController(Monitor):
         else:
 
             try:
+
+                current_leader_host, current_leader_port = self._term_leaders[-1]
 
                 result = await asyncio.wait_for(
                     self.forward_entries_to_leader(
@@ -664,7 +734,7 @@ class ReplicationController(Monitor):
         entries: List[Dict[str, Any]]
     ) -> List[Entry]:
         
-        current_leader_host, current_leader_port = self._get_current_term_leader()
+        current_leader_host, current_leader_port = self._term_leaders[-1]
 
         entries = [
             Entry.from_data(
@@ -679,33 +749,26 @@ class ReplicationController(Monitor):
         return entries
     
     def _get_max_instance_id(self):
+
+        nodes = [
+            address for address, status in self._node_statuses.items() if status == 'healthy'
+        ]
+
+        nodes.append((
+            self.host,
+            self.port
+        ))
+
         instance_address_id_pairs = list(
             sorted(
-                self._instance_ids.items(),
-                key=lambda instance: instance[1]
+                nodes,
+                key=lambda instance: self._instance_ids.get(instance)
             )
         )
 
-        healthy_instances = [
-            (
-                address,
-                instance_id
-            ) for address, instance_id in instance_address_id_pairs if self._node_statuses.get(
-                address
-            ) in self._healthy_statuses
-        ]
+        if len(instance_address_id_pairs) > 0:
 
-        healthy_instances.append((
-            (
-                self.host,
-                self.port
-            ),
-            self._instance_id
-        ))
-
-        if len(healthy_instances) > 0:
-
-            max_instance = healthy_instances[-1][0]
+            max_instance = instance_address_id_pairs[-1]
             elected_host, elected_port = max_instance
 
         else:
@@ -772,33 +835,6 @@ class ReplicationController(Monitor):
                     port
                 )
 
-                elected_leader_host, elected_leader_port = update_response.elected_leader
-                current_leader_host, current_leader_port = self._get_current_term_leader()
-
-                elected_leader_matches = current_leader_host == elected_leader_host and current_leader_port == elected_leader_port
-
-                if update_response.error and elected_leader_matches is False:
-
-                    await self._cancel_election(update_response)
-
-                    if update_response.failed_node and self._suspect_tasks.get(
-                        update_response.failed_node
-                    ):
-
-                        node_host, node_port = update_response.failed_node
-
-                        self._tasks_queue.append(
-                            asyncio.create_task(
-                                self._cancel_suspicion_probe(
-                                    node_host,
-                                    node_port
-                                )
-                            )
-                        )
-
-                    self._term_leaders.append(update_response.elected_leader)
-                    self._term_number = update_response.term_number
-
                 return shard_id, update_response
             
             except Exception:
@@ -834,8 +870,8 @@ class ReplicationController(Monitor):
 
         else:
 
-            await self._logger.distributed.aio.debug(f'Node - {check_host}:{check_port} - responded on try - {idx}/{self._poll_interval} - for source - {self.host}:{self.port}')
-            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Node - {check_host}:{check_port} - responded on try - {idx}/{self._poll_interval} - for source - {self.host}:{self.port}')
+            await self._logger.distributed.aio.debug(f'Node - {check_host}:{check_port} - responded on try - {idx}/{self._poll_retries} - for source - {self.host}:{self.port}')
+            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Node - {check_host}:{check_port} - responded on try - {idx}/{self._poll_retries} - for source - {self.host}:{self.port}')
 
     def _calculate_current_timeout(
         self,
@@ -851,28 +887,6 @@ class ReplicationController(Monitor):
         )
 
         return self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1) * modifier
-
-    def _get_current_term_leader(self):
-
-        current_leader_index = max(
-            self._term_number,
-            0
-        )
-
-        if current_leader_index < len(self._term_leaders):
-            current_leader_host, current_leader_port = self._term_leaders[current_leader_index]
-
-        elif len(self._term_leaders) > 0:
-            current_leader_host, current_leader_port = self._term_leaders[-1]
-
-        else:
-            current_leader_host = self.host
-            current_leader_port = self.port
-
-        return (
-            current_leader_host,
-            current_leader_port
-        )
     
     async def run_election(
         self,
@@ -886,8 +900,8 @@ class ReplicationController(Monitor):
         await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - Running election for term - {next_term}')
         await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - Running election for term - {next_term}')
 
-
         elected_host, elected_port = self._get_max_instance_id()
+        self._term_leaders.append((elected_host, elected_port))
 
         if elected_host == self.host and elected_port == self.port:
 
@@ -896,7 +910,6 @@ class ReplicationController(Monitor):
 
 
             self._raft_node_status = NodeState.LEADER
-            self._term_leaders.append((self.host, self.port))
             self._term_number += 1
 
             members: List[Tuple[str, int]] = [
@@ -905,13 +918,11 @@ class ReplicationController(Monitor):
 
             members = list(set(members))
 
-            current_leader_host, current_leader_port = self._get_current_term_leader()
-
             self._logs.update([
                 Entry.from_data(
                     entry_id=self._entry_id_generator.generate(),
-                    leader_host=current_leader_host,
-                    leader_port=current_leader_port,
+                    leader_host=self.host,
+                    leader_port=self.port,
                     term=self._term_number,
                     data={
                         'key': 'election_update',
@@ -947,18 +958,14 @@ class ReplicationController(Monitor):
 
         if self._term_number > next_term:
             self._term_number = next_term
-            self._election_status = ElectionState.READY
-
-        else:
-            self._election_status = ElectionState.READY
+        
+        self._election_status = ElectionState.READY
         
         return
 
     async def _run_raft_monitor(self):
 
         while self._running:
-
-            current_leader_host, current_leader_port = self._get_current_term_leader()
 
             if self._raft_node_status == NodeState.LEADER:
 
@@ -967,8 +974,8 @@ class ReplicationController(Monitor):
                         self._submit_logs_to_members([
                             Entry.from_data(
                                 entry_id=self._entry_id_generator.generate(),
-                                leader_host=current_leader_host,
-                                leader_port=current_leader_port,
+                                leader_host=self.host,
+                                leader_port=self.port,
                                 term=self._term_number,
                                 data={
                                     'key': 'logs_update',
@@ -979,11 +986,11 @@ class ReplicationController(Monitor):
                     )
                 )
 
-            await self._logger.distributed.aio.debug(f'Source - {self.host}:{self.port} - has node {current_leader_host}:{current_leader_port} - as leader for term - {self._term_number}')
-            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - has node {current_leader_host}:{current_leader_port} - as leader for term - {self._term_number}')
+            # await self._logger.distributed.aio.debug(f'Source - {self.host}:{self.port} - has node {current_leader_host}:{current_leader_port} - as leader for term - {self._term_number}')
+            # await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - has node {current_leader_host}:{current_leader_port} - as leader for term - {self._term_number}')
 
             await asyncio.sleep(
-                self._logs_update_poll_interval
+                self._logs_update_poll_interval * self._initial_expected_nodes
             )
 
     async def _submit_logs_to_members(
