@@ -1085,10 +1085,7 @@ class ReplicationController(Monitor):
                         ])
                     )
                 )
-
-            # await self._logger.distributed.aio.debug(f'Source - {self.host}:{self.port} - has node {current_leader_host}:{current_leader_port} - as leader for term - {self._term_number}')
-            # await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - has node {current_leader_host}:{current_leader_port} - as leader for term - {self._term_number}')
-
+                
             await asyncio.sleep(
                 self._logs_update_poll_interval * self._initial_expected_nodes
             )
