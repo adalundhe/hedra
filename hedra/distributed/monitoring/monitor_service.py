@@ -1362,6 +1362,11 @@ class Monitor(Controller):
 
                 self._node_statuses[(suspect_host, suspect_port)] = 'healthy'
 
+                self._reduce_health_multiplier(
+                    suspect_host,
+                    suspect_port
+                )
+
                 await self._logger.distributed.aio.info(f'Node - {suspect_host}:{suspect_port} - successfully responded to one or more probes for source - {self.host}:{self.port}')
                 await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Node - {suspect_host}:{suspect_port} - failed to respond for source - {self.host}:{self.port}. Setting next timeout as - {suspicion_timeout}')
 
@@ -1549,7 +1554,7 @@ class Monitor(Controller):
         
         await asyncio.gather(*[
             cancel(pending_check) for pending_check in pending
-        ])
+        ], return_exceptions=True)
 
 
         await self._logger.distributed.aio.debug(f'Total of {suspect_count} nodes confirmed node - {host}:{port} - is suspect for source - {self.host}:{self.port}')
@@ -1945,7 +1950,7 @@ class Monitor(Controller):
 
         await asyncio.gather(*[
             cancel(check) for check in self._tasks_queue
-        ])
+        ], return_exceptions=True)
 
         if self._healthcheck_task:
             await cancel(self._healthcheck_task)
@@ -1970,7 +1975,7 @@ class Monitor(Controller):
     async def soft_shutdown(self):
         await asyncio.gather(*[
             cancel(check) for check in self._tasks_queue
-        ])
+        ], return_exceptions=True)
 
 
             
