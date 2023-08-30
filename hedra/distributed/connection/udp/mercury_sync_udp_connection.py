@@ -54,7 +54,7 @@ class MercurySyncUDPConnection:
         self._loop: Union[asyncio.AbstractEventLoop, None] = None
         self.queue: Dict[str, Deque[Tuple[str, int, float, Any]] ] = defaultdict(deque)
         self.parsers: Dict[str, Message] = {}
-        self._waiters: Dict[str, Deque[asyncio.Future]] = defaultdict(deque)
+        self._waiters: Dict[str, asyncio.Queue] = defaultdict(asyncio.Queue)
         self._pending_responses: Deque[asyncio.Task] = deque()
 
         self._udp_cert_path: Union[str, None] = None
@@ -141,7 +141,6 @@ class MercurySyncUDPConnection:
 
         transport, _ = self._loop.run_until_complete(server)
         self._transport = transport
-
         self._cleanup_task = self._loop.create_task(self._cleanup())
 
     async def connect_async(
@@ -249,15 +248,9 @@ class MercurySyncUDPConnection:
                     try:
                         await pending
 
-                    except (
-                        ConnectionAbortedError,
-                        ConnectionRefusedError,
-                        ConnectionResetError,
-                        asyncio.CancelledError,
-                        asyncio.InvalidStateError,
-                        AttributeError
-                    ):
-                        await self._reset_connection()
+                    except (Exception, socket.error):
+                        # await self._reset_connection()
+                        pass
 
                     if len(self._pending_responses) > 0:
                         self._pending_responses.pop()
@@ -279,12 +272,12 @@ class MercurySyncUDPConnection:
         encrypted_message = self._encryptor.encrypt(item)
         compressed = self._compressor.compress(encrypted_message)
         
-        self._transport.sendto(compressed, addr)
-
-        waiter = self._loop.create_future()
-        self._waiters[event_name].append(waiter)
-
         try:
+            self._transport.sendto(compressed, addr)
+
+            waiter = self._loop.create_future()
+            self._waiters[event_name].put_nowait(waiter)
+
             (
                 _,
                 shard_id,
@@ -302,7 +295,7 @@ class MercurySyncUDPConnection:
                 response_data
             )
         
-        except asyncio.TimeoutError:
+        except (Exception, socket.error):
 
             return (
                 self.id_generator.generate(),
@@ -320,19 +313,18 @@ class MercurySyncUDPConnection:
         addr: Tuple[str, int]
     ) -> bytes:
         
-        self._transport.sendto(data, addr)
-
-        waiter = self._loop.create_future()
-        self._waiters[event_name].append(waiter)
-        
         try:
+            self._transport.sendto(data, addr)
+
+            waiter = self._loop.create_future()
+            self._waiters[event_name].put_nowait(waiter)
 
             return await asyncio.wait_for(
                 waiter,
                 timeout=self._request_timeout
             )
         
-        except asyncio.TimeoutError:
+        except (Exception, socket.error):
             return b'Request timed out.'
 
     async def stream(
@@ -351,14 +343,14 @@ class MercurySyncUDPConnection:
 
         encrypted_message = self._encryptor.encrypt(item)
         compressed = self._compressor.compress(encrypted_message)
-        
-        self._transport.sendto(compressed, addr)
 
-        waiter = self._loop.create_future()
-        self._waiters[event_name].append(waiter)
 
         try:
+            self._transport.sendto(compressed, addr)
 
+            waiter = self._loop.create_future()
+            self._waiters[event_name].put_nowait(waiter)
+            
             await asyncio.wait_for(
                 waiter,
                 timeout=self._request_timeout
@@ -381,7 +373,7 @@ class MercurySyncUDPConnection:
 
             self.queue.clear()
 
-        except asyncio.TimeoutError:
+        except (Exception, socket.error):
 
             yield (
                 self.id_generator.generate(),
@@ -448,25 +440,47 @@ class MercurySyncUDPConnection:
             )
 
         else:
-
-            event_waiter = self._waiters[event_name]
-    
-            if bool(event_waiter):
-                waiter = event_waiter.pop()
-            
-                try:
-                    
-                    waiter.set_result((
-                        message_type, 
-                        shard_id,
+            self._pending_responses.append(
+                asyncio.create_task(
+                    self._receive_response(
                         event_name,
-                        payload, 
+                        message_type,
+                        shard_id,
+                        payload,
                         incoming_host,
                         incoming_port
-                    ))
+                    )
+                )
+            )
+            
+
+    async def _receive_response(
+        self,
+        event_name: str,
+        message_type: str,
+        shard_id: int,
+        payload: bytes,
+        incoming_host: str,
+        incoming_port: int
+    ):
+        event_waiter = self._waiters[event_name]
+
+        if bool(event_waiter):
+            waiter: asyncio.Future = await event_waiter.get()
+        
+            try:
                 
-                except asyncio.InvalidStateError:
-                    pass
+                waiter.set_result((
+                    message_type, 
+                    shard_id,
+                    event_name,
+                    payload, 
+                    incoming_host,
+                    incoming_port
+                ))
+            
+            except asyncio.InvalidStateError:
+                pass
 
     async def _reset_connection(self):
         
@@ -507,8 +521,9 @@ class MercurySyncUDPConnection:
 
             self._transport.sendto(compressed, addr)
 
-        except Exception:
-            await self._reset_connection()
+        except (Exception, socket.error):
+            pass
+            # await self._reset_connection()
 
 
     async def _read_iterator(
@@ -536,7 +551,8 @@ class MercurySyncUDPConnection:
                 self._transport.sendto(compressed, addr)
 
             except Exception:
-                await self._reset_connection()
+                pass
+                # await self._reset_connection()
 
     async def close(self) -> None:
         self._running = False

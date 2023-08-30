@@ -80,6 +80,11 @@ class MercurySyncTCPConnection:
         self._cleanup_task: Union[asyncio.Task, None] = None
         self._sleep_task: Union[asyncio.Task, None] = None
         self._cleanup_interval = TimeParser(env.MERCURY_SYNC_CLEANUP_INTERVAL).time
+
+        self._request_timeout = TimeParser(
+            env.MERCURY_SYNC_REQUEST_TIMEOUT
+        ).time
+
         self._max_concurrency = env.MERCURY_SYNC_MAX_CONCURRENCY
         self._tcp_connect_retries = env.MERCURY_SYNC_TCP_CONNECT_RETRIES
 
@@ -333,12 +338,13 @@ class MercurySyncTCPConnection:
                     try:
                         await pending
 
-                    except Exception:
-                        await self.close()
-                        await self.connect_async(
-                            cert_path=self._client_cert_path,
-                            key_path=self._client_key_path
-                        )
+                    except (Exception, socket.error):
+                        pass
+                        # await self.close()
+                        # await self.connect_async(
+                        #     cert_path=self._client_cert_path,
+                        #     key_path=self._client_key_path
+                        # )
 
                     self._pending_responses.pop()
 
@@ -350,52 +356,78 @@ class MercurySyncTCPConnection:
     ) -> Tuple[int, Dict[str, Any]]:
         
         async with self._semaphore:
-            self._last_call.append(event_name)
 
-            client_transport = self._client_transports.get(address)
-            if client_transport is None:
-                await self.connect_client(
-                    address,
-                    cert_path=self._client_cert_path,
-                    key_path=self._client_key_path
-                )
+            try:
+                self._last_call.append(event_name)
 
                 client_transport = self._client_transports.get(address)
+                if client_transport is None:
+                    await self.connect_client(
+                        address,
+                        cert_path=self._client_cert_path,
+                        key_path=self._client_key_path
+                    )
 
-            item = pickle.dumps(
+                    client_transport = self._client_transports.get(address)
+
+                item = pickle.dumps(
+                    (
+                        'request',
+                        self.id_generator.generate(),
+                        event_name,
+                        data,
+                        self.host,
+                        self.port
+                    ),
+                    protocol=pickle.HIGHEST_PROTOCOL
+                )
+
+                encrypted_message = self._encryptor.encrypt(item)
+                compressed = self._compressor.compress(encrypted_message)
+
+                if client_transport.is_closing():
+                    return (
+                        self.id_generator.generate(),
+                        Message(
+                            host=self.host,
+                            port=self.port,
+                            error='Transport closed.'
+                        )
+                    )
+
+                client_transport.write(compressed)
+
+                waiter = self._loop.create_future()
+                self._waiters[event_name].append(waiter)
+
                 (
-                    'request',
+                    _,
+                    shard_id,
+                    _,
+                    response_data,
+                    _, 
+                    _
+                ) = await asyncio.wait_for(
+                    waiter,
+                    timeout=self._request_timeout
+                )
+
+                return (
+                    shard_id,
+                    response_data
+                )
+            
+            except (Exception, socket.error):
+
+                return (
                     self.id_generator.generate(),
-                    event_name,
-                    data,
-                    self.host,
-                    self.port
-                ),
-                protocol=pickle.HIGHEST_PROTOCOL
-            )
-
-            encrypted_message = self._encryptor.encrypt(item)
-            compressed = self._compressor.compress(encrypted_message)
-
-            client_transport.write(compressed)
-
-            waiter = self._loop.create_future()
-            self._waiters[event_name].append(waiter)
-
-            (
-                _,
-                shard_id,
-                _,
-                response_data,
-                _, 
-                _
-            ) = await waiter
-
-            return (
-                shard_id,
-                response_data
-            )
-        
+                    Message(
+                        host=self.host,
+                        port=self.port,
+                        error='Request timed out.'
+                    )
+                )
+            
     async def send_bytes(
         self,
         event_name: str,
@@ -403,23 +435,43 @@ class MercurySyncTCPConnection:
         address: Tuple[str, int]
     ) -> bytes:
         async with self._semaphore:
-            self._last_call.append(event_name)
 
-            client_transport = self._client_transports.get(address)
-            if client_transport is None:
-                await self.connect_client(
-                    address,
-                    cert_path=self._client_cert_path,
-                    key_path=self._client_key_path
-                )
+            try:
+                self._last_call.append(event_name)
 
                 client_transport = self._client_transports.get(address)
+                if client_transport is None:
+                    await self.connect_client(
+                        address,
+                        cert_path=self._client_cert_path,
+                        key_path=self._client_key_path
+                    )
 
-            client_transport.write(data)
+                    client_transport = self._client_transports.get(address)
 
-            waiter = self._loop.create_future()
-            self._waiters[event_name].append(waiter)
-            return await waiter
+                if client_transport.is_closing():
+                    return (
+                        self.id_generator.generate(),
+                        Message(
+                            host=self.host,
+                            port=self.port,
+                            error='Transport closed.'
+                        )
+                    )
+
+                client_transport.write(data)
+
+                waiter = self._loop.create_future()
+                self._waiters[event_name].append(waiter)
+                
+                return await asyncio.wait_for(
+                    waiter,
+                    timeout=self._request_timeout
+                )
+            
+            except (Exception, socket.error):
+                return b'Request timed out.'
+
     
     async def stream(
         self, 
@@ -429,93 +481,118 @@ class MercurySyncTCPConnection:
     ) -> AsyncIterable[Tuple[int, Dict[str, Any]]]: 
         
         async with self._semaphore:
-            self._last_call.append(event_name)
 
-            client_transport = self._client_transports.get(address)
+            try:
+                self._last_call.append(event_name)
 
-
-            if self._stream is False:
-                item = pickle.dumps(
-                    (
-                        'stream_connect',
-                        self.id_generator.generate(),
-                        event_name,
-                        data,
-                        self.host,
-                        self.port
-                    ),
-                    protocol=pickle.HIGHEST_PROTOCOL
-                )
+                client_transport = self._client_transports.get(address)
 
 
-            else:
-                item = pickle.dumps(
-                    (
-                        'stream',
-                        self.id_generator.generate(),
-                        event_name,
-                        data,
-                        self.host,
-                        self.port
-                    ),
-                    protocol=pickle.HIGHEST_PROTOCOL
-                )
+                if self._stream is False:
+                    item = pickle.dumps(
+                        (
+                            'stream_connect',
+                            self.id_generator.generate(),
+                            event_name,
+                            data,
+                            self.host,
+                            self.port
+                        ),
+                        protocol=pickle.HIGHEST_PROTOCOL
+                    )
 
-            encrypted_message = self._encryptor.encrypt(item)
-            compressed = self._compressor.compress(encrypted_message)
 
-            client_transport.write(compressed)
-
-            waiter = self._loop.create_future()
-            self._waiters[event_name].append(waiter)
-
-            await waiter
-
-            if self._stream is False:
-
-                self.queue[event_name].pop()
-
-                self._stream = True
-
-                item = pickle.dumps(
-                    (
-                        'stream',
-                        self.id_generator.generate(),
-                        event_name,
-                        data,
-                        self.host,
-                        self.port
-                    ),
-                    pickle.HIGHEST_PROTOCOL
-                )
+                else:
+                    item = pickle.dumps(
+                        (
+                            'stream',
+                            self.id_generator.generate(),
+                            event_name,
+                            data,
+                            self.host,
+                            self.port
+                        ),
+                        protocol=pickle.HIGHEST_PROTOCOL
+                    )
 
                 encrypted_message = self._encryptor.encrypt(item)
                 compressed = self._compressor.compress(encrypted_message)
+
+                if client_transport.is_closing():
+                    yield (
+                        self.id_generator.generate(),
+                        Message(
+                            host=self.host,
+                            port=self.port,
+                            error='Transport closed.'
+                        )
+                    )
 
                 client_transport.write(compressed)
 
                 waiter = self._loop.create_future()
                 self._waiters[event_name].append(waiter)
 
-                await waiter
-
-
-            while bool(self.queue[event_name]) and self._stream:
-
-                (
-                    _,
-                    shard_id,
-                    _,
-                    response_data,
-                    _, 
-                    _
-                ) = self.queue[event_name].pop()
-            
-                yield(
-                    shard_id,
-                    response_data
+                await asyncio.wait_for(
+                    waiter,
+                    timeout=self._request_timeout
                 )
 
+                if self._stream is False:
+
+                    self.queue[event_name].pop()
+
+                    self._stream = True
+
+                    item = pickle.dumps(
+                        (
+                            'stream',
+                            self.id_generator.generate(),
+                            event_name,
+                            data,
+                            self.host,
+                            self.port
+                        ),
+                        pickle.HIGHEST_PROTOCOL
+                    )
+
+                    encrypted_message = self._encryptor.encrypt(item)
+                    compressed = self._compressor.compress(encrypted_message)
+
+                    client_transport.write(compressed)
+
+                    waiter = self._loop.create_future()
+                    self._waiters[event_name].append(waiter)
+
+                    await waiter
+
+
+                while bool(self.queue[event_name]) and self._stream:
+
+                    (
+                        _,
+                        shard_id,
+                        _,
+                        response_data,
+                        _, 
+                        _
+                    ) = self.queue[event_name].pop()
+                
+                    yield(
+                        shard_id,
+                        response_data
+                    )
+            
+            except (Exception, socket.error):
+
+                yield (
+                    self.id_generator.generate(),
+                    Message(
+                        host=self.host,
+                        port=self.port,
+                        error='Request timed out.'
+                    )
+                )
 
         self.queue.clear()
 
@@ -690,22 +767,28 @@ class MercurySyncTCPConnection:
     ) -> Coroutine[Any, Any, None]:
         response: Message = await coroutine
 
-        item = pickle.dumps(
-            (
-                'response', 
-                self.id_generator.generate(),
-                event_name,
-                response.to_data(), 
-                self.host,
-                self.port
-            ),
-            protocol=pickle.HIGHEST_PROTOCOL
-        )
+        try:
+            if transport.is_closing() is False:
 
-        encrypted_message = self._encryptor.encrypt(item)
-        compressed = self._compressor.compress(encrypted_message)
+                item = pickle.dumps(
+                    (
+                        'response', 
+                        self.id_generator.generate(),
+                        event_name,
+                        response.to_data(), 
+                        self.host,
+                        self.port
+                    ),
+                    protocol=pickle.HIGHEST_PROTOCOL
+                )
 
-        transport.write(compressed)
+                encrypted_message = self._encryptor.encrypt(item)
+                compressed = self._compressor.compress(encrypted_message)
+
+                transport.write(compressed)
+
+        except (Exception, socket.error):
+            pass
 
     async def _read_iterator(
         self,
@@ -713,47 +796,63 @@ class MercurySyncTCPConnection:
         coroutine: AsyncIterable[Message],
         transport: asyncio.Transport       
     ) -> Coroutine[Any, Any, None]:
+        
+        if transport.is_closing() is False:
   
-        async for response in coroutine:
-            item = pickle.dumps(
-                (
-                    'response', 
-                    self.id_generator.generate(),
-                    event_name,
-                    response.to_data(), 
-                    self.host,
-                    self.port
-                ),
-                protocol=pickle.HIGHEST_PROTOCOL
-            )
+            async for response in coroutine:
+                
+                try:
 
-            encrypted_message = self._encryptor.encrypt(item)
-            compressed = self._compressor.compress(encrypted_message)
+                    item = pickle.dumps(
+                        (
+                            'response', 
+                            self.id_generator.generate(),
+                            event_name,
+                            response.to_data(), 
+                            self.host,
+                            self.port
+                        ),
+                        protocol=pickle.HIGHEST_PROTOCOL
+                    )
 
-            transport.write(compressed)
+                    encrypted_message = self._encryptor.encrypt(item)
+                    compressed = self._compressor.compress(encrypted_message)
+
+                    transport.write(compressed)
+
+                except (Exception, socket.error):
+                    pass
 
     async def _initialize_stream(
         self,
         event_name: str,
         transport: asyncio.Transport            
     ) -> Coroutine[Any, Any, None]:
-        message = Message()
-        item = pickle.dumps(
-            (
-                'response', 
-                self.id_generator.generate(),
-                event_name,
-                message.to_data(), 
-                self.host,
-                self.port
-            ),
-            protocol=pickle.HIGHEST_PROTOCOL
-        )
+        
+        if transport.is_closing() is False:
+        
+            try:
 
-        encrypted_message = self._encryptor.encrypt(item)
-        compressed = self._compressor.compress(encrypted_message)
+                message = Message()
+                item = pickle.dumps(
+                    (
+                        'response', 
+                        self.id_generator.generate(),
+                        event_name,
+                        message.to_data(), 
+                        self.host,
+                        self.port
+                    ),
+                    protocol=pickle.HIGHEST_PROTOCOL
+                )
 
-        transport.write(compressed)
+                encrypted_message = self._encryptor.encrypt(item)
+                compressed = self._compressor.compress(encrypted_message)
+
+                transport.write(compressed)
+
+            except (Exception, socket.error):
+                pass
 
     async def _send_error(
         self,
@@ -761,26 +860,33 @@ class MercurySyncTCPConnection:
         transport: asyncio.Transport
     ) -> Coroutine[Any, Any, None]:
         
-        error = Message(
-            error=error_message
-        )
+        if transport.is_closing():
+            
+            try:
+                
+                error = Message(
+                    error=error_message
+                )
 
-        item = pickle.dumps(
-            (
-                'response', 
-                self.id_generator.generate(),
-                None,
-                error.to_data(), 
-                self.host,
-                self.port
-            ),
-            protocol=pickle.HIGHEST_PROTOCOL
-        )
+                item = pickle.dumps(
+                    (
+                        'response', 
+                        self.id_generator.generate(),
+                        None,
+                        error.to_data(), 
+                        self.host,
+                        self.port
+                    ),
+                    protocol=pickle.HIGHEST_PROTOCOL
+                )
 
-        encrypted_message = self._encryptor.encrypt(item)
-        compressed = self._compressor.compress(encrypted_message)
+                encrypted_message = self._encryptor.encrypt(item)
+                compressed = self._compressor.compress(encrypted_message)
 
-        transport.write(compressed)
+                transport.write(compressed)
+
+            except (Exception, socket.error):
+                pass
         
     async def close(self) -> None:
         self._stream = False
@@ -797,14 +903,14 @@ class MercurySyncTCPConnection:
                     if not self._sleep_task.cancelled():
                         await self._sleep_task
 
-                except asyncio.CancelledError:
+                except (Exception, socket.error):
                     pass
 
                 try:
 
                     await self._cleanup_task
 
-                except asyncio.CancelledError:
+                except Exception:
                     pass
 
             

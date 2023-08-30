@@ -1,5 +1,7 @@
 import asyncio
 import random
+import time
+import traceback
 from collections import (
     defaultdict,
     deque
@@ -256,6 +258,11 @@ class ReplicationController(Monitor):
                     await asyncio.sleep(self._poll_interval)
 
             await asyncio.sleep(self._poll_interval)
+
+        registered_count = self._calculate_all_registered_nodes()
+
+        await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - reporting - {registered_count}/{self._initial_expected_nodes} - as fully registered')
+        await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - reporting - {registered_count}/{self._initial_expected_nodes} - as fully registered')
 
     def _calculate_all_registered_nodes(self) -> int:
         self._registered_counts[(self.host, self.port)] = len(self._instance_ids)
@@ -581,7 +588,44 @@ class ReplicationController(Monitor):
             received_timestamp=self._logs.last_timestamp
         )
         
+    @server()
+    async def receive_failure_notification(
+        self,
+        shard_id: int,
+        message: RaftMessage
+    ) -> Call[RaftMessage]:
+        
+        try:
+            failed_node = message.failed_node
 
+
+            if self._election_status == ElectionState.READY and failed_node not in self.failed_nodes:
+                self.failed_nodes.append(failed_node)
+                self._node_statuses[failed_node] = 'failed'
+
+                self._election_status = ElectionState.ACTIVE
+                
+                self._tasks_queue.append(
+                    asyncio.create_task(
+                        self.run_election(
+                            failed_node=failed_node
+                        )
+                    )
+                )
+
+            return RaftMessage(
+                host=message.host,
+                port=message.port,
+                source_host=self.host,
+                source_port=self.port,
+                status=self.status,
+                term_number=self._term_number,
+                raft_node_status=self._raft_node_status,
+                received_timestamp=self._logs.last_timestamp
+            )
+        
+        except Exception:
+            pass
 
     @client('receive_vote_request')
     async def request_vote(
@@ -637,17 +681,43 @@ class ReplicationController(Monitor):
             entries=entries
         )
     
+    @client('receive_failure_notification')
+    async def submit_failure_notification(
+        self,
+        host: str,
+        port: int,
+        failed_node: Tuple[str, int]
+    ) -> Call[RaftMessage]:
+        return RaftMessage(
+            host=host,
+            port=port,
+            source_host=self.host,
+            source_port=self.port,
+            status=self.status,
+            term_number=self._term_number,
+            raft_node_status=self._raft_node_status,
+            failed_node=failed_node
+        )
+    
     async def _start_suspect_monitor(self):
         suspect_host, suspect_port = await super()._start_suspect_monitor()
 
-        if self._election_status == ElectionState.READY:
+        node_status = self._node_statuses.get((suspect_host, suspect_port))
+
+        failed_node = (suspect_host, suspect_port)
+
+        if self._election_status == ElectionState.READY and node_status == 'failed' and failed_node not in self.failed_nodes:
+
+            self.failed_nodes.append((
+                suspect_host,
+                suspect_port,
+                time.monotonic()
+            ))
+
             self._election_status = ElectionState.ACTIVE
-            await self.run_election(
-                failed_node=(
-                    suspect_host,
-                    suspect_port
-                )
-            )
+
+            await self.notify_of_failed_node(failed_node=failed_node)
+            await self.run_election(failed_node=failed_node)
 
     async def push_entries(
         self,
@@ -839,11 +909,6 @@ class ReplicationController(Monitor):
             
             except Exception:
 
-                await self._refresh_after_timeout(
-                    host,
-                    port
-                )
-
                 self._local_health_multipliers[(host, port)] = self._increase_health_multiplier(
                     host,
                     port
@@ -887,6 +952,38 @@ class ReplicationController(Monitor):
         )
 
         return self._poll_timeout * (self._local_health_multipliers[(host, port)] + 1) * modifier
+    
+    async def notify_of_failed_node(
+        self,
+        failed_node: Tuple[str, int]
+    ):
+        monitors = [
+            address for address, status in self._node_statuses.items() if status == 'healthy' and address != failed_node
+        ]
+
+        responses: List[
+            Union[
+                Tuple[int, RaftMessage],
+                Exception
+            ]
+        ] = await asyncio.gather(*[
+            asyncio.wait_for(
+                self.submit_failure_notification(
+                    host,
+                    port,
+                    failed_node
+                ),
+                timeout=self._calculate_current_timeout(
+                    host,
+                    port
+                )
+            ) for host , port in monitors
+        ], return_exceptions=True)
+
+        for response in responses:
+            if isinstance(response, Exception):
+                raise response
+    
     
     async def run_election(
         self,
@@ -937,24 +1034,27 @@ class ReplicationController(Monitor):
 
             latest_logs = self._logs.latest()
 
-            for host, port in members:
-                self._tasks_queue.append(
-                    asyncio.create_task(
-                        self._update_logs(
-                            host,
-                            port,
-                            latest_logs,
-                            failed_node=failed_node
-                        )
+            await asyncio.gather(*[
+                asyncio.wait_for(
+                    self._update_logs(
+                        host,
+                        port,
+                        latest_logs,
+                        failed_node=failed_node
+                    ),
+                    timeout=self._calculate_current_timeout(
+                        host,
+                        port
                     )
-                )
+                ) for host, port in members
+            ], return_exceptions=True)
 
         else:
 
             self._raft_node_status = NodeState.FOLLOWER
 
-            await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - failed to receive majority votes and is now a follower for term - {next_term}')
-            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - failed to receive majority votes and is now a follower for term - {next_term}')
+            await self._logger.distributed.aio.info(f'Source - {self.host}:{self.port} - failed to receive majority votes and is reverting to a follower for term - {self._term_number}')
+            await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Source - {self.host}:{self.port} - failed to receive majority votes and is reverting to a follower for term - {self._term_number}')
 
         if self._term_number > next_term:
             self._term_number = next_term

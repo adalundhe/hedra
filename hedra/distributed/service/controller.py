@@ -204,45 +204,36 @@ class Controller(Generic[*P]):
         ]
 
         if env.MERCURY_SYNC_USE_UDP_MULTICAST:
-            self._udp_pool = [
-                MercurySyncUDPMulticastConnection(
-                    self.host,
-                    self.port,
-                    instance_id,
-                    env=env
-                ) for instance_id in self.instance_ids
-            ]
-
+            self._udp = MercurySyncUDPMulticastConnection(
+                self.host,
+                self.port,
+                self._instance_id,
+                env=env
+            ) 
         else:
-            self._udp_pool = [
-                MercurySyncUDPConnection(
-                    self.host,
-                    self.port,
-                    instance_id,
-                    env=env
-                ) for instance_id in self.instance_ids
-            ]
-
+            self._udp = MercurySyncUDPConnection(
+                self.host,
+                self.port,
+                self._instance_id,
+                env=env
+            )
+            
         if env.MERCURY_SYNC_USE_HTTP_SERVER:
 
-            self._tcp_pool = [
-                MercurySyncHTTPConnection(
-                    self.host,
-                    self.port + 1,
-                    instance_id,
-                    env=env
-                ) for instance_id in self.instance_ids
-            ]
+            self._tcp = MercurySyncHTTPConnection(
+                self.host,
+                self.port + 1,
+                self._instance_id,
+                env=env
+            ) 
 
         else:
-            self._tcp_pool = [
-                MercurySyncTCPConnection(
-                    self.host,
-                    self.port + 1,
-                    instance_id,
-                    env=env
-                ) for instance_id in self.instance_ids
-            ]
+            self._tcp =MercurySyncTCPConnection(
+                self.host,
+                self.port + 1,
+                self._instance_id,
+                env=env
+            )
 
         self.setup()
 
@@ -291,31 +282,26 @@ class Controller(Generic[*P]):
         self._parsers: Dict[str, Message] = {}
         self._events: Dict[str, Message] = {}
 
-        for udp_connection, tcp_connection in zip(
-            self._udp_pool,
-            self._tcp_pool
-        ):
-            
-            for method_name, model in controller_models.items():
+        for method_name, model in controller_models.items():
 
-                udp_connection.parsers[method_name] = model
-                tcp_connection.parsers[method_name] = model
+            self._udp.parsers[method_name] = model
+            self._tcp.parsers[method_name] = model
 
-                if isinstance(tcp_connection, MercurySyncHTTPConnection):
-                    tcp_connection._supported_handlers = supported_http_handlers
-                    tcp_connection._middleware_enabled = middleware_enabled
+            if isinstance(self._tcp, MercurySyncHTTPConnection):
+                self._tcp._supported_handlers = supported_http_handlers
+                self._tcp._middleware_enabled = middleware_enabled
 
-                self._parsers[method_name] = model
+            self._parsers[method_name] = model
 
-            for method_name, method in controller_methods.items():
+        for method_name, method in controller_methods.items():
 
-                udp_connection.events[method_name] = method
-                tcp_connection.events[method_name] = method
+            self._udp.events[method_name] = method
+            self._tcp.events[method_name] = method
 
-                self._events[method_name] = method
+            self._events[method_name] = method
 
-            for key, parser in response_parsers.items():
-                tcp_connection._response_parsers[key] = parser
+        for key, parser in response_parsers.items():
+            self._tcp._response_parsers[key] = parser
 
     def apply_method(
         self, 
@@ -508,51 +494,43 @@ class Controller(Generic[*P]):
                     )
                 )  
 
-            for udp_connection, tcp_connection in zip(
-                self._udp_pool,
-                self._tcp_pool
-            ):
+            for _ in range(self._workers):
 
                 service_worker = loop.run_in_executor(
                     engine,
                     functools.partial(
                         start_pool,
-                        udp_connection,
-                        tcp_connection,
+                        MercurySyncUDPConnection(
+                            self.host,
+                            self.port,
+                            self._instance_id,
+                            self._env
+                        ),
+                        MercurySyncTCPConnection(
+                            self.host,
+                            self.port + 1,
+                            self._instance_id,
+                            self._env
+                        ),
                         config=config
                     )
                 )
 
                 pool.append(service_worker) 
+            
+            await asyncio.gather(*pool)
 
         else:
 
-            for udp_connection, tcp_connection in zip(
-                self._udp_pool,
-                self._tcp_pool
-            ):
+            await self._udp.connect_async(
+                cert_path=cert_path,
+                key_path=key_path
+            )
 
-                pool.append(
-                    asyncio.create_task(
-                        udp_connection.connect_async(
-                            cert_path=cert_path,
-                            key_path=key_path,
-                            worker_transport=udp_connection._transport
-                        )
-                    )
-                )
-
-                pool.append(
-                    asyncio.create_task(
-                        tcp_connection.connect_async(
-                            cert_path=cert_path,
-                            key_path=key_path,
-                            worker_server=tcp_connection._server
-                        )
-                    )
-                )
-
-        await asyncio.gather(*pool)
+            await self._tcp.connect_async(
+                cert_path=cert_path,
+                key_path=key_path,
+            )
 
     async def start_client(
         self,
@@ -567,187 +545,18 @@ class Controller(Generic[*P]):
 
             host, port = address
 
-            for udp_connection, tcp_connection in zip(
-                self._udp_pool,
-                self._tcp_pool
-            ):
-                
-                await udp_connection.connect_async(
+            await self._tcp.connect_client(
+                    (host, port + 1),
                     cert_path=cert_path,
                     key_path=key_path
-                )
-
-                await tcp_connection.connect_async(
-                    cert_path=cert_path,
-                    key_path=key_path
-                )
-            
-                # for message_type in message_types:
-
-                #     self._host_map[message_type.__name__][udp_connection] = (
-                #         host, 
-                #         port
-                #     )
-
-                #     self._host_map[message_type.__name__][tcp_connection] = (
-                #         host, 
-                #         port
-                #     )
-
-                
-                await self._udp_queue[(host, port)].put(udp_connection)
-                await self._tcp_queue[(host, port)].put(tcp_connection)
-
-            for tcp_connection in self._tcp_pool:
-                await tcp_connection.connect_client(
-                        (host, port + 1),
-                        cert_path=cert_path,
-                        key_path=key_path
-                )
-                
-    async def extend_client(
-        self,
-        remotes: Dict[
-            Tuple[str, int]: List[Type[Message]]
-        ],
-        cert_path: Optional[str]=None,
-        key_path: Optional[str]=None    
-    ):
-
-
-        for address, message_types in remotes.items():   
-
-            host, port = address  
-
-            try:
-
-                for udp_connection, tcp_connection in zip(
-                    self._udp_pool,
-                    self._tcp_pool
-                ):
-
-                    # udp_connection = MercurySyncUDPConnection(
-                    #     self.host,
-                    #     self.port,
-                    #     self._instance_id,
-                    #     env=self._env
-                    # )
-
-                    tcp_connection = MercurySyncTCPConnection(
-                        self.host,
-                        self.port + 1,
-                        self._instance_id,
-                        env=self._env
-                    )
-                    
-                    tcp_connection.parsers.update(self._parsers)
-                    # udp_connection.parsers.update(self._parsers)
-
-                    tcp_connection.events.update(self._events)
-                    # udp_connection.events.update(self._events)
-            
-                    # await udp_connection.connect_async(
-                    #     cert_path=cert_path,
-                    #     key_path=key_path
-                    # )
-
-                    await tcp_connection.connect_async(
-                        cert_path=cert_path,
-                        key_path=key_path
-                    )
-
-                    await self._udp_queue[(host, port)].put(udp_connection)
-                    await self._tcp_queue[(host, port)].put(tcp_connection)
-
-                    
-
-                    # self._udp_pool.append(udp_connection)
-                    self._tcp_pool.append(tcp_connection)
-
-                    for message_type in message_types:
-
-                        self._host_map[message_type.__class__.__name__][udp_connection] = (
-                            host, 
-                            port
-                        )
-
-                        self._host_map[message_type.__class__.__name__][tcp_connection] = (
-                            host, 
-                            port
-                        )
-
-            except Exception:
-                pass
-    
-    async def refresh_clients(
-        self,
-        remotes: Dict[
-            Tuple[str, int]: List[Type[Message]]
-        ],
-        cert_path: Optional[str]=None,
-        key_path: Optional[str]=None    
-    ) -> int:
-        
-        for host, port in remotes.keys(): 
-
-            existing_udp_connections = self._udp_queue[(host, port)]
-            existing_tcp_connections = self._tcp_queue[(host, port)]
-
-            while existing_udp_connections.empty() is False:
-                connection: MercurySyncUDPConnection = await existing_udp_connections.get()
-                await connection.close()
-
-            while existing_tcp_connections.empty() is False:
-                connection: MercurySyncUDPConnection = await existing_tcp_connections.get()
-                await connection.close()
-
-        return await self.extend_client(
-            remotes,
-            cert_path=cert_path,
-            key_path=key_path
-        )
-    
-    async def remove_clients(
-        self,
-        remote: Message 
-    ):
-        
-        existing_udp_connections = self._udp_queue[(remote.host, remote.port)]
-        existing_tcp_connections = self._tcp_queue[(remote.host, remote.port)]
-
-        while existing_udp_connections.empty() is False:
-            connection: MercurySyncUDPConnection = await existing_udp_connections.get()
-            await connection.close()
-
-        while existing_tcp_connections.empty() is False:
-            connection: MercurySyncUDPConnection = await existing_tcp_connections.get()
-            await connection.close()
-
-        if self._udp_queue.get((remote.host, remote.port)):
-            del self._udp_queue[(remote.host, remote.port)]
-
-        
-        if self._tcp_queue.get((remote.host, remote.port)):
-            del self._tcp_queue[(remote.host, remote.port)]
+            )
 
     async def send(
         self,
         event_name: str,
         message: Message
     ):
-        connection: MercurySyncUDPConnection = await self._udp_queue[(message.host, message.port)].get()
-
-        # (host, port) = self._host_map.get(message.__class__.__name__).get(
-        #     connection,
-        #     (message.host, message.port)
-        # )
-
-        # address = (
-        #     host,
-        #     port
-        # )
-
-        shard_id, data = await connection.send(
+        shard_id, data = await self._udp.send(
             event_name,
             message.to_data(),
             (message.host, message.port)
@@ -760,8 +569,6 @@ class Controller(Generic[*P]):
             **data
         )
 
-        self._udp_queue[(message.host, message.port)].put_nowait(connection)
-
         return shard_id, response_data
     
     async def send_tcp(
@@ -769,18 +576,8 @@ class Controller(Generic[*P]):
         event_name: str,
         message: Message
     ):
-        connection: MercurySyncTCPConnection = await self._tcp_queue[(message.host, message.port)].get()
-        # (host, port) = self._host_map.get(message.__class__.__name__).get(
-        #     connection,
-        #     (message.host, message.port)
-        # )
 
-        # address = (
-        #     host,
-        #     port + 1
-        # )
-
-        shard_id, data = await connection.send(
+        shard_id, data = await self._tcp.send(
             event_name,
             message.to_data(),
             (message.host, message.port + 1)
@@ -790,8 +587,6 @@ class Controller(Generic[*P]):
             **data
         )
 
-        await self._tcp_queue[(message.host, message.port)].put(connection)
-
         return shard_id, response_data
     
     async def stream(
@@ -800,25 +595,22 @@ class Controller(Generic[*P]):
         message: Message
     ) -> AsyncIterable[Tuple[int, Union[Message, Error]]]:
         
-        async for connection in self._iter_udp_connections():
-            (host, port) = self._host_map.get(message.__class__.__name__).get(
-                connection,
-                (message.host, message.port)
+        address = (
+            message.host,
+            message.port
+        )
+
+        async for response in self._udp.stream(
+            event_name,
+            message.to_data(),
+            address
+        ):
+            shard_id, data = response
+            response_data = self._response_parsers.get(event_name)(
+                **data
             )
 
-            address = (host, port)
-
-            async for response in connection.stream(
-                event_name,
-                message.to_data(),
-                address
-            ):
-                shard_id, data = response
-                response_data = self._response_parsers.get(event_name)(
-                    **data
-                )
-
-                yield shard_id, response_data
+            yield shard_id, response_data
 
     async def stream_tcp(
         self,
@@ -826,55 +618,34 @@ class Controller(Generic[*P]):
         message: Message
     ) -> AsyncIterable[Tuple[int, Union[Message, Error]]]:
         
-        
-        async for connection in self._iter_tcp_connections():
-            (host, port) = self._host_map.get(message.__class__.__name__).get(
-                connection,
-                (message.host, message.port)
+        address = (
+            message.host,
+            message.port
+        )
+
+        async for response in self._tcp.stream(
+            event_name,
+            message.to_data(),
+            address
+        ):
+            shard_id, data = response
+
+            if data.get('error'):
+                yield shard_id, Error(**data)
+
+            response_data = self._response_parsers.get(event_name)(
+                **data
             )
 
-            address = (host, port + 1)
-
-            async for response in connection.stream(
-                event_name,
-                message.to_data(),
-                address
-            ):
-                shard_id, data = response
-
-                if data.get('error'):
-                    yield shard_id, Error(**data)
-
-                response_data = self._response_parsers.get(event_name)(
-                    **data
-                )
-
-                yield shard_id, response_data
-    
-    async def _iter_tcp_connections(self) -> AsyncIterable[MercurySyncUDPConnection]:
-        for connection in enumerate(self._tcp_pool):
-            yield connection
-
-    async def _iter_udp_connections(self) -> AsyncIterable[MercurySyncTCPConnection]:
-        for connection in enumerate(self._udp_pool):
-            yield connection
+            yield shard_id, response_data
 
     async def close(self) -> None:
 
         if self._engine:
             self._engine.shutdown(cancel_futures=True)
 
-        await asyncio.gather(*[
-            asyncio.create_task(
-                udp_connection.close()
-            ) for udp_connection in self._udp_pool
-        ])
-
-        await asyncio.gather(*[
-            asyncio.create_task(
-                tcp_connection.close()
-            ) for tcp_connection in self._tcp_pool
-        ])
+        await self._udp.close()
+        await self._tcp.close()
 
         if self._waiter:
             self._waiter.set_result(None)

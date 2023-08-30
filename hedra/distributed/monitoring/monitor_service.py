@@ -197,15 +197,6 @@ class Monitor(Controller):
             )
 
             if not_self and not_registered: 
-
-                self._tasks_queue.append(
-                    asyncio.create_task(
-                        self.extend_client({
-                            (source_host, source_port): self._models
-                        })
-                    )
-                )
-
                 self._node_statuses[(source_host, source_port)] = 'healthy'
 
             snowflake = Snowflake.parse(shard_id)
@@ -226,19 +217,14 @@ class Monitor(Controller):
                     )
 
                     if not_self and not_registered:
-                    
-                        self._tasks_queue.append(
-                            asyncio.create_task(
-                                self.extend_client({
-                                    (host, port): self._models
-                                })
-                            )
-                        )
-
                         self._node_statuses[(host, port)] = 'healthy'
                     
                     self._instance_ids[(host, port)] = instance_id
 
+            node_address = (source_host, source_port)
+
+            if node_address in self.failed_nodes:
+                self.failed_nodes.remove(node_address)
 
             self._registered_counts[(source_host, source_port)] = max(
                 healthcheck.registered_count,
@@ -338,35 +324,12 @@ class Monitor(Controller):
 
         if healthcheck.target_status:
             update_status = healthcheck.target_status
-        
-        local_status = self._node_statuses.get((
-            update_node_host,
-            update_node_port
-        ))
-
 
         target_last_updated: Union[int, None] = healthcheck.target_last_updated
         local_last_updated: Union[int, None] = self._latest_update.get((
             update_node_host,
             update_node_port
         ), 0)
-
-        not_self = update_node_host != self.host and update_node_port != self.port
-
-        if not_self and local_status not in self._healthy_statuses:
-
-            self._tasks_queue.append(
-                asyncio.create_task(
-                    self.refresh_clients(
-                        {
-                            (
-                                update_node_host,
-                                update_node_port
-                            ): self._models
-                        }
-                    )
-                )
-            )
 
         snowflake = Snowflake.parse(shard_id)
 
@@ -1385,12 +1348,6 @@ class Monitor(Controller):
                         )
                     ) for host, port in monitors
                 ])
-
-            self.failed_nodes.append((
-                suspect_host,
-                suspect_port,
-                time.monotonic()
-            ))
 
             await self._logger.distributed.aio.info(f'Node - {suspect_host}:{suspect_port} - marked failed for source - {self.host}:{self.port}')
             await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Node - {suspect_host}:{suspect_port} - marked failed for source - {self.host}:{self.port}')
