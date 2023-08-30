@@ -287,8 +287,15 @@ class ReplicationController(Monitor):
             source_host = response.source_host
             source_port = response.source_port
 
+            not_self = self._check_is_not_self(
+                source_host,
+                source_port
+            )
+
             self._instance_ids[(source_host, source_port)] = Snowflake.parse(shard_id).instance
-            self._node_statuses[(source_host, source_port)] = 'healthy'
+
+            if not_self:
+                self._node_statuses[(source_host, source_port)] = 'healthy'
 
             self._registered_counts[(source_host, source_port)] = max(
                 response.registered_count,
@@ -597,10 +604,23 @@ class ReplicationController(Monitor):
         
         try:
             failed_node = message.failed_node
+            host, port = failed_node
+
+            not_self = self._check_is_not_self(
+                host,
+                port
+            )
 
 
-            if self._election_status == ElectionState.READY and failed_node not in self.failed_nodes:
-                self.failed_nodes.append(failed_node)
+            if not_self and self._election_status == ElectionState.READY and failed_node not in self.failed_nodes:
+
+
+                self.failed_nodes.append((
+                    host,
+                    port,
+                    time.monotonic()
+                ))
+
                 self._node_statuses[failed_node] = 'failed'
 
                 self._election_status = ElectionState.ACTIVE
@@ -898,7 +918,13 @@ class ReplicationController(Monitor):
                 shard_id, update_response = response
                 source_host, source_port = update_response.source_host, update_response.source_port
 
-                self._node_statuses[(source_host, source_port)] = update_response.status
+                not_self = self._check_is_not_self(
+                    source_host,
+                    source_port
+                )
+
+                if not_self:
+                    self._node_statuses[(source_host, source_port)] = update_response.status
 
                 self._local_health_multipliers[(host, port)] = self._reduce_health_multiplier(
                     host,
@@ -917,7 +943,17 @@ class ReplicationController(Monitor):
         check_host = host
         check_port = port
 
-        if update_response is None and self._node_statuses.get((check_host, check_port)) == 'healthy':
+        node_status = self._node_statuses.get((
+            check_host, 
+            check_port
+        )) 
+
+        not_self = self._check_is_not_self(
+            check_host,
+            check_port
+        )
+
+        if not_self and update_response is None and node_status == 'healthy':
 
             await self._logger.distributed.aio.debug(f'Node - {check_host}:{check_port} - failed to respond over - {self._poll_retries} - retries and is now suspect for source - {self.host}:{self.port}')
             await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Node - {check_host}:{check_port} - failed to respond over - {self._poll_retries} - retries and is now suspect for source - {self.host}:{self.port}')
@@ -1085,7 +1121,7 @@ class ReplicationController(Monitor):
                         ])
                     )
                 )
-                
+
             await asyncio.sleep(
                 self._logs_update_poll_interval * self._initial_expected_nodes
             )

@@ -109,6 +109,10 @@ class Monitor(Controller):
             monitor_env.MERCURY_SYNC_UDP_SYNC_INTERVAL
         ).time
 
+        self._suspect_max_age= TimeParser(
+            monitor_env.MERCURY_SYNC_SUSPECT_MAX_AGE
+        ).time
+
         self._check_nodes_count = monitor_env.MERCURY_SYNC_INDIRECT_CHECK_NODES
 
         self.min_suspect_multiplier = monitor_env.MERCURY_SYNC_MIN_SUSPECT_TIMEOUT_MULTIPLIER
@@ -124,6 +128,7 @@ class Monitor(Controller):
         self._tasks_queue: Deque[asyncio.Task] = deque()
         self._degraded_nodes: Deque[Tuple[str, int]] = deque()
         self._suspect_nodes: Deque[Tuple[str, int]] = deque()
+        self._suspect_history: List[Tuple[str, int, int]] = []
 
         self._degraded_tasks: Dict[Tuple[str, int], asyncio.Task] = {}
         self._suspect_tasks: Dict[Tuple[str, int], asyncio.Task] = {}
@@ -715,7 +720,17 @@ class Monitor(Controller):
             check_host = target_host
             check_port = target_port
 
-        if healthcheck is None and self._node_statuses.get((check_host, check_port)) == 'healthy':
+        node_status = self._node_statuses.get((
+            check_host, 
+            check_port
+        )) 
+
+        not_self = self._check_is_not_self(
+            check_host,
+            check_port
+        )
+
+        if not_self and healthcheck is None and node_status == 'healthy':
 
             await self._logger.distributed.aio.debug(f'Node - {check_host}:{check_port} - failed to respond over - {self._poll_retries} - retries and is now suspect for source - {self.host}:{self.port}')
             await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Node - {check_host}:{check_port} - failed to respond over - {self._poll_retries} - retries and is now suspect for source - {self.host}:{self.port}')
@@ -1138,7 +1153,13 @@ class Monitor(Controller):
 
                 source_host, source_port = healthcheck.source_host, healthcheck.source_port
 
-                self._node_statuses[(source_host, source_port)] = healthcheck.status
+                not_self = self._check_is_not_self(
+                    source_host,
+                    source_port
+                )
+
+                if not_self:
+                    self._node_statuses[(source_host, source_port)] = healthcheck.status
 
                 await self._logger.distributed.aio.debug(f'Completed indirect check request to - {target_host}:{target_port} -for node - {host}:{port} - from source - {self.host}:{self.port} - on try - {idx}/{self._poll_retries}')
                 await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Completed indirect check request to - {target_host}:{target_port} -for node - {host}:{port} - from source - {self.host}:{self.port} - on try - {idx}/{self._poll_retries}')
@@ -1186,7 +1207,13 @@ class Monitor(Controller):
                 shard_id, healthcheck = response
                 source_host, source_port = healthcheck.source_host, healthcheck.source_port
 
-                self._node_statuses[(source_host, source_port)] = healthcheck.status
+                not_self = self._check_is_not_self(
+                    source_host,
+                    source_port
+                )
+
+                if not_self:
+                    self._node_statuses[(source_host, source_port)] = healthcheck.status
 
                 self._local_health_multipliers[(host, port)] = self._reduce_health_multiplier(
                     host,
@@ -1215,7 +1242,17 @@ class Monitor(Controller):
             check_host = target_host
             check_port = target_port
 
-        if healthcheck is None and self._node_statuses.get((check_host, check_port)) == 'healthy':
+        node_status = self._node_statuses.get((
+            check_host, 
+            check_port
+        )) 
+
+        not_self = self._check_is_not_self(
+            check_host,
+            check_port
+        )
+
+        if not_self and healthcheck is None and node_status== 'healthy':
 
             await self._logger.distributed.aio.debug(f'Node - {check_host}:{check_port} - failed to respond over - {self._poll_retries} - retries and is now suspect for source - {self.host}:{self.port}')
             await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].info(f'Node - {check_host}:{check_port} - failed to respond over - {self._poll_retries} - retries and is now suspect for source - {self.host}:{self.port}')
@@ -1238,8 +1275,26 @@ class Monitor(Controller):
         if len(self._suspect_nodes) < 1:
             return
         
-        address = self._suspect_nodes.pop()
+        address = self._suspect_nodes.pop() 
         suspect_host, suspect_port = address
+
+
+        not_self = self._check_is_not_self(
+            suspect_host,
+            suspect_port
+        )
+
+        if not_self and address not in self._suspect_history:
+            self._suspect_history.append((
+                suspect_host,
+                suspect_port,
+                time.monotonic()
+            ))
+
+        else:
+            return
+
+
         status = self._node_statuses[(suspect_host, suspect_port)] 
 
         if status == 'suspect':
@@ -1716,7 +1771,13 @@ class Monitor(Controller):
                 shard_id, healthcheck = response
                 source_host, source_port = healthcheck.source_host, healthcheck.source_port
 
-                self._node_statuses[(source_host, source_port)] = healthcheck.status
+                not_self = self._check_is_not_self(
+                    source_host,
+                    source_port
+                )
+                
+                if not_self:
+                    self._node_statuses[(source_host, source_port)] = healthcheck.status
 
                 return shard_id, healthcheck
 
@@ -1768,7 +1829,13 @@ class Monitor(Controller):
                 shard_id, healthcheck = response
                 source_host, source_port = healthcheck.source_host, healthcheck.source_port
 
-                self._node_statuses[(source_host, source_port)] = healthcheck.status
+                not_self = self._check_is_not_self(
+                    source_host,
+                    source_port
+                )
+
+                if not_self:
+                    self._node_statuses[(source_host, source_port)] = healthcheck.status
 
                 return shard_id, healthcheck
 
@@ -1809,7 +1876,13 @@ class Monitor(Controller):
 
             _, healthcheck = response
 
-            self._node_statuses[(host, port)] = healthcheck.status
+            not_self = self._check_is_not_self(
+                host,
+                port
+            )
+
+            if not_self:
+                self._node_statuses[(host, port)] = healthcheck.status
 
         except Exception:
             pass          
@@ -1833,6 +1906,15 @@ class Monitor(Controller):
 
                     self._tasks_queue.remove(pending_check)
                     pending_checks_count += 1
+
+            for node in list(self._suspect_history):
+                _, _, age = node
+
+                failed_elapsed = time.monotonic() - age
+
+                if failed_elapsed >= self._suspect_max_age:
+                    self._suspect_history.remove(node)
+
 
             for node in list(self.failed_nodes):
 
