@@ -1,5 +1,4 @@
 import zstandard
-from base64 import b64encode
 from hedra.distributed.middleware.base import (
     Middleware,
     MiddlewareType
