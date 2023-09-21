@@ -41,8 +41,6 @@ from typing import (
     List,
     Any
 )
-
-from .constants import FLEXIBLE_PAXOS_QUORUM
 from .log_queue import LogQueue
 
 
@@ -164,7 +162,9 @@ class ReplicationController(Monitor):
 
         await self.start_server()
 
-        self._instance_ids[(self.host, self.port)] = self._instance_id
+        self._instance_ids[(self.host, self.port)] = Snowflake.parse(
+            self._entry_id_generator.generate()
+        ).instance
 
         boot_wait = random.uniform(0.1, self.boot_wait * self._initial_expected_nodes)
         await asyncio.sleep(boot_wait)
@@ -465,22 +465,22 @@ class ReplicationController(Monitor):
             source_port = message.source_port
 
             if message.failed_node and self._suspect_tasks.get(
-                    message.failed_node
-                ):
-                    
-                    node_host, node_port = message.failed_node
-                    
-                    self._tasks_queue.append(
-                        asyncio.create_task(
-                            self._cancel_suspicion_probe(
-                                node_host,
-                                node_port
-                            )
+                message.failed_node
+            ):
+                
+                node_host, node_port = message.failed_node
+                
+                self._tasks_queue.append(
+                    asyncio.create_task(
+                        self._cancel_suspicion_probe(
+                            node_host,
+                            node_port
                         )
                     )
+                )
 
-                    await self._logger.distributed.aio.debug(f'Node - {node_host}:{node_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
-                    await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Node - {node_host}:{node_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
+                await self._logger.distributed.aio.debug(f'Node - {node_host}:{node_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
+                await self._logger.filesystem.aio[f'hedra.distributed.{self._instance_id}'].debug(f'Node - {node_host}:{node_port} - submitted healthy status to source - {self.host}:{self.port} - and is no longer suspect')
 
 
             if self._suspect_tasks.get((
@@ -718,7 +718,7 @@ class ReplicationController(Monitor):
             raft_node_status=self._raft_node_status,
             failed_node=failed_node
         )
-    
+            
     async def _start_suspect_monitor(self):
         suspect_host, suspect_port = await super()._start_suspect_monitor()
 
@@ -852,7 +852,10 @@ class ReplicationController(Monitor):
         instance_address_id_pairs = list(
             sorted(
                 nodes,
-                key=lambda instance: self._instance_ids.get(instance)
+                key=lambda instance: self._instance_ids.get(
+                    instance,
+                    self._instance_id
+                )
             )
         )
 
@@ -1155,7 +1158,7 @@ class ReplicationController(Monitor):
         self._logs.commit()
 
         return results
-
+    
     async def _cleanup_pending_raft_tasks(self):
 
         await self._logger.distributed.aio.debug(f'Running cleanup for source - {self.host}:{self.port}')

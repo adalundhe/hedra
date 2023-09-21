@@ -1,7 +1,6 @@
 import asyncio
 import math
 import random
-import traceback
 import time
 from collections import defaultdict, deque
 from hedra.distributed.env import (
@@ -223,10 +222,28 @@ class Monitor(Controller):
 
                     if not_self and not_registered:
                         self._node_statuses[(host, port)] = 'healthy'
+
+                        self._tasks_queue.append(
+                            asyncio.create_task(
+                                self._cancel_suspicion_probe(
+                                    host,
+                                    port
+                                )
+                            )
+                        )
                     
                     self._instance_ids[(host, port)] = instance_id
 
             node_address = (source_host, source_port)
+
+            self._tasks_queue.append(
+                asyncio.create_task(
+                    self._cancel_suspicion_probe(
+                        source_host,
+                        source_port
+                    )
+                )
+            )
 
             if node_address in self.failed_nodes:
                 self.failed_nodes.remove(node_address)
