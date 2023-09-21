@@ -460,6 +460,7 @@ class ReplicationController(Monitor):
                     term_number=self._term_number
                 )
 
+
             source_host = message.source_host
             source_port = message.source_port
 
@@ -889,7 +890,7 @@ class ReplicationController(Monitor):
         host: str,
         port: int,
         entries: List[Entry],
-        failed_node: Optional[Tuple[str, int]]=None
+        failed_node: Optional[Tuple[str, int]]=None,
     ) -> Union[
         Tuple[int, RaftMessage],
         None
