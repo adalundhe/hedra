@@ -1,7 +1,6 @@
 import asyncio
 import random
 import time
-import traceback
 from collections import (
     defaultdict,
     deque

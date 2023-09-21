@@ -1,13 +1,13 @@
 from hedra.distributed.env import Env
-from hedra.distributed.env.memory_parser import MemoryParser
-from hedra.distributed.models.limit import Limit
-from hedra.distributed.models.request import Request
+from hedra.distributed.models.http import (
+    Limit,
+    Request
+)
 from pydantic import IPvAnyAddress
 from typing import (
     Optional,
     Callable,
     Dict,
-    Tuple,
     Union
 )
 from .limiters import (

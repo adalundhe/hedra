@@ -1,4 +1,4 @@
-from hedra.distributed.models.message import Message
+from hedra.distributed.models.base.message import Message
 from typing import AsyncIterable, TypeVar
 from .call import Call
 

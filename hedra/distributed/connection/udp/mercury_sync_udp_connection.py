@@ -13,7 +13,7 @@ from hedra.distributed.connection.udp.protocols import MercurySyncUDPProtocol
 from hedra.distributed.encryption import AESGCMFernet
 from hedra.distributed.env import Env
 from hedra.distributed.env.time_parser import TimeParser
-from hedra.distributed.models.message import Message
+from hedra.distributed.models.base.message import Message
 from hedra.distributed.snowflake.snowflake_generator import SnowflakeGenerator
 from typing import (
     Tuple, 

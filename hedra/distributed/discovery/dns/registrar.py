@@ -1,6 +1,5 @@
 import asyncio
 import socket
-import time
 from hedra.distributed.discovery.dns.core.url import URL
 from hedra.distributed.env import load_env, Env
 from hedra.distributed.env.time_parser import TimeParser
@@ -8,8 +7,12 @@ from hedra.distributed.hooks import (
     client,
     server
 )
-from hedra.distributed.models.dns_message import DNSMessage
-from hedra.distributed.models.dns_message_group import DNSMessageGroup
+from hedra.distributed.models.dns import (
+    DNSMessage,
+    DNSMessageGroup,
+    DNSEntry,
+    Service
+)
 from hedra.distributed.service.controller import Controller
 from hedra.distributed.discovery.dns.core.record import (
     Record
@@ -17,8 +20,6 @@ from hedra.distributed.discovery.dns.core.record import (
 from hedra.distributed.discovery.dns.core.random import RandomIDGenerator
 
 from hedra.distributed.discovery.dns.resolver import DNSResolver
-from hedra.distributed.models.dns_entry import DNSEntry
-from hedra.distributed.models.service import Service
 from hedra.distributed.types import Call
 from typing import (
     Optional, 

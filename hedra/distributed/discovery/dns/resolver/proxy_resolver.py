@@ -1,6 +1,6 @@
 
 from hedra.distributed.discovery.dns.core.cache import CacheNode
-from hedra.distributed.models.dns_message import (
+from hedra.distributed.models.dns import (
     DNSMessage,
     QueryType
 )

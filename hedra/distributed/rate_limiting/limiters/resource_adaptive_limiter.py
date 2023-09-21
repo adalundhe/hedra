@@ -3,7 +3,7 @@ import math
 import os
 import psutil
 import statistics
-from hedra.distributed.models.limit import Limit
+from hedra.distributed.models.http import Limit
 from typing import Union, List
 from .base_limiter import BaseLimiter
 

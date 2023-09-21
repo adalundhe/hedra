@@ -22,8 +22,11 @@ from typing import (
     Dict,
     Optional
 )
-from .http_request import HTTPRequest, HTTPRequestMethod
-from .message import Message
+from hedra.distributed.models.http import (
+    HTTPRequest, 
+    HTTPRequestMethod
+)
+from hedra.distributed.models.base.message import Message
 
 
 

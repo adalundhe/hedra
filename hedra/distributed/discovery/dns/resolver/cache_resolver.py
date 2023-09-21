@@ -6,8 +6,8 @@ from hedra.distributed.discovery.dns.core.url import (
 
 )
 from hedra.distributed.discovery.dns.core.cache import CacheNode
-from hedra.distributed.models.dns_entry import DNSEntry
-from hedra.distributed.models.dns_message import (
+from hedra.distributed.models.dns import (
+    DNSEntry,
     DNSMessage,
     QueryType
 )

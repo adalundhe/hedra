@@ -1,4 +1,4 @@
-from hedra.distributed.models.request import Request
+from hedra.distributed.models.http import Request
 from pydantic import BaseModel
 from typing import (
     Callable, 

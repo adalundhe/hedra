@@ -6,7 +6,7 @@ from hedra.distributed.discovery.dns.core.record import (
 from hedra.distributed.discovery.dns.core.record.record_data_types import RecordData
 from hedra.distributed.discovery.dns.core.url import URL
 from hedra.distributed.env import Env
-from hedra.distributed.models.dns_message import DNSMessage
+from hedra.distributed.models.dns import DNSMessage
 from typing import Literal, Optional, List, Tuple, Callable, Union
 from .proxy_resolver import ProxyResolver
 from .recursive_resolver import RecursiveResolver

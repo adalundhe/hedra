@@ -1,7 +1,9 @@
 import asyncio
-from hedra.distributed.models.limit import Limit
-from hedra.distributed.models.http_message import HTTPMessage
-from hedra.distributed.models.request import Request
+from hedra.distributed.models.http import (
+    Limit,
+    HTTPMessage,
+    Request
+)
 from types import TracebackType
 from typing import (
     Optional, 

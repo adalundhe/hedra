@@ -20,13 +20,12 @@ from hedra.distributed.connection.tcp.mercury_sync_tcp_connection import Mercury
 from hedra.distributed.connection.udp.mercury_sync_udp_connection import MercurySyncUDPConnection
 from hedra.distributed.connection.udp.mercury_sync_udp_multicast_connection import MercurySyncUDPMulticastConnection
 from hedra.distributed.env import load_env, Env
-from hedra.distributed.models.error import Error
-from hedra.distributed.models.message import Message
+from hedra.distributed.models.base.error import Error
+from hedra.distributed.models.base.message import Message
 from pydantic import BaseModel
 from typing import (
     Optional, 
     List, 
-    Set,
     Literal, 
     Union, 
     Dict,

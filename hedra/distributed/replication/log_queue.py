@@ -1,5 +1,4 @@
 import time
-import traceback
 from hedra.distributed.env import (
     load_env,
     ReplicationEnv

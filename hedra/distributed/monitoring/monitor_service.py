@@ -182,7 +182,7 @@ class Monitor(Controller):
     @server()
     async def register_node(
         self,
-        shard_id: int,
+     shard_id: int,
         healthcheck: HealthCheck
     ) -> Call[HealthCheck]:
         

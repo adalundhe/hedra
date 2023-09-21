@@ -1,9 +1,10 @@
 from __future__ import annotations
-from hedra.distributed.models.response import Response
-from hedra.distributed.models.request import Request
+from hedra.distributed.models.http import (
+    Request,
+    Response
+)
 from pydantic import BaseModel
 from typing import (
-    Any,
     Callable, 
     Union, 
     Dict, 

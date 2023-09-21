@@ -1,7 +1,7 @@
 import asyncio
 import math
 import statistics
-from hedra.distributed.models.limit import Limit
+from hedra.distributed.models.http import Limit
 from .base_limiter import BaseLimiter
 
 class AdaptiveRateLimiter(BaseLimiter):
