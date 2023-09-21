@@ -8,9 +8,10 @@ from typing import (
 )
 from .env import Env
 from .monitor_env import MonitorEnv
+from .replication_env import ReplicationEnv
 from .registrar_env import RegistrarEnv
 
-T = TypeVar('T', bound=(Env, MonitorEnv, RegistrarEnv,))
+T = TypeVar('T')
 
 
 PrimaryType=Union[str, int, bool, float, bytes]
@@ -21,7 +22,8 @@ def load_env(
     env_file: str=None
 ) -> T:
     
-    envars = env.types_map()
+    env_type: Union[Env, MonitorEnv, ReplicationEnv, RegistrarEnv] = env
+    envars = env_type.types_map()
     
     if env_file is None:
         env_file = '.env'

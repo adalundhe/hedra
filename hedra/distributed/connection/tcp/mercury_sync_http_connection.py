@@ -4,15 +4,16 @@ import ipaddress
 import psutil
 import socket
 import ssl
-import traceback
 import zstandard
 from collections import deque, defaultdict
 from hedra.distributed.env import Env
 from hedra.distributed.connection.base.connection_type import ConnectionType
-from hedra.distributed.models.http_message import HTTPMessage
-from hedra.distributed.models.http_request import HTTPRequest
-from hedra.distributed.models.response import Response
-from hedra.distributed.models.request import Request
+from hedra.distributed.models.http import (
+    HTTPMessage,
+    HTTPRequest,
+    Response,
+    Request
+)
 from hedra.distributed.rate_limiting import Limiter
 from pydantic import BaseModel
 from typing import (
@@ -79,7 +80,8 @@ class MercurySyncHTTPConnection(MercurySyncTCPConnection):
         self, 
         cert_path: Optional[str] = None, 
         key_path: Optional[str] = None, 
-        worker_socket: Optional[socket.socket] = None
+        worker_socket: Optional[socket.socket] = None,
+        worker_server: Optional[asyncio.Server]=None
     ):
         self._backoff_sem = asyncio.Semaphore(
             self._rate_limiting_backoff_rate

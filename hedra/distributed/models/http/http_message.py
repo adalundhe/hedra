@@ -4,8 +4,8 @@ from pydantic import (
     StrictInt,
     Json
 )
-from typing import Dict, Optional, Union, Literal, List
-from .message import Message
+from typing import Dict, Optional, Union, Literal
+from hedra.distributed.models.base.message import Message
 
 
 class HTTPMessage(Message):

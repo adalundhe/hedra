@@ -13,8 +13,8 @@ from hedra.distributed.env import (
     load_env
 )
 from hedra.distributed.env.time_parser import TimeParser
-from hedra.distributed.models.dns_entry import DNSEntry
-from hedra.distributed.models.dns_message import (
+from hedra.distributed.models.dns import (
+    DNSEntry,
     DNSMessage
 )
 from hedra.distributed.discovery.dns.core.exceptions import (

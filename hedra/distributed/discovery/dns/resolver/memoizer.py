@@ -1,6 +1,6 @@
 import asyncio
 import functools
-from hedra.distributed.models.dns_message import DNSMessage
+from hedra.distributed.models.dns import DNSMessage
 from hedra.distributed.discovery.dns.core.record import RecordType
 from typing import Dict, Callable, Tuple, Optional
 

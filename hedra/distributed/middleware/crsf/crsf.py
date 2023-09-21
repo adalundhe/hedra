@@ -12,8 +12,10 @@ from hedra.distributed.encryption import AESGCMFernet
 from hedra.distributed.middleware.base import (
     Middleware
 )
-from hedra.distributed.models.response import Response
-from hedra.distributed.models.request import Request
+from hedra.distributed.models.http import (
+    Request,
+    Response
+)
 from secrets import (
     compare_digest,
     token_urlsafe

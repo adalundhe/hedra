@@ -1,8 +1,6 @@
 import math
 import asyncio
 import random
-import traceback
-from collections import deque
 from hedra.distributed.env import Env, load_env
 from hedra.distributed.env.time_parser import TimeParser
 from hedra.distributed.middleware.base import (
@@ -10,19 +8,14 @@ from hedra.distributed.middleware.base import (
     MiddlewareType
 )
 from hedra.distributed.middleware.base.types import RequestHandler
-from hedra.distributed.models.limit import Limit
-from hedra.distributed.models.response import Response
-from hedra.distributed.models.request import Request
+from hedra.distributed.models.http import (
+    Request,
+    Response
+)
 from hedra.distributed.rate_limiting.limiters import SlidingWindowLimiter
 from typing import (
-    Dict,
-    List,
-    Literal,
     Optional,
-    Union,
-    Tuple,
-    Callable,
-    Deque
+    Union
 )
 from .circuit_breaker_state import CircuitBreakerState
 

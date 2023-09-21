@@ -1,12 +1,13 @@
-import traceback
 from base64 import b64encode
 from gzip import compress
 from hedra.distributed.middleware.base import (
     Middleware,
     MiddlewareType
 )
-from hedra.distributed.models.response import Response
-from hedra.distributed.models.request import Request
+from hedra.distributed.models.http import (
+    Request,
+    Response
+)
 from pydantic import BaseModel
 from typing import (
     Dict, 

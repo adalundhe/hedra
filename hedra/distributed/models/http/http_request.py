@@ -4,7 +4,7 @@ from pydantic import AnyHttpUrl
 from typing import Dict, Optional, List, Union
 from urllib.parse import urlparse
 from .http_message import HTTPMessage
-from .message import Message
+from hedra.distributed.models.base.message import Message
 
 
 class HTTPRequestMethod(Enum):

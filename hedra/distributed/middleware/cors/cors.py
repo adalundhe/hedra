@@ -1,8 +1,10 @@
 from hedra.distributed.middleware.base import (
     Middleware
 )
-from hedra.distributed.models.response import Response
-from hedra.distributed.models.request import Request
+from hedra.distributed.models.http import (
+    Request,
+    Response
+)
 from typing import Union, Optional, List, Literal, Tuple
 from .cors_headers import CorsHeaders
 

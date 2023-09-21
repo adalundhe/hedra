@@ -12,8 +12,8 @@ from hedra.distributed.env import (
     load_env
 )
 from hedra.distributed.env.time_parser import TimeParser
-from hedra.distributed.models.dns_message import DNSMessage
-from hedra.distributed.models.http_message import HTTPMessage
+from hedra.distributed.models.dns import DNSMessage
+from hedra.distributed.models.http import HTTPMessage
 from hedra.distributed.discovery.dns.core.url import URL
 from typing import Optional, Tuple, Union, Dict
 
