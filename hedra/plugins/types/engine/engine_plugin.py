@@ -44,7 +44,7 @@ class EnginePlugin(Generic[A, R], Plugin):
         self.hooks = {}
         self.request_type = self.__class__.__name__
         self.next_name = None
-        self.intercept = False
+        self.suspend: bool = False
         self.waiter = None
         self.actions: ActionsStore = None
         self.registered = {}

@@ -1,12 +1,16 @@
 import inspect
+import networkx
 import os
 import uuid
-from hedra.core.engines.client import Client
-from hedra.core.engines.client.config import Config
 from typing import (
     Dict,
-    Any
+    Any,
+    List,
+    Callable,
+    Awaitable
 )
+from .engines.client import Client, TimeParser
+from .engines.client.config import Config
 from .hooks import (
     Hook
 )
@@ -30,10 +34,15 @@ class Workflow:
             )
         }
 
+        for hook in self.hooks.values():
+            hook.call = hook.call.__get__(self, self.__class__)
+            setattr(self, hook.name, hook.call)
+
         self.config = {
             'vus': 1000,
             'duration': '1m',
-            'threads': os.cpu_count()
+            'threads': os.cpu_count(),
+            'connect_retries': 3
         }
 
         self.config.update({
@@ -41,6 +50,8 @@ class Workflow:
                 self
             ) if self.config.get(name)
         })
+
+        self.config['duration'] = TimeParser(self.config['duration']).time
 
         self.client = Client(
             self.graph,
@@ -50,4 +61,19 @@ class Workflow:
             Config(**self.config)
         )
 
+        self.client.set_mutations()
+
+        self.workflow_graph = networkx.DiGraph()
+
+        self.traversal_order: List[
+            List[
+                Callable[
+                    ...,
+                    Awaitable[Any]
+                ]
+            ]
+        ] = []
         
+        self.is_test = len([
+            hook for hook in self.hooks.values() if hook.is_test
+        ]) > 0

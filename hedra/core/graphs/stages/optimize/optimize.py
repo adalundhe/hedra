@@ -33,7 +33,6 @@ from hedra.monitoring import (
     MemoryMonitor
 )
 from hedra.monitoring.base.exceptions import MonitorKilledError
-from hedra.plugins.extensions import get_enabled_extensions
 from hedra.plugins.types.extension.types import ExtensionType
 from hedra.plugins.types.extension.extension_plugin import ExtensionPlugin
 from hedra.plugins.types.plugin_types import PluginType
@@ -220,18 +219,6 @@ class Optimize(Stage):
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Optimizer plugin - {plugin_name}')
   
         execute_stage_extensions: Dict[str, ExtensionPlugin] = {}
-
-        stage_extension_plugins: List[str] = self.plugins_by_type.get(
-            PluginType.EXTENSION, {}
-        )
-
-        extension_plugins: Dict[str, Type[ExtensionPlugin]] = get_enabled_extensions()
-        for plugin_name in stage_extension_plugins:
-            plugin = extension_plugins.get(plugin_name)
-
-            if plugin:
-                enabled_plugin = plugin()
-                execute_stage_extensions[enabled_plugin.name] = enabled_plugin
 
         source_stage_plugins = defaultdict(list)
         for plugin in self.plugins.values():

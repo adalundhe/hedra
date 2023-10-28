@@ -51,7 +51,6 @@ from hedra.plugins.types.extension.extension_plugin import ExtensionPlugin
 from hedra.reporting.reporter import ReporterConfig
 from hedra.versioning.flags.types.base.active import active_flags
 from hedra.versioning.flags.types.base.flag_type import FlagTypes
-from hedra.plugins.extensions import get_enabled_extensions
 from .parallel import execute_actions
 
 
@@ -227,18 +226,6 @@ class Execute(Stage, Generic[Unpack[T]]):
             await self.logger.filesystem.aio['hedra.core'].info(f'{self.metadata_string} - Loaded Persona plugin - {plugin.name}')
         
         execute_stage_extensions: Dict[str, ExtensionPlugin] = {}
-
-        stage_extension_plugins: List[str] = self.plugins_by_type.get(
-            PluginType.EXTENSION, {}
-        )
-
-        extension_plugins: Dict[str, Type[ExtensionPlugin]] = get_enabled_extensions()
-        for plugin_name in stage_extension_plugins:
-            plugin = extension_plugins.get(plugin_name)
-
-            if plugin:
-                enabled_plugin = plugin()
-                execute_stage_extensions[enabled_plugin.name] = enabled_plugin
 
         source_stage_plugins = defaultdict(list)
         for plugin in self.plugins.values():

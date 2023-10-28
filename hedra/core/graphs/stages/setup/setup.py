@@ -73,6 +73,7 @@ class SetupCall:
                 self.hook.stage_instance.client._config = self.config
                 self.hook.stage_instance.client.set_mutations()
                 await self.hook.call()
+                break
 
             except Exception as setup_exception:
                 self.exception = setup_exception

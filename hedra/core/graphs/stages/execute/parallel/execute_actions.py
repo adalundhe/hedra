@@ -44,7 +44,6 @@ from hedra.logging import (
     LoggerTypes,
     logging_manager
 )
-from hedra.plugins.extensions import get_enabled_extensions
 from hedra.plugins.types.extension.types import ExtensionType
 from hedra.plugins.types.plugin_types import PluginType
 from hedra.plugins.types.engine.engine_plugin import EnginePlugin
@@ -390,7 +389,6 @@ def execute_actions(parallel_config: str):
         engine_plugins: Dict[str, Type[EnginePlugin]] = plugins_by_type[PluginType.ENGINE]
         
         stage_extension_plugins: List[str] = source_stage_plugins[PluginType.EXTENSION]
-        extension_plugins: Dict[str, Type[ExtensionPlugin]] = get_enabled_extensions()
 
         enabled_extensions: Dict[str, ExtensionPlugin] = {}
         
@@ -403,13 +401,6 @@ def execute_actions(parallel_config: str):
             plugin = engine_plugins.get(plugin_name)
             plugin.name = plugin_name
             registered_engines[plugin_name] = lambda config: plugin(config)
-
-        for plugin_name in stage_extension_plugins:
-            plugin = extension_plugins.get(plugin_name)
-
-            if plugin:
-                enabled_plugin = plugin()
-                enabled_extensions[enabled_plugin.name] = enabled_plugin
 
         events_graph = EventGraph(hooks_by_type)
         events_graph.hooks_to_events().assemble_graph().apply_graph_to_events()

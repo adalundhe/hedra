@@ -19,7 +19,6 @@ class BaseAction(Generic[A]):
     __slots__ = ( 
         'action_id'
         'protocols', 
-        'name', 
         'is_setup', 
         'metadata', 
         'hooks',
@@ -29,14 +28,14 @@ class BaseAction(Generic[A]):
     )
 
     def __init__(
-        self, 
-        name: str=None,
+        self,
+        name: str=None, 
         user: str=None, 
         tags: List[Dict[str, str]] = []
     ) -> None:
+        self.name = name
         self.action_id = str(uuid.uuid4())
         self.protocols = ProtocolMap()
-        self.name = name
         self.is_setup = False
         self.metadata = Metadata(user, tags)
         self.hooks: Hooks[BaseAction] = Hooks()

@@ -23,7 +23,6 @@ from .client_types import  (
     GraphQLHTTP2Client,
     WebsocketClient,
     PlaywrightClient,
-    TaskClient,
     UDPClient
 )
 
@@ -65,7 +64,6 @@ class Client(Generic[Unpack[T]]):
         self._websocket = WebsocketClient
         self._playwright = PlaywrightClient
         self._udp = UDPClient
-        self._task = TaskClient
 
         self.clients = {}
         self._plugin = PluginsStore[Unpack[T]](self.metadata_string)
@@ -255,20 +253,6 @@ class Client(Generic[Unpack[T]]):
         self._udp.next_name = self.next_name
         self._udp.intercept = self.intercept
         return self._udp
-    
-    @property
-    def task(self):
-            
-        if self._task.initialized is False:
-            self._task = self._task(self._config)
-            self._task.metadata_string = self.metadata_string
-            self.clients[RequestTypes.TASK] = self._task
-            
-            self._task.mutations.update(self.mutations)
-            self.mutations.update(self._task.mutations)
-
-        self._task.next_name = self.next_name
-        return self._task
 
 
         
