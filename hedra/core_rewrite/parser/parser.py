@@ -21,6 +21,7 @@ class Parser:
     def __init__(self) -> None:
         
         self.parser_class: Any = None
+        self.parser_class_name: Union[str, None] = None
         self._attributes = {}
         self.constants_count = 0
         self._constants = []

@@ -101,15 +101,17 @@ class Hook:
             if isinstance(node, ast.Call):
 
                 result = self.parser.parse_call(node)
+                engine = result.get('engine')
 
-                if result.get('engine') and len(self.cache) < 1:
-
+                if engine:
+                    
+                    parser_class = self.parser.parser_class_name
                     method = result.get('method')
 
-                    source_fullname = f'{self.full_name}.{method}'
+                    source_fullname = f'{parser_class}.client.{engine}.{method}'
                     result['source'] = source_fullname
 
-                    self.cache = result
+                    self.cache[source_fullname] = result
 
 
 

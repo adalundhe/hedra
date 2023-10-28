@@ -58,9 +58,10 @@ class Graph:
     ):
         
         for hook in workflow.hooks.values():
+            hook.parser.parser_class = workflow
+            hook.parser.parser_class_name = workflow.name
 
             if hook.is_test:
-                hook.parser.parser_class = workflow
                 hook.setup()
                
         sources = []
