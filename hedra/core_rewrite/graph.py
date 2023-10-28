@@ -6,6 +6,7 @@ import networkx
 import traceback
 import ast
 import inspect
+from pprint import pprint
 from typing import List, Any, Union
 from .engines.client.client_types.common.base_action import BaseAction
 from .workflow import Workflow
@@ -61,8 +62,9 @@ class Graph:
             hook.parser.parser_class = workflow
             hook.parser.parser_class_name = workflow.name
 
-            if hook.is_test:
-                hook.setup()
+            hook.setup()
+
+            pprint(hook.cache)
                
         sources = []
 

@@ -95,7 +95,6 @@ class Hook:
 
             if isinstance(node, ast.Attribute):
                 result = self.parser.parse_attribute(node)
-
         
         for node in ast.walk(self._tree):
             if isinstance(node, ast.Call):
@@ -107,9 +106,11 @@ class Hook:
                     
                     parser_class = self.parser.parser_class_name
                     method = result.get('method')
+                    self.static = result.get('static')
 
                     source_fullname = f'{parser_class}.client.{engine}.{method}'
                     result['source'] = source_fullname
+
 
                     self.cache[source_fullname] = result
 
