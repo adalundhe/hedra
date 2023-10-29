@@ -7,7 +7,7 @@ import traceback
 import ast
 import inspect
 from pprint import pprint
-from typing import List, Any, Union
+from typing import List, Any, Union, Dict, Callable
 from .engines.client.client_types.common.base_action import BaseAction
 from .workflow import Workflow
 
@@ -40,12 +40,22 @@ class Graph:
     
     def __init__(
         self,
-        workflows: List[Workflow]
+        workflows: List[Workflow],
+        context: Dict[
+            str, 
+            Callable[..., Any] | object
+        ] = {}
     ) -> None:
         self.graph = __file__
         self.workflows = workflows
         self.max_active = 0
         self.active = 0
+
+        self.context: Dict[
+            str, 
+            Callable[..., Any] | object
+        ] = context
+
         self._active_waiter: asyncio.Future | None = None
 
     async def run(self):
@@ -61,6 +71,8 @@ class Graph:
         for hook in workflow.hooks.values():
             hook.parser.parser_class = workflow
             hook.parser.parser_class_name = workflow.name
+
+            hook.parser.attributes.update(self.context)
 
             hook.setup()
 

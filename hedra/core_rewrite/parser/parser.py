@@ -1,6 +1,8 @@
 import ast
 import json
+import inspect
 import uuid
+import asyncio
 from collections import defaultdict
 from typing import (
     List,
@@ -9,10 +11,11 @@ from typing import (
     Any,
     Literal,
     Callable,
-    Awaitable,
     Union
 )
+from types import FunctionType
 from .dynamic_placeholder import DynamicPlaceholder
+from .dynamic_template_string import DynamicTemplateString
 from .placeholder_call import PlaceholderCall
 
 
@@ -22,8 +25,7 @@ class Parser:
         
         self.parser_class: Any = None
         self.parser_class_name: Union[str, None] = None
-        self._attributes = {}
-        self.constants_count = 0
+        self.attributes = {}
         self._constants = []
         self._calls: Dict[str, Callable[..., Any]] = {}
         self._active_trace: bool = False
@@ -38,7 +40,9 @@ class Parser:
             ast.Assign: self.parse_assign,
             ast.Call: self.parse_call,
             ast.keyword: self.parse_keyword,
-            ast.Await: self.parse_await
+            ast.Await: self.parse_await,
+            ast.JoinedStr: self.parse_joined_string,
+            ast.FormattedValue: self.parse_formatted_value
         }
 
         self._types = defaultdict(lambda node: node, zip(
@@ -46,16 +50,12 @@ class Parser:
             node_types.values()
         ))
 
-        self.last_attribute: Any = None
-
     def parse_node(self, node: ast.AST):
         return self._types.get(
             type(node)
         )(node)
 
     def parse_constant(self, node: ast.Constant) -> Literal:
-        self.constants_count += 1
-        self._constants.append(node.value)
         return node.value
     
     def parse_list(self, node: ast.List) -> List[Any]:
@@ -83,7 +83,6 @@ class Parser:
         return dict(zip(keys, values))
 
     def parse_tuple(self, node: ast.Tuple) -> Tuple[Any, ...]:
-
         return [
             self._types.get(
                 type(node_val)
@@ -92,7 +91,7 @@ class Parser:
     
     def parse_name(self, node: ast.Name) -> Any:
 
-        attribute_value = self._attributes.get(node.id)
+        attribute_value = self.attributes.get(node.id)
 
         if attribute_value:
             return attribute_value
@@ -101,17 +100,27 @@ class Parser:
     
     def parse_attribute(self, node: ast.Attribute) -> Any:
 
-        source = self._types.get(
-            type(node.value)
-        )(node.value)
+
+        if isinstance(node.value, ast.Name):
+            source = node.value.id
+
+        else:
+            source = self._types.get(
+                type(node.value)
+            )(node.value)
 
         attribute_name = node.attr
-
         attribute_value: Any = node.value
-        if source == 'self':
-            attribute_value = getattr(self.parser_class, attribute_name)
+        
+        source_instance = self.attributes.get(
+            source,
+            self.parser_class
+        )
 
-        self._attributes[attribute_name] = attribute_value
+        if hasattr(source_instance, attribute_name):
+            attribute_value = getattr(source_instance, attribute_name)
+
+        self.attributes[attribute_name] = attribute_value
 
         return attribute_value
     
@@ -128,8 +137,22 @@ class Parser:
             target_value = self._types.get(
                 type(node.value)
             )(node.value)
-            
+
+            if isinstance(target_value, ast.Name) and isinstance(node.value, ast.Attribute):
+                instance = self.attributes.get(
+                    target_value.id,
+                    self.parser_class
+                )
+
+                if hasattr(instance, node.value.attr):
+                    target_value = getattr(instance, node.value.attr)
+                    self.attributes[node.value.attr] = target_value
+
             if isinstance(node.value, ast.Call):
+
+                call_data: Dict[str, Any] = target_value
+                is_static = call_data.get('static')
+
 
                 compiled_call = compile(
                     ast.unparse(node.value),
@@ -137,13 +160,23 @@ class Parser:
                     'eval'
                 )
 
-                target_value = PlaceholderCall({
-                    **target_value,
-                    'call_name': compiled_call.co_names[0]
-                })
+                call_name = compiled_call.co_names[0]
+                call_item = self.attributes.get(call_name)
+
+                is_async = inspect.isawaitable(call_item)
+
+                if is_static and call_item and is_async is False:
+                    target_node = target.id if isinstance(target, ast.Name) else target_node
+                    target_value = call_item()
+                
+                else:
+
+                    target_value = PlaceholderCall({
+                        **target_value,
+                        'call_name': compiled_call.co_names[0]
+                    })
 
             elif isinstance(node.value, ast.Await):
-
 
                 compiled_call = compile(
                     ast.unparse(target_value),
@@ -160,21 +193,19 @@ class Parser:
                     'call_name': compiled_call.co_names[0],
                     'awaitable': True
                 })
+
+            elif isinstance(target, ast.Name) and isinstance(target_value, ast.expr) is False:
+                target_node = target.id
                 
             assignments[target_node] = target_value
-            self._attributes.update(assignments)
+            self.attributes.update(assignments)
 
         return assignments
     
     def parse_call(self, node: ast.Call):
 
-        self._active_trace = True
-
         call_id = str(uuid.uuid4())
         self._calls[call_id] = node
-
-        self.constants_count = 0
-        self._constants = []
 
         call = {
             'call_id': call_id,
@@ -227,7 +258,10 @@ class Parser:
         call['kwargs'] = call_kwargs
 
         call_string = ast.unparse(node)
-        
+
+        all_args_count = len(call['args']) + len(call['kwargs'])
+        call['static'] = len(matched_constants) == all_args_count
+
         if 'self.client.' in call_string:
             call_string = call_string.removeprefix('self.client.')
         
@@ -235,13 +269,10 @@ class Parser:
             method, _ = method_string.split('(', maxsplit=1)
 
             call.update({
-                'source': self.parser_class.name,
+                'source': self.parser_class_name,
                 'engine': engine,
-                'method': method,
-                'static': len(matched_constants) == self.constants_count
+                'method': method
             })
-
-        self._active_trace = False
         
         return call
     
@@ -255,3 +286,34 @@ class Parser:
     
     def parse_await(self, node: ast.Await) -> Any:
         return node.value
+    
+    def parse_joined_string(self, node: ast.JoinedStr) -> Any:
+
+        values = [
+            self._types.get(
+                type(arg)
+            )(arg) for arg in node.values
+        ]
+
+        joined_values = ''
+
+        for value in values:
+            try:
+                json.dumps(value)
+                joined_values = f'{joined_values}{value}'
+
+            except Exception:
+                joined_values = DynamicTemplateString(values)
+                break
+                    
+
+        return joined_values
+
+    def parse_formatted_value(self, node: ast.FormattedValue) -> Any:
+        result = self._types.get(
+            type(node.value)
+        )(node.value)
+
+        return result
+
+        
