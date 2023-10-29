@@ -164,20 +164,24 @@ class Parser:
                 call_name = compiled_call.co_names[0]
                 call_item = self.attributes.get(call_name)
 
+                call_args: List[Any] = call_data.get('args')
+                call_kwargs: Dict[str, Any] = call_data.get('kwargs')
+                call_is_static = call_data.get('static')
 
-                return_type = get_origin(
+                return_is_static = get_origin(
                     inspect.signature(call_item).return_annotation
-                )
+                ) == Literal
+
+                no_arguments = len(
+                    inspect.signature(call_item).parameters
+                ) == 0
                 
-                is_static = call_data.get('static') and return_type == Literal
+                is_static = call_is_static and return_is_static and no_arguments
 
                 is_async = inspect.isawaitable(call_item)
-
+                
                 if is_static and call_item and is_async is False:
                     target_node = target.id if isinstance(target, ast.Name) else target_node
-
-                    call_args: List[Any] = call_data.get('args')
-                    call_kwargs: Dict[str, Any] = call_data.get('kwargs')
 
                     args = [
                         arg.get('value') for arg in call_args
@@ -187,15 +191,11 @@ class Parser:
                         name: arg.get('value') for name, arg, in call_kwargs.items()
                     }
 
-                    try:
-                        target_value = call_item(
-                            *args,
-                            **kwargs
-                        )
-
-                    except Exception:
-                        pass
-                
+                    target_value = call_item(
+                        *args,
+                        **kwargs
+                    )
+                    
                 else:
 
                     call_name = compiled_call.co_names[0]
