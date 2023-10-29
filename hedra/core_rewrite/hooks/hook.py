@@ -110,7 +110,6 @@ class Hook:
                     self.static = result.get('static')
 
                     source_fullname = f'{parser_class}.client.{engine}.{method}'
-                    result['source'] = source_fullname
 
                 elif isinstance(call_source, ast.Attribute):
                     source_fullname = call_source.attr
@@ -123,6 +122,7 @@ class Hook:
 
                 if source_fullname != 'step':
                     call_id = result.get('call_id')
+                    result['source'] = source_fullname
                     self.cache[source_fullname][call_id] = result
 
 
