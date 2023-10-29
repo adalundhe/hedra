@@ -12,7 +12,8 @@ from typing import (
     Literal,
     Callable,
     Union,
-    get_origin
+    get_origin,
+    get_args
 )
 from types import FunctionType
 from .dynamic_placeholder import DynamicPlaceholder
@@ -164,13 +165,20 @@ class Parser:
                 call_name = compiled_call.co_names[0]
                 call_item = self.attributes.get(call_name)
 
+                if call_name == 'self' and isinstance(node.value.func, ast.Attribute):
+                    call_item = getattr(
+                        self.parser_class,
+                        node.value.func.attr
+                    )
+
+
                 call_args: List[Any] = call_data.get('args')
                 call_kwargs: Dict[str, Any] = call_data.get('kwargs')
                 call_is_static = call_data.get('static')
 
-                return_is_static = get_origin(
-                    inspect.signature(call_item).return_annotation
-                ) == Literal
+                call_return_annotation = inspect.signature(call_item).return_annotation
+
+                return_is_static = get_origin(call_return_annotation) == Literal
 
                 no_arguments = len(
                     inspect.signature(call_item).parameters
@@ -178,9 +186,12 @@ class Parser:
                 
                 is_static = call_is_static and return_is_static and no_arguments
 
-                is_async = inspect.isawaitable(call_item)
+                is_async = inspect.isawaitable(call_item) or inspect.iscoroutinefunction(call_item)
                 
                 if is_static and call_item and is_async is False:
+
+                    return_annotation_value = get_args(call_return_annotation)[0]
+
                     target_node = target.id if isinstance(target, ast.Name) else target_node
 
                     args = [
@@ -195,6 +206,8 @@ class Parser:
                         *args,
                         **kwargs
                     )
+
+                    assert return_annotation_value == target_value, "Err. - Literal annotation does not match return value of static function."
                     
                 else:
 

@@ -58,6 +58,12 @@ class Graph:
 
         self._active_waiter: asyncio.Future | None = None
 
+        for workflow in workflows:
+            methods = inspect.getmembers(workflow, inspect.ismethod)
+            
+            for name, method in methods:
+                self.context[name] = method
+
     async def run(self):
 
         for workflow in self.workflows:
