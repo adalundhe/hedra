@@ -60,7 +60,9 @@ class Hook:
             } for arg in self.params.values() if arg.KEYWORD_ONLY
         }
 
-        self.static = False
+        self.static = len([
+            param for param in self.params if param != 'self'
+        ]) == 0
 
         self.return_type = call_signature.return_annotation
         self.is_test = False
