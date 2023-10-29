@@ -370,7 +370,7 @@ class HTTPClient(BaseClient[Union[A, HTTPAction], Union[R, HTTPResult]]):
         except Exception as e:       
             raise e
 
-    async def request(self, action: HTTPAction) -> Coroutine[Any, Any, HTTPResult]:
+    async def request(self, action: HTTPAction) -> HTTPResult:
         trace: Union[Trace, None] = None
         if self.tracing_session:
             trace = self.tracing_session.create_trace()

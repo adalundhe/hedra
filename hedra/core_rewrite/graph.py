@@ -82,6 +82,7 @@ class Graph:
 
             hook.setup()
 
+            print(hook.full_name)
             pprint(hook.cache)
                
         sources = []

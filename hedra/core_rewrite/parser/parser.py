@@ -82,20 +82,27 @@ class Parser:
             )(value_val) for value_val in node.values
         ]
 
-        return dict(zip(keys, values))
+        return {
+            key: value for key, value in zip(
+                keys,
+                values
+            )
+        }
 
     def parse_tuple(self, node: ast.Tuple) -> Tuple[Any, ...]:
-        return [
+        values = [
             self._types.get(
                 type(node_val)
             )(node_val) for node_val in node.elts if node_val is not None
         ]
+
+        return values
     
     def parse_name(self, node: ast.Name) -> Any:
 
         attribute_value = self.attributes.get(node.id)
 
-        if attribute_value:
+        if attribute_value and isinstance(attribute_value, ast.Name) is False:
             return attribute_value
 
         return DynamicPlaceholder(node.id)
@@ -149,6 +156,16 @@ class Parser:
                 if hasattr(instance, node.value.attr):
                     target_value = getattr(instance, node.value.attr)
                     self.attributes[node.value.attr] = target_value
+
+            elif isinstance(node.value, ast.Name) and isinstance(target, ast.Name):
+       
+                target_value = self.attributes.get(
+                    node.value.id,
+                    DynamicPlaceholder(node.value.id)
+                )
+
+            elif isinstance(target, ast.Name) and isinstance(target_value, ast.expr) is False:
+                target_node = target.id
 
             if isinstance(node.value, ast.Call):
 
@@ -261,10 +278,7 @@ class Parser:
                     'call_name': call_name,
                     'awaitable': True
                 })
-
-            elif isinstance(target, ast.Name) and isinstance(target_value, ast.expr) is False:
-                target_node = target.id
-                
+            
             assignments[target_node] = target_value
             self.attributes.update(assignments)
 
@@ -275,11 +289,25 @@ class Parser:
         call_id = str(uuid.uuid4())
         self._calls[call_id] = node
 
+        call_source = self._types.get(
+            type(node.func)
+        )(node.func)
+
+        source = call_source
+        if isinstance(call_source, ast.Attribute):
+            source = call_source.attr
+
+            attribute = self.attributes.get(source)
+
+            if isinstance(attribute, ast.Name):
+                attribute = self.attributes.get(
+                    attribute.id,
+                    DynamicPlaceholder(attribute.id)
+                )
+
         call = {
             'call_id': call_id,
-            'source': self._types.get(
-                type(node.func)
-            )(node.func),
+            'source': source,
             'args': [
                 {
                     'value': self._types.get(
@@ -328,7 +356,7 @@ class Parser:
         call_string = ast.unparse(node)
 
         all_args_count = len(call['args']) + len(call['kwargs'])
-        call['static'] = len(matched_constants) == all_args_count
+        call['static'] = len(matched_constants) == all_args_count and isinstance(call_source, ast.Attribute) is False
 
         if 'self.client.' in call_string:
             call_string = call_string.removeprefix('self.client.')
@@ -345,11 +373,12 @@ class Parser:
         return call
     
     def parse_keyword(self, node: ast.keyword) -> Any:
+
         return {
             'name': node.arg,
             'value': self._types.get(
-                type(node.value)
-            )(node.value)
+            type(node.value)
+        )(node.value)
         }
     
     def parse_await(self, node: ast.Await) -> Any:

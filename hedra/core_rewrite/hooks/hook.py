@@ -78,7 +78,7 @@ class Hook:
                 BaseResult
             )
 
-        self.cache: Dict[str, Any] = {}
+        self.cache: Dict[str, List[Any]] = defaultdict(dict)
         self.parser = Parser()
         self._tree = ast.parse(
             textwrap.dedent(
@@ -101,6 +101,7 @@ class Hook:
 
                 result = self.parser.parse_call(node)
                 engine = result.get('engine')
+                call_source = result.get('source')
 
                 if engine:
                     
@@ -111,8 +112,18 @@ class Hook:
                     source_fullname = f'{parser_class}.client.{engine}.{method}'
                     result['source'] = source_fullname
 
+                elif isinstance(call_source, ast.Attribute):
+                    source_fullname = call_source.attr
 
-                    self.cache[source_fullname] = result
+                elif inspect.isfunction(call_source) or inspect.ismethod(call_source):
+                    source_fullname = call_source.__qualname__
+
+                else:
+                    source_fullname = call_source
+
+                if source_fullname != 'step':
+                    call_id = result.get('call_id')
+                    self.cache[source_fullname][call_id] = result
 
 
 
