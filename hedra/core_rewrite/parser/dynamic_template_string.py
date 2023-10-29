@@ -1,5 +1,6 @@
 import inspect
 from typing import List, Any
+from .placeholder_call import PlaceholderCall
 
 
 class DynamicTemplateString:
@@ -9,9 +10,17 @@ class DynamicTemplateString:
         values: List[Any]
     ) -> None:
         self.values = values
-        self.is_async = len([
+
+        is_awaitable = len([
             inspect.isawaitable(value) for value in values
-        ])
+        ]) > 0 and len([
+            value for value in values if isinstance(
+                value, 
+                PlaceholderCall
+            ) and value.is_async
+        ]) > 0
+
+        self.is_async = is_awaitable
 
     async def eval_string_async(self, values: List[Any]) -> str:
         
@@ -30,6 +39,10 @@ class DynamicTemplateString:
                 value = value()
                 joined_string = f'{joined_string}{value}'
 
+            elif isinstance(value, PlaceholderCall):
+                value = await value.call()
+                joined_string = f'{joined_string}{value}'
+                
             else:
                 joined_string = f'{joined_string}{value}'
 

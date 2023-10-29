@@ -11,7 +11,8 @@ from typing import (
     Any,
     Literal,
     Callable,
-    Union
+    Union,
+    get_origin
 )
 from types import FunctionType
 from .dynamic_placeholder import DynamicPlaceholder
@@ -163,17 +164,47 @@ class Parser:
                 call_name = compiled_call.co_names[0]
                 call_item = self.attributes.get(call_name)
 
+
+                return_type = get_origin(
+                    inspect.signature(call_item).return_annotation
+                )
+                
+                is_static = call_data.get('static') and return_type == Literal
+
                 is_async = inspect.isawaitable(call_item)
 
                 if is_static and call_item and is_async is False:
                     target_node = target.id if isinstance(target, ast.Name) else target_node
-                    target_value = call_item()
+
+                    call_args: List[Any] = call_data.get('args')
+                    call_kwargs: Dict[str, Any] = call_data.get('kwargs')
+
+                    args = [
+                        arg.get('value') for arg in call_args
+                    ]
+
+                    kwargs = {
+                        name: arg.get('value') for name, arg, in call_kwargs.items()
+                    }
+
+                    try:
+                        target_value = call_item(
+                            *args,
+                            **kwargs
+                        )
+
+                    except Exception:
+                        pass
                 
                 else:
 
+                    call_name = compiled_call.co_names[0]
+
                     target_value = PlaceholderCall({
                         **target_value,
-                        'call_name': compiled_call.co_names[0]
+                        'call': self.attributes.get(call_name),
+                        'call_name': call_name,
+                        'awaitable': is_async
                     })
 
             elif isinstance(node.value, ast.Await):
@@ -188,9 +219,33 @@ class Parser:
                     type(target_value)
                 )(target_value)
 
+                call_name = compiled_call.co_names[0]
+
+                if inspect.iscoroutine(call_data):
+
+                    call_name = call_data.__qualname__
+                    call = self.attributes.get(call_name)
+
+                    call_signature = inspect.signature(call)
+                    call_args = call_signature.parameters.values()
+
+                    call_data = {
+                        'args': [
+                            DynamicPlaceholder(
+                                arg.name
+                            ) for arg in call_args if arg.default is None
+                        ],
+                        'kwargs': {
+                            arg.name: DynamicPlaceholder(
+                                arg.name
+                            ) for arg in call_args if arg.default
+                        }
+                    }  
+
                 target_value = PlaceholderCall({
                     **call_data,
-                    'call_name': compiled_call.co_names[0],
+                    'call': self.attributes.get(call_name),
+                    'call_name': call_name,
                     'awaitable': True
                 })
 
