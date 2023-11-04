@@ -20,7 +20,7 @@ from yaspin.spinners import Spinners
 from aiologger.levels import LogLevel
 from aiologger.formatters.base import Formatter
 from hedra.logging.spinner import ProgressText
-from yaspin.helpers import to_unicode
+from yaspin.core import to_unicode
 from .async_logger import AsyncLogger
 from .logger_types import LoggerTypes
 
