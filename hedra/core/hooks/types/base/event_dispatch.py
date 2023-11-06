@@ -1,7 +1,6 @@
 from __future__ import annotations
 import asyncio
 import networkx
-import matplotlib.pyplot as plt
 from collections import OrderedDict, defaultdict
 from typing import List, Union, Dict, Any, Tuple
 from hedra.core.hooks.types.action.event import ActionEvent

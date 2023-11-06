@@ -26,7 +26,7 @@ class BatchExecutor:
         start_method: str='spawn'
     ) -> None:
         
-        cpu_cores = psutil.cpu_count(logical=False)
+        cpu_cores = psutil.cpu_count()
         if max_workers > cpu_cores:
             max_workers = cpu_cores
 

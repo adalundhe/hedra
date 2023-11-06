@@ -12,5 +12,6 @@ class SubmitKafkaResultsStage(Submit):
         host='localhost:9092',
         client_id='results',
         events_topic='events',
-        metrics_topic='metrics'
+        metrics_topic='metrics',
+        compression_type=None
     )
