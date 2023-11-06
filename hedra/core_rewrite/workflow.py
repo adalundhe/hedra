@@ -77,3 +77,29 @@ class Workflow:
         self.is_test = len([
             hook for hook in self.hooks.values() if hook.is_test
         ]) > 0
+
+        for hook in self.hooks.values():
+            hook.setup(self.context)
+               
+        sources = []
+
+        for hook_name, hook in self.hooks.items():
+            self.workflow_graph.add_node(hook_name, hook=hook)
+
+        for hook in self.hooks.values():
+
+            if len(hook.dependencies) == 0:
+                sources.append(hook.name)
+            
+            for dependency in hook.dependencies:
+                self.workflow_graph.add_edge(
+                    dependency, 
+                    hook.name
+                )
+
+        for traversal_layer in networkx.bfs_layers(self.workflow_graph, sources):
+            self.traversal_order.append([
+                self.hooks.get(
+                    hook_name
+                ).call for hook_name in traversal_layer
+            ])

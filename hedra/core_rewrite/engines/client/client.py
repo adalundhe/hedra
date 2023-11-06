@@ -354,3 +354,11 @@ class Client(Generic[Unpack[T]]):
 
         else:
             engine = self.clients[engine_type]
+
+        
+        if isinstance(engine, PlaywrightClient) and engine.config is None:
+            await engine.setup(
+                config=self._config.playwright_options
+            )
+
+        await engine.prepare()

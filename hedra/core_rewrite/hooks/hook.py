@@ -88,7 +88,20 @@ class Hook:
             )
         )
 
-    def setup(self):
+    def setup(
+        self,
+        context: Dict[str, Any]
+    ):
+        
+        self.parser.attributes.update(context)
+
+        for cls in inspect.getmro(self.call.__self__.__class__):
+            if self.call.__name__ in cls.__dict__: 
+                
+                self.parser.parser_class = cls
+                self.parser.parser_class_name = self.workflow
+
+                break
         
         for node in ast.walk(self._tree):
 

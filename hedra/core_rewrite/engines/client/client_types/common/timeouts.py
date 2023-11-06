@@ -2,8 +2,8 @@ class Timeouts:
 
     __slots__ = (
         'connect_timeout',
-        'socket_read_timeout',
-        'socket_write_timeout',
+        'read_timeout',
+        'write_timeout',
         'request_timeout',
         'total_time'
     )

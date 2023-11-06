@@ -69,41 +69,25 @@ class Graph:
         for workflow in self.workflows:
             results = await self._run(workflow)
 
-    async def setup(
-        self,
-        workflow: Workflow
-    ):
+    async def setup(self):
         
-        for hook in workflow.hooks.values():
-            hook.parser.parser_class = workflow
-            hook.parser.parser_class_name = workflow.name
+        for workflow in self.workflows:
 
-            hook.parser.attributes.update(self.context)
+            functions = inspect.getmembers(
+                workflow, 
+                inspect.isfunction
+            )
 
-            hook.setup()
-               
-        sources = []
+            classes = inspect.getmembers(
+                workflow, 
+                inspect.isclass
+            )
 
-        for hook_name, hook in workflow.hooks.items():
-            workflow.workflow_graph.add_node(hook_name, hook=hook)
+            for name, function in functions:
+                self.context[name] = function
 
-        for hook in workflow.hooks.values():
-
-            if len(hook.dependencies) == 0:
-                sources.append(hook.name)
-            
-            for dependency in hook.dependencies:
-                workflow.workflow_graph.add_edge(
-                    dependency, 
-                    hook.name
-                )
-
-        for traversal_layer in networkx.bfs_layers(workflow.workflow_graph, sources):
-            workflow.traversal_order.append([
-                workflow.hooks.get(
-                    hook_name
-                ).call for hook_name in traversal_layer
-            ])
+            for name, class_item in classes:
+                self.context[name] = class_item
 
     async def _run(
         self,
