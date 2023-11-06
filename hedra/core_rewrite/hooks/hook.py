@@ -122,16 +122,13 @@ class Hook:
                 else:
                     source_fullname = call_source
 
-                if source_fullname != 'step':
+                is_cacheable_call = (
+                    source_fullname != 'step' and (
+                        engine is not None or self.is_test is False
+                    )
+                )
+
+                if is_cacheable_call:
                     call_id = result.get('call_id')
                     result['source'] = source_fullname
-                    self.cache[source_fullname][call_id] = result
-
-
-
-        
-
-
-
-
-
+                    self.cache[source_fullname][call_id] = result 

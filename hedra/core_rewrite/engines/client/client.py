@@ -7,7 +7,9 @@ from typing import (
     Generic, 
     Iterable, 
     Union, 
-    Optional
+    Optional,
+    Callable,
+    Any
 )
 from typing_extensions import TypeVarTuple, Unpack
 from hedra.core.engines.types.common import Timeouts
@@ -67,9 +69,6 @@ class Client(Generic[Unpack[T]]):
 
         self.actions = ActionsStore(self.metadata_string)
         self.mutations: Dict[str, Mutation] = {}
-        self.timeouts = Timeouts(
-            total_timeout=config.request_timeout
-        )
 
         self.initialized: Dict[str, bool] = {
             'graphql': False,
@@ -83,6 +82,72 @@ class Client(Generic[Unpack[T]]):
             'websocket': False
         }
 
+        self._engines: Dict[
+            str,
+            Callable[
+                [Config],
+                Union[
+                    GraphQLClient,
+                    GraphQLHTTP2Client,
+                    GRPCClient,
+                    HTTPClient,
+                    HTTP2Client,
+                    HTTP3Client,
+                    PluginsStore[Unpack[T]],
+                    PlaywrightClient,
+                    UDPClient,
+                    WebsocketClient
+                ]
+            ]
+        ] = {
+            'graphql': lambda config: GraphQLClient(
+                concurrency=config.vus,
+                timeouts=config.timeouts,
+                reset_connections=config.reset_connections
+            ),
+            'graphqlh2': lambda config: GraphQLHTTP2Client(
+                concurrency=config.vus,
+                timeouts=config.timeouts,
+                reset_connections=config.reset_connections
+            ),
+            'grpc': lambda config: GRPCClient(
+                concurrency=config.vus,
+                timeouts=config.timeouts,
+                reset_connections=config.reset_connections
+            ),
+            'http': lambda config: HTTPClient(
+                concurrency=config.vus,
+                timeouts=config.timeouts,
+                reset_connections=config.reset_connections
+            ),
+            'http2': lambda config: HTTP2Client(
+                concurrency=config.vus,
+                timeouts=config.timeouts,
+                reset_connections=config.reset_connections
+            ),
+            'http3': lambda config: HTTP3Client(
+                concurrency=config.vus,
+                timeouts=config.timeouts,
+                reset_connections=config.reset_connections
+            ),
+            'plugin': lambda config: self._setup_plugin(config),
+            'playwright': lambda config: PlaywrightClient(
+                concurrency=config.vus,
+                group_size=config.group_size,
+                timeouts=config.timeouts
+            ),
+            'udp': lambda config: UDPClient(
+                concurrency=config.vus,
+                timeouts=config.timeouts,
+                reset_connections=config.reset_connections
+            ),
+            'websocket': lambda config: WebsocketClient(
+                concurrency=config.vus,
+                timeouts=config.timeouts,
+                reset_connections=config.reset_connections
+            )
+        }
+
     def __getitem__(self, key: str):
         return self.clients.get(key)
 
@@ -94,6 +159,19 @@ class Client(Generic[Unpack[T]]):
             for mutation in self._config.mutations:
                 for target in mutation.targets:
                     self.mutations[target] = mutation
+
+    def _setup_plugin(
+        self,
+        config: Config
+    ) -> PluginsStore[Unpack[T]]:
+        self._plugin._config = self._config
+        self._plugin.actions = self.actions
+        self._plugin.metadata_string = self.metadata_string
+        self._plugin.actions.waiter = self.actions.waiter
+        self._plugin.actions.current_stage = self.actions.current_stage
+
+        return self._plugin
+        
                     
     @property
     def thread_id(self) -> int:
@@ -123,7 +201,7 @@ class Client(Generic[Unpack[T]]):
         return self._plugin
 
     @property
-    def http(self):
+    def http(self) -> HTTPClient:
 
         if not self.initialized.get('http'):
             self._http = self._http(
@@ -144,7 +222,7 @@ class Client(Generic[Unpack[T]]):
         return self._http
 
     @property
-    def http2(self):
+    def http2(self) -> HTTP2Client:
         if self._http2.initialized is False:
             self._http2 = self._http2(self._config)
             self._http2.actions = self.actions
@@ -158,7 +236,7 @@ class Client(Generic[Unpack[T]]):
         return self._http2
 
     @property
-    def http3(self):
+    def http3(self) -> HTTP3Client:
         if self._http3.initialized is False:
             self._http3 = self._http3(self._config)
             self._http3.actions = self.actions
@@ -172,7 +250,7 @@ class Client(Generic[Unpack[T]]):
         return self._http3
 
     @property
-    def grpc(self):
+    def grpc(self) -> GRPCClient:
         if self._grpc.initialized is False:
             self._grpc = self._grpc(self._config)
             self._grpc.actions = self.actions
@@ -186,7 +264,7 @@ class Client(Generic[Unpack[T]]):
         return self._grpc
 
     @property
-    def graphql(self):
+    def graphql(self) -> GraphQLClient:
         if self._graphql.initialized is False:
             self._graphql = self._graphql(self._config)
             self._graphql.actions = self.actions
@@ -200,7 +278,7 @@ class Client(Generic[Unpack[T]]):
         return self._graphql
 
     @property
-    def graphqlh2(self):
+    def graphqlh2(self) -> GraphQLHTTP2Client:
 
         if self._config is None:
             self._config = config_registry.pop()
@@ -218,7 +296,7 @@ class Client(Generic[Unpack[T]]):
         return self._graphql
 
     @property
-    def playwright(self):
+    def playwright(self) -> PlaywrightClient:
         if self._playwright.initialized is False:
             self._playwright = self._playwright(self._config)
             self._playwright.actions = self.actions
@@ -232,7 +310,7 @@ class Client(Generic[Unpack[T]]):
         return self._playwright
 
     @property
-    def udp(self):
+    def udp(self) -> UDPClient:
         if self._udp.initialized is False:
             self._udp = self._udp(self._config)
             self._udp.actions = self.actions
@@ -246,7 +324,7 @@ class Client(Generic[Unpack[T]]):
         return self._udp
     
     @property
-    def websocket(self):
+    def websocket(self) -> WebsocketClient:
         if self._websocket.initialized is False:
             self._websocket = self._websocket(self._config)
             self._websocket.actions = self.actions
@@ -258,9 +336,21 @@ class Client(Generic[Unpack[T]]):
         self._websocket.next_name = self.next_name
         self._websocket.suspend = self.suspend
         return self._websocket
+    
+    async def prepare(
+        self,
+        hook_name: str,
+        cached_hook: Dict[str, Any]
+    ):
+        engine_type: RequestTypes = cached_hook.get('engine')
 
-        
+        if not self.initialized.get(engine_type):
+            engine = self._engines.get(engine)(
+                self._config
+            )
 
+            self.clients[engine_type] = engine
+            self.initialized[engine_type] = True
 
-        
-        
+        else:
+            engine = self.clients[engine_type]

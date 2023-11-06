@@ -81,9 +81,6 @@ class Graph:
             hook.parser.attributes.update(self.context)
 
             hook.setup()
-
-            print(hook.full_name)
-            pprint(hook.cache)
                
         sources = []
 
