@@ -69,9 +69,6 @@ class Graph:
                 )
                 
         await self._call_optimizer.optimize_arg_types()
-        
-        for call_id, args in self._call_optimizer:
-            print(call_id, args)
 
     async def _run(
         self,
