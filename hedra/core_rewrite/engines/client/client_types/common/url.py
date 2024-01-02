@@ -24,7 +24,13 @@ class URL:
         'loop'
     )
 
-    def __init__(self, url: str, port: int=80, family: SocketTypes=SocketTypes.DEFAULT, protocol: SocketProtocols=SocketProtocols.DEFAULT) -> None:
+    def __init__(
+        self, 
+        url: str, 
+        port: int=80, 
+        family: SocketTypes=SocketTypes.DEFAULT, 
+        protocol: SocketProtocols=SocketProtocols.DEFAULT
+    ) -> None:
         self.resolver = aiodns.DNSResolver()
         self.ip_addr = None
         self.parsed = urlparse(url)

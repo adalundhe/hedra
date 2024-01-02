@@ -636,6 +636,12 @@ class XML:
                 self.events_file.close
             )
 
+        if self.metrics_file:
+            await self._loop.run_in_executor(
+                self._executor,
+                self.metrics_file.close
+            )
+
         if self.experiments_file:
             await self._loop.run_in_executor(
                 self._executor,

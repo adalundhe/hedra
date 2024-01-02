@@ -45,7 +45,7 @@ from typing import (
     Any, 
     Union,
     Optional,
-    Type
+    Literal
 )
 from .optimization.parameters import Parameter
 from .parallel import optimize_stage
@@ -82,7 +82,11 @@ def handle_loop_stop(
 class Optimize(Stage):
     stage_type=StageTypes.OPTIMIZE
     optimize_iterations=0
-    algorithm='shg'
+    algorithm: Literal[
+        'shg', 
+        'dual-annealing', 
+        'diff-evolution'
+    ]='shg'
     time_limit='1m'
     optimize_params: List[Parameter]=[
         Parameter(

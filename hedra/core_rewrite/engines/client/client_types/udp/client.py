@@ -7,7 +7,8 @@ from typing import (
     Any,
     Union,
     List,
-    Iterator
+    Iterator,
+    Optional
 )
 from hedra.core_rewrite.engines.client.client_types.common.base_client import BaseClient
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
@@ -76,7 +77,7 @@ class UDPClient(BaseClient[UDPAction, UDPResult]):
     async def receive(
         self,
         url: str, 
-        user: str = None,
+        user: Optional[str] = None,
         tags: List[Dict[str, str]] = []
     ):
 

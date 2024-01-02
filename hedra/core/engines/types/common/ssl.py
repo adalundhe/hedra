@@ -56,8 +56,6 @@ def get_graphql_ssl_context():
     # compression.
     ctx.options |= ssl.OP_NO_COMPRESSION
 
-    ctx.minimum_version = ssl.PROTOCOL_TLSv1_2
-
     # # RFC 7540 Section 9.2.2: "deployments of HTTP/2 that use TLS 1.2 MUST
     # # support TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256". In practice, the
     # # blocklist defined in this section allows only the AES GCM and ChaCha20

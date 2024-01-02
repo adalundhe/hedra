@@ -101,10 +101,11 @@ class HTTP2Client(BaseClient[Union[A, HTTP2Action], Union[R, HTTP2Result]]):
     async def get(
         self, 
         url: str, 
-        headers: Dict[str, str] = {}, 
-        user: str = None,
+        headers: Optional[Dict[str, str]] = None, 
+        user: Optional[str] = None,
         tags: List[Dict[str, str]] = [],
-        trace: Trace=None
+        timeouts: Optional[Timeouts]=None,
+        trace: Optional[Trace]=None
     ):
         if trace and self.tracing_session is None:
             self.tracing_session = TraceSession(
@@ -132,11 +133,12 @@ class HTTP2Client(BaseClient[Union[A, HTTP2Action], Union[R, HTTP2Result]]):
     async def post(
         self,
         url: str, 
-        headers: Dict[str, str] = {}, 
-        data: Union[dict, str, bytes, Iterator] = None,
-        user: str = None,
+        headers: Optional[Dict[str, str]] = None, 
+        data: Optional[dict | str | bytes | Iterator] = None,
+        user: Optional[str] = None,
         tags: List[Dict[str, str]] = [],
-        trace: Trace=None
+        timeouts: Optional[Timeouts]=None,
+        trace: Optional[Trace]=None
     ):
         if trace and self.tracing_session is None:
             self.tracing_session = TraceSession(
@@ -169,6 +171,7 @@ class HTTP2Client(BaseClient[Union[A, HTTP2Action], Union[R, HTTP2Result]]):
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
         tags: List[Dict[str, str]] = [],
+        timeouts: Optional[Timeouts]=None,
         trace: Trace=None
     ):
         if trace and self.tracing_session is None:
@@ -202,6 +205,7 @@ class HTTP2Client(BaseClient[Union[A, HTTP2Action], Union[R, HTTP2Result]]):
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
         tags: List[Dict[str, str]] = [],
+        timeouts: Optional[Timeouts]=None,
         trace: Trace=None
     ):
         if trace and self.tracing_session is None:
@@ -234,6 +238,7 @@ class HTTP2Client(BaseClient[Union[A, HTTP2Action], Union[R, HTTP2Result]]):
         headers: Dict[str, str] = {}, 
         user: str = None,
         tags: List[Dict[str, str]] = [],
+        timeouts: Optional[Timeouts]=None,
         trace: Trace=None
     ):
         if trace and self.tracing_session is None:

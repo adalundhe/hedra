@@ -2,13 +2,9 @@ import asyncio
 import math
 import psutil
 import time
-import networkx
 import traceback
-import ast
-import inspect
-from pprint import pprint
-from typing import List, Any, Union, Dict, Callable
-from .engines.client.client_types.common.base_action import BaseAction
+from typing import List, Any, Dict, Callable
+from .hooks import CallResolver
 from .workflow import Workflow
 
 
@@ -50,6 +46,7 @@ class Graph:
         self.workflows = workflows
         self.max_active = 0
         self.active = 0
+        self._call_optimizer = CallResolver()
 
         self.context: Dict[
             str, 
@@ -58,36 +55,23 @@ class Graph:
 
         self._active_waiter: asyncio.Future | None = None
 
-        for workflow in workflows:
-            methods = inspect.getmembers(workflow, inspect.ismethod)
-            
-            for name, method in methods:
-                self.context[name] = method
-
     async def run(self):
 
         for workflow in self.workflows:
-            results = await self._run(workflow)
+            await self._run(workflow)
 
     async def setup(self):
-        
+
         for workflow in self.workflows:
-
-            functions = inspect.getmembers(
-                workflow, 
-                inspect.isfunction
-            )
-
-            classes = inspect.getmembers(
-                workflow, 
-                inspect.isclass
-            )
-
-            for name, function in functions:
-                self.context[name] = function
-
-            for name, class_item in classes:
-                self.context[name] = class_item
+            for hook in workflow.hooks.values():
+                self._call_optimizer.add_args(
+                    hook.static_args
+                )
+                
+        await self._call_optimizer.optimize_arg_types()
+        
+        for call_id, args in self._call_optimizer:
+            print(call_id, args)
 
     async def _run(
         self,
@@ -117,8 +101,6 @@ class Graph:
         all_completed: List[Any] = []
         for results_set in results:
             all_completed.extend(results_set)
-
-        print(len(all_completed))
 
         return all_completed
         
@@ -182,7 +164,7 @@ class Graph:
                     self._active_waiter = asyncio.Future()
 
         except Exception:
-            print(traceback.format_exc())
+            pass
 
         return results
 

@@ -26,8 +26,8 @@ class ActionsStore:
         self.waiter = None
         self.setup_call = None
         self.metadata_string: str = None
-        self.logger = HedraLogger()
-        self.logger.initialize()
+        # self.logger = HedraLogger()
+        # self.logger.initialize()
 
     def set_waiter(self, stage: str):
 
@@ -38,11 +38,11 @@ class ActionsStore:
         self.current_stage = stage
 
     async def wait_for_ready(self, setup_call):
-        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Action Store waiting for Action or Task to notify store it is ready')
+        # await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Action Store waiting for Action or Task to notify store it is ready')
         self.setup_call = setup_call
         await self.waiter
 
-        await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Action Store was notified and is exiting suspension')
+        # await self.logger.filesystem.aio['hedra.core'].debug(f'{self.metadata_string} - Action Store was notified and is exiting suspension')
 
     def store(self, request: str, action: Any, session: Any):
 

@@ -6,7 +6,8 @@ from typing import (
     Coroutine, 
     Any, 
     Callable,
-    Union
+    Union,
+    Optional
 )
 from hedra.core.engines.types.common import Timeouts
 from hedra.core_rewrite.engines.client.client_types.common.base_client import BaseClient
@@ -112,7 +113,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -124,13 +126,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def fill(
         self, 
@@ -138,7 +137,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         text: str,
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -150,13 +150,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks     
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def check(
         self,
@@ -164,7 +161,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -176,13 +174,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def click(
         self,
@@ -190,7 +185,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -202,13 +198,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def double_click(
         self,
@@ -216,7 +209,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -228,13 +222,11 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
-            return command
-
-        return await self.request(command)
 
     async def submit_event(
         self,
@@ -243,7 +235,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -258,13 +251,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def drag_and_drop(
         self,
@@ -273,7 +263,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -288,19 +279,17 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def switch_active_tab(
         self,
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -310,13 +299,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def evaluate_selector(
         self,
@@ -326,7 +312,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -342,13 +329,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def evaluate_all_selectors(
         self,
@@ -358,7 +342,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -374,13 +359,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def evaluate_expression(
         self,
@@ -389,7 +371,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -404,13 +387,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def evaluate_handle(
         self,
@@ -419,7 +399,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -434,13 +415,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def exepect_console_message(
         self,
@@ -448,7 +426,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -460,13 +439,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def expect_download(
         self,
@@ -474,7 +450,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -486,13 +463,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def expect_event(
         self,
@@ -500,7 +474,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -514,13 +489,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def expect_location(
         self,
@@ -528,7 +500,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -540,13 +513,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def expect_popup(
         self,
@@ -554,7 +524,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -566,13 +537,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def expect_request(
         self,
@@ -580,7 +548,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -592,13 +561,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def expect_request_finished(
         self,
@@ -606,7 +572,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -618,13 +585,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def expect_response(
         self,
@@ -632,7 +596,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -644,13 +609,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def focus(
         self,
@@ -658,7 +620,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -670,13 +633,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def hover(
         self,
@@ -684,7 +644,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -696,13 +657,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def get_inner_html(
         self,
@@ -710,7 +668,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -722,13 +681,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def get_text(
         self,
@@ -736,7 +692,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -748,13 +705,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def get_input_value(
         self,
@@ -762,7 +716,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -774,13 +729,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def press_key(
         self,
@@ -789,7 +741,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -802,13 +755,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def verify_is_enabled(
         self,
@@ -816,7 +766,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -828,13 +779,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def verify_is_hidden(
         self,
@@ -842,7 +790,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -854,13 +803,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def verify_is_visible(
         self,
@@ -868,7 +814,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -880,13 +827,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def verify_is_checked(
         self,
@@ -894,7 +838,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -906,19 +851,17 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def get_content(
         self,
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -928,13 +871,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def get_element(
         self,
@@ -942,7 +882,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -954,13 +895,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def get_all_elements(
         self,
@@ -968,7 +906,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -980,20 +919,18 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def reload_page(
         self,
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1004,13 +941,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def take_screenshot(
         self,
@@ -1018,7 +952,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1030,13 +965,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def select_option(
         self,
@@ -1047,7 +979,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1064,13 +997,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def set_checked(
         self,
@@ -1079,7 +1009,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1094,13 +1025,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def set_default_timeout(
         self,
@@ -1108,7 +1036,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1122,13 +1051,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def set_navigation_timeout(
         self,
@@ -1136,7 +1062,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1150,13 +1077,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def set_http_headers(
         self,
@@ -1164,7 +1088,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1176,13 +1101,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def tap(
         self,
@@ -1190,7 +1112,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1202,13 +1125,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def get_text_content(
         self,
@@ -1216,7 +1136,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1228,19 +1149,17 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def get_page_title(
         self,
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1250,13 +1169,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def input_text(
         self,
@@ -1265,7 +1181,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1278,13 +1195,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def uncheck(
         self,
@@ -1292,7 +1206,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1304,13 +1219,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def wait_for_event(
         self,
@@ -1318,7 +1230,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1332,13 +1245,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def wait_for_function(
         self,
@@ -1347,7 +1257,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1362,20 +1273,18 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def wait_for_page_load_state(
         self,
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1386,13 +1295,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def wait_for_selector(
         self,
@@ -1400,7 +1306,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1412,13 +1319,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def wait_for_timeout(
         self,
@@ -1426,7 +1330,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1440,13 +1345,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
     
     async def wait_for_url(
         self,
@@ -1454,7 +1356,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1466,13 +1369,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def switch_frame(
         self,
@@ -1481,7 +1381,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1494,19 +1395,17 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def get_frames(
         self,
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1516,13 +1415,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def get_attribute(
         self,
@@ -1531,7 +1427,8 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1546,20 +1443,18 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def go_back_page(
         self,
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1570,20 +1465,18 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def go_forward_page(
         self,
         extra: Dict[str, Any]={}, 
         user: str=None,
         tags: List[Dict[str, str]]=[],
-        checks: List[Callable]=[]
+        checks: List[Callable]=[],
+        timeouts: Optional[Timeouts]=None,
     ):
         command = PlaywrightCommand(
             self.next_name,
@@ -1594,13 +1487,10 @@ class PlaywrightClient(BaseClient[PlaywrightCommand, PlaywrightResult]):
             checks=checks
         )
 
-        if self.suspend and self.waiter is None:
-            self.waiter = asyncio.Future()
-            await self.waiter
-
-            return command
-
-        return await self.request(command)
+        return await asyncio.wait_for(
+            self.request(command),
+            timeout=timeouts.total_timeout
+        )
 
     async def request(self, command: PlaywrightCommand) -> Coroutine[Any, Any, PlaywrightResult]:
 

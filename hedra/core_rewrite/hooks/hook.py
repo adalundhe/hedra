@@ -13,11 +13,14 @@ from typing import (
     Type,
     Union,
     Any,
-    get_args
+    get_args,
+    Optional
 )
+from hedra.core_rewrite.engines.client.client_types.common import Timeouts
 from hedra.core_rewrite.parser import Parser
 from hedra.core.engines.types.common.base_action import BaseAction
 from hedra.core.engines.types.common.base_result import BaseResult
+from .call_arg import CallArg
 
 
 
@@ -29,8 +32,12 @@ class Hook:
             ...,
             Awaitable[Any] | Awaitable[BaseAction] | Awaitable[BaseResult]
         ],
-        dependencies: List[str]
+        dependencies: List[str],
+        timeouts: Optional[Timeouts]=None
     ) -> None:
+        
+        if timeouts is None:
+            timeouts = Timeouts()
 
         call_signature = signature(call)
 
@@ -39,6 +46,7 @@ class Hook:
         self.name = call.__name__
         self.workflow = self.full_name.split('.').pop(0)
         self.dependencies = dependencies
+        self._timeouts = timeouts
 
         self.params = call_signature.parameters
         self.args: Dict[
@@ -80,7 +88,19 @@ class Hook:
                 BaseResult
             )
 
-        self.cache: Dict[str, List[Any]] = defaultdict(dict)
+        self.cache: Dict[
+            str, 
+            Dict[
+                str, 
+                Dict[
+                    str,
+                    Union[
+                        List[Dict[str, Any]], 
+                        Dict[str, Any]
+                    ]
+                ]
+            ]
+        ] = defaultdict(dict)
         self.parser = Parser()
         self._tree = ast.parse(
             textwrap.dedent(
@@ -145,3 +165,81 @@ class Hook:
                     call_id = result.get('call_id')
                     result['source'] = source_fullname
                     self.cache[source_fullname][call_id] = result 
+
+    @property
+    def args_map(self):
+        
+        call_args: Dict[str, List[CallArg]] = defaultdict(list)
+        for call_name, calls in self.cache.items():
+            for call_id, call_data in calls.items():
+                call_id = call_data.get('call_id')
+                args = call_data.get('args')
+                timeouts = call_data.get(
+                    'kwargs', {}
+                ).get('timeouts', self._timeouts)
+
+                call_args[call_id].extend([
+                    CallArg(
+                        call_name=call_name,
+                        call_id=call_id,
+                        arg_type='arg',
+                        position=arg_postition,
+                        workflow=self.workflow,
+                        engine=call_data.get('engine'),
+                        method=call_data.get('method'),
+                        value=arg.get('value'),
+                        data_type=arg.get('type', 'static'),
+                        timeouts=timeouts
+                    ) for arg_postition, arg in enumerate(args)
+                ])
+
+        return call_args
+    
+    @property
+    def kwargs_map(self):
+        call_args: Dict[str, List[CallArg]] = defaultdict(list)
+        for call_name, calls in self.cache.items():
+            for call_id, call_data in calls.items():
+                call_id = call_data.get('call_id')
+                kwargs = call_data.get(
+                    'kwargs', {}
+                )
+                
+                call_timeouts = kwargs.get('timeouts', self._timeouts)
+                
+                for arg_name, arg in kwargs.items():
+                    call_args[call_id].extend([
+                        CallArg(
+                            call_name=call_name,
+                            call_id=call_id,
+                            arg_name=arg_name,
+                            arg_type='kwarg',
+                            workflow=self.workflow,
+                            engine=call_data.get('engine'),
+                            method=call_data.get('method'),
+                            value=arg.get('value'),
+                            data_type=arg.get('type', 'static'),
+                            timeouts=call_timeouts
+                        )
+                    ])
+                    
+        return call_args
+    
+    @property
+    def static_args(self):
+        static_args: Dict[str, List[str]] = defaultdict(list)
+
+        call_args = self.args_map
+        for call_id in self.args_map:
+            call_args[call_id].extend(
+                self.kwargs_map[call_id]
+            )
+
+        for call_id, args in call_args.items():
+            static_call_args = [
+                arg for arg in args if arg.data_type == 'static'
+            ]
+            if len(static_call_args) > 0:
+                static_args[call_id].extend(static_call_args)
+        
+        return static_args

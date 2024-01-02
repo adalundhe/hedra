@@ -22,7 +22,7 @@ class DynamicTemplateString:
 
         self.is_async = is_awaitable
 
-    async def eval_string_async(self, values: List[Any]) -> str:
+    async def to_value(self, *values, **kwargs) -> str:
         
         joined_string = ''
 

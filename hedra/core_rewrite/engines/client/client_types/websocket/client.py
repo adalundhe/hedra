@@ -7,6 +7,7 @@ from typing import (
     Any,
     Union,
     List,
+    Optional
 )
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core_rewrite.engines.client.client_types.common.base_client import BaseClient
@@ -78,8 +79,8 @@ class WebsocketClient(BaseClient[WebsocketAction, WebsocketResult]):
     async def listen(
         self, 
         url: str, 
-        headers: Dict[str, str] = {}, 
-        user: str = None, 
+        headers: Optional[Dict[str, str]] = None, 
+        user: Optional[str] = None, 
         tags: List[Dict[str, str]] = []  
     ):
 
@@ -104,9 +105,9 @@ class WebsocketClient(BaseClient[WebsocketAction, WebsocketResult]):
     async def send(
         self, 
         url: str, 
-        headers: Dict[str, str] = {}, 
-        data: Any = None, 
-        user: str = None, 
+        headers: Optional[Dict[str, str]] = None, 
+        data: Optional[Any] = None, 
+        user: Optional[str] = None, 
         tags: List[Dict[str, str]] = []
     ):
 

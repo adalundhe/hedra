@@ -5,7 +5,7 @@ from asyncio.constants import SSL_HANDSHAKE_TIMEOUT
 from ssl import SSLContext
 from typing import Optional
 from asyncio.sslproto import SSLProtocol
-from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core_rewrite.engines.client.client_types.common.types import RequestType
 from hedra.core.engines.types.common.protocols.shared.reader import Reader
 from hedra.core.engines.types.common.protocols.shared.writer import Writer
 from .protocol import TCPProtocol
@@ -18,7 +18,7 @@ from hedra.core.engines.types.common.protocols.shared.constants import (
 
 class TCPConnection:
 
-    def __init__(self, factory_type: RequestTypes = RequestTypes.HTTP) -> None:
+    def __init__(self, factory_type: RequestType = RequestType.HTTP) -> None:
         self.loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
         self.transport = None
         self.factory_type = factory_type

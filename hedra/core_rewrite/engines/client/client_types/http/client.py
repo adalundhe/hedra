@@ -9,9 +9,11 @@ from typing import (
     Union, 
     Coroutine, 
     TypeVar, 
-    Optional
+    Optional,
+    Tuple
 )
 from hedra.core_rewrite.engines.client.client_types.common.base_client import BaseClient
+from hedra.core_rewrite.engines.client.client_types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.ssl import get_default_ssl_context
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.tracing.trace_session import (
@@ -80,8 +82,8 @@ class HTTPClient(BaseClient[Union[A, HTTPAction], Union[R, HTTPResult]]):
         self.sem = asyncio.Semaphore(value=concurrency)
         self.pool = Pool(concurrency, reset_connections=reset_connections)
         self.tracing_session: Union[TraceSession, None] = tracing_session
-        self.logger = HedraLogger()
-        self.logger.initialize()
+        # self.logger = HedraLogger()
+        # self.logger.initialize()
         self.pool.create_pool()
 
         self.active = 0
@@ -105,12 +107,16 @@ class HTTPClient(BaseClient[Union[A, HTTPAction], Union[R, HTTPResult]]):
     async def get(
         self,
         url: str, 
-        headers: Dict[str, str] = {}, 
+        headers: Optional[Dict[str, str]] = None,
+        params: Optional[Dict[str, str | int | float | bool]] = None,
+        auth: Optional[Tuple[str, str]]=None,
         user: str = None,
         tags: List[Dict[str, str]] = [],
         redirects: int=3,
-        trace: Trace=None
+        timeouts: Optional[Timeouts]=None,
+        trace: Optional[Trace]=None
     ):
+
         if trace and self.tracing_session is None:
             self.tracing_session = TraceSession(
                 **trace.to_dict()
@@ -146,11 +152,14 @@ class HTTPClient(BaseClient[Union[A, HTTPAction], Union[R, HTTPResult]]):
     async def post(
         self,
         url: str, 
-        headers: Dict[str, str] = {}, 
+        headers: Optional[Dict[str, str]] = None,
+        params: Optional[Dict[str, str | int | float | bool]] = None,
+        auth: Optional[Tuple[str, str]]=None,
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
         tags: List[Dict[str, str]] = [],
         redirects: int=3,
+        timeouts: Optional[Timeouts]=None,
         trace: Trace=None
     ):
         if trace and self.tracing_session is None:
@@ -188,11 +197,14 @@ class HTTPClient(BaseClient[Union[A, HTTPAction], Union[R, HTTPResult]]):
     async def put(
         self,
         url: str, 
-        headers: Dict[str, str] = {}, 
+        headers: Optional[Dict[str, str]] = None,
+        params: Optional[Dict[str, str | int | float | bool]] = None,
+        auth: Optional[Tuple[str, str]]=None,
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
         tags: List[Dict[str, str]] = [],
         redirects: int=3,
+        timeouts: Optional[Timeouts]=None,
         trace: Trace=None
     ):
         if trace and self.tracing_session is None:
@@ -230,11 +242,14 @@ class HTTPClient(BaseClient[Union[A, HTTPAction], Union[R, HTTPResult]]):
     async def patch(
         self,
         url: str, 
-        headers: Dict[str, str] = {}, 
+        headers: Optional[Dict[str, str]] = None,
+        params: Optional[Dict[str, str | int | float | bool]] = None,
+        auth: Optional[Tuple[str, str]]=None,
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
         tags: List[Dict[str, str]] = [],
         redirects: int=3,
+        timeouts: Optional[Timeouts]=None,
         trace: Trace=None
     ):
         if trace and self.tracing_session is None:
@@ -272,10 +287,13 @@ class HTTPClient(BaseClient[Union[A, HTTPAction], Union[R, HTTPResult]]):
     async def delete(
         self, 
         url: str, 
-        headers: Dict[str, str] = {}, 
+        headers: Optional[Dict[str, str]] = None,
+        params: Optional[Dict[str, str | int | float | bool]] = None,
+        auth: Optional[Tuple[str, str]]=None,
         user: str = None,
         tags: List[Dict[str, str]] = [],
         redirects: int=3,
+        timeouts: Optional[Timeouts]=None,
         trace: Trace=None
     ):
         if trace and self.tracing_session is None:

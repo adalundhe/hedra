@@ -7,9 +7,12 @@ from typing import (
     Optional, 
     Union,
     Dict,
-    List
+    List,
+    Tuple,
+    Optional
 )
 from hedra.core_rewrite.engines.client.client_types.http import HTTPClient
+from hedra.core_rewrite.engines.client.client_types.common.timeouts import Timeouts
 from hedra.core.engines.types.http.connection import HTTPConnection
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.types.tracing.trace_session import (
@@ -67,11 +70,14 @@ class GraphQLClient(HTTPClient[GraphQLAction, GraphQLResult]):
         query: str,
         operation_name: str = None,
         variables: Dict[str, Any] = None, 
-        headers: Dict[str, str] = {}, 
-        user: str = None, 
+        headers: Optional[Dict[str, str]] = None,
+        params: Optional[Dict[str, str | int | float | bool]]=None,
+        auth: Optional[Tuple[str, str]]= None,
+        user: Optional[str] = None, 
         tags: List[Dict[str, str]] = [],
         redirects: int = 3,
-        trace: Trace=None
+        timeouts: Optional[Timeouts]=None,
+        trace: Optional[Trace]=None
     ):
         if trace and self.tracing_session is None:
             self.tracing_session = TraceSession(

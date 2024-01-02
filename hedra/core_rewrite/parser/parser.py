@@ -340,7 +340,6 @@ class Parser:
             }
 
         call['kwargs'] = call_kwargs
-
         call_string = ast.unparse(node)
 
         all_args_count = len(call['args']) + len(call['kwargs'])
@@ -390,7 +389,6 @@ class Parser:
                 joined_values = DynamicTemplateString(values)
                 break
                     
-
         return joined_values
 
     def parse_formatted_value(self, node: ast.FormattedValue) -> Any:

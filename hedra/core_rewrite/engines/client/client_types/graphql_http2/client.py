@@ -10,6 +10,7 @@ from typing import (
     Union
 )
 from hedra.core_rewrite.engines.client.client_types.http2 import HTTP2Client
+from hedra.core_rewrite.engines.client.client_types.common.timeouts import Timeouts
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core.engines.types.tracing.trace_session import (
     TraceSession, 
@@ -69,6 +70,7 @@ class GraphQLHTTP2Client(HTTP2Client[GraphQLHTTP2Action, GraphQLHTTP2Result]):
         headers: Dict[str, str] = {}, 
         user: str = None, 
         tags: List[Dict[str, str]] = [],
+        timeouts: Optional[Timeouts]=None,
         trace: Trace=None
     ):
         if trace and self.tracing_session is None:

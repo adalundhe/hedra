@@ -113,6 +113,7 @@ class HTTP3Client(BaseClient[Union[A, HTTP3Action], Union[R, HTTP3Result]]):
         user: str = None,
         tags: List[Dict[str, str]] = [],
         redirects: int=3,
+        timeouts: Optional[Timeouts]=None,
         trace: Trace=None
     ):
         if trace and self.tracing_session is None:
@@ -147,6 +148,7 @@ class HTTP3Client(BaseClient[Union[A, HTTP3Action], Union[R, HTTP3Result]]):
         user: str = None,
         tags: List[Dict[str, str]] = [],
         redirects: int=3,
+        timeouts: Optional[Timeouts]=None,
         trace: Trace=None
     ):
         if trace and self.tracing_session is None:
@@ -181,6 +183,7 @@ class HTTP3Client(BaseClient[Union[A, HTTP3Action], Union[R, HTTP3Result]]):
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
         tags: List[Dict[str, str]] = [],
+        timeouts: Optional[Timeouts]=None,
         trace: Trace=None
     ):
         if trace and self.tracing_session is None:
@@ -215,6 +218,7 @@ class HTTP3Client(BaseClient[Union[A, HTTP3Action], Union[R, HTTP3Result]]):
         user: str = None,
         tags: List[Dict[str, str]] = [],
         redirects: int=3,
+        timeouts: Optional[Timeouts]=None,
         trace: Trace=None
     ):
         if trace and self.tracing_session is None:
@@ -249,6 +253,7 @@ class HTTP3Client(BaseClient[Union[A, HTTP3Action], Union[R, HTTP3Result]]):
         user: str = None,
         tags: List[Dict[str, str]] = [],
         redirects: int=3,
+        timeouts: Optional[Timeouts]=None,
         trace: Trace=None
     ):
         if trace and self.tracing_session is None:

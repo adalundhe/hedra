@@ -10,6 +10,7 @@ from typing import (
     Dict
 )
 from hedra.core_rewrite.engines.client.client_types.http2 import HTTP2Client
+from hedra.core_rewrite.engines.client.client_types.common.timeouts import Timeouts
 from hedra.core.engines.types.common import Timeouts
 from hedra.core.engines.types.tracing.trace_session import (
     TraceSession, 
@@ -67,6 +68,7 @@ class GRPCClient(HTTP2Client[GRPCAction, GRPCResult]):
         protobuf: Any = None, 
         user: str = None, 
         tags: List[Dict[str, str]] = [],
+        timeouts: Optional[Timeouts]=None,
         trace: Trace=None
     ):
         if trace and self.tracing_session is None:
