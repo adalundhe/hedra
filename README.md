@@ -16,7 +16,7 @@
 
 Hedra is a Python performance and scalable unit/integration testing framework that makes creating and running complex test workflows easy.
 
-These workflows are written as directed acrylic graphs in Python, where each graph is specified as a collection of Python classes referred to as <b>stages</b>. Each Stage may then specify async Python methods which are then wrapped in Python decorators (referred to as <b>hooks</b>), which that Stage will then execute. The hook wrapping a method tells Hedra both what the action does and when to execute it. In combination, stages and hooks allow you to craft test workflows that can mimic real-world user behavior, optimize framework performance, or interact with a variety of Hedra's powerful integrations.
+These workflows are written as directed acyclic graphs in Python, where each graph is specified as a collection of Python classes referred to as <b>stages</b>. Each Stage may then specify async Python methods which are then wrapped in Python decorators (referred to as <b>hooks</b>), which that Stage will then execute. The hook wrapping a method tells Hedra both what the action does and when to execute it. In combination, stages and hooks allow you to craft test workflows that can mimic real-world user behavior, optimize framework performance, or interact with a variety of Hedra's powerful integrations.
 
 <br/>
 
