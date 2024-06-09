@@ -1,685 +1,763 @@
+from __future__ import annotations
 import asyncio
-import time
-import uuid
+import ssl
+from urllib.parse import urlparse
+from collections import defaultdict
+from pydantic import BaseModel
 from typing import (
-    Dict, 
-    Any, 
-    List,
-    Iterator,
+    Tuple, 
     Union, 
-    Coroutine, 
-    TypeVar, 
-    Optional,
-    Tuple
+    Optional, 
+    Dict, 
+    List, 
 )
-from hedra.core_rewrite.engines.client.client_types.common.base_client import BaseClient
-from hedra.core_rewrite.engines.client.client_types.common.timeouts import Timeouts
-from hedra.core.engines.types.common.ssl import get_default_ssl_context
-from hedra.core.engines.types.common.timeouts import Timeouts
-from hedra.core.engines.types.tracing.trace_session import (
-    TraceSession, 
-    Trace
+from .protocols import HTTPConnection
+from .models.http import (
+    Cookies,
+    HTTPResponse,
+    HTTPRequest,
+    Metadata,
+    URL,
+    URLMetadata,
+    HTTPCookie,
+    HTTPEncodableValue
 )
-
-from hedra.logging import HedraLogger
-from .connection import HTTPConnection
-from .action import HTTPAction
-from .result import HTTPResult
-from .pool import Pool
+from .timeouts import Timeouts
 
 
-A = TypeVar('A')
-R = TypeVar('R')
-
-tracked = {}
-
-loads = {'LOAD_GLOBAL', 'LOAD_ATTR'}
-
-
-class HTTPClient(BaseClient[Union[A, HTTPAction], Union[R, HTTPResult]]):
-
-    __slots__ = (
-        'mutations',
-        'actions',
-        'initialized',
-        'session_id',
-        'timeouts',
-        'registered',
-        'suspend',
-        '_hosts',
-        'closed',
-        'sem',
-        'pool',
-        'active',
-        'waiter',
-        'ssl_context',
-        'logger',
-        'tracing_session',
-        'next_name'
-    )
+class HTTPClient:
 
     def __init__(
-        self,
-        concurrency: int=10**3, 
-        timeouts: Timeouts = Timeouts(), 
-        reset_connections: bool=False,
-        tracing_session: Optional[TraceSession]=None
+        self, 
+        cert_path: Optional[str]=None,
+        key_path: Optional[str]=None,
+        pool_size: Optional[int]=None,
     ) -> None:
-        super(
-            HTTPClient,
-            self
-        ).__init__()
-
-        self.session_id = str(uuid.uuid4())
-        self.timeouts = timeouts
-        self.actions: Dict[str, HTTPAction] = {}
-
-        self.registered: Dict[str, HTTPAction] = {}
-        self._hosts = {}
-        self.closed = False
-        self.suspend: bool = False
-
-        self.sem = asyncio.Semaphore(value=concurrency)
-        self.pool = Pool(concurrency, reset_connections=reset_connections)
-        self.tracing_session: Union[TraceSession, None] = tracing_session
-        # self.logger = HedraLogger()
-        # self.logger.initialize()
-        self.pool.create_pool()
-
-        self.active = 0
-        self.initialized: bool = False
-        self.waiter = None
-        self.next_name: Union[str, None] = None
-
-        self.ssl_context = get_default_ssl_context()
-
-    def config_to_dict(self):
-        return {
-            'concurrency': self.pool.size,
-            'timeouts': {
-                'connect_timeout': self.timeouts.connect_timeout,
-                'socket_read_timeout': self.timeouts.socket_read_timeout,
-                'total_timeout': self.timeouts.total_timeout
-            },
-            'reset_connections': self.pool.reset_connections
-        }
- 
-    async def get(
-        self,
-        url: str, 
-        headers: Optional[Dict[str, str]] = None,
-        params: Optional[Dict[str, str | int | float | bool]] = None,
-        auth: Optional[Tuple[str, str]]=None,
-        user: str = None,
-        tags: List[Dict[str, str]] = [],
-        redirects: int=3,
-        timeouts: Optional[Timeouts]=None,
-        trace: Optional[Trace]=None
-    ):
-
-        if trace and self.tracing_session is None:
-            self.tracing_session = TraceSession(
-                **trace.to_dict()
-            )
-
-        request = self.actions.get(self.next_name)
-
-        if request is None:
-            request = HTTPAction(
-                self.next_name,
-                url,
-                method='GET',
-                headers=headers,
-                data=None,
-                user=user,
-                tags=tags,
-                redirects=redirects             
-            )
-
-            await self.prepare(request)
-
-            self.actions[self.next_name] = request
-
-        if self.suspend and self.waiter is None:
-
-            loop = asyncio.get_event_loop()
-
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.request(request)
-
-    async def post(
-        self,
-        url: str, 
-        headers: Optional[Dict[str, str]] = None,
-        params: Optional[Dict[str, str | int | float | bool]] = None,
-        auth: Optional[Tuple[str, str]]=None,
-        data: Union[dict, str, bytes, Iterator] = None,
-        user: str = None,
-        tags: List[Dict[str, str]] = [],
-        redirects: int=3,
-        timeouts: Optional[Timeouts]=None,
-        trace: Trace=None
-    ):
-        if trace and self.tracing_session is None:
-            self.tracing_session = TraceSession(
-                **trace.to_dict()
-            )
-
-        request = self.actions.get(self.next_name)
-
-        if request is None:
-            request = HTTPAction(
-                self.next_name,
-                url,
-                method='POST',
-                headers=headers,
-                data=data,
-                user=user,
-                tags=tags,
-                redirects=redirects           
-            )
-
-            await self.prepare(request)
-
-            self.actions[self.next_name] = request
-
-        if self.suspend and self.waiter is None:
-
-            loop = asyncio.get_event_loop()
-
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.request(request)
-
-    async def put(
-        self,
-        url: str, 
-        headers: Optional[Dict[str, str]] = None,
-        params: Optional[Dict[str, str | int | float | bool]] = None,
-        auth: Optional[Tuple[str, str]]=None,
-        data: Union[dict, str, bytes, Iterator] = None,
-        user: str = None,
-        tags: List[Dict[str, str]] = [],
-        redirects: int=3,
-        timeouts: Optional[Timeouts]=None,
-        trace: Trace=None
-    ):
-        if trace and self.tracing_session is None:
-            self.tracing_session = TraceSession(
-                **trace.to_dict()
-            )
-
-        request = self.actions.get(self.next_name)
-
-        if request is None:
-            request = HTTPAction(
-                self.next_name,
-                url,
-                method='PUT',
-                headers=headers,
-                data=data,
-                user=user,
-                tags=tags,
-                redirects=redirects
-            )
-
-            await self.prepare(request)
-
-            self.actions[self.next_name] = request
-
-        if self.suspend and self.waiter is None:
-
-            loop = asyncio.get_event_loop()
-
-            self.waiter = loop.create_future()
-            await self.waiter 
-
-        return await self.request(request)
-
-    async def patch(
-        self,
-        url: str, 
-        headers: Optional[Dict[str, str]] = None,
-        params: Optional[Dict[str, str | int | float | bool]] = None,
-        auth: Optional[Tuple[str, str]]=None,
-        data: Union[dict, str, bytes, Iterator] = None,
-        user: str = None,
-        tags: List[Dict[str, str]] = [],
-        redirects: int=3,
-        timeouts: Optional[Timeouts]=None,
-        trace: Trace=None
-    ):
-        if trace and self.tracing_session is None:
-            self.tracing_session = TraceSession(
-                **trace.to_dict()
-            )
-
-        request = self.actions.get(self.next_name)
-
-        if request is None:
-            request = HTTPAction(
-                self.next_name,
-                url,
-                method='PATCH',
-                headers=headers,
-                data=data,
-                user=user,
-                tags=tags,
-                redirects=redirects
-            )
-
-            await self.prepare(request)
-
-            self.actions[self.next_name] = request
-
-        if self.suspend and self.waiter is None:
-
-            loop = asyncio.get_event_loop()
-
-            self.waiter = loop.create_future()
-            await self.waiter   
-
-        return await self.request(request)
-
-    async def delete(
-        self, 
-        url: str, 
-        headers: Optional[Dict[str, str]] = None,
-        params: Optional[Dict[str, str | int | float | bool]] = None,
-        auth: Optional[Tuple[str, str]]=None,
-        user: str = None,
-        tags: List[Dict[str, str]] = [],
-        redirects: int=3,
-        timeouts: Optional[Timeouts]=None,
-        trace: Trace=None
-    ):
-        if trace and self.tracing_session is None:
-            self.tracing_session = TraceSession(
-                **trace.to_dict()
-            )
-
-
-        request = self.actions.get(self.next_name)
-
-        if request is None:
-            request = HTTPAction(
-                self.next_name,
-                url,
-                method='DELETE',
-                headers=headers,
-                data=None,
-                user=user,
-                tags=tags,
-                redirects=redirects
-            )
-
-            await self.prepare(request)
-
-            self.actions[self.next_name] = request
-
-        if self.suspend and self.waiter is None:
-
-            loop = asyncio.get_event_loop()
-
-            self.waiter = loop.create_future()
-            await self.waiter
-
-        return await self.request(request)
-    
-    async def prepare(
-        self, 
-        action: HTTPAction
-    ) -> Coroutine[Any, Any, None]:
         
-        try:
-            if action.url.is_ssl:
-                action.ssl_context = self.ssl_context
-                
-            if self._hosts.get(action.url.hostname) is None:
-                socket_configs = await asyncio.wait_for(action.url.lookup(), timeout=self.timeouts.connect_timeout)
-            
-                for ip_addr, configs in socket_configs.items():
-                    for config in configs:
+        if pool_size is None:
+            pool_size = 100
+        
+        self.timeouts = Timeouts()
 
-                        connection = HTTPConnection()
-                        
-                        try:
-                            await connection.make_connection(
-                                action.url.hostname,
-                                ip_addr,
-                                action.url.port,
-                                config,
-                                ssl=action.ssl_context,
-                                timeout=self.timeouts.connect_timeout
-                            )
+        self._cert_path = cert_path
+        self._key_path = key_path
+        self._client_ssl_context = self._create_general_client_ssl_context()
+        
+        self._dns_lock: Dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self._dns_waiters: Dict[str, asyncio.Future] = defaultdict(asyncio.Future)
+        self._pending_queue: List[asyncio.Future] = []
 
-                            action.url.socket_config = config
-                            action.url.ip_addr = ip_addr
-                            action.url.has_ip_addr = True
-                            break
+        self._client_waiters: Dict[asyncio.Transport, asyncio.Future] = {}
+        self._connections: List[HTTPConnection] = [
+            HTTPConnection() for _ in range(pool_size)
+        ]
 
-                        except Exception as e:
-                            pass
+        self._hosts: Dict[str, Tuple[str, int]] = {}
 
-                    if action.url.socket_config:
-                        break
+        self._connections_count: Dict[str, List[asyncio.Transport]] = defaultdict(list)
+        self._locks: Dict[asyncio.Transport, asyncio.Lock] = {}
 
-                if action.url.socket_config is None:
-                    raise Exception('Err. - No socket found.')
+        self._max_concurrency = pool_size
 
-                self._hosts[action.url.hostname] = {
-                    'ip_addr': action.url.ip_addr,
-                    'socket_config': action.url.socket_config
-                }
+        self._semaphore = asyncio.Semaphore(self._max_concurrency)
+        self._connection_waiters: List[asyncio.Future] = []
 
-            else:
-                host_config = self._hosts[action.url.hostname]
-                action.url.ip_addr = host_config.get('ip_addr')
-                action.url.socket_config = host_config.get('socket_config')
+        self._url_cache: Dict[
+            str,
+            URL
+        ] = {}
 
-            if action.is_setup is False:
-                action.setup()
+    def _create_general_client_ssl_context(self):
+        ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
 
-            self.registered[action.name] = action
+        return ctx
+    
+    async def head(
+        self,
+        url: str,
+        auth: Optional[Tuple[str, str]]=None,
+        cookies: Optional[List[HTTPCookie]]=None,
+        headers: Dict[str, str]={},
+        params: Optional[Dict[str, HTTPEncodableValue]]=None,
+        timeout: Union[
+            Optional[int], 
+            Optional[float]
+        ]=None,
+        
+        
+        redirects: int=3
+    ):
+        async with self._semaphore:
 
-        except Exception as e:       
-            raise e
-
-    async def request(self, action: HTTPAction) -> HTTPResult:
-        trace: Union[Trace, None] = None
-        if self.tracing_session:
-            trace = self.tracing_session.create_trace()
-            await trace.on_request_start(action)
-  
-        response = HTTPResult(action)
-        response.wait_start = time.monotonic()
-        self.active += 1
-
-        if trace and trace.on_connection_queued_start:
-            await trace.on_connection_queued_start(
-                trace.span,
-                action,
-                response
-            )
- 
-        async with self.sem:
-
-            if trace and trace.on_connection_queued_end:
-                await trace.on_connection_queued_end(
-                    trace.span,
-                    action,
-                    response
-                )
-            
             try:
                 
-                connection = self.pool.connections.pop()
-
-                if action.hooks.listen:
-                    event = asyncio.Event()
-                    action.hooks.channel_events.append(event)
-                    await event.wait()
-                    
-                if action.hooks.before:
-                    action = await self.execute_before(action)
-                    action.setup()
-
-                response.start = time.monotonic()
-
-                if trace and trace.on_connection_create_start:
-                    await trace.on_connection_create_start(
-                        trace.span,
-                        action,
-                        response
-                    )
-
-
-                await connection.make_connection(
-                    action.url.hostname,
-                    action.url.ip_addr,
-                    action.url.port,
-                    action.url.socket_config,
-                    timeout=self.timeouts.connect_timeout,
-                    ssl=action.ssl_context
+                return await asyncio.wait_for(
+                    self._request(
+                        HTTPRequest(
+                            url=url,
+                            method='HEAD',
+                            cookies=cookies,
+                            auth=auth,
+                            headers=headers,
+                            params=params,
+                            redirects=redirects
+                        ),
+                    ),
+                    timeout=timeout
                 )
-
-                response.connect_end = time.monotonic()
-
-                if trace and trace.on_connection_create_end:
-                    await trace.on_connection_create_end(
-                        trace.span,
-                        action,
-                        response
-                    )
-
-                connection.write(action.encoded_headers)
-
-                if trace and trace.on_request_headers_sent:
-                    await trace.on_request_headers_sent(
-                        trace.span,
-                        action,
-                        response
-                    )
-                
-                if action.encoded_data:
-                    if action.is_stream:
-                        action.write_chunks(
-                            connection,
-                            trace
-                        )
-
-                    else:
-                        connection.write(action.encoded_data)
-
-                response.write_end = time.monotonic()
-
-                if action.encoded_data and trace and trace.on_request_data_sent:
-                        await trace.on_request_data_sent(
-                            trace.span,
-                            action,
-                            response
-                        )
-
-                response.response_code = await asyncio.wait_for(
-                    connection.reader.readline_fast(),
-                    timeout=self.timeouts.socket_read_timeout
-                )
-
-                headers = await asyncio.wait_for(
-                    connection.read_headers(),
-                    timeout=self.timeouts.socket_read_timeout
-                )
-
-                if trace and trace.on_response_headers_received:
-                    await trace.on_response_headers_received(
-                        trace.span,
-                        action,
-                        response
-                    )
-
-                status = response.status
             
-                if status >= 300 and status < 400:
+            except asyncio.TimeoutError:
 
-                    if trace and trace.on_request_redirect:
-                        await trace.on_request_redirect(
-                            trace.span,
-                            action,
-                            response
-                        )
+                url_data = urlparse(url)
 
-                    elapsed_time = 0
-                    redirect_time_start = time.time()
+                return HTTPResponse(
+                    metadata=Metadata(),
+                    url=URLMetadata(
+                        host=url_data.hostname,
+                        path=url_data.path,
+                        params=url_data.params,
+                        query=url_data.query
+                    ),
+                    headers=headers,
+                    method='HEAD',
+                    status=408,
+                    status_message='Request timed out.'
+                )
+            
+    async def options(
+        self,
+        url: str,
+        auth: Optional[Tuple[str, str]]=None,
+        cookies: Optional[List[HTTPCookie]]=None,
+        headers: Dict[str, str]={},
+        params: Optional[Dict[str, HTTPEncodableValue]]=None,
+        timeout: Union[
+            Optional[int], 
+            Optional[float]
+        ]=None,   
+        redirects: int=3
+    ):
+        async with self._semaphore:
 
-                    for _ in range(action.redirects):
+            try:
+                
+                return await asyncio.wait_for(
+                    self._request(
+                        HTTPRequest(
+                            url=url,
+                            method='OPTIONS',
+                            cookies=cookies,
+                            auth=auth,
+                            headers=headers,
+                            params=params,
+                            redirects=redirects
+                        ),
+                    ),
+                    timeout=timeout
+                )
+            
+            except asyncio.TimeoutError:
 
-                        if elapsed_time > self.timeouts.total_timeout:
-                            response.status = 408
-                            raise Exception('Request timed out while redirecting.')
-                        
-                        redirect_url = str(headers.get(b'location'))
-                        if redirect_url.startswith('http') is False:
-                            action.url.path = redirect_url
-                            action.encoded_headers = None
-                            action.setup()
+                url_data = urlparse(url)
 
-                        else:
-                            await action.url.replace(redirect_url)
-                            action.encoded_headers = None
-                            action.is_setup = False
-                            await self.prepare(action)
-
-                            await connection.make_connection(
-                                action.url.hostname,
-                                action.url.ip_addr,
-                                action.url.port,
-                                action.url.socket_config,
-                                timeout=self.timeouts.connect_timeout,
-                                ssl=action.ssl_context
-                            )
-
-                        response.connect_end = time.monotonic()
-                            
-                        connection.write(action.encoded_headers)
-                        
-                        if action.encoded_data:
-                            if action.is_stream:
-                                action.write_chunks(connection)
-
-                            else:
-                                connection.write(action.encoded_data)
-
-                        response.write_end = time.monotonic()
-
-                        response.response_code = await asyncio.wait_for(
-                            connection.reader.readline_fast(),
-                            timeout=self.timeouts.socket_read_timeout
-                        )
-
-                        headers = await asyncio.wait_for(
-                            connection.read_headers(),
-                            timeout=self.timeouts.socket_read_timeout
-                        )
-
-                        status = response.status
-
-                        if status >= 200 and status < 300:
-                            break
-
-                        elapsed_time = time.time() - redirect_time_start
-
-                content_length = headers.get(b'content-length')
-                transfer_encoding = headers.get(b'transfer-encoding')
-
-                # We require Content-Length or Transfer-Encoding headers to read a
-                # request body, otherwise it's anyone's guess as to how big the body
-                # is, and we ain't playing that game.
-                body = bytearray()
-                if content_length:
-                    body = await asyncio.wait_for(
-                        connection.readexactly(int(content_length)),
-                        timeout=self.timeouts.socket_read_timeout
-                    )
-
-                elif transfer_encoding:
-                    
-                    all_chunks_read = False
-
-                    while True and not all_chunks_read:
-
-                        chunk_size = int((await connection.readuntil()).rstrip(), 16)
+                return HTTPResponse(
+                    metadata=Metadata(),
+                    url=URLMetadata(
+                        host=url_data.hostname,
+                        path=url_data.path,
+                        params=url_data.params,
+                        query=url_data.query
+                    ),
+                    headers=headers,
+                    method='OPTIONS',
+                    status=408,
+                    status_message='Request timed out.'
+                )
     
-                        if not chunk_size:
-                            # read last CRLF
-                            body.extend(
-                                await asyncio.wait_for(
-                                    connection.readuntil(),
-                                    timeout=self.timeouts.socket_read_timeout
-                                )
-                            )
-                            
-                            break
-                        
-                        chunk = await asyncio.wait_for(
-                            connection.readexactly(chunk_size + 2),
-                            timeout=self.timeouts.socket_read_timeout
+    async def get(
+        self,
+        url: str,
+        auth: Optional[Tuple[str, str]]=None,
+        cookies: Optional[List[HTTPCookie]]=None,
+        headers: Dict[str, str]={},
+        params: Optional[Dict[str, HTTPEncodableValue]]=None,
+        timeout: Union[
+            Optional[int], 
+            Optional[float]
+        ]=None,
+        redirects: int=3
+    ):
+        
+        async with self._semaphore:
+            
+            try:
+            
+                return await asyncio.wait_for(
+                    self._request(
+                        HTTPRequest(
+                            url=url,
+                            method='GET',
+                            cookies=cookies,
+                            data=None,
+                            auth=auth,
+                            headers=headers,
+                            params=params,
+                            redirects=redirects
                         )
+                    ),
+                    timeout=timeout
+                )
+            
+            except asyncio.TimeoutError:
 
-                        body.extend(
-                            chunk[:-2]
-                        )
+                url_data = urlparse(url)
 
-                        if trace and trace.on_response_chunk_received:
-                            await trace.on_response_chunk_received(
-                                trace.span,
-                                action,
-                                response
+                return HTTPResponse(
+                    metadata=Metadata(),
+                    url=URLMetadata(
+                        host=url_data.hostname,
+                        path=url_data.path,
+                        params=url_data.params,
+                        query=url_data.query
+                    ),
+                    headers=headers,
+                    method='GET',
+                    status=408,
+                    status_message='Request timed out.'
+                )
+        
+    async def post(
+        self,
+        url: str,
+        auth: Optional[Tuple[str, str]]=None,
+        cookies: Optional[List[HTTPCookie]]=None,
+        headers: Dict[str, str]={},
+        params: Optional[Dict[str, HTTPEncodableValue]]=None,
+        timeout: Union[
+            Optional[int], 
+            Optional[float]
+        ]=None,
+        data: Union[
+            Optional[str],
+            Optional[BaseModel]
+        ]=None,
+        
+        
+        redirects: int=3
+    ):
+        async with self._semaphore:
+
+            try:
+                
+                return await asyncio.wait_for(
+                    self._request(
+                        HTTPRequest(
+                            url=url,
+                            method='POST',
+                            cookies=cookies,
+                            auth=auth,
+                            headers=headers,
+                            params=params,
+                            data=data,
+                            redirects=redirects
+                        ),
+                    ),
+                    timeout=timeout
+                )
+            
+            except asyncio.TimeoutError:
+
+                url_data = urlparse(url)
+
+                return HTTPResponse(
+                    metadata=Metadata(),
+                    url=URLMetadata(
+                        host=url_data.hostname,
+                        path=url_data.path,
+                        params=url_data.params,
+                        query=url_data.query
+                    ),
+                    headers=headers,
+                    method='POST',
+                    status=408,
+                    status_message='Request timed out.'
+                )
+        
+    async def put(
+        self,
+        url: str,
+        auth: Optional[Tuple[str, str]]=None,
+        cookies: Optional[List[HTTPCookie]]=None,
+        headers: Dict[str, str]={},
+        params: Optional[Dict[str, HTTPEncodableValue]]=None,
+        timeout: Union[
+            Optional[int], 
+            Optional[float]
+        ]=None,
+        data: Union[
+            Optional[str],
+            Optional[BaseModel]
+        ]=None,
+        redirects: int=3
+    ):
+        async with self._semaphore:
+
+            try:
+                
+                return await asyncio.wait_for(
+                    self._request(
+                        HTTPRequest(
+                            url=url,
+                            method='PUT',
+                            cookies=cookies,
+                            auth=auth,
+                            headers=headers,
+                            params=params,
+                            data=data,
+                            redirects=redirects
+                        ),
+                    ),
+                    timeout=timeout
+                )
+            
+            except asyncio.TimeoutError:
+
+                url_data = urlparse(url)
+
+                return HTTPResponse(
+                    metadata=Metadata(),
+                    url=URLMetadata(
+                        host=url_data.hostname,
+                        path=url_data.path,
+                        params=url_data.params,
+                        query=url_data.query
+                    ),
+                    headers=headers,
+                    method='PUT',
+                    status=408,
+                    status_message='Request timed out.'
+                )
+    
+    async def patch(
+        self,
+        url: str,
+        auth: Optional[Tuple[str, str]]=None,
+        cookies: Optional[List[HTTPCookie]]=None,
+        headers: Dict[str, str]={},
+        params: Optional[Dict[str, HTTPEncodableValue]]=None,
+        timeout: Union[
+            Optional[int], 
+            Optional[float]
+        ]=None,
+        data: Union[
+            Optional[str],
+            Optional[BaseModel]
+        ]=None,
+        
+        
+        redirects: int=3
+    ):
+        async with self._semaphore:
+                
+            try:
+                
+                return await asyncio.wait_for(
+                    self._request(
+                        HTTPRequest(
+                            url=url,
+                            method='PATCH',
+                            cookies=cookies,
+                            auth=auth,
+                            headers=headers,
+                            params=params,
+                            data=data,
+                            redirects=redirects
+                        ),
+                    ),
+                    timeout=timeout
+                )
+            
+            except asyncio.TimeoutError:
+
+                url_data = urlparse(url)
+
+                return HTTPResponse(
+                    metadata=Metadata(),
+                    url=URLMetadata(
+                        host=url_data.hostname,
+                        path=url_data.path,
+                        params=url_data.params,
+                        query=url_data.query
+                    ),
+                    headers=headers,
+                    method='PATCH',
+                    status=408,
+                    status_message='Request timed out.'
+                )
+        
+    async def delete(
+        self,
+        url: str,
+        auth: Optional[Tuple[str, str]]=None,
+        cookies: Optional[List[HTTPCookie]]=None,
+        headers: Dict[str, str]={},
+        params: Optional[Dict[str, HTTPEncodableValue]]=None,
+        timeout: Union[
+            Optional[int], 
+            Optional[float]
+        ]=None,
+        
+        
+        redirects: int=3
+    ):
+        
+        async with self._semaphore:
+        
+            try:
+                
+                return await asyncio.wait_for(
+                    self._request(
+                        HTTPRequest(
+                            url=url,
+                            method='DELETE',
+                            cookies=cookies,
+                            auth=auth,
+                            headers=headers,
+                            params=params,
+                            redirects=redirects
+                        ),
+                    ),
+                    timeout=timeout
+                )
+            
+            except asyncio.TimeoutError:
+
+                url_data = urlparse(url)
+
+                return HTTPResponse(
+                    metadata=Metadata(),
+                    url=URLMetadata(
+                        host=url_data.hostname,
+                        path=url_data.path,
+                        params=url_data.params,
+                        query=url_data.query
+                    ),
+                    headers=headers,
+                    method='DELETE',
+                    status=408,
+                    status_message='Request timed out.'
+                )
+
+    async def _request(
+        self, 
+        request: HTTPRequest, 
+        cert_path: Optional[str]=None,
+        key_path: Optional[str]=None
+    ):
+        if cert_path is None:
+            cert_path = self._cert_path
+
+        if key_path is None:
+            key_path = self._key_path
+        
+
+        result, redirect = await self._execute(
+            request,
+            cert_path=cert_path,
+            key_path=key_path
+        )
+
+        if redirect:
+
+            location = result.headers.get(
+                b'location'
+            ).decode()
+
+            upgrade_ssl = False
+            if 'https' in location and 'https' not in request.url:
+                upgrade_ssl = True
+
+            for _ in range(request.redirects):
+                result, redirect = await self._execute(
+                    request,
+                    upgrade_ssl=upgrade_ssl,
+                    redirect_url=location,
+                    cert_path=cert_path,
+                    key_path=key_path
+                )
+
+                if redirect is False:
+                    break
+
+                location = result.headers.get(b'location').decode()
+
+                upgrade_ssl = False
+                if 'https' in location and 'https' not in request.url:
+                    upgrade_ssl = True
+
+        return result
+        
+    async def _execute(
+        self,
+        request: HTTPRequest,
+        upgrade_ssl: bool=False,
+        redirect_url: Optional[str]=None,
+        cert_path: Optional[str]=None,
+        key_path: Optional[str]=None
+    ) -> Tuple[
+        HTTPResponse, 
+        bool
+    ]:
+    
+        if redirect_url:
+            request_url = redirect_url
+
+        else:
+            request_url = request.url
+
+        try:
+            
+            (
+                connection, 
+                url, 
+                upgrade_ssl
+            ) = await asyncio.wait_for(
+                self._connect_to_url_location(
+                    request_url,
+                    ssl_redirect_url=request_url if upgrade_ssl else None,
+                    cert_path=cert_path,
+                    key_path=key_path
+                ),
+                timeout=self.timeouts.connect_timeout
+            )
+
+            if upgrade_ssl:
+
+                ssl_redirect_url = request_url.replace('http://', 'https://')
+
+                connection, url, _ = await asyncio.wait_for(
+                    self._connect_to_url_location(
+                        request_url,
+                        ssl_redirect_url=ssl_redirect_url,
+                        cert_path=cert_path,
+                        key_path=key_path
+                    ),
+                    timeout=self.timeouts.connect_timeout
+                )
+
+                request_url = ssl_redirect_url
+
+            headers, data = request.prepare(url)
+
+            if connection.reader is None:
+                return HTTPResponse(
+                    url=URLMetadata(
+                        host=url.hostname,
+                        path=url.path
+                    ),
+                    method=request.method,
+                    status=status,
+                    headers=headers
+                ), False
+
+            connection.write(headers)
+
+            if data:
+                connection.write(data)
+
+            response_code = await asyncio.wait_for(
+                connection.reader.readline(),
+                timeout=self.timeouts.read_timeout
+            )
+
+            headers: Dict[bytes, bytes] = await asyncio.wait_for(
+                connection.read_headers(),
+                timeout=self.timeouts.read_timeout
+            )
+
+            status_string: List[bytes] = response_code.split()
+            status = int(status_string[1])
+
+            if status >= 300 and status < 400:
+                return HTTPResponse(
+                    url=URLMetadata(
+                        host=url.hostname,
+                        path=url.path
+                    ),
+                    method=request.method,
+                    status=status,
+                    headers=headers
+                ), True
+
+            content_length = headers.get(b'content-length')
+            transfer_encoding = headers.get(b'transfer-encoding')
+
+            cookies: Union[Cookies, None] = None
+            cookies_data: Union[bytes, None] = headers.get(b'set-cookie')
+            if cookies_data:
+                cookies = Cookies()
+                cookies.update(cookies_data)
+
+            # We require Content-Length or Transfer-Encoding headers to read a
+            # request body, otherwise it's anyone's guess as to how big the body
+            # is, and we ain't playing that game.
+            
+            if content_length:
+                body = await asyncio.wait_for(
+                    connection.readexactly(int(content_length)),
+                    timeout=self.timeouts.read_timeout
+                )
+
+            elif transfer_encoding:
+                
+                body = bytearray()
+                all_chunks_read = False
+
+                while True and not all_chunks_read:
+                    chunk_size = int(
+                        (
+                            await asyncio.wait_for(
+                                connection.readline(),
+                                timeout=self.timeouts.read_timeout
                             )
+                        ).rstrip(), 
+                        16
+                    )
+                    
+                    if not chunk_size:
+                        # read last CRLF
+                        await asyncio.wait_for(
+                            connection.readline(),
+                            timeout=self.timeouts.read_timeout
+                        )
+                        break
 
-                    all_chunks_read = True
-         
-                response.complete = time.monotonic()
-
-                if trace and trace.on_response_data_received:
-                    await trace.on_response_data_received(
-                        trace.span,
-                        action,
-                        response
+                    chunk = await asyncio.wait_for(
+                        connection.readexactly(chunk_size + 2),
+                        self.timeouts.read_timeout
+                    )
+                    body.extend(
+                        chunk[:-2]
                     )
 
-                response.headers = headers
-                response.body = body
-                self.pool.connections.append(connection)
+                all_chunks_read = True
 
-                if action.hooks.after:
-                    response = await self.execute_after(action, response)
-                    action.setup()
+            self._connections.append(connection)
 
-                if action.hooks.checks:
-                    response = await self.execute_checks(action, response)
+            return HTTPResponse(
+                url=URLMetadata(
+                    host=url.hostname,
+                    path=url.path
+                ),
+                cookies=cookies,
+                method=request.method,
+                status=status,
+                headers=headers,
+                content=body
+            ), False
 
-                if action.hooks.notify:
-                    await asyncio.gather(*[
-                        asyncio.create_task(
-                            channel.call(response, action.hooks.listeners)
-                        ) for channel in action.hooks.channels
-                    ])
+        except Exception as request_exception:
+            self._connections.append(
+                HTTPConnection()
+            )
 
-                    for listener in action.hooks.listeners: 
-                        if len(listener.hooks.channel_events) > 0:
-                            listener.setup()
-                            event = listener.hooks.channel_events.pop()
-                            if not event.is_set():
-                                event.set()       
+            if isinstance(request_url, str):
+                request_url = urlparse(request_url)
 
-            except Exception as e:
-                response.complete = time.monotonic()
-                response.error = str(e)
+            return HTTPResponse(
+                url=URLMetadata(
+                    host=request_url.hostname,
+                    path=request_url.path
+                ),
+                method=request.method,
+                status=400,
+                status_message=str(request_exception)
+            ), False
 
-                self.pool.connections.append(HTTPConnection(reset_connection=self.pool.reset_connections))
+    async def _connect_to_url_location(
+        self,
+        request_url: str,
+        ssl_redirect_url: Optional[str]=None,
+        cert_path: Optional[str]=None,
+        key_path: Optional[str]=None,
+    ) -> Tuple[
+        HTTPConnection,
+        URL,
+        bool
+    ]:
+        
+        if ssl_redirect_url:
+            parsed_url = URL(ssl_redirect_url)
+        
+        else:
+            parsed_url = URL(request_url)
 
-                if trace and trace.on_request_exception:
-                    await trace.on_request_exception(response)
+        url = self._url_cache.get(parsed_url.hostname)
+        dns_lock = self._dns_lock[parsed_url.hostname]
+        dns_waiter = self._dns_waiters[parsed_url.hostname]
 
-            self.active -= 1
-            if self.waiter and self.active <= self.pool.size:
+        do_dns_lookup = url is None or ssl_redirect_url
+        
+        if do_dns_lookup and dns_lock.locked() is False:
+            await dns_lock.acquire()
+            url = parsed_url
+            await url.lookup()
+
+            self._dns_lock[parsed_url.hostname] = dns_lock
+            self._url_cache[parsed_url.hostname] = url
+            
+            dns_waiter = self._dns_waiters[parsed_url.hostname]
+
+            if dns_waiter.done() is False:
+                dns_waiter.set_result(None)
+
+            dns_lock.release()
+
+        elif do_dns_lookup:
+            await dns_waiter
+            url = self._url_cache.get(parsed_url.hostname)
+
+        connection = self._connections.pop()
+
+        if url.address is None or ssl_redirect_url:
+            for address, ip_info in url:
 
                 try:
-                    self.waiter.set_result(None)
-                    self.waiter = None
+                    
+                    await connection.make_connection(
+                        url.hostname,
+                        address,
+                        url.port,
+                        ip_info,
+                        ssl=self._client_ssl_context if url.is_ssl or ssl_redirect_url else None,
+                        ssl_upgrade=ssl_redirect_url is not None
+                    )
 
-                except asyncio.InvalidStateError:
-                    self.waiter = None
+                    url.address = address
+                    url.socket_config = ip_info
 
-            if trace and trace.on_request_end:
-                await trace.on_request_end(response)
+                except Exception as connection_error:
+                    if 'server_hostname is only meaningful with ssl' in str(connection_error):
+                        return None, parsed_url, True
+                    
+        else:
+            try:
+                    
+                await connection.make_connection(
+                    url.hostname,
+                    url.address,
+                    url.port,
+                    url.socket_config,
+                    ssl=self._client_ssl_context if url.is_ssl or ssl_redirect_url else None,
+                    ssl_upgrade=ssl_redirect_url is not None
+                )
 
-            return response
+            except Exception as connection_error:
+                if 'server_hostname is only meaningful with ssl' in str(connection_error):
+                    return None, parsed_url, True
+                
+                raise connection_error
 
-    async def close(self):
-        if self.closed is False:
-            await self.pool.close()
-            self.closed = True
+        return connection, parsed_url, False

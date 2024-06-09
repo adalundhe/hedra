@@ -1,8 +1,10 @@
 from __future__ import annotations
+
 import binascii
-from typing import Dict, Union
+
 from hedra.core.engines.types.common.types import RequestTypes
 from hedra.core.engines.types.http2.result import HTTP2Result
+
 from .action import GRPCAction
 
 

@@ -47,6 +47,7 @@ class Hook:
         self.workflow = self.full_name.split('.').pop(0)
         self.dependencies = dependencies
         self._timeouts = timeouts
+        self.call_ids: List[str] = []
 
         self.params = call_signature.parameters
         self.args: Dict[
@@ -108,6 +109,10 @@ class Hook:
             )
         )
 
+    def __iter__(self):
+        for call_id in self.call_ids:
+            yield call_id
+
     def setup(
         self,
         context: Dict[str, Any]
@@ -137,11 +142,13 @@ class Hook:
                 result = self.parser.parse_call(node)
                 engine = result.get('engine')
                 call_source = result.get('source')
+                call_id = result.get('call_id')
+                method = result.get('method')
 
                 if engine:
+                    self.call_ids.append(call_id)
                     
                     parser_class = self.parser.parser_class_name
-                    method = result.get('method')
                     self.static = result.get('static')
 
                     source_fullname = f'{parser_class}.client.{engine}.{method}'
@@ -162,7 +169,6 @@ class Hook:
                 )
 
                 if is_cacheable_call:
-                    call_id = result.get('call_id')
                     result['source'] = source_fullname
                     self.cache[source_fullname][call_id] = result 
 

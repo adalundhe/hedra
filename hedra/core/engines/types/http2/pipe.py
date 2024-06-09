@@ -1,14 +1,23 @@
 import asyncio
-from hedra.core.engines.types.common.encoder import Encoder
-from hedra.core.engines.types.common.decoder import Decoder
+from typing import (
+    Dict,
+    List,
+    Optional,
+    Tuple,
+)
+
+from hedra.core.engines.types.common.fast_hpack import Decoder, Encoder
 from hedra.core.engines.types.common.hpack.table import HeaderTable
 from hedra.core.engines.types.http2.config import H2Configuration
+from hedra.core.engines.types.http2.errors.exceptions import (
+    StreamClosedError,
+    StreamError,
+)
 from hedra.core.engines.types.http2.errors.types import ErrorCodes
-from hedra.core.engines.types.http2.errors.exceptions import StreamClosedError
-from hedra.core.engines.types.http2.errors.exceptions import StreamError
-from hedra.core.engines.types.http2.events.connection_terminated_event import ConnectionTerminated
+from hedra.core.engines.types.http2.events.connection_terminated_event import (
+    ConnectionTerminated,
+)
 from hedra.core.engines.types.http2.events.data_received_event import DataReceived
-from hedra.core.engines.types.http2.events.deferred_headers_event import DeferredHeaders
 from hedra.core.engines.types.http2.events.stream_reset import StreamReset
 from hedra.core.engines.types.http2.events.window_updated_event import WindowUpdated
 from hedra.core.engines.types.http2.stream import Stream
@@ -18,9 +27,9 @@ from hedra.core.engines.types.http2.streams.stream_settings_codes import Setting
 from hedra.core.engines.types.tracing.trace_session import Trace
 
 from .action import HTTP2Action
+from .frames.types.base_frame import Frame
 from .result import HTTP2Result
 from .windows import WindowManager
-from .frames.types.base_frame import Frame
 
 
 class HTTP2Pipe:
@@ -234,17 +243,32 @@ class HTTP2Pipe:
 
                     elif frame.type == 0x01:
                         # HEADERS
-                        deferred_headers = DeferredHeaders(
-                            stream.encoder,
-                            frame,
-                            self.CONFIG.header_encoding
-                        )
+                        headers: List[Tuple[bytes, bytes]] = {}
 
-                        if deferred_headers.end_stream:
+                        try:
+                            headers = self._decoder.decode(frame.data, raw=True)
+
+                        except Exception:
+                            return 400, {}
+
+                        status_code: Optional[int] = None
+                        headers_dict: Dict[bytes, bytes] = {}
+                        for k, v in headers:
+                            if k == b":status":
+                                status_code = int(v.decode("ascii", errors="ignore"))
+                            elif k.startswith(b":"):
+                                headers_dict[k.strip(b':')] = v
+                            else:
+                                headers_dict[k] = v
+
+                        
+
+                        if 'END_STREAM' in frame.flags:
                             done = True
 
                         frames = []
-                        response.deferred_headers = deferred_headers
+                        response.status = status_code
+                        response.headers = headers_dict
 
                         if trace and trace.on_response_headers_received:
                             await trace.on_response_headers_received(

@@ -41,6 +41,7 @@ from .resolved_arg_type import ResolvedArgType
 from .resolved_auth import ResolvedAuth
 from .resolved_data import ResolvedData
 from .resolved_headers import ResolvedHeaders
+from .resolved_method import ResolvedMethod
 from .resolved_params import ResolvedParams
 from .resolved_query import ResolvedQuery
 from .resolved_url import ResolvedURL
@@ -126,6 +127,9 @@ class CallResolver:
             RequestType.WEBSOCKET: lambda: get_default_ssl_context()
         }
 
+        self._call_engine_types: Dict[str, str] = {}
+        self._call_workflows: Dict[str, str] = {}
+
     def __iter__(self):
         for call_id, args in self._resolved.items():
             yield call_id, args
@@ -135,6 +139,18 @@ class CallResolver:
         call_id: str
     ):
         return self._resolved.get(call_id)
+    
+    def get_engine(
+        self,
+        call_id: str
+    ):
+        return self._call_engine_types.get(call_id)
+    
+    def get_workflow(
+        self,
+        call_id: str
+    ):
+        return self._call_workflows.get(call_id)
 
     def add_args(
         self,
@@ -151,7 +167,7 @@ class CallResolver:
                 arg for arg in optimizer_args[call_id] if arg.arg_type == 'kwarg'
             ])
 
-    async def optimize_arg_types(self):
+    async def resolve_arg_types(self):
         await asyncio.gather(*[
             self._optimize_engine_type(
                 engine_type
@@ -170,6 +186,20 @@ class CallResolver:
 
         engine_type_args: List[Tuple[CallArg, Callable[..., None]]]  = []
         engine_arg_positions = self._position_map.get(engine_type)
+
+
+        for call_id in self._args:
+
+            for arg in self._args[call_id]:
+                self._call_engine_types[call_id] = self._request_types_map[arg.engine]
+                self._call_workflows[call_id] = arg.workflow
+                self._resolved[call_id]['method'] = ResolvedArg(
+                    ResolvedArgType.METHOD,
+                    arg,
+                    ResolvedMethod(
+                        method=arg.method
+                    )
+                )
 
         for call_id in self._args:
             engine_type_args.extend([
@@ -412,8 +442,9 @@ class CallResolver:
         self,
         arg: CallArg
     ):
-        resolved_url: ResolvedArg[ResolvedURL] = self._resolved[arg.call_id]['url'].value
-        resolved_data: ResolvedArg[ResolvedData] = self._resolved[arg.call_id]['data'].value
+        resolved_url: ResolvedURL = self._resolved[arg.call_id]['url'].value
+        resolved_data: ResolvedData = self._resolved[arg.call_id]['data'].value
+
         get_base = f"{arg.method} {resolved_url.url.path} HTTP/1.1{NEW_LINE}"
 
         port = resolved_url.url.port or (443 if resolved_url.url.scheme == "https" else 80)
@@ -451,7 +482,7 @@ class CallResolver:
         self,
         arg: CallArg
     ):
-        resolved_url: ResolvedArg[ResolvedURL] = self._resolved[arg.call_id]['url'].value
+        resolved_url: ResolvedURL = self._resolved[arg.call_id]['url'].value
         header_data: Dict[str, str] = arg.value
         lowered_headers: Dict[str, Any] = {}
 
@@ -538,7 +569,7 @@ class CallResolver:
         self,
         arg: CallArg
     ):
-        resolved_url: ResolvedArg[ResolvedURL] = self._resolved[arg.call_id]['url'].value
+        resolved_url: ResolvedURL = self._resolved[arg.call_id]['url'].value
         request_type = self._request_types_map[arg.engine]
 
         hpack_encoder = Encoder()
@@ -597,7 +628,7 @@ class CallResolver:
         arg: CallArg
     ) -> Union[bytes, Dict[str, str]]:
 
-        resolved_url: ResolvedArg[ResolvedURL] = self._resolved[arg.call_id]['url'].value
+        resolved_url: ResolvedURL = self._resolved[arg.call_id]['url'].value
 
         encoded_headers = [
             (b":method", arg.method.encode()),

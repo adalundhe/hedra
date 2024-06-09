@@ -1,11 +1,13 @@
 from __future__ import annotations
+
 import json
-from typing import Dict, Union, Any
 from gzip import decompress as gzip_decompress
+from typing import Dict, Union
 from zlib import decompress as zlib_decompress
-from hedra.core.engines.types.common.types import RequestTypes
+
 from hedra.core.engines.types.common.base_result import BaseResult
-from .events.deferred_headers_event import DeferredHeaders
+from hedra.core.engines.types.common.types import RequestTypes
+
 from .action import HTTP2Action
 
 
@@ -53,28 +55,17 @@ class HTTP2Result(BaseResult):
         self.params = action.url.params
         self.query = action.url.query
         self.hostname = action.url.hostname
-        self._headers: Dict[bytes, bytes] = {}
+        self.headers: Dict[bytes, bytes] = {}
+        self.status: int = None
         self.body = bytearray()
         
         self.response_code: str = None
-        self.deferred_headers: DeferredHeaders = None
         self._compression = None
         self._content_type = None
         self._size = None
         self._version = None
         self._reason = None
         self._status = None
-
-    @property
-    def headers(self) -> Dict[bytes, bytes]:
-        if self._headers is None or  len(self._headers) == 0:
-            self._headers = self._parse_headers()
-        
-        return self._headers
-
-    @headers.setter
-    def headers(self, value: Any):
-        self._headers = value
 
     @property
     def content_type(self):
@@ -111,18 +102,6 @@ class HTTP2Result(BaseResult):
     @version.setter
     def version(self, value: str):
         self._version = value
-
-    @property
-    def status(self) -> Union[int, None]:
-        if self._status is None and len(self.headers) == 0 and self.deferred_headers:
-            self.headers = self._parse_headers()
-            self._status = int(self.headers.get(b'status', 400))
-        
-        return self._status
-
-    @status.setter
-    def status(self, value: int):
-        self._status = value
 
     @property
     def reason(self) -> Union[str, None]:

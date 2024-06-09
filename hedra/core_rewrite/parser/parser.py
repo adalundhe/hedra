@@ -1,21 +1,20 @@
 import ast
-import json
 import inspect
+import json
 import uuid
-import asyncio
 from collections import defaultdict
 from typing import (
-    List,
-    Dict,
-    Tuple,
     Any,
-    Literal,
     Callable,
+    Dict,
+    List,
+    Literal,
+    Tuple,
     Union,
+    get_args,
     get_origin,
-    get_args
 )
-from types import FunctionType
+
 from .dynamic_placeholder import DynamicPlaceholder
 from .dynamic_template_string import DynamicTemplateString
 from .placeholder_call import PlaceholderCall
@@ -57,7 +56,7 @@ class Parser:
             type(node)
         )(node)
 
-    def parse_constant(self, node: ast.Constant) -> Literal:
+    def parse_constant(self, node: ast.Constant) -> Any:
         return node.value
     
     def parse_list(self, node: ast.List) -> List[Any]:

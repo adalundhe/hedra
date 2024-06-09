@@ -2,9 +2,8 @@ import asyncio
 import math
 import psutil
 import time
-import traceback
 from typing import List, Any, Dict, Callable
-from .hooks import CallResolver
+from .hooks import CallResolver, Hook
 from .workflow import Workflow
 
 
@@ -46,7 +45,7 @@ class Graph:
         self.workflows = workflows
         self.max_active = 0
         self.active = 0
-        self._call_optimizer = CallResolver()
+        self._call_resolver = CallResolver()
 
         self.context: Dict[
             str, 
@@ -54,6 +53,7 @@ class Graph:
         ] = context
 
         self._active_waiter: asyncio.Future | None = None
+        self._workflows_by_name: Dict[str, Workflow] = {}
 
     async def run(self):
 
@@ -62,13 +62,39 @@ class Graph:
 
     async def setup(self):
 
+        call_ids: List[str] = []
+        hooks_by_call_id: Dict[str, Hook] = {}
+
         for workflow in self.workflows:
+            self._workflows_by_name[workflow.name] = workflow
+
             for hook in workflow.hooks.values():
-                self._call_optimizer.add_args(
+                self._call_resolver.add_args(
                     hook.static_args
                 )
+
+                hooks_by_call_id.update({
+                    call_id: hook for call_id in hook.call_ids
+                })
+
+                call_ids.extend(hook.call_ids)
                 
-        await self._call_optimizer.optimize_arg_types()
+        await self._call_resolver.resolve_arg_types()
+
+        for call_id in call_ids:
+            
+            call_engine_type = self._call_resolver.get_engine(call_id)
+            call_workflow = self._call_resolver.get_workflow(call_id)
+
+            if call_workflow:
+
+                workflow = self._workflows_by_name.get(call_workflow)
+                engine = workflow.client.get_engine(call_engine_type)
+
+                arg_set = self._call_resolver[call_id]
+                hook = hooks_by_call_id[call_id]
+                
+                engine.prepare(arg_set)
 
     async def _run(
         self,

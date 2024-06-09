@@ -19,16 +19,15 @@ class SocketProtocols(Enum):
 
 
 class RequestType(Enum):
-    HTTP='HTTP'
-    HTTP2='HTTP2'
-    HTTP3='HTTP3'
-    WEBSOCKET='WEBSOCKET'
     GRAPHQL='GRAPHQL'
     GRAPHQL_HTTP2="GRAPHQL_HTTP2"
     GRPC='GRPC'
+    HTTP='HTTP'
+    HTTP2='HTTP2'
+    HTTP3='HTTP3'
     PLAYWRIGHT='PLAYWRIGHT'
     UDP='UDP'
-    TASK='TASK'
+    WEBSOCKET='WEBSOCKET'
     CUSTOM='CUSTOM'
 
 

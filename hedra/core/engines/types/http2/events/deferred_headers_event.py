@@ -1,6 +1,7 @@
 from typing import Dict, List, Tuple, Union
-from hedra.core.engines.types.common.decoder import Decoder
-from hedra.core.engines.types.common.encoder import Encoder
+
+from hedra.core.engines.types.common.fast_hpack import Decoder, Encoder
+
 from .base_event import BaseEvent
 
 

@@ -9,7 +9,8 @@ from typing import (
     Any, 
     List,
     Iterator,
-    Optional
+    Optional,
+    Tuple
 )
 from hedra.core_rewrite.engines.client.client_types.common.base_client import BaseClient
 from hedra.core.engines.types.common.timeouts import Timeouts
@@ -102,6 +103,7 @@ class HTTP2Client(BaseClient[Union[A, HTTP2Action], Union[R, HTTP2Result]]):
         self, 
         url: str, 
         headers: Optional[Dict[str, str]] = None, 
+        auth: Optional[Tuple[str, str]]=None,
         user: Optional[str] = None,
         tags: List[Dict[str, str]] = [],
         timeouts: Optional[Timeouts]=None,
@@ -134,6 +136,7 @@ class HTTP2Client(BaseClient[Union[A, HTTP2Action], Union[R, HTTP2Result]]):
         self,
         url: str, 
         headers: Optional[Dict[str, str]] = None, 
+        auth: Optional[Tuple[str, str]]=None,
         data: Optional[dict | str | bytes | Iterator] = None,
         user: Optional[str] = None,
         tags: List[Dict[str, str]] = [],
@@ -168,6 +171,7 @@ class HTTP2Client(BaseClient[Union[A, HTTP2Action], Union[R, HTTP2Result]]):
         self,
         url: str, 
         headers: Dict[str, str] = {}, 
+        auth: Optional[Tuple[str, str]]=None,
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
         tags: List[Dict[str, str]] = [],
@@ -202,6 +206,7 @@ class HTTP2Client(BaseClient[Union[A, HTTP2Action], Union[R, HTTP2Result]]):
         self,
         url: str, 
         headers: Dict[str, str] = {}, 
+        auth: Optional[Tuple[str, str]]=None,
         data: Union[dict, str, bytes, Iterator] = None,
         user: str = None,
         tags: List[Dict[str, str]] = [],
@@ -236,6 +241,7 @@ class HTTP2Client(BaseClient[Union[A, HTTP2Action], Union[R, HTTP2Result]]):
         self, 
         url: str, 
         headers: Dict[str, str] = {}, 
+        auth: Optional[Tuple[str, str]]=None,
         user: str = None,
         tags: List[Dict[str, str]] = [],
         timeouts: Optional[Timeouts]=None,
