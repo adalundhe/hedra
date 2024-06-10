@@ -3,14 +3,16 @@ from __future__ import annotations
 import asyncio
 from typing import Optional, Tuple
 
-from hedra.core_rewrite.engines.client.http.protocols.shared import (
+from hedra.core_rewrite.engines.client.shared.protocols import (
     _DEFAULT_LIMIT,
     Reader,
     Writer,
 )
 
+from .protocols.dtls import do_patch
 from .protocols.udp import UDPConnection as UDP
 
+do_patch()
 
 class UDPConnection:
 

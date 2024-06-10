@@ -5,7 +5,7 @@ import psutil
 from hedra.core.experiments.mutations.types.base.mutation import Mutation
 from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
-from .client_types.playwright.context_config import ContextConfig
+from .playwright.context_config import ContextConfig
 from .time_parser import TimeParser
 from .tracing_config import TracingConfig
 
