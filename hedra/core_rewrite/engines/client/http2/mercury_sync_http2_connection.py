@@ -624,10 +624,11 @@ class MercurySyncHTTP2Connection:
                 return HTTP2Response(
                     url=URLMetadata(
                         host=url.hostname,
-                        path=url.path
+                        path=url.path,
                     ),
                     method=request.method,
                     status=400,
+                    status_message=str(error),
                     headers={
                         key.encode(): value.encode() for key, value in request.headers.items()
                     }
@@ -671,28 +672,19 @@ class MercurySyncHTTP2Connection:
                 error
             ) = await asyncio.wait_for(
                 pipe.receive_response(connection), 
-                    timeout=self.timeouts.read_timeout
-                )
+                timeout=self.timeouts.read_timeout
+            )
             
             if status >= 300 and status < 400:
                 timings['read_end'] = time.monotonic()
 
-                self._connections.append(
-                    HTTP2Connection(
-                        self._concurrency,
-                        connection.stream.stream_id,
-                        reset_connection=connection.reset_connection
-                    )
-                )
-
-                self._pipes.append(
-                    HTTP2Pipe(self._max_concurrency)
-                )
+                self._connections.append(connection)
+                self._pipes.append(HTTP2Pipe(self._max_concurrency))
 
                 return HTTP2Response(
                     url=URLMetadata(
                         host=url.hostname,
-                        path=url.path
+                        path=url.path,
                     ),
                     method=request.method,
                     status=status,
@@ -716,7 +708,7 @@ class MercurySyncHTTP2Connection:
             return HTTP2Response(
                 url=URLMetadata(
                     host=url.hostname,
-                    path=url.path
+                    path=url.path,
                 ),
                 cookies=cookies,
                 method=request.method,
@@ -746,7 +738,7 @@ class MercurySyncHTTP2Connection:
             return HTTP2Response(
                 url=URLMetadata(
                     host=request_url.hostname,
-                    path=request_url.path
+                    path=request_url.path,
                 ),
                 method=request.method,
                 status=400,
@@ -799,7 +791,7 @@ class MercurySyncHTTP2Connection:
         request_url: str,
         ssl_redirect_url: Optional[str]=None
     ) -> Tuple[
-        Exception,
+        Optional[Exception],
         HTTP2Connection,
         HTTP2Pipe,
         URL,

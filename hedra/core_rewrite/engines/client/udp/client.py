@@ -2,23 +2,19 @@ import asyncio
 import ssl
 import time
 from collections import defaultdict
-from typing import (
-    Any,
-    Coroutine,
-    Dict,
-    List,
-    Optional,
-    Tuple,
-)
+from typing import Dict, List, Literal, Optional, Tuple, Union
+from urllib.parse import urlparse
+
+from pydantic import BaseModel
 
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core_rewrite.engines.client.shared.models import (
     URL,
+    URLMetadata,
 )
 
-from .action import UDPAction
-from .connection import UDPConnection
-from .result import UDPResult
+from .models.udp import UDPRequest, UDPResponse
+from .protocols import UDPConnection
 
 
 class MercuryUDPClient:
@@ -93,159 +89,312 @@ class MercuryUDPClient:
         ssl_ctx.set_ciphers('ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384')
         
         return ssl_ctx
-
-    async def prepare(self, action: UDPAction) -> Coroutine[Any, Any, None]:
-        try:
-            if action.url.is_ssl:
-                action.ssl_context = self.ssl_context
-
-            if self._hosts.get(action.url.hostname) is None:
-
-                    socket_configs = await asyncio.wait_for(action.url.lookup(), timeout=self.timeouts.connect_timeout)
-              
-                    for ip_addr, configs in socket_configs.items():
-                        for config in configs:
-
-                            connection = UDPConnection()
-                            
-                            try:
-                                await connection.make_connection(
-                                    ip_addr,
-                                    action.url.port,
-                                    config,
-                                    timeout=self.timeouts.connect_timeout
-                                )
-
-                                action.url.socket_config = config
-                                action.url.ip_addr = ip_addr
-                                action.url.has_ip_addr = True
-                                break
-
-                            except Exception: 
-                                pass
-
-                        if action.url.socket_config:
-                            break
-
-                    if action.url.socket_config is None:
-                        raise Exception('Err. - No socket found.')
-                    
-                    self._hosts[action.url.hostname] = {
-                        'ip_addr': action.url.ip_addr,
-                        'socket_config': action.url.socket_config
-                    }
-
-            else:
-                host_config = self._hosts[action.url.hostname]
-                action.url.ip_addr = host_config.get('ip_addr')
-                action.url.socket_config = host_config.get('socket_config')
-
-            if action.is_setup is False:
-                action.setup()
-
-            self.registered[action.name] = action
-
-        except Exception as e:   
-            raise e
-
-    def extend_pool(self, increased_capacity: int):
-        self.pool.size += increased_capacity
-        for _ in range(increased_capacity):
-            self.pool.connections.append(
-                UDPConnection(self.pool.reset_connections)
-            )
-        
-        self.sem = asyncio.Semaphore(self.pool.size)
-
-    def shrink_pool(self, decrease_capacity: int):
-        self.pool.size -= decrease_capacity
-        self.pool.connections = self.pool.connections[:self.pool.size]
-        self.sem = asyncio.Semaphore(self.pool.size)
-
-    async def execute_prepared_request(self, action: UDPAction) -> Coroutine[Any, Any, UDPResult]:
- 
-        response = UDPResult(action)
-        response.wait_start = time.monotonic()
-        self.active += 1
- 
-        async with self.sem:
-            connection = self.pool.connections.pop()
-            
+    
+    async def send(
+        self,
+        url: str,
+        data: str | bytes | BaseModel,
+        timeout: Union[
+            Optional[int], 
+            Optional[float]
+        ]=None,   
+    ):
+        async with self._semaphore:
             try:
+                return await asyncio.wait_for(
+                    self._request(
+                        UDPRequest(
+                            url=url,
+                            method='SEND',
+                            data=data,
+                        )
+                    ),
+                    timeout=timeout
+                )
+            
+            except Exception as err:
+                url_data = urlparse(url)
 
-                if action.hooks.listen:
-                    event = asyncio.Event()
-                    action.hooks.channel_events.append(event)
-                    await event.wait()
+                return UDPResponse(
+                    url=URLMetadata(
+                        host=url_data.hostname,
+                        path=url_data.path
+                    ),
+                    error=str(err)
+                )
+            
+    async def receive(
+        self,
+        url: str,
+        delimiter: Optional[str | bytes]=b'\n',
+        response_size: Optional[int]=None,
+        timeout: Union[
+            Optional[int], 
+            Optional[float]
+        ]=None,   
+    ):
+        async with self._semaphore:
+            try:
+                if isinstance(delimiter, str):
+                    delimiter = delimiter.encode()
 
-                if action.hooks.before:
-                    action = await self.execute_before(action)
-                    action.setup()
+                return await asyncio.wait_for(
+                    self._request(
+                        UDPRequest(
+                            url=url,
+                            method='RECEIVE',
+                            response_size=response_size,
+                            delimiter=delimiter
+                        )
+                    ),
+                    timeout=timeout
+                )
+            
+            except Exception as err:
+                url_data = urlparse(url)
 
-                response.start = time.monotonic()
+                return UDPResponse(
+                    url=URLMetadata(
+                        host=url_data.hostname,
+                        path=url_data.path
+                    ),
+                    error=str(err)
+                )
+            
+    async def bidirectional(
+        self,
+        url: str,
+        data: str | bytes | BaseModel,
+        delimiter: Optional[str | bytes]=b'\n',
+        response_size: Optional[int]=None,
+        timeout: Union[
+            Optional[int], 
+            Optional[float]
+        ]=None,  
+    ):
+        async with self._semaphore:
+            try:
+                if isinstance(delimiter, str):
+                    delimiter = delimiter.encode()
 
-                await connection.make_connection(
-                    action.url.ip_addr,
-                    action.url.port,
-                    action.url.socket_config,
-                    timeout=self.timeouts.connect_timeout
+                return await asyncio.wait_for(
+                    self._request(
+                        UDPRequest(
+                            url=url,
+                            method='BIDIRECTIONAL',
+                            data=data,
+                            response_size=response_size,
+                            delimiter=delimiter
+                        )
+                    ),
+                    timeout=timeout
+                )
+            
+            except Exception as err:
+                url_data = urlparse(url)
+
+                return UDPResponse(
+                    url=URLMetadata(
+                        host=url_data.hostname,
+                        path=url_data.path
+                    ),
+                    error=str(err)
                 )
 
-                response.connect_end = time.monotonic()
-                
-                if action.encoded_data:
-                    if action.is_stream:
-                        action.write_chunks(connection)
+    async def _request(
+        self,
+        request: UDPRequest,
+        timings: Dict[
+            Literal[
+                'request_start',
+                'connect_start',
+                'connect_end',
+                'write_start',
+                'write_end',
+                'read_start',
+                'read_end',
+                'request_end'
+            ],
+            float | None
+        ]={}
+    ):
+        request_url = request.url
+
+        if timings['connect_start'] is None:
+            timings['connect_start'] = time.monotonic()
+        
+        (
+            error,
+            connection, 
+            url, 
+        ) = await asyncio.wait_for(
+            self._connect_to_url_location(request_url),
+            timeout=self.timeouts.connect_timeout
+        )
+
+        if connection.reader is None:
+            timings['connect_end'] = time.monotonic()
+            self._connections.append(
+                UDPConnection(
+                    reset_connections=self.reset_connections
+                )
+            )
+
+            return UDPResponse(
+                url=URLMetadata(
+                    host=url.hostname,
+                    path=url.path
+                ),
+                error=str(error),
+                timings=timings
+            ), False, timings
+        
+        timings['connect_end'] = time.monotonic()
+
+        data = request.prepare()
+        response_data = b''
+
+        try:
+            match request.method:
+                case 'BIDIRECTIONAL':
+
+                    timings['write_start'] = time.monotonic()
+    
+                    connection.writer.write(data)
+                    
+                    timings['write_end'] = time.monotonic()
+                    timings['read_start'] = time.monotonic()
+
+                    if request.response_size:
+                        response_data = await connection.reader.readexactly(request.response_size)
 
                     else:
-                        connection.write(action.encoded_data)
+                        response_data = await connection.reader.readuntil(separator=request.delimiter)
+                    
+                    timings['read_end'] = time.monotonic()
 
-                response.write_end = time.monotonic()
+                case 'SEND':
+                    timings['write_start'] = time.monotonic()
+                    connection.writer.write(data)
+                    timings['write_end'] = time.monotonic()
+
+                case 'RECEIVE':
+                    timings['read_start'] = time.monotonic()
+
+                    if request.response_size:
+                        response_data = await connection.reader.readexactly(request.response_size)
+
+                    else:
+                        response_data = await connection.reader.readuntil(separator=request.delimiter)
+
+                    timings['read_end'] = time.monotonic()
+
+                case _:
+
+                    if timings['write_start']:
+                        timings['write_end'] = time.monotonic()
+
+                    if timings['read_start']:
+                        timings['read_end'] = time.monotonic()
+
+                    raise Exception('Err. - invalid UDP operation. Must be one of - BIDIRECTIONAL, SEND, or RECEIVE.')
                 
-                if action.wait_for_response:
-                    response.body = await connection.readuntil()
-         
-                response.complete = time.monotonic()
+            self._connections.append(connection)
 
-                self.pool.connections.append(connection)
+            return UDPResponse(
+                url=URLMetadata(
+                    host=url.hostname,
+                    path=url.path
+                ),
+                content=response_data,
+                timings=timings
+            )
+                
+        except Exception as err:
+            self._connections.append(
+                UDPConnection(reset_connections=self.reset_connections)
+            )
 
-                if action.hooks.after:
-                    response = await self.execute_after(action, response)
-                    action.setup()
+            return UDPResponse(
+                url=URLMetadata(
+                    host=url.hostname,
+                    path=url.path
+                ),
+                error=str(err),
+                timings=timings
+            ), False, timings
+                
+            
 
-                if action.hooks.notify:
-                    await asyncio.gather(*[
-                        asyncio.create_task(
-                            channel.call(response, action.hooks.listeners)
-                        ) for channel in action.hooks.channels
-                    ])
+    async def _connect_to_url_location(
+        self,
+        request_url: str,
+    ) -> Tuple[
+        Optional[Exception],
+        UDPConnection,
+        URL,
+    ]:
+        
+        parsed_url = URL(request_url)
 
-                    for listener in action.hooks.listeners: 
-                        if len(listener.hooks.channel_events) > 0:
-                            listener.setup()
-                            event = listener.hooks.channel_events.pop()
-                            if not event.is_set():
-                                event.set()    
+        url = self._url_cache.get(parsed_url.hostname)
+        dns_lock = self._dns_lock[parsed_url.hostname]
+        dns_waiter = self._dns_waiters[parsed_url.hostname]
 
-            except Exception as e:
-                response.complete = time.monotonic()
-                response.error = str(e)
+        do_dns_lookup = url is None
+        
+        if do_dns_lookup and dns_lock.locked() is False:
+            await dns_lock.acquire()
+            url = parsed_url
+            await url.lookup()
 
-                self.pool.connections.append(UDPConnection(reset_connection=self.pool.reset_connections))
+            self._dns_lock[parsed_url.hostname] = dns_lock
+            self._url_cache[parsed_url.hostname] = url
+            
+            dns_waiter = self._dns_waiters[parsed_url.hostname]
 
-            self.active -= 1
-            if self.waiter and self.active <= self.pool.size:
+            if dns_waiter.done() is False:
+                dns_waiter.set_result(None)
+
+            dns_lock.release()
+
+        elif do_dns_lookup:
+            await dns_waiter
+            url = self._url_cache.get(parsed_url.hostname)
+
+        connection_error: Optional[Exception] = None
+        connection = self._connections.pop()
+
+        if url.address is None:
+            for address, ip_info in url:
 
                 try:
-                    self.waiter.set_result(None)
-                    self.waiter = None
+                    
+                    await connection.make_connection(
+                        url.address,
+                        url.port,
+                        url.socket_config,
+                        tls=self._udp_ssl_context if 'wss' in url.scheme else None
+                    )
 
-                except asyncio.InvalidStateError:
-                    self.waiter = None
+                    url.address = address
+                    url.socket_config = ip_info
 
-            return response
+                except Exception:
+                    pass
+                    
+        else:
+            try:
+                    
+                await connection.make_connection(
+                    url.address,
+                    url.port,
+                    url.socket_config,
+                    tls=self._udp_ssl_context if 'wss' in url.scheme else None
+                )
 
-    async def close(self):
-        if self.closed is False:
-            await self.pool.close()
-            self.closed = True
+            except Exception as connection_error:
+                
+                raise connection_error
+
+        return connection_error, connection, parsed_url

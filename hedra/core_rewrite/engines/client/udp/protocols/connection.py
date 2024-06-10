@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import ssl
 from typing import Optional, Tuple
 
 from hedra.core_rewrite.engines.client.shared.protocols import (
-    _DEFAULT_LIMIT,
     Reader,
     Writer,
 )
 
-from .protocols.dtls import do_patch
-from .protocols.udp import UDPConnection as UDP
+from .dtls import do_patch
+from .udp import UDPConnection as UDP
 
 do_patch()
 
@@ -35,14 +35,14 @@ class UDPConnection:
         dns_address: str,
         port: int, 
         socket_config: Tuple[int, int, int, int, Tuple[int, int]],
-        timeout: Optional[float]=None
+        tls: Optional[ssl.SSLContext]=None
     ) -> None:
     
         if self.connected is False or self.dns_address != dns_address or self.reset_connections:
             try:
-                reader, writer = await asyncio.wait_for(
-                    self._connection_factory.create_udp(socket_config), 
-                    timeout=timeout
+                reader, writer = self._connection_factory.create_udp(
+                    socket_config,
+                    tls=tls
                 )
                     
                 self.connected = True
@@ -61,28 +61,6 @@ class UDPConnection:
 
             except Exception as e:
                 raise e
-
-    @property
-    def empty(self):
-        return not self.reader._buffer
-
-    def read(self):
-        return self.reader.read(n=_DEFAULT_LIMIT)
-
-    def readexactly(self, n_bytes: int):
-        return self.reader.read(n=n_bytes)
-
-    def readuntil(self, sep=b'\n'):
-        return self.reader.readuntil(separator=sep)
-
-    def write(self, data):
-        self.writer.send(data)
-
-    def reset_buffer(self):
-        self.reader._buffer = bytearray()
-
-    def read_headers(self):
-        return self.reader.read_headers()
 
     async def close(self):
         try:

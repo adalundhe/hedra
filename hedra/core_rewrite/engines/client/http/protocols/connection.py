@@ -24,13 +24,13 @@ class HTTPConnection:
         'reader',
         'writer',
         'connected',
-        'reset_connection',
+        'reset_connections',
         'pending',
         '_connection_factory',
         '_reader_and_writer'
     )
 
-    def __init__(self, reset_connection: bool=False) -> None:
+    def __init__(self, reset_connections: bool=False) -> None:
         self.dns_address: str = None
         self.port: int = None
         self.ssl: SSLContext = None
@@ -46,7 +46,7 @@ class HTTPConnection:
         ] = {}
 
         self.connected = False
-        self.reset_connection = reset_connection
+        self.reset_connection = reset_connections
         self.pending = 0
         self._connection_factory = TCPConnection()
 

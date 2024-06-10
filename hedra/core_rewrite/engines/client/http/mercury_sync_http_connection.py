@@ -596,6 +596,11 @@ class MercurySyncHTTPConnection:
             if connection.reader is None:
                 
                 timings['connect_end'] = time.monotonic()
+                self._connections.append(
+                    HTTPConnection(
+                        reset_connections=self.reset_connections,
+                    )
+                )
 
                 return HTTPResponse(
                     url=URLMetadata(
@@ -638,6 +643,7 @@ class MercurySyncHTTPConnection:
 
             if status >= 300 and status < 400:
                 timings['read_end'] = time.monotonic()
+                self._connections.append(connection)
 
                 return HTTPResponse(
                     url=URLMetadata(
@@ -720,7 +726,9 @@ class MercurySyncHTTPConnection:
 
         except Exception as request_exception:
             self._connections.append(
-                HTTPConnection()
+                HTTPConnection(
+                    reset_connections=self.reset_connections
+                )
             )
 
             if isinstance(request_url, str):
