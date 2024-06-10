@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, StrictInt, StrictStr
 
-from .url import URL
+from hedra.core_rewrite.engines.client.shared.models import URL
 
 NEW_LINE = '\r\n'
 

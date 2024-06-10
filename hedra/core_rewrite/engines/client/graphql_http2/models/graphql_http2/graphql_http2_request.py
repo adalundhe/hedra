@@ -10,21 +10,15 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, StrictInt, StrictStr
 
-from .url import URL
+from hedra.core_rewrite.engines.client.shared.models import URL
 
 NEW_LINE = '\r\n'
 
 class GraphQLHTTP2Request(BaseModel):
     url: StrictStr
     method: Literal[
-        "GET", 
         "POST",
-        "HEAD",
-        "OPTIONS", 
-        "PUT", 
-        "PATCH", 
-        "DELETE"
-    ]
+    ]='POST'
     headers: Dict[str, str]={}
     data: Dict[
         Literal[

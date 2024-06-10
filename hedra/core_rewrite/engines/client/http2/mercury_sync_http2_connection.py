@@ -16,15 +16,18 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel
 
-from .models.http import (
+from hedra.core_rewrite.engines.client.shared.models import (
     URL,
     Cookies,
-    HTTP2Request,
-    HTTP2Response,
     HTTPCookie,
     HTTPEncodableValue,
     Metadata,
     URLMetadata,
+)
+
+from .models.http2 import (
+    HTTP2Request,
+    HTTP2Response,
 )
 from .pipe import HTTP2Pipe
 from .protocols import HTTP2Connection

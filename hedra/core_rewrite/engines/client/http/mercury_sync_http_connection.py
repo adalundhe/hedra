@@ -9,15 +9,18 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel
 
-from .models.http import (
+from hedra.core_rewrite.engines.client.shared.models import (
     URL,
     Cookies,
     HTTPCookie,
     HTTPEncodableValue,
-    HTTPRequest,
-    HTTPResponse,
     Metadata,
     URLMetadata,
+)
+
+from .models.http import (
+    HTTPRequest,
+    HTTPResponse,
 )
 from .protocols import HTTPConnection
 from .timeouts import Timeouts

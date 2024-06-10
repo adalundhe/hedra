@@ -4,6 +4,8 @@ from typing import Generic, Optional
 from typing_extensions import TypeVarTuple, Unpack
 
 from .config import Config
+from .graphql import MercurySyncGraphQLConnection
+from .grpc import MercurySyncGRPCConnection
 from .http import MercurySyncHTTPConnection
 from .http2 import MercurySyncHTTP2Connection
 
@@ -33,5 +35,8 @@ class Client(Generic[Unpack[T]]):
         self.suspend = False
 
         self._config: Config = config
+
+        self.graphql = MercurySyncGraphQLConnection(pool_size=config.vus)
+        self.grpc = MercurySyncGRPCConnection(pool_size=config.vus)
         self.http = MercurySyncHTTPConnection(pool_size=config.vus)
         self.http2 = MercurySyncHTTP2Connection(pool_size=config.vus)

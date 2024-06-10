@@ -7,8 +7,10 @@ from typing import Dict, Literal, Optional, Type, TypeVar, Union
 import orjson
 from pydantic import BaseModel, StrictBytes, StrictFloat, StrictInt, StrictStr
 
-from .cookies import Cookies
-from .url_metadata import URLMetadata
+from hedra.core_rewrite.engines.client.shared.models import (
+    Cookies,
+    URLMetadata,
+)
 
 T = TypeVar('T')
 

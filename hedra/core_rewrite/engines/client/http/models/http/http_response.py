@@ -5,8 +5,11 @@ from typing import Dict, Literal, Optional, Type, TypeVar, Union
 import orjson
 from pydantic import BaseModel, StrictBytes, StrictFloat, StrictInt, StrictStr
 
-from .cookies import Cookies
-from .url_metadata import URLMetadata
+from hedra.core_rewrite.engines.client.shared.models import (
+    Cookies,
+    Metadata,
+    URLMetadata,
+)
 
 space_pattern = re.compile(r"\s+")
 
@@ -15,6 +18,7 @@ T = TypeVar('T', bound=BaseModel)
 
 
 class HTTPResponse(BaseModel):
+    metadata: Metadata
     url: URLMetadata
     method: Optional[
         Literal[

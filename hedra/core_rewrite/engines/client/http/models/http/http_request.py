@@ -1,22 +1,14 @@
-import orjson
-from pydantic import (
-    BaseModel,
-    StrictStr,
-    StrictBytes,
-    StrictInt
-)
-from typing import (
-    Dict, 
-    List,
-    Optional, 
-    Tuple, 
-    Union,
-    Literal
-)
+from typing import Dict, List, Literal, Optional, Tuple, Union
 from urllib.parse import urlencode
-from .url import URL
-from .types import HTTPCookie, HTTPEncodableValue
 
+import orjson
+from pydantic import BaseModel, StrictBytes, StrictInt, StrictStr
+
+from hedra.core_rewrite.engines.client.shared.models import (
+    URL,
+    HTTPCookie,
+    HTTPEncodableValue,
+)
 
 NEW_LINE = '\r\n'
 

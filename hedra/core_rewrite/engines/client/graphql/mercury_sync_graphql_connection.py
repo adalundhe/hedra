@@ -5,14 +5,16 @@ from urllib.parse import urlparse
 
 from hedra.core_rewrite.engines.client.client_types.common import Timeouts
 from hedra.core_rewrite.engines.client.http import MercurySyncHTTPConnection
-
-from .models.graphql import (
-    GraphQLRequest,
-    GraphQLResponse,
+from hedra.core_rewrite.engines.client.shared.models import (
     HTTPCookie,
     HTTPEncodableValue,
     Metadata,
     URLMetadata,
+)
+
+from .models.graphql import (
+    GraphQLRequest,
+    GraphQLResponse,
 )
 
 

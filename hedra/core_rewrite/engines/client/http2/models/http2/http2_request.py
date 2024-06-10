@@ -4,8 +4,11 @@ from urllib.parse import urlencode, urlparse
 import orjson
 from pydantic import BaseModel, StrictBytes, StrictInt, StrictStr
 
-from .types import HTTPCookie, HTTPEncodableValue
-from .url import URL
+from hedra.core_rewrite.engines.client.shared.models import (
+    URL,
+    HTTPCookie,
+    HTTPEncodableValue,
+)
 
 NEW_LINE = '\r\n'
 

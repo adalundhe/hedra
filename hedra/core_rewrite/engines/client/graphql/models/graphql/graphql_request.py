@@ -3,8 +3,7 @@ from typing import Dict, List, Literal, Optional
 import orjson
 from pydantic import BaseModel, StrictInt, StrictStr
 
-from .types import HTTPCookie
-from .url import URL
+from hedra.core_rewrite.engines.client.shared.models import URL, HTTPCookie
 
 try:
     from graphql import Source, parse, print_ast

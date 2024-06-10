@@ -9,12 +9,14 @@ from urllib.parse import urlparse
 
 from hedra.core_rewrite.engines.client.client_types.common import Timeouts
 from hedra.core_rewrite.engines.client.http2 import MercurySyncHTTP2Connection
+from hedra.core_rewrite.engines.client.shared.models import (
+    Metadata,
+    URLMetadata,
+)
 
 from .models.grpc import (
     GRPCRequest,
     GRPCResponse,
-    Metadata,
-    URLMetadata,
 )
 
 T = TypeVar('T')

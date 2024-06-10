@@ -1,22 +1,11 @@
 from __future__ import annotations
 
 import binascii
-from typing import Dict, Optional, TypeVar
 
-from pydantic import BaseModel, StrictBytes, StrictFloat, StrictInt, StrictStr
+from hedra.core_rewrite.engines.client.http2.models.http2 import HTTP2Response
 
-from .metadata import Metadata
-from .url_metadata import URLMetadata
 
-T = TypeVar('T')
-
-class GRPCResponse(BaseModel):
-    metadata: Metadata
-    url: URLMetadata
-    status: Optional[StrictInt]=None
-    status_message: Optional[StrictStr]=None
-    content: StrictBytes=b''
-    timings: Dict[StrictStr, StrictFloat]={}
+class GRPCResponse(HTTP2Response):
 
     class Config:
         arbitrary_types_allowed=True
@@ -28,7 +17,7 @@ class GRPCResponse(BaseModel):
     
     @property
     def data(self):
-        wire_msg = binascii.b2a_hex(self.content)
+        wire_msg = binascii.b2a_hex(self.body)
 
         message_length = wire_msg[4:10]
         msg = wire_msg[10:10+int(message_length, 16)*2]
