@@ -350,8 +350,6 @@ class MercurySyncHTTPConnection:
             Optional[str],
             Optional[BaseModel]
         ]=None,
-        
-        
         redirects: int=3
     ):
         async with self._semaphore:

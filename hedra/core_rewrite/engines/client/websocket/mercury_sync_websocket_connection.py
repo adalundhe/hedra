@@ -12,13 +12,23 @@ from typing import (
 )
 from urllib.parse import urlparse
 
-from hedra.core_rewrite.engines.client.shared.models import URL, Cookies, URLMetadata
+from pydantic import BaseModel
+
+from hedra.core_rewrite.engines.client.shared.models import (
+    URL,
+    Cookies,
+    HTTPCookie,
+    HTTPEncodableValue,
+    URLMetadata,
+)
 from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
 from .connection import WebsocketConnection
 from .models.websocket import (
     WebsocketRequest,
     WebsocketResponse,
+    get_header_bits,
+    get_message_buffer_size,
 )
 
 
@@ -74,6 +84,64 @@ class MercurySyncWebsocketConnection:
         ctx.verify_mode = ssl.CERT_NONE
 
         return ctx
+    
+    async def send(
+        self,
+        url: str,
+        auth: Optional[Tuple[str, str]]=None,
+        cookies: Optional[List[HTTPCookie]]=None,
+        headers: Dict[str, str]={},
+        params: Optional[Dict[str, HTTPEncodableValue]]=None,
+        timeout: Union[
+            Optional[int], 
+            Optional[float]
+        ]=None,
+        data: Union[
+            Optional[str],
+            Optional[Dict[str, str]],
+            Optional[BaseModel]
+        ]=None,
+        redirects: int=3
+    ):
+        async with self._semaphore:
+            try:
+    
+                method = 'GET'
+                if data:
+                    method = 'POST'
+
+                return await asyncio.wait_for(
+                    self._request(
+                        WebsocketRequest(
+                            url=url,
+                            method=method,
+                            cookies=cookies,
+                            auth=auth,
+                            headers=headers,
+                            params=params,
+                            data=data,
+                            redirects=redirects
+                        ),
+                    ),
+                    timeout=timeout
+                )
+            
+
+            except asyncio.TimeoutError:
+                url_data = urlparse(url)
+
+                return WebsocketResponse(
+                    url=URLMetadata(
+                        host=url_data.hostname,
+                        path=url_data.path,
+                        params=url_data.params,
+                        query=url_data.query
+                    ),
+                    headers=headers,
+                    method='PUT',
+                    status=408,
+                    status_message='Request timed out.'
+                )
 
     async def _request(
         self, 
@@ -245,10 +313,10 @@ class MercurySyncWebsocketConnection:
             if timings['write_start'] is None:
                 timings['write_start'] = time.monotonic()
 
-            connection.write(headers)
+            connection.writer.write(headers)
 
             if data:
-                connection.write(data)
+                connection.writer.write(data)
 
             timings['write_end'] = time.monotonic()
 
@@ -257,11 +325,6 @@ class MercurySyncWebsocketConnection:
 
             response_code = await asyncio.wait_for(
                 connection.reader.readline(),
-                timeout=self.timeouts.read_timeout
-            )
-
-            headers: Dict[bytes, bytes] = await asyncio.wait_for(
-                connection.read_headers(),
                 timeout=self.timeouts.read_timeout
             )
 
@@ -280,59 +343,29 @@ class MercurySyncWebsocketConnection:
                     status=status,
                     headers=headers
                 ), True, timings
+            
+            headers: Dict[bytes, bytes] = {}
 
-            content_length = headers.get(b'content-length')
-            transfer_encoding = headers.get(b'transfer-encoding')
+            raw_headers = b''
+            async for key, value, header_line in connection.reader.iter_headers(connection):
+                headers[key] = value
+                raw_headers += header_line
 
             cookies: Union[Cookies, None] = None
             cookies_data: Union[bytes, None] = headers.get(b'set-cookie')
             if cookies_data:
                 cookies = Cookies()
                 cookies.update(cookies_data)
-
-            # We require Content-Length or Transfer-Encoding headers to read a
-            # request body, otherwise it's anyone's guess as to how big the body
-            # is, and we ain't playing that game.
             
-            if content_length:
-                body = await asyncio.wait_for(
-                    connection.readexactly(int(content_length)),
-                    timeout=self.timeouts.read_timeout
-                )
+            header_content_length = 0
+            if data:
+                header_bits = get_header_bits(raw_headers)
+                header_content_length = get_message_buffer_size(header_bits)
 
-            elif transfer_encoding:
-                
-                body = bytearray()
-                all_chunks_read = False
+            body_size = min(16384, header_content_length)
 
-                while True and not all_chunks_read:
-                    chunk_size = int(
-                        (
-                            await asyncio.wait_for(
-                                connection.readline(),
-                                timeout=self.timeouts.read_timeout
-                            )
-                        ).rstrip(), 
-                        16
-                    )
-                    
-                    if not chunk_size:
-                        # read last CRLF
-                        await asyncio.wait_for(
-                            connection.readline(),
-                            timeout=self.timeouts.read_timeout
-                        )
-                        break
-
-                    chunk = await asyncio.wait_for(
-                        connection.readexactly(chunk_size + 2),
-                        self.timeouts.read_timeout
-                    )
-                    body.extend(
-                        chunk[:-2]
-                    )
-
-                all_chunks_read = True
+            if body_size > 0:
+                body = await asyncio.wait_for(connection.readexactly(body_size), self.timeouts.request_timeout)
 
             self._connections.append(connection)
 
@@ -343,7 +376,6 @@ class MercurySyncWebsocketConnection:
                     host=url.hostname,
                     path=url.path
                 ),
-                cookies=cookies,
                 method=request.method,
                 status=status,
                 headers=headers,
@@ -353,7 +385,7 @@ class MercurySyncWebsocketConnection:
         except Exception as request_exception:
             self._connections.append(
                 WebsocketConnection(
-                    reset_connection=self.reset_connection
+                    reset_connection=self.reset_connections
                 )
             )
 
@@ -377,7 +409,7 @@ class MercurySyncWebsocketConnection:
         request_url: str,
         ssl_redirect_url: Optional[str]=None
     ) -> Tuple[
-        WebsocketRequest,
+        WebsocketConnection,
         URL,
         bool
     ]:

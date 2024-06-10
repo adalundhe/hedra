@@ -1,12 +1,6 @@
-import signal
-import asyncio
-from asyncio import (
-    Future,
-    Transport,
-    get_event_loop,
-    AbstractEventLoop
-)
+from asyncio import AbstractEventLoop, Future, Transport, get_event_loop
 from asyncio.exceptions import LimitOverrunError
+
 from .constants import _DEFAULT_LIMIT
 
 
@@ -330,7 +324,6 @@ class Reader:
         LimitOverrunError exception  will be raised, and the data
         will be left in the internal buffer, so it can be read again.
         """
-        headers = {}
         seplen = len(separator)
 
         while True:
