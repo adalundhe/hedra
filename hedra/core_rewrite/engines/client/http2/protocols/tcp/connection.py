@@ -5,7 +5,7 @@ from asyncio.sslproto import SSLProtocol
 from ssl import SSLContext
 from typing import Optional
 
-from hedra.core_rewrite.engines.client.http2.protocols.shared import (
+from hedra.core_rewrite.engines.client.shared.protocols import (
     HTTP2_LIMIT,
     Reader,
     Writer,

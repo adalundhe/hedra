@@ -29,16 +29,18 @@ class MercurySyncHTTPConnection:
 
     def __init__(
         self, 
+        pool_size: Optional[int]=None,
         cert_path: Optional[str]=None,
         key_path: Optional[str]=None,
-        pool_size: Optional[int]=None,
+        reset_connections: bool =False
     ) -> None:
         
         if pool_size is None:
             pool_size = 100
         
         self.timeouts = Timeouts()
-
+        self.reset_connections = reset_connections
+ 
         self._cert_path = cert_path
         self._key_path = key_path
         self._client_ssl_context = self._create_general_client_ssl_context()

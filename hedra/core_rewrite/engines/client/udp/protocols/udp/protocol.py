@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from asyncio import Protocol, Transport
 from asyncio.coroutines import iscoroutine
 from weakref import ref
@@ -11,28 +9,12 @@ from hedra.core_rewrite.engines.client.shared.protocols import (
 )
 
 
-class TCPProtocol(FlowControlMixin, Protocol):
-    """Helper class to adapt between Protocol and StreamReader.
-    (This is a helper class instead of making StreamReader itself a
-    Protocol subclass, because the StreamReader has other potential
-    uses, and to prevent the user of the StreamReader to accidentally
-    call inappropriate methods of the protocol.)
-    """
+class UDPProtocol(FlowControlMixin, Protocol):
 
-    __slots__ = (
-        '_source_traceback',
-        '_reject_connection',
-        '_stream_writer',
-        '_transport',
-        '_client_connected_cb',
-        '_over_ssl',
-        '_closed',
-        '_stream_reader_wr'
-    )
+    _source_traceback = None
 
-    def __init__(self, stream_reader: Reader, client_connected_cb=None, loop=None):
+    def __init__(self, stream_reader, client_connected_cb=None, loop=None):
         super().__init__(loop=loop)
-        self._source_traceback = None
 
         if stream_reader is not None:
             self._stream_reader_wr: Reader = ref(stream_reader)
@@ -48,7 +30,7 @@ class TCPProtocol(FlowControlMixin, Protocol):
         self._stream_writer: Writer = None
         self._transport: Transport = None
         self._client_connected_cb = client_connected_cb
-        self._over_ssl = False
+        
         self._closed = self._loop.create_future()
 
     @property
@@ -61,7 +43,6 @@ class TCPProtocol(FlowControlMixin, Protocol):
         transport = writer.transport
         self._stream_writer = writer
         self._transport = transport
-        self._over_ssl = transport.get_extra_info('sslcontext') is not None
 
     def connection_made(self, transport: Transport):
         if self._reject_connection:
@@ -79,7 +60,7 @@ class TCPProtocol(FlowControlMixin, Protocol):
         reader: Reader = self._stream_reader
         if reader is not None:
             reader.set_transport(transport)
-        self._over_ssl = transport.get_extra_info('sslcontext') is not None
+
         if self._client_connected_cb is not None:
             self._stream_writer = Reader(transport, self,
                                                reader,
@@ -107,7 +88,10 @@ class TCPProtocol(FlowControlMixin, Protocol):
         self._stream_writer = None
         self._transport = None
 
-    def data_received(self, data):
+    def error_received(self, exc):
+        raise exc
+
+    def datagram_received(self, data):
         reader = self._stream_reader
         if reader is not None:
             reader.feed_data(data)
@@ -116,11 +100,7 @@ class TCPProtocol(FlowControlMixin, Protocol):
         reader: Reader = self._stream_reader
         if reader is not None:
             reader.feed_eof()
-        if self._over_ssl:
-            # Prevent a warning in SSLProtocol.eof_received:
-            # "returning true from eof_received()
-            # has no effect when using ssl"
-            return False
+
         return True
 
     def _get_close_waiter(self, stream):
@@ -136,4 +116,3 @@ class TCPProtocol(FlowControlMixin, Protocol):
         else:
             if closed.done() and not closed.cancelled():
                 closed.exception()
-

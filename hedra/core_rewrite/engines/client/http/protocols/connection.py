@@ -4,7 +4,12 @@ import asyncio
 from ssl import SSLContext
 from typing import Dict, Optional, Tuple
 
-from .shared import _DEFAULT_LIMIT, Reader, Writer
+from hedra.core_rewrite.engines.client.shared.protocols import (
+    _DEFAULT_LIMIT,
+    Reader,
+    Writer,
+)
+
 from .tcp import TCPConnection
 
 

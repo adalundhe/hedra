@@ -1,10 +1,13 @@
+from typing import Dict, List, Union
+
 import psutil
-from typing import List, Union, Dict
-from hedra.core_rewrite.engines.client.client_types.common import Timeouts
+
 from hedra.core.experiments.mutations.types.base.mutation import Mutation
-from .tracing_config import TracingConfig
-from .time_parser import TimeParser
+from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
+
 from .client_types.playwright.context_config import ContextConfig
+from .time_parser import TimeParser
+from .tracing_config import TracingConfig
 
 
 class Config:

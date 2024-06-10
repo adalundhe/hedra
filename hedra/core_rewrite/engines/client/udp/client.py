@@ -1,66 +1,98 @@
 import asyncio
+import ssl
 import time
-import uuid
-from typing import Dict, Coroutine, Any
-from hedra.core.engines.types.common.base_engine import BaseEngine
-from hedra.core.engines.types.common.ssl import get_default_ssl_context
+from collections import defaultdict
+from typing import (
+    Any,
+    Coroutine,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+)
+
 from hedra.core.engines.types.common.timeouts import Timeouts
-from .connection import UDPConnection
+from hedra.core_rewrite.engines.client.shared.models import (
+    URL,
+)
+
 from .action import UDPAction
+from .connection import UDPConnection
 from .result import UDPResult
-from .pool import Pool
 
 
-class MercuryUDPClient(BaseEngine[UDPAction, UDPResult]):
+class MercuryUDPClient:
 
-    __slots__ = (
-        'session_id',
-        'timeouts',
-        '_hosts',
-        'closed',
-        'sem',
-        'pool',
-        'active',
-        'waiter',
-        'ssl_context'
-    )
 
-    def __init__(self, concurrency: int=10**3, timeouts: Timeouts = Timeouts(), reset_connections: bool=False) -> None:
-        super(
-            MercuryUDPClient,
-            self
-        ).__init__()
+    def __init__(
+        self,
+        pool_size: Optional[int]=None,
+        cert_path: Optional[str]=None,
+        key_path: Optional[str]=None,
+        reset_connections: bool =False
+    ) -> None:
+   
+        self.timeouts = Timeouts()
+        self.reset_connections = reset_connections
+ 
+        self._cert_path = cert_path
+        self._key_path = key_path
+        self._udp_ssl_context = self._create_udp_ssl_context(
+                cert_path=cert_path,
+                key_path=key_path,
+        )
+        
+        self._dns_lock: Dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self._dns_waiters: Dict[str, asyncio.Future] = defaultdict(asyncio.Future)
+        self._pending_queue: List[asyncio.Future] = []
 
-        self.session_id = str(uuid.uuid4())
-        self.timeouts = timeouts
+        self._client_waiters: Dict[asyncio.Transport, asyncio.Future] = {}
+        self._connections: List[UDPConnection] = [
+            UDPConnection(
+                reset_connection=reset_connections
+            ) for _ in range(pool_size)
+        ]
 
-        self.registered: Dict[str, UDPConnection] = {}
-        self._hosts = {}
-        self.closed = False
+        self._hosts: Dict[str, Tuple[str, int]] = {}
 
-        self.sem = asyncio.Semaphore(value=concurrency)
-        self.pool = Pool(concurrency, reset_connections=reset_connections)
-        self.pool.create_pool()
-        self.active = 0
-        self.waiter = None
+        self._connections_count: Dict[str, List[asyncio.Transport]] = defaultdict(list)
+        self._locks: Dict[asyncio.Transport, asyncio.Lock] = {}
 
-        self.ssl_context = get_default_ssl_context()
+        self._max_concurrency = pool_size
 
-    def config_to_dict(self):
-        return {
-            'concurrency': self.pool.size,
-            'timeouts': {
-                'connect_timeout': self.timeouts.connect_timeout,
-                'socket_read_timeout': self.timeouts.socket_read_timeout,
-                'total_timeout': self.timeouts.total_timeout
-            },
-            'reset_connections': self.pool.reset_connections
-        }
-    
-    async def set_pool(self, concurrency: int):
-        self.sem = asyncio.Semaphore(value=concurrency)
-        self.pool = Pool(concurrency, reset_connections=self.pool.reset_connections)
-        self.pool.create_pool()
+        self._semaphore = asyncio.Semaphore(self._max_concurrency)
+        self._connection_waiters: List[asyncio.Future] = []
+
+        self._url_cache: Dict[
+            str,
+            URL
+        ] = {}
+
+
+    def _create_udp_ssl_context(
+        self,
+        cert_path: Optional[str]=None,
+        key_path: Optional[str]=None
+    ) -> ssl.SSLContext: 
+        
+        if self._udp_cert_path is None:
+            self._udp_cert_path = cert_path
+
+        if self._udp_key_path is None:
+            self._udp_key_path = key_path
+
+        ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS)
+        ssl_ctx.options |= ssl.OP_NO_TLSv1
+        ssl_ctx.options |= ssl.OP_NO_TLSv1_1
+        ssl_ctx.options |= ssl.OP_SINGLE_DH_USE
+        ssl_ctx.options |= ssl.OP_SINGLE_ECDH_USE
+        ssl_ctx.load_cert_chain(cert_path, keyfile=key_path)
+        ssl_ctx.load_verify_locations(cafile=cert_path)
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.VerifyMode.CERT_REQUIRED
+        ssl_ctx.set_ciphers('ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384')
+        
+        return ssl_ctx
 
     async def prepare(self, action: UDPAction) -> Coroutine[Any, Any, None]:
         try:
@@ -89,7 +121,7 @@ class MercuryUDPClient(BaseEngine[UDPAction, UDPResult]):
                                 action.url.has_ip_addr = True
                                 break
 
-                            except Exception as e: 
+                            except Exception: 
                                 pass
 
                         if action.url.socket_config:

@@ -4,7 +4,7 @@ from asyncio import Protocol, Transport
 from asyncio.coroutines import iscoroutine
 from weakref import ref
 
-from hedra.core_rewrite.engines.client.http2.protocols.shared import (
+from hedra.core_rewrite.engines.client.shared.protocols import (
     FlowControlMixin,
     Reader,
     Writer,
