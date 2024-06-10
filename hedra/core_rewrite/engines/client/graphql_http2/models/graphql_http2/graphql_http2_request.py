@@ -1,35 +1,16 @@
 import binascii
 from typing import (
-    Any,
-    Dict,
     List,
-    Literal,
     Tuple,
 )
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, StrictInt, StrictStr
-
+from hedra.core_rewrite.engines.client.http2.models.http2 import HTTP2Request
 from hedra.core_rewrite.engines.client.shared.models import URL
 
 NEW_LINE = '\r\n'
 
-class GraphQLHTTP2Request(BaseModel):
-    url: StrictStr
-    method: Literal[
-        "POST",
-    ]='POST'
-    headers: Dict[str, str]={}
-    data: Dict[
-        Literal[
-            'query', 
-            'operation_name', 
-            'variables'
-        ], 
-        str
-    ]={}
-    protobuf: Any=None
-    redirects: StrictInt=3
+class GraphQLHTTP2Request(HTTP2Request):
 
     class Config:
         arbitrary_types_allowed=True

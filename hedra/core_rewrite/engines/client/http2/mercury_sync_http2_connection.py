@@ -21,9 +21,9 @@ from hedra.core_rewrite.engines.client.shared.models import (
     Cookies,
     HTTPCookie,
     HTTPEncodableValue,
-    Metadata,
     URLMetadata,
 )
+from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
 from .models.http2 import (
     HTTP2Request,
@@ -31,7 +31,6 @@ from .models.http2 import (
 )
 from .pipe import HTTP2Pipe
 from .protocols import HTTP2Connection
-from .timeouts import Timeouts
 
 A = TypeVar('A')
 R = TypeVar('R')
@@ -137,7 +136,6 @@ class MercurySyncHTTP2Connection:
                 url_data = urlparse(url)
 
                 return HTTP2Response(
-                    metadata=Metadata(),
                     url=URLMetadata(
                         host=url_data.hostname,
                         path=url_data.path,
@@ -187,7 +185,6 @@ class MercurySyncHTTP2Connection:
                 url_data = urlparse(url)
 
                 return HTTP2Response(
-                    metadata=Metadata(),
                     url=URLMetadata(
                         host=url_data.hostname,
                         path=url_data.path,
@@ -239,7 +236,6 @@ class MercurySyncHTTP2Connection:
                 url_data = urlparse(url)
 
                 return HTTP2Response(
-                    metadata=Metadata(),
                     url=URLMetadata(
                         host=url_data.hostname,
                         path=url_data.path,
@@ -296,7 +292,6 @@ class MercurySyncHTTP2Connection:
                 url_data = urlparse(url)
 
                 return HTTP2Response(
-                    metadata=Metadata(),
                     url=URLMetadata(
                         host=url_data.hostname,
                         path=url_data.path,
@@ -351,7 +346,6 @@ class MercurySyncHTTP2Connection:
                 url_data = urlparse(url)
 
                 return HTTP2Response(
-                    metadata=Metadata(),
                     url=URLMetadata(
                         host=url_data.hostname,
                         path=url_data.path,
@@ -408,7 +402,6 @@ class MercurySyncHTTP2Connection:
                 url_data = urlparse(url)
 
                 return HTTP2Response(
-                    metadata=Metadata(),
                     url=URLMetadata(
                         host=url_data.hostname,
                         path=url_data.path,
@@ -461,7 +454,6 @@ class MercurySyncHTTP2Connection:
                 url_data = urlparse(url)
 
                 return HTTP2Response(
-                    metadata=Metadata(),
                     url=URLMetadata(
                         host=url_data.hostname,
                         path=url_data.path,
@@ -909,6 +901,3 @@ class MercurySyncHTTP2Connection:
             False
         )
     
-    async def close(self):
-        if self.closed is False:
-            self.closed = True

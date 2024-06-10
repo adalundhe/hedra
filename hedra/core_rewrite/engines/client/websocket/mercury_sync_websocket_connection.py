@@ -1,101 +1,83 @@
 import asyncio
 import ssl
 import time
-import uuid
+from collections import defaultdict
 from typing import (
     Dict,
+    List,
     Literal,
     Optional,
     Tuple,
-    TypeVar,
     Union,
 )
 from urllib.parse import urlparse
 
-from hedra.core_rewrite.engines.client.client_types.common import Timeouts
-from hedra.core_rewrite.engines.client.http2 import MercurySyncHTTP2Connection
-from hedra.core_rewrite.engines.client.http2.pipe import HTTP2Pipe
-from hedra.core_rewrite.engines.client.http2.protocols import HTTP2Connection
-from hedra.core_rewrite.engines.client.shared.models import (
-    URL,
-    URLMetadata,
+from hedra.core_rewrite.engines.client.shared.models import URL, Cookies, URLMetadata
+from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
+
+from .connection import WebsocketConnection
+from .models.websocket import (
+    WebsocketRequest,
+    WebsocketResponse,
 )
 
-from .models.grpc import (
-    GRPCRequest,
-    GRPCResponse,
-)
 
-T = TypeVar('T')
-
-class MercurySyncGRPCConnection(MercurySyncHTTP2Connection):
+class MercurySyncWebsocketConnection:
 
     def __init__(
-        self, 
-        pool_size: int = 10 ** 3, 
+        self,  
+        pool_size: Optional[int]=None,
         cert_path: Optional[str]=None,
         key_path: Optional[str]=None,
-        timeouts: Timeouts = Timeouts(),
         reset_connections: bool=False,
     ) -> None:
-        super(
-            MercurySyncGRPCConnection,
-            self
-        ).__init__(
-            pool_size=pool_size,
-            cert_path=cert_path,
-            key_path=key_path,
-            timeouts=timeouts, 
-            reset_connections=reset_connections
-        )
-
-        self.session_id = str(uuid.uuid4())
         
-    async def send(
-        self,
-        url: str,
-        protobuf: T,
-        timeout: Union[
-            Optional[int], 
-            Optional[float]
-        ]=None,
-        redirects: int=3
-    ) -> GRPCResponse:
-        async with self._semaphore:
+        if pool_size is None:
+            pool_size = 100
+        
+        self.timeouts = Timeouts()
+        self.reset_connections = reset_connections
 
-            try:
-                
-                return await asyncio.wait_for(
-                    self._request(
-                        GRPCRequest(
-                            url=url,
-                            protobuf=protobuf,
-                            redirects=redirects
-                        ),
-                    ),
-                    timeout=timeout
-                )
-            
-            except asyncio.TimeoutError:
+        self._cert_path = cert_path
+        self._key_path = key_path
+        self._client_ssl_context = self._create_general_client_ssl_context()
+        
+        self._dns_lock: Dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self._dns_waiters: Dict[str, asyncio.Future] = defaultdict(asyncio.Future)
+        self._pending_queue: List[asyncio.Future] = []
 
-                url_data = urlparse(url)
+        self._client_waiters: Dict[asyncio.Transport, asyncio.Future] = {}
+        self._connections: List[WebsocketConnection] = [
+            WebsocketConnection(
+                reset_connections=reset_connections,
+            ) for _ in range(pool_size)
+        ]
 
-                return GRPCResponse(
-                    url=URLMetadata(
-                        host=url_data.hostname,
-                        path=url_data.path,
-                        params=url_data.params,
-                        query=url_data.query
-                    ),
-                    status=408,
-                    status_message='Request timed out.'
-                )
+        self._hosts: Dict[str, Tuple[str, int]] = {}
 
+        self._connections_count: Dict[str, List[asyncio.Transport]] = defaultdict(list)
+        self._locks: Dict[asyncio.Transport, asyncio.Lock] = {}
 
-    
+        self._max_concurrency = pool_size
+
+        self._semaphore = asyncio.Semaphore(self._max_concurrency)
+        self._connection_waiters: List[asyncio.Future] = []
+
+        self._url_cache: Dict[
+            str,
+            URL
+        ] = {}
+
+    def _create_general_client_ssl_context(self):
+        ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+
+        return ctx
+
     async def _request(
         self, 
-        request: GRPCRequest, 
+        request: WebsocketRequest, 
         cert_path: Optional[str]=None,
         key_path: Optional[str]=None
     ):
@@ -137,7 +119,9 @@ class MercurySyncGRPCConnection(MercurySyncHTTP2Connection):
 
         if redirect:
 
-            location = result.headers.get('location')
+            location = result.headers.get(
+                b'location'
+            ).decode()
 
             upgrade_ssl = False
             if 'https' in location and 'https' not in request.url:
@@ -155,7 +139,7 @@ class MercurySyncGRPCConnection(MercurySyncHTTP2Connection):
                 if redirect is False:
                     break
 
-                location = result.headers.get('location')
+                location = result.headers.get(b'location').decode()
 
                 upgrade_ssl = False
                 if 'https' in location and 'https' not in request.url:
@@ -165,10 +149,10 @@ class MercurySyncGRPCConnection(MercurySyncHTTP2Connection):
         result.timings.update(timings)
 
         return result
-
+        
     async def _execute(
-        self, 
-        request: GRPCRequest,
+        self,
+        request: WebsocketRequest,
         upgrade_ssl: bool=False,
         redirect_url: Optional[str]=None,
         timings: Dict[
@@ -184,8 +168,24 @@ class MercurySyncGRPCConnection(MercurySyncHTTP2Connection):
             ],
             float | None
         ]={}
-    ):
-        
+    ) -> Tuple[
+        WebsocketResponse, 
+        bool,
+        Dict[
+            Literal[
+                'request_start',
+                'connect_start',
+                'connect_end',
+                'write_start',
+                'write_end',
+                'read_start',
+                'read_end',
+                'request_end'
+            ],
+            float | None
+        ]
+    ]:
+    
         if redirect_url:
             request_url = redirect_url
 
@@ -198,9 +198,7 @@ class MercurySyncGRPCConnection(MercurySyncHTTP2Connection):
                 timings['connect_start'] = time.monotonic()
             
             (
-                error, 
-                connection,
-                pipe,
+                connection, 
                 url, 
                 upgrade_ssl
             ) = await asyncio.wait_for(
@@ -215,13 +213,7 @@ class MercurySyncGRPCConnection(MercurySyncHTTP2Connection):
 
                 ssl_redirect_url = request_url.replace('http://', 'https://')
 
-                (
-                    error, 
-                    connection,
-                    pipe, 
-                    url, 
-                    _
-                ) = await asyncio.wait_for(
+                connection, url, _ = await asyncio.wait_for(
                     self._connect_to_url_location(
                         request_url,
                         ssl_redirect_url=ssl_redirect_url
@@ -231,112 +223,128 @@ class MercurySyncGRPCConnection(MercurySyncHTTP2Connection):
 
                 request_url = ssl_redirect_url
 
-            headers = request.encode_headers(url)
+            headers, data = request.prepare(url)
 
-            if error:
+            if connection.reader is None:
+                
                 timings['connect_end'] = time.monotonic()
 
-                self._connections.append(
-                    HTTP2Connection(
-                        self._concurrency,
-                        stream_id=connection.stream.stream_id,
-                        reset_connection=connection.reset_connection
-                    )
-                )
-
-                self._pipes.append(
-                    HTTP2Pipe(self._max_concurrency)
-                )
-
-                return GRPCResponse(
+                return WebsocketResponse(
                     url=URLMetadata(
                         host=url.hostname,
                         path=url.path
                     ),
-                    method='POST',
+                    method=request.method,
                     status=400,
-                    headers={
-                        key.encode(): value.encode() for key, value in request.headers.items()
-                    }
+                    headers=headers
                 ), False, timings
             
+
             timings['connect_end'] = time.monotonic()
 
             if timings['write_start'] is None:
                 timings['write_start'] = time.monotonic()
 
-            connection = pipe.send_preamble(connection)
-            data = request.encode_data()
-
-            connection = pipe.send_request_headers(
-                headers,
-                data,
-                connection
-            )
+            connection.write(headers)
 
             if data:
-                connection = await asyncio.wait_for(
-                    pipe.submit_request_body(
-                        data,
-                        connection
-                    ),
-                    timeout=self.timeouts.write_timeout
-                )
-            
+                connection.write(data)
+
             timings['write_end'] = time.monotonic()
 
             if timings['read_start'] is None:
                 timings['read_start'] = time.monotonic()
 
-            (
-                status,
-                headers,
-                body,
-                error
-            ) = await asyncio.wait_for(
-                pipe.receive_response(connection), 
-                    timeout=self.timeouts.read_timeout
-                )
-            
+            response_code = await asyncio.wait_for(
+                connection.reader.readline(),
+                timeout=self.timeouts.read_timeout
+            )
+
+            headers: Dict[bytes, bytes] = await asyncio.wait_for(
+                connection.read_headers(),
+                timeout=self.timeouts.read_timeout
+            )
+
+            status_string: List[bytes] = response_code.split()
+            status = int(status_string[1])
+
             if status >= 300 and status < 400:
                 timings['read_end'] = time.monotonic()
 
-                self._connections.append(
-                    HTTP2Connection(
-                        self._concurrency,
-                        connection.stream.stream_id,
-                        reset_connection=connection.reset_connection
-                    )
-                )
-
-                self._pipes.append(
-                    HTTP2Pipe(self._max_concurrency)
-                )
-
-                return GRPCResponse(
+                return WebsocketResponse(
                     url=URLMetadata(
                         host=url.hostname,
                         path=url.path
                     ),
-                    method='POST',
+                    method=request.method,
                     status=status,
                     headers=headers
                 ), True, timings
+
+            content_length = headers.get(b'content-length')
+            transfer_encoding = headers.get(b'transfer-encoding')
+
+            cookies: Union[Cookies, None] = None
+            cookies_data: Union[bytes, None] = headers.get(b'set-cookie')
+            if cookies_data:
+                cookies = Cookies()
+                cookies.update(cookies_data)
+
+            # We require Content-Length or Transfer-Encoding headers to read a
+            # request body, otherwise it's anyone's guess as to how big the body
+            # is, and we ain't playing that game.
             
-            if error:
-                raise error
+            if content_length:
+                body = await asyncio.wait_for(
+                    connection.readexactly(int(content_length)),
+                    timeout=self.timeouts.read_timeout
+                )
+
+            elif transfer_encoding:
+                
+                body = bytearray()
+                all_chunks_read = False
+
+                while True and not all_chunks_read:
+                    chunk_size = int(
+                        (
+                            await asyncio.wait_for(
+                                connection.readline(),
+                                timeout=self.timeouts.read_timeout
+                            )
+                        ).rstrip(), 
+                        16
+                    )
+                    
+                    if not chunk_size:
+                        # read last CRLF
+                        await asyncio.wait_for(
+                            connection.readline(),
+                            timeout=self.timeouts.read_timeout
+                        )
+                        break
+
+                    chunk = await asyncio.wait_for(
+                        connection.readexactly(chunk_size + 2),
+                        self.timeouts.read_timeout
+                    )
+                    body.extend(
+                        chunk[:-2]
+                    )
+
+                all_chunks_read = True
 
             self._connections.append(connection)
-            self._pipes.append(pipe)
 
             timings['read_end'] = time.monotonic()
 
-            return GRPCResponse(
+            return WebsocketResponse(
                 url=URLMetadata(
                     host=url.hostname,
                     path=url.path
                 ),
-                method='POST',
+                cookies=cookies,
+                method=request.method,
                 status=status,
                 headers=headers,
                 content=body
@@ -344,15 +352,9 @@ class MercurySyncGRPCConnection(MercurySyncHTTP2Connection):
 
         except Exception as request_exception:
             self._connections.append(
-                HTTP2Connection(
-                    self._concurrency,
-                    connection.stream.stream_id,
-                    reset_connection=connection.reset_connection
+                WebsocketConnection(
+                    reset_connection=self.reset_connection
                 )
-            )
-
-            self._pipes.append(
-                HTTP2Pipe(self._max_concurrency)
             )
 
             if isinstance(request_url, str):
@@ -360,65 +362,22 @@ class MercurySyncGRPCConnection(MercurySyncHTTP2Connection):
 
             timings['read_end'] = time.monotonic()
 
-            return GRPCResponse(
+            return WebsocketResponse(
                 url=URLMetadata(
                     host=request_url.hostname,
                     path=request_url.path
                 ),
-                method='POST',
+                method=request.method,
                 status=400,
                 status_message=str(request_exception)
             ), False, timings
-        
-    def _create_http2_ssl_context(self):
-        """
-        This function creates an SSLContext object that is suitably configured for
-        HTTP/2. If you're working with Python TLS directly, you'll want to do the
-        exact same setup as this function does.
-        """
-        # Get the basic context from the standard library.
-        ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-
-        # RFC 7540 Section 9.2: Implementations of HTTP/2 MUST use TLS version 1.2
-        # or higher. Disable TLS 1.1 and lower.
-        ctx.options |= (
-            ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3 | ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
-        )
-
-        # RFC 7540 Section 9.2.1: A deployment of HTTP/2 over TLS 1.2 MUST disable
-        # compression.
-        ctx.options |= ssl.OP_NO_COMPRESSION
-
-        # RFC 7540 Section 9.2.2: "deployments of HTTP/2 that use TLS 1.2 MUST
-        # support TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256". In practice, the
-        # blocklist defined in this section allows only the AES GCM and ChaCha20
-        # cipher suites with ephemeral key negotiation.
-        ctx.set_ciphers("ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20")
-
-        # We want to negotiate using NPN and ALPN. ALPN is mandatory, but NPN may
-        # be absent, so allow that. This setup allows for negotiation of HTTP/1.1.
-        ctx.set_alpn_protocols(["h2", "http/1.1"])
-
-        try:
-            if hasattr(ctx, '_set_npn_protocols'):
-                ctx.set_npn_protocols(["h2", "http/1.1"])
-        except NotImplementedError:
-            pass
-
-
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-
-        return ctx
 
     async def _connect_to_url_location(
         self,
         request_url: str,
         ssl_redirect_url: Optional[str]=None
     ) -> Tuple[
-        Exception,
-        HTTP2Connection,
-        HTTP2Pipe,
+        WebsocketRequest,
         URL,
         bool
     ]:
@@ -455,9 +414,6 @@ class MercurySyncGRPCConnection(MercurySyncHTTP2Connection):
             url = self._url_cache.get(parsed_url.hostname)
 
         connection = self._connections.pop()
-        pipe = self._pipes.pop()
-
-        connection_error: Optional[Exception] = None
 
         if url.address is None or ssl_redirect_url:
             for address, ip_info in url:
@@ -478,13 +434,7 @@ class MercurySyncGRPCConnection(MercurySyncHTTP2Connection):
 
                 except Exception as connection_error:
                     if 'server_hostname is only meaningful with ssl' in str(connection_error):
-                        return (
-                            None, 
-                            None,
-                            None,
-                            parsed_url, 
-                            True
-                        )
+                        return None, parsed_url, True
                     
         else:
             try:
@@ -500,20 +450,8 @@ class MercurySyncGRPCConnection(MercurySyncHTTP2Connection):
 
             except Exception as connection_error:
                 if 'server_hostname is only meaningful with ssl' in str(connection_error):
-                    return (
-                        None,
-                        None,
-                        None,
-                        parsed_url, 
-                        True
-                    )
+                    return None, parsed_url, True
                 
                 raise connection_error
 
-        return (
-            connection_error,
-            connection,
-            pipe, 
-            parsed_url, 
-            False
-        )
+        return connection, parsed_url, False

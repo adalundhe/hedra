@@ -7,7 +7,6 @@ from pydantic import BaseModel, StrictBytes, StrictFloat, StrictInt, StrictStr
 
 from hedra.core_rewrite.engines.client.shared.models import (
     Cookies,
-    Metadata,
     URLMetadata,
 )
 
@@ -18,7 +17,6 @@ T = TypeVar('T', bound=BaseModel)
 
 
 class HTTPResponse(BaseModel):
-    metadata: Metadata
     url: URLMetadata
     method: Optional[
         Literal[

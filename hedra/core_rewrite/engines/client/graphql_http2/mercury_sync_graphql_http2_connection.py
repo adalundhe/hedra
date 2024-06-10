@@ -10,12 +10,11 @@ from urllib.parse import urlparse
 
 from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core_rewrite.engines.client.http2 import MercurySyncHTTP2Connection
+from hedra.core_rewrite.engines.client.shared.models import URLMetadata
 
 from .models.graphql_http2 import (
     GraphQLHTTP2Request,
     GraphQLHTTP2Response,
-    Metadata,
-    URLMetadata,
 )
 
 T = TypeVar('T')
@@ -78,7 +77,6 @@ class MercurySyncGraphQLHTTP2Connection(MercurySyncHTTP2Connection):
                 url_data = urlparse(url)
 
                 return GraphQLHTTP2Response(
-                    metadata=Metadata(),
                     url=URLMetadata(
                         host=url_data.hostname,
                         path=url_data.path,

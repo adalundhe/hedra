@@ -1,5 +1,5 @@
 import binascii
-from typing import Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, StrictInt, StrictStr
@@ -10,6 +10,7 @@ NEW_LINE = '\r\n'
 
 class GRPCRequest(BaseModel):
     url: StrictStr
+    headers: Dict[str, str]={}
     protobuf: Any=None
     redirects: StrictInt=3
 
@@ -33,7 +34,7 @@ class GRPCRequest(BaseModel):
         timeout: int | float=60
     ) -> List[Tuple[bytes, bytes]]:
         
-        return [
+        encoded_headers = [
             (b":method", b'POST'),
             (b":authority", url.hostname.encode()),
             (b":scheme", url.scheme.encode()),
@@ -42,3 +43,18 @@ class GRPCRequest(BaseModel):
             (b'Grpc-Timeout', f'{timeout}'.encode()),
             (b'TE', b'trailers')
         ]
+
+        encoded_headers.extend([
+            (
+                k.lower().encode(), 
+                v.encode()
+            )
+            for k, v in self.headers.items()
+            if k.lower()
+            not in (
+                b"host",
+                b"transfer-encoding",
+            )
+        ])
+        
+        return encoded_headers

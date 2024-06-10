@@ -14,16 +14,15 @@ from hedra.core_rewrite.engines.client.shared.models import (
     Cookies,
     HTTPCookie,
     HTTPEncodableValue,
-    Metadata,
     URLMetadata,
 )
+from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
 from .models.http import (
     HTTPRequest,
     HTTPResponse,
 )
 from .protocols import HTTPConnection
-from .timeouts import Timeouts
 
 
 class MercurySyncHTTPConnection:
@@ -114,7 +113,6 @@ class MercurySyncHTTPConnection:
                 url_data = urlparse(url)
 
                 return HTTPResponse(
-                    metadata=Metadata(),
                     url=URLMetadata(
                         host=url_data.hostname,
                         path=url_data.path,
@@ -164,7 +162,6 @@ class MercurySyncHTTPConnection:
                 url_data = urlparse(url)
 
                 return HTTPResponse(
-                    metadata=Metadata(),
                     url=URLMetadata(
                         host=url_data.hostname,
                         path=url_data.path,
@@ -216,7 +213,6 @@ class MercurySyncHTTPConnection:
                 url_data = urlparse(url)
 
                 return HTTPResponse(
-                    metadata=Metadata(),
                     url=URLMetadata(
                         host=url_data.hostname,
                         path=url_data.path,
@@ -273,7 +269,6 @@ class MercurySyncHTTPConnection:
                 url_data = urlparse(url)
 
                 return HTTPResponse(
-                    metadata=Metadata(),
                     url=URLMetadata(
                         host=url_data.hostname,
                         path=url_data.path,
@@ -328,7 +323,6 @@ class MercurySyncHTTPConnection:
                 url_data = urlparse(url)
 
                 return HTTPResponse(
-                    metadata=Metadata(),
                     url=URLMetadata(
                         host=url_data.hostname,
                         path=url_data.path,
@@ -385,7 +379,6 @@ class MercurySyncHTTPConnection:
                 url_data = urlparse(url)
 
                 return HTTPResponse(
-                    metadata=Metadata(),
                     url=URLMetadata(
                         host=url_data.hostname,
                         path=url_data.path,
@@ -438,7 +431,6 @@ class MercurySyncHTTPConnection:
                 url_data = urlparse(url)
 
                 return HTTPResponse(
-                    metadata=Metadata(),
                     url=URLMetadata(
                         host=url_data.hostname,
                         path=url_data.path,
