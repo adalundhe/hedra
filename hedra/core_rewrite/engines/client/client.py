@@ -8,6 +8,9 @@ from .graphql import MercurySyncGraphQLConnection
 from .grpc import MercurySyncGRPCConnection
 from .http import MercurySyncHTTPConnection
 from .http2 import MercurySyncHTTP2Connection
+from .http3 import MercurySyncHTTP3Connection
+from .udp import MercurySyncUDPConnection
+from .websocket import MercurySyncWebsocketConnection
 
 T = TypeVarTuple('T')
 
@@ -40,3 +43,6 @@ class Client(Generic[Unpack[T]]):
         self.grpc = MercurySyncGRPCConnection(pool_size=config.vus)
         self.http = MercurySyncHTTPConnection(pool_size=config.vus)
         self.http2 = MercurySyncHTTP2Connection(pool_size=config.vus)
+        self.http3 = MercurySyncHTTP3Connection(pool_size=config.vus)
+        self.udp = MercurySyncUDPConnection(pool_size=config.vus)
+        self.websocket = MercurySyncWebsocketConnection(pool_size=config.vus)
