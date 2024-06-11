@@ -1,8 +1,6 @@
 import os
-from setuptools import (
-    setup,
-    find_packages
-)
+
+from setuptools import find_packages, setup
 
 current_directory = os.path.abspath(os.path.dirname(__file__))
 
@@ -64,7 +62,8 @@ setup(
         'python3-dtls',
         'zstandard',
         'cryptography',
-        'python-dotenv'
+        'python-dotenv',
+        'aioquic'
     ],
     entry_points = {
         'console_scripts': [

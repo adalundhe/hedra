@@ -8,9 +8,9 @@ from typing import (
 )
 from urllib.parse import urlparse
 
-from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core_rewrite.engines.client.http2 import MercurySyncHTTP2Connection
 from hedra.core_rewrite.engines.client.shared.models import URLMetadata
+from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
 from .models.graphql_http2 import (
     GraphQLHTTP2Request,

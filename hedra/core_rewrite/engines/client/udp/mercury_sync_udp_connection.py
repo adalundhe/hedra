@@ -7,17 +7,17 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel
 
-from hedra.core.engines.types.common.timeouts import Timeouts
 from hedra.core_rewrite.engines.client.shared.models import (
     URL,
     URLMetadata,
 )
+from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
 from .models.udp import UDPRequest, UDPResponse
 from .protocols import UDPConnection
 
 
-class MercuryUDPClient:
+class MercurySyncUDPConnection:
 
 
     def __init__(

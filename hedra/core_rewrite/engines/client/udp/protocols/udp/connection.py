@@ -3,10 +3,11 @@ import socket
 import ssl
 from typing import Callable
 
-from hedra.core.engines.types.common.protocols.shared.constants import _DEFAULT_LIMIT
-from hedra.core.engines.types.common.protocols.shared.reader import Reader
-from hedra.core.engines.types.common.protocols.shared.writer import Writer
-from hedra.core.engines.types.common.types import RequestTypes
+from hedra.core_rewrite.engines.client.shared.protocols import (
+    _DEFAULT_LIMIT,
+    Reader,
+    Writer,
+)
 
 from .protocol import UDPProtocol
 
@@ -15,10 +16,9 @@ QuicStreamHandler = Callable[[asyncio.StreamReader, asyncio.StreamWriter], None]
 
 class UDPConnection:
 
-    def __init__(self, factory_type: RequestTypes = RequestTypes.HTTP) -> None:
+    def __init__(self) -> None:
         self.loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
         self.transport: asyncio.DatagramTransport = None
-        self.factory_type = factory_type
         self._connection = None
         self.socket: socket.socket = None
         self._writer = None

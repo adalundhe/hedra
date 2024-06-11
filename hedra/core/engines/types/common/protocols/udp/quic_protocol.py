@@ -1,21 +1,22 @@
 from __future__ import annotations
+
 import asyncio
 import re
-from enum import Enum, IntEnum
 from collections import deque
+from enum import Enum, IntEnum
 from typing import (
-    Deque, 
-    Dict, 
-    List, 
-    Optional, 
-    cast, 
-    Set, 
-    FrozenSet, 
-    Callable,
-    Tuple,
     Any,
-    Union,
+    Callable,
+    Deque,
+    Dict,
+    FrozenSet,
+    List,
+    Optional,
+    Set,
     Text,
+    Tuple,
+    Union,
+    cast,
 )
 
 
@@ -30,13 +31,11 @@ def dummy_stream_is_unidirectional(val: int):
 try:
 
     import pylsqpack
-    from aioquic.quic.connection import QuicConnection, NetworkAddress
-    from aioquic.quic.events import (
-        ConnectionTerminated,
-        ConnectionIdRetired,
-        ConnectionIdIssued,
-        HandshakeCompleted,
-        PingAcknowledged
+    from aioquic.buffer import (
+        UINT_VAR_MAX_SIZE,
+        Buffer,
+        BufferReadError,
+        encode_uint_var,
     )
     from aioquic.h3.events import (
         DatagramReceived,
@@ -47,20 +46,21 @@ try:
         PushPromiseReceived,
         WebTransportStreamDataReceived,
     )
-    from aioquic.buffer import (
-        UINT_VAR_MAX_SIZE,
-        Buffer, 
-        BufferReadError, 
-        encode_uint_var
+    from aioquic.quic.connection import (
+        NetworkAddress,
+        QuicConnection,
+        stream_is_unidirectional,
     )
-
     from aioquic.quic.events import (
-        DatagramFrameReceived, 
-        QuicEvent, 
-        StreamDataReceived
+        ConnectionIdIssued,
+        ConnectionIdRetired,
+        ConnectionTerminated,
+        DatagramFrameReceived,
+        HandshakeCompleted,
+        PingAcknowledged,
+        QuicEvent,
+        StreamDataReceived,
     )
-
-    from aioquic.quic.connection import stream_is_unidirectional
 
 except ImportError:
     pylsqpack = object

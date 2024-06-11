@@ -2,31 +2,20 @@ import asyncio
 import socket
 from typing import Callable, Optional
 
-from hedra.core.engines.types.common.types import RequestTypes
+from aioquic.h3.connection import H3_ALPN
+from aioquic.quic.configuration import QuicConfiguration
+from aioquic.quic.connection import QuicConnection
 
 from .quic_protocol import QuicProtocol
-
-try:
-    from aioquic.h3.connection import H3_ALPN
-    from aioquic.quic.configuration import QuicConfiguration
-    from aioquic.quic.connection import QuicConnection
-
-except ImportError:
-    H3_ALPN = []
-    QuicConnection = object
-    QuicConfiguration = object
-
-
 
 QuicStreamHandler = Callable[[asyncio.StreamReader, asyncio.StreamWriter], None]
 
 
 class UDPConnection:
 
-    def __init__(self, factory_type: RequestTypes = RequestTypes.HTTP) -> None:
+    def __init__(self,) -> None:
         self.loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
         self.transport: asyncio.DatagramTransport = None
-        self.factory_type = factory_type
         self._connection = None
         self.socket: socket.socket = None
         self._writer = None
@@ -38,7 +27,7 @@ class UDPConnection:
         configuration: Optional[QuicConfiguration] = None,
         stream_handler: Optional[QuicStreamHandler] = None,
         local_port: int = 0,
-    ):
+    ) -> QuicProtocol:
         
         _, _, _, _, address = socket_config
         if len(address) == 2:

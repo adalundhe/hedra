@@ -1,33 +1,23 @@
 from __future__ import annotations
+
 import asyncio
 from typing import Optional, Tuple
-from hedra.core.engines.types.common.protocols import UDPConnection
-from hedra.core.engines.types.common.protocols.udp.quic_protocol import QuicProtocol
+
+from .quic_protocol import QuicProtocol
+from .udp_connection import UDPConnection
 
 
 class HTTP3Connection:
 
-    __slots__ = (
-        'dns_address',
-        'port',
-        'ip_addr',
-        'lock',
-        'protocol',
-        'connected',
-        'reset_connection',
-        'pending',
-        '_connection_factory'
-    )
-
-    def __init__(self, reset_connection: bool=False) -> None:
+    def __init__(self, reset_connections: bool=False) -> None:
         self.dns_address: str = None
         self.port: int = None
         self.ip_addr = None
         self.lock = asyncio.Lock()
 
-        self.protocol: QuicProtocol = None
+        self.protocol: Optional[QuicProtocol] = None
         self.connected = False
-        self.reset_connection = reset_connection
+        self.reset_connections = reset_connections
         self.pending = 0
         self._connection_factory = UDPConnection()
 

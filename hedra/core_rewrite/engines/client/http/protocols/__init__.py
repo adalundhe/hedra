@@ -1,1 +1,1 @@
-from .connection import HTTPConnection
+from .connection import HTTPConnection as HTTPConnection

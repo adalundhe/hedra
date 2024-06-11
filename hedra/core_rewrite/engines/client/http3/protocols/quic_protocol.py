@@ -1,93 +1,50 @@
 from __future__ import annotations
+
 import asyncio
 import re
-from enum import Enum, IntEnum
 from collections import deque
+from enum import Enum, IntEnum
 from typing import (
-    Deque, 
-    Dict, 
-    List, 
-    Optional, 
-    cast, 
-    Set, 
-    FrozenSet, 
-    Callable,
-    Tuple,
     Any,
-    Union,
+    Callable,
+    Deque,
+    Dict,
+    FrozenSet,
+    List,
+    Optional,
+    Set,
     Text,
+    Tuple,
+    Union,
+    cast,
 )
 
-
-def dummy_unit_encode(val: int):
-    return b''
-
-
-def dummy_stream_is_unidirectional(val: int):
-    return False
-    
-
-try:
-
-    import pylsqpack
-    from aioquic.quic.connection import QuicConnection, NetworkAddress
-    from aioquic.quic.events import (
-        ConnectionTerminated,
-        ConnectionIdRetired,
-        ConnectionIdIssued,
-        HandshakeCompleted,
-        PingAcknowledged
-    )
-    from aioquic.h3.events import (
-        DatagramReceived,
-        DataReceived,
-        H3Event,
-        Headers,
-        HeadersReceived,
-        PushPromiseReceived,
-        WebTransportStreamDataReceived,
-    )
-    from aioquic.buffer import (
-        UINT_VAR_MAX_SIZE,
-        Buffer, 
-        BufferReadError, 
-        encode_uint_var
-    )
-
-    from aioquic.quic.events import (
-        DatagramFrameReceived, 
-        QuicEvent, 
-        StreamDataReceived
-    )
-
-    from aioquic.quic.connection import stream_is_unidirectional
-
-except ImportError:
-    pylsqpack = object
-    aioquic = object
-    QuicConnection = object
-    ConnectionTerminated = object
-    ConnectionIdRetired = object
-    ConnectionIdIssued = object
-    HandshakeCompleted = object
-    PingAcknowledged = object
-    DatagramReceived = object
-    DataReceived = object
-    H3Event = object
-    Headers = Any
-    HeadersReceived = object
-    PushPromiseReceived = object
-    WebTransportStreamDataReceived = object
-    NetworkAddress = Any
-    UINT_VAR_MAX_SIZE = 0 
-    Buffer = object
-    BufferReadError = object 
-    encode_uint_var = dummy_unit_encode
-    DatagramFrameReceived = object
-    QuicEvent = object
-    StreamDataReceived = object
-    stream_is_unidirectional = dummy_stream_is_unidirectional
-
+import pylsqpack
+from aioquic.buffer import UINT_VAR_MAX_SIZE, Buffer, BufferReadError, encode_uint_var
+from aioquic.h3.events import (
+    DatagramReceived,
+    DataReceived,
+    H3Event,
+    Headers,
+    HeadersReceived,
+    PushPromiseReceived,
+    WebTransportStreamDataReceived,
+)
+from aioquic.quic.connection import (
+    NetworkAddress,
+    QuicConnection,
+    stream_is_unidirectional,
+)
+from aioquic.quic.events import (
+    ConnectionIdIssued,
+    ConnectionIdRetired,
+    ConnectionTerminated,
+    DatagramFrameReceived,
+    HandshakeCompleted,
+    PingAcknowledged,
+    QuicEvent,
+    StreamDataReceived,
+)
 
 QuicConnectionIdHandler = Callable[[bytes], None]
 QuicStreamHandler = Callable[[asyncio.StreamReader, asyncio.StreamWriter], None]
@@ -334,24 +291,24 @@ class QuicStreamAdapter(asyncio.Transport):
             return self.stream_id
 
     def write(self, data):
-        self.protocol._quic.send_stream_data(self.stream_id, data)
+        self.protocol.quic.send_stream_data(self.stream_id, data)
         self.protocol._transmit_soon()
 
     def write_eof(self):
-        self.protocol._quic.send_stream_data(self.stream_id, b"", end_stream=True)
+        self.protocol.quic.send_stream_data(self.stream_id, b"", end_stream=True)
         self.protocol._transmit_soon()
 
 
 class QuicProtocol(asyncio.DatagramProtocol):
 
     __slots__ = (
-        '_loop',
+        'loop',
         '_request_waiter',
         '_closed',
         '_connected',
         '_connected_waiter',
         '_ping_waiters',
-        '_quic',
+        'quic',
         '_stream_readers',
         '_timer',
         '_timer_at',
@@ -362,7 +319,7 @@ class QuicProtocol(asyncio.DatagramProtocol):
         '_connection_terminated_handler',
         '_stream_handler',
         'pushes',
-        '_request_events',
+        'request_events',
         '_request_waiter',
         '_stream',
         '_is_done',
@@ -371,9 +328,9 @@ class QuicProtocol(asyncio.DatagramProtocol):
         '_decoder',
         '_decoder_bytes_received',
         '_decoder_bytes_sent',
-        '_encoder',
-        '_encoder_bytes_received',
-        '_encoder_bytes_sent',
+        'encoder',
+        'encoder_bytes_received',
+        'encoder_bytes_sent',
         '_settings_received',
         '_stream',
         '_max_push_id',
@@ -396,14 +353,14 @@ class QuicProtocol(asyncio.DatagramProtocol):
         loop: asyncio.AbstractEventLoop = None
     ):
         
-        self._loop = loop
+        self.loop = loop
 
         self._request_waiter: Dict[int, asyncio.Future[Deque[H3Event]]] = {}
         self._closed = asyncio.Event()
         self._connected = False
         self._connected_waiter: Optional[asyncio.Future[None]] = None
         self._ping_waiters: Dict[int, asyncio.Future[None]] = {}
-        self._quic = quic
+        self.quic = quic
         self._stream_readers: Dict[int, asyncio.StreamReader] = {}
         self._timer: Optional[asyncio.TimerHandle] = None
         self._timer_at: Optional[float] = None
@@ -420,7 +377,7 @@ class QuicProtocol(asyncio.DatagramProtocol):
             self._stream_handler = lambda r, w: None
 
         self.pushes: Dict[int, Deque[H3Event]] = {}
-        self._request_events: Dict[int, Deque[H3Event]] = {}
+        self.request_events: Dict[int, Deque[H3Event]] = {}
         self._request_waiter: Dict[int, asyncio.Future[Deque[H3Event]]] = {}
         self._stream: Dict[int, H3Stream] = {}
         self._is_done = False
@@ -432,9 +389,9 @@ class QuicProtocol(asyncio.DatagramProtocol):
         )
         self._decoder_bytes_received = 0
         self._decoder_bytes_sent = 0
-        self._encoder = pylsqpack.Encoder()
-        self._encoder_bytes_received = 0
-        self._encoder_bytes_sent = 0
+        self.encoder = pylsqpack.Encoder()
+        self.encoder_bytes_received = 0
+        self.encoder_bytes_sent = 0
         self._settings_received = False
         self._stream: Dict[int, H3Stream] = {}
 
@@ -470,12 +427,12 @@ class QuicProtocol(asyncio.DatagramProtocol):
             buf.push_uint_var(setting)
             buf.push_uint_var(value)
 
-        self._quic.send_stream_data(
+        self.quic.send_stream_data(
             self._local_control_stream_id,
             encode_frame(FrameType.SETTINGS, buf.data),
         )
         if self._max_push_id is not None:
-            self._quic.send_stream_data(
+            self.quic.send_stream_data(
                 self._local_control_stream_id,
                 encode_frame(FrameType.MAX_PUSH_ID, encode_uint_var(self._max_push_id)),
             )
@@ -494,8 +451,8 @@ class QuicProtocol(asyncio.DatagramProtocol):
         """
         Create an unidirectional stream of the given type.
         """
-        stream_id = self._quic.get_next_available_stream_id(is_unidirectional=True)
-        self._quic.send_stream_data(stream_id, encode_uint_var(stream_type))
+        stream_id = self.quic.get_next_available_stream_id(is_unidirectional=True)
+        self.quic.send_stream_data(stream_id, encode_uint_var(stream_type))
         return stream_id
 
     def change_connection_id(self) -> None:
@@ -504,7 +461,7 @@ class QuicProtocol(asyncio.DatagramProtocol):
 
         The previous connection ID will be retired.
         """
-        self._quic.change_connection_id()
+        self.quic.change_connection_id()
         self.transmit()
 
     def close(self) -> None:
@@ -512,7 +469,7 @@ class QuicProtocol(asyncio.DatagramProtocol):
         Close the connection.
         """
         self._is_closed = True
-        self._quic.close()
+        self.quic.close()
         self.transmit()
 
     def connect(self, addr: NetworkAddress) -> None:
@@ -521,11 +478,11 @@ class QuicProtocol(asyncio.DatagramProtocol):
 
         This method can only be called for clients and a single time.
         """
-        self._quic.connect(addr, now=self._loop.time())
+        self.quic.connect(addr, now=self.loop.time())
         self.transmit()
 
     
-    def _get_or_create_stream(self, stream_id: int) -> H3Stream:
+    def get_or_create_stream(self, stream_id: int) -> H3Stream:
         if stream_id not in self._stream:
             self._stream[stream_id] = H3Stream(stream_id)
         return self._stream[stream_id]
@@ -540,7 +497,7 @@ class QuicProtocol(asyncio.DatagramProtocol):
         The returned reader and writer objects are instances of :class:`asyncio.StreamReader`
         and :class:`asyncio.StreamWriter` classes.
         """
-        stream_id = self._quic.get_next_available_stream_id(
+        stream_id = self.quic.get_next_available_stream_id(
             is_unidirectional=is_unidirectional
         )
         return self._create_stream(stream_id)
@@ -549,17 +506,17 @@ class QuicProtocol(asyncio.DatagramProtocol):
         """
         Request an update of the encryption keys.
         """
-        self._quic.request_key_update()
+        self.quic.request_key_update()
         self.transmit()
 
     async def ping(self) -> None:
         """
         Ping the peer and wait for the response.
         """
-        waiter = self._loop.create_future()
+        waiter = self.loop.create_future()
         uid = id(waiter)
         self._ping_waiters[uid] = waiter
-        self._quic.send_ping(uid)
+        self.quic.send_ping(uid)
         self.transmit()
         await asyncio.shield(waiter)
 
@@ -570,16 +527,16 @@ class QuicProtocol(asyncio.DatagramProtocol):
         self._transmit_task = None
 
         # send datagrams
-        for data, addr in self._quic.datagrams_to_send(now=self._loop.time()):
+        for data, addr in self.quic.datagrams_to_send(now=self.loop.time()):
             self._transport.sendto(data, addr)
 
         # re-arm timer
-        timer_at = self._quic.get_timer()
+        timer_at = self.quic.get_timer()
         if self._timer is not None and self._timer_at != timer_at:
             self._timer.cancel()
             self._timer = None
         if self._timer is None and timer_at is not None:
-            self._timer = self._loop.call_at(timer_at, self._handle_timer)
+            self._timer = self.loop.call_at(timer_at, self._handle_timer)
         self._timer_at = timer_at
 
     async def wait_closed(self) -> None:
@@ -594,7 +551,7 @@ class QuicProtocol(asyncio.DatagramProtocol):
         """
         assert self._connected_waiter is None, "already awaiting connected"
         if not self._connected:
-            self._connected_waiter = self._loop.create_future()
+            self._connected_waiter = self.loop.create_future()
             await self._connected_waiter
 
     # asyncio.Transport
@@ -603,7 +560,7 @@ class QuicProtocol(asyncio.DatagramProtocol):
         self._transport = cast(asyncio.DatagramTransport, transport)
 
     def datagram_received(self, data: Union[bytes, Text], addr: NetworkAddress) -> None:
-        self._quic.receive_datagram(cast(bytes, data), addr, now=self._loop.time())
+        self.quic.receive_datagram(cast(bytes, data), addr, now=self.loop.time())
         self._process_events()
         self.transmit()
 
@@ -615,7 +572,7 @@ class QuicProtocol(asyncio.DatagramProtocol):
             try:
                 if isinstance(event, StreamDataReceived):
                     stream_id = event.stream_id
-                    stream = self._get_or_create_stream(stream_id)
+                    stream = self.get_or_create_stream(stream_id)
                     if stream_is_unidirectional(stream_id):
 
                         http_events: List[H3Event] = []
@@ -702,7 +659,7 @@ class QuicProtocol(asyncio.DatagramProtocol):
 
                                     if (
                                         settings.get(Setting.H3_DATAGRAM) == 1
-                                        and self._quic._remote_max_datagram_frame_size is None
+                                        and self.quic._remote_max_datagram_frame_size is None
                                     ):
                                         raise SettingsError(
                                             "H3_DATAGRAM requires max_datagram_frame_size transport parameter"
@@ -715,11 +672,11 @@ class QuicProtocol(asyncio.DatagramProtocol):
                                         raise SettingsError("ENABLE_WEBTRANSPORT requires H3_DATAGRAM")
 
                                     self._received_settings = settings
-                                    encoder = self._encoder.apply_settings(
+                                    encoder = self.encoder.apply_settings(
                                         max_table_capacity=settings.get(Setting.QPACK_MAX_TABLE_CAPACITY, 0),
                                         blocked_streams=settings.get(Setting.QPACK_BLOCKED_STREAMS, 0),
                                     )
-                                    self._quic.send_stream_data(self._local_encoder_stream_id, encoder)
+                                    self.quic.send_stream_data(self._local_encoder_stream_id, encoder)
                                     self._settings_received = True
 
                                 elif frame_type in (
@@ -770,7 +727,7 @@ class QuicProtocol(asyncio.DatagramProtocol):
                                 data = buf.pull_bytes(buf.capacity - buf.tell())
                                 consumed = buf.tell()
                                 try:
-                                    self._encoder.feed_decoder(data)
+                                    self.encoder.feed_decoder(data)
                                 except pylsqpack.DecoderStreamError as exc:
                                     raise QpackDecoderStreamError() from exc
                                 self._decoder_bytes_received += len(data)
@@ -782,7 +739,7 @@ class QuicProtocol(asyncio.DatagramProtocol):
                                     unblocked_streams.update(self._decoder.feed_encoder(data))
                                 except pylsqpack.EncoderStreamError as exc:
                                     raise QpackEncoderStreamError() from exc
-                                self._encoder_bytes_received += len(data)
+                                self.encoder_bytes_received += len(data)
                             else:
                                 # unknown stream type, discard data
                                 buf.seek(buf.capacity)
@@ -833,7 +790,7 @@ class QuicProtocol(asyncio.DatagramProtocol):
 
             except ProtocolError as exc:
                 self._is_done = True
-                self._quic.close(
+                self.quic.close(
                     error_code=exc.error_code, reason_phrase=exc.reason_phrase
                 )
 
@@ -1005,20 +962,20 @@ class QuicProtocol(asyncio.DatagramProtocol):
     ) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter]:
         adapter = QuicStreamAdapter(self, stream_id)
         reader = asyncio.StreamReader()
-        writer = asyncio.StreamWriter(adapter, None, reader, self._loop)
+        writer = asyncio.StreamWriter(adapter, None, reader, self.loop)
         self._stream_readers[stream_id] = reader
         return reader, writer
 
     def _handle_timer(self) -> None:
-        now = max(self._timer_at, self._loop.time())
+        now = max(self._timer_at, self.loop.time())
         self._timer = None
         self._timer_at = None
-        self._quic.handle_timer(now=now)
+        self.quic.handle_timer(now=now)
         self._process_events()
         self.transmit()
 
     def _process_events(self) -> None:
-        event = self._quic.next_event()
+        event = self.quic.next_event()
         while event is not None:
             if isinstance(event, ConnectionIdIssued):
                 self._connection_id_issued_handler(event.connection_id)
@@ -1050,11 +1007,11 @@ class QuicProtocol(asyncio.DatagramProtocol):
                 if waiter is not None:
                     waiter.set_result(None)
             self.quic_event_received(event)
-            event = self._quic.next_event()
+            event = self.quic.next_event()
 
     def _transmit_soon(self) -> None:
         if self._transmit_task is None:
-            self._transmit_task = self._loop.call_soon(self.transmit)
+            self._transmit_task = self.loop.call_soon(self.transmit)
 
     def _handle_request_or_push_frame(
         self,
@@ -1173,7 +1130,7 @@ class QuicProtocol(asyncio.DatagramProtocol):
             else:
                 decoder, headers = self._decoder.feed_header(stream_id, frame_data)
             self._decoder_bytes_sent += len(decoder)
-            self._quic.send_stream_data(self._local_decoder_stream_id, decoder)
+            self.quic.send_stream_data(self._local_decoder_stream_id, decoder)
         except pylsqpack.DecompressionFailed as exc:
             raise QpackDecompressionFailed() from exc
 

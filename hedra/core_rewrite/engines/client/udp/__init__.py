@@ -1,5 +1,3 @@
-from .client import MercuryUDPClient
-from .action import UDPAction
-from .result import UDPResult
-
-
+from .mercury_sync_udp_connection import (
+    MercurySyncUDPConnection as MercurySyncUDPConnection,
+)
