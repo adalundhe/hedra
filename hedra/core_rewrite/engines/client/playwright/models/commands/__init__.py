@@ -34,3 +34,13 @@ from .goto_command import GoToCommand as GoToCommand
 from .hover_command import HoverCommand as HoverCommand
 from .press_command import PressCommand as PressCommand
 from .reload_command import ReloadCommand as ReloadCommand
+from .screenshot_command import ScreenshotCommand as ScreenshotCommand
+from .select_option_command import SelectOptionCommand as SelectOptionCommand
+from .set_checked_command import SetCheckedCommand as SetCheckedCommand
+from .set_extra_http_headers_command import (
+    SetExtraHTTPHeadersCommand as SetExtraHTTPHeadersCommand,
+)
+from .set_timeout_command import SetTimeoutCommand as SetTimeoutCommand
+from .tap_command import TapCommand as TapCommand
+from .title_command import TitleCommand as TitleCommand
+from .type_command import TypeCommand as TypeCommand
