@@ -2,6 +2,7 @@
 import asyncio
 import time
 from collections import deque
+from pathlib import Path
 from typing import (
     Any,
     Awaitable,
@@ -13,6 +14,7 @@ from typing import (
     Optional,
     Pattern,
     Sequence,
+    Tuple,
 )
 
 from playwright._impl._async_base import AsyncEventContextManager
@@ -20,9 +22,12 @@ from playwright.async_api import (
     BrowserContext,
     ConsoleMessage,
     Download,
+    ElementHandle,
     FileChooser,
+    FloatRect,
     Geolocation,
     JSHandle,
+    Locator,
     Page,
     Position,
     Request,
@@ -33,7 +38,6 @@ from playwright.async_api import (
 from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
 from .browser_session import BrowserSession
-from .command import PlaywrightCommand
 from .models.commands import (
     BringToFrontCommand,
     CheckCommand,
@@ -60,6 +64,9 @@ from .models.commands import (
     GoToCommand,
     HoverCommand,
     PressCommand,
+    ReloadCommand,
+    ScreenshotCommand,
+    SelectOptionCommand,
 )
 from .models.results import PlaywrightResult
 
@@ -69,17 +76,28 @@ class MercurySyncPlaywrightClient:
 
     def __init__(
         self, 
-        concurrency: int,
-        pages: int
+        pool_size: int=10**3,
+        pages: int=1
     ) -> None:
-        self.concurrency = concurrency
+        self.pool_size = pool_size
         self.pages = pages
         self.config = {}
         self.context: Optional[BrowserContext] = None
         self.sessions: Deque[BrowserSession] = deque()
-        self.sem = asyncio.Semaphore(self.concurrency)
+        self.sem = asyncio.Semaphore(self.pool_size)
         self.timeouts = Timeouts()
         self.results: List[PlaywrightResult] = []
+        self._active: Deque[Tuple[
+            BrowserSession,
+            Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ],
+            Page
+        ]] = deque()
 
     async def start(
         self,
@@ -100,7 +118,7 @@ class MercurySyncPlaywrightClient:
         playwright = await async_playwright().start()
 
         self.sessions.extend([
-            BrowserSession(playwright) for _ in self.concurrency
+            BrowserSession(playwright, self.pages) for _ in self.concurrency
         ])
 
         await asyncio.gather(*[
@@ -116,15 +134,69 @@ class MercurySyncPlaywrightClient:
             ) for session in self.sessions
         ])
 
-    async def new_page(self):
-         async with self.sem:
-            session = self.sessions.popleft()
+    async def next_context(self):
+        await self.sem.acquire()
+        session = self.sessions.popleft()
+        return session.context
 
-            page = await session.context.new_page()
+    async def get_page(self):
+        await self.sem.acquire()
+        session = self.sessions.popleft()
 
-            self.sessions.append(session)
-             
-            return page
+        page = await session.next_page()
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        timings['command_start'] = time.monotonic()
+
+        self._active.append((
+            session,
+            timings,
+            page
+        ))
+            
+        return page
+         
+    async def __aenter__(self):
+        await self.sem.acquire()
+
+        session = self.sessions.popleft()
+        page = await session.next_page()
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        timings['command_start'] = time.monotonic()
+
+        self._active.append((
+            session,
+            timings,
+            page
+        ))
+
+        return page
+    
+    async def __aexit__(self):
+        session, timings, page = self._active.popleft()
+
+        timings['command_start'] = time.monotonic()
+
+        session.return_page(page)
+        self.sessions.append(session)
+
+        self.sem.release()
+
 
     async def goto(
         self, 
@@ -181,31 +253,28 @@ class MercurySyncPlaywrightClient:
                 
                 session.return_page(page)
                 self.sessions.append(session)
-                self.results.append(PlaywrightResult(
+                
+                return PlaywrightResult(
                     command='goto',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
 
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='goto',
                 command_args=command,
                 metadata=session.metadata,
                 result=result,
                 timings=timings
-            ))
-
-
-            return result
+            )
 
     async def get_url(
         self,
@@ -242,15 +311,13 @@ class MercurySyncPlaywrightClient:
             session.return_page(page)
             self.sessions.append(session)
 
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='get_url',
                 command_args=command,
                 metadata=session.metadata,
                 result=page_url,
                 timings=timings
-            ))  
-
-            return page_url
+            )
 
     async def fill(
         self,
@@ -308,27 +375,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='fill',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
             
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='fill',
                 command_args=command,
+                result=None,
                 metadata=session.metadata,
                 timings=timings
-            ))
+            )
 
     async def check(
         self,
@@ -340,6 +407,7 @@ class MercurySyncPlaywrightClient:
         strict: Optional[bool]=None,
         trial: Optional[bool]=None
     ):
+        
         async with self.sem:
 
             timings: Dict[
@@ -389,27 +457,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='check',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
             
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='check',
                 command_args=command,
                 metadata=session.metadata,
+                result=None,
                 timings=timings
-            ))
+            )
     
     async def click(
         self,
@@ -485,27 +553,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='click',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
             
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='click',
                 command_args=command,
                 metadata=session.metadata,
+                result=None,
                 timings=timings
-            ))
+            )
 
     async def double_click(
         self,
@@ -520,6 +588,7 @@ class MercurySyncPlaywrightClient:
         strict: Optional[bool]=None,
         trial: Optional[bool]=None
     ):
+        
         async with self.sem:
 
             if timeout is None:
@@ -578,28 +647,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='double_click',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
             
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='double_click',
                 command_args=command,
                 metadata=session.metadata,
+                result=None,
                 timings=timings
-            ))
-
+            )
 
     async def dispatch_event(
         self,
@@ -609,6 +677,7 @@ class MercurySyncPlaywrightClient:
         strict: Optional[bool]=None,
         timeout: int | float=None
     ):
+        
         async with self.sem:
 
             if timeout is None:
@@ -657,27 +726,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='dispatch_event',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
             
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='dispatch_event',
                 command_args=command,
                 metadata=session.metadata,
+                result=None,
                 timings=timings
-            ))
+            )
 
     async def drag_and_drop(
         self,
@@ -691,6 +760,7 @@ class MercurySyncPlaywrightClient:
         strict: Optional[bool]=None,
         trial: Optional[bool]=None
     ):
+        
         async with self.sem:
 
             if timeout is None:
@@ -747,32 +817,33 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='drag_and_drop',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
             
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='drag_and_drop',
                 command_args=command,
                 metadata=session.metadata,
+                result=None,
                 timings=timings
-            ))
+            )
 
     async def bring_to_front(
         self,
         timeout: Optional[int | float]=None
     ):
+        
         async with self.sem:
 
             if timeout is None:
@@ -814,27 +885,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='bring_to_front',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
             
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='bring_to_front',
                 command_args=command,
                 metadata=session.metadata,
+                result=None,
                 timings=timings
-            ))
+            )
 
     async def evaluate_on_selector(
         self,
@@ -870,7 +941,7 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            result: Optional[Any] = None
+            result: Any = None
             err: Optional[Exception] = None
             page = await session.next_page()
 
@@ -895,28 +966,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='eval_on_selector',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
             
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='eval_on_selector',
                 command_args=command,
                 result=result,
                 metadata=session.metadata,
                 timings=timings
-            ))
+            )
 
     async def evaluate_on_selectors_all(
         self,
@@ -925,6 +995,7 @@ class MercurySyncPlaywrightClient:
         arg: Any,
         timeout: Optional[int | float]=None,
     ):
+        
         async with self.sem:
 
             if timeout is None:
@@ -950,7 +1021,7 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            result: Optional[Any] = None
+            result: Any = None
             err: Optional[Exception] = None
             page = await session.next_page()
 
@@ -975,28 +1046,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='eval_on_selector_all',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
             
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='eval_on_selector_all',
                 command_args=command,
                 result=result,
                 metadata=session.metadata,
                 timings=timings
-            ))
+            )
 
     async def evaluate(
         self,
@@ -1004,6 +1074,7 @@ class MercurySyncPlaywrightClient:
         arg: Any,
         timeout: Optional[int | float]=None,
     ):
+        
         async with self.sem:
 
             if timeout is None:
@@ -1028,7 +1099,7 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            result: Optional[Any] = None
+            result: Any = None
             err: Optional[Exception] = None
             page = await session.next_page()
 
@@ -1051,28 +1122,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='evaluate',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
             
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='evaluate',
                 command_args=command,
                 result=result,
                 metadata=session.metadata,
                 timings=timings
-            ))
+            )
 
     async def evaluate_handle(
         self,
@@ -1080,6 +1150,7 @@ class MercurySyncPlaywrightClient:
         arg: Any,
         timeout: Optional[int | float]=None,
     ):
+        
         async with self.sem:
 
             if timeout is None:
@@ -1104,7 +1175,7 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            result: Optional[JSHandle] = None
+            result: JSHandle = None
             err: Optional[Exception] = None
             page = await session.next_page()
 
@@ -1127,28 +1198,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='evaluate_handle',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
             
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='evaluate_handle',
                 command_args=command,
                 result=result,
                 metadata=session.metadata,
                 timings=timings
-            ))
+            )
 
     async def expect_console_message(
         self,
@@ -1183,7 +1253,7 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            result: Optional[ConsoleMessage] = None
+            result: ConsoleMessage = None
             err: Optional[Exception] = None
             page = await session.next_page()
 
@@ -1215,28 +1285,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='expect_console_message',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
 
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='expect_console_message',
                 command_args=command,
                 result=result,
                 metadata=session.metadata,
                 timings=timings
-            ))
+            )
             
 
     async def expect_download(
@@ -1272,7 +1341,7 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            result: Optional[Download] = None
+            result: Download = None
             err: Optional[Exception] = None
             page = await session.next_page()
 
@@ -1304,28 +1373,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='expect_download',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
 
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='expect_download',
                 command_args=command,
                 result=result,
                 metadata=session.metadata,
                 timings=timings
-            ))
+            )
 
 
     async def expect_event(
@@ -1363,7 +1431,7 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            result: Optional[Any] = None
+            result: Any = None
             err: Optional[Exception] = None
             page = await session.next_page()
 
@@ -1397,28 +1465,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='expect_event',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
 
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='expect_event',
                 command_args=command,
                 result=result,
                 metadata=session.metadata,
                 timings=timings
-            ))
+            )
 
     async def expect_file_chooser(
         self,
@@ -1453,7 +1520,7 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            result: Optional[Any] = None
+            result: Any = None
             err: Optional[Exception] = None
             page = await session.next_page()
 
@@ -1485,28 +1552,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='expect_file_chooser',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
 
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='expect_file_chooser',
                 command_args=command,
                 result=result,
                 metadata=session.metadata,
                 timings=timings
-            ))
+            )
 
     async def expect_navigation(
         self,
@@ -1540,7 +1606,7 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            result: Optional[Response] = None
+            result: Response = None
             err: Optional[Exception] = None
             page = await session.next_page()
 
@@ -1564,28 +1630,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='expect_navigation',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
 
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='expect_navigation',
                 command_args=command,
                 result=result,
                 metadata=session.metadata,
                 timings=timings
-            ))
+            )
 
     async def expect_popup(
         self,
@@ -1620,7 +1685,7 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            result: Optional[Page] = None
+            result: Page = None
             err: Optional[Exception] = None
             page = await session.next_page()
 
@@ -1652,28 +1717,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='expect_popup',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
 
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='expect_popup',
                 command_args=command,
                 result=result,
                 metadata=session.metadata,
                 timings=timings
-            ))
+            )
 
     async def expect_request(
         self,
@@ -1710,7 +1774,7 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            result: Optional[Request] = None
+            result: Request = None
             err: Optional[Exception] = None
             page = await session.next_page()
 
@@ -1742,28 +1806,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='expect_request',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
 
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='expect_request',
                 command_args=command,
                 result=result,
                 metadata=session.metadata,
                 timings=timings
-            ))
+            )
 
     async def expect_request_finished(
         self,
@@ -1798,7 +1861,7 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            result: Optional[Request] = None
+            result: Request = None
             err: Optional[Exception] = None
             page = await session.next_page()
 
@@ -1830,28 +1893,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='expect_request_finished',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
 
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='expect_request_finished',
                 command_args=command,
                 result=result,
                 metadata=session.metadata,
                 timings=timings
-            ))
+            )
             
     async def expect_response(
         self,
@@ -1888,7 +1950,7 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            result: Optional[Response] = None
+            result: Response = None
             err: Optional[Exception] = None
             page = await session.next_page()
 
@@ -1920,28 +1982,27 @@ class MercurySyncPlaywrightClient:
                 session.return_page(page)
                 self.sessions.append(session)
 
-                self.results.append(PlaywrightResult(
+                return PlaywrightResult(
                     command='expect_response',
                     command_args=command,
                     metadata=session.metadata,
+                    result=err,
                     error=str(err),
                     timings=timings
-                ))
-
-                return err
+                )
 
             timings['command_end'] = time.monotonic()
 
             session.return_page(page)
             self.sessions.append(session)
 
-            self.results.append(PlaywrightResult(
+            return PlaywrightResult(
                 command='expect_response',
                 command_args=command,
                 result=result,
                 metadata=session.metadata,
                 timings=timings
-            ))
+            )
     
     async def focus(
         self,
@@ -1954,7 +2015,18 @@ class MercurySyncPlaywrightClient:
             if timeout is None:
                 timeout = self.timeouts.request_timeout
 
-            page = self.pages.popleft()
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
 
             command = FocusCommand(
                 selector=selector,
@@ -1962,13 +2034,47 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            await page.focus(
-                command.selector,
-                strict=command.strict,
-                timeout=command.timeout
-            )
+            err: Optional[Exception] = None
+            page = await session.next_page()
 
-            self.pages.append(page)
+            timings['command_start'] = time.monotonic()
+
+            try:
+
+                await page.focus(
+                    command.selector,
+                    strict=command.strict,
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+
+                return PlaywrightResult(
+                    command='focus',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='focus',
+                command_args=command,
+                metadata=session.metadata,
+                result=None,
+                timings=timings
+            )
 
     async def hover(
         self,
@@ -1986,7 +2092,18 @@ class MercurySyncPlaywrightClient:
             if timeout is None:
                 timeout = self.timeouts.request_timeout
 
-            page = self.pages.popleft()
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
 
             command = HoverCommand(
                 selector=selector,
@@ -1999,18 +2116,52 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            await page.hover(
-                command.selector,
-                modifiers=command.modifiers,
-                position=command.postion,
-                force=command.force,
-                no_wait_after=command.no_wait_after,
-                trial=command.trial,
-                strict=command.strict,
-                timeout=command.timeout
-            )
+            err: Optional[Exception] = None
+            page = await session.next_page()
 
-            self.pages.append(page)
+            timings['command_start'] = time.monotonic()
+
+            try:
+
+                await page.hover(
+                    command.selector,
+                    modifiers=command.modifiers,
+                    position=command.postion,
+                    force=command.force,
+                    no_wait_after=command.no_wait_after,
+                    trial=command.trial,
+                    strict=command.strict,
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+
+                return PlaywrightResult(
+                    command='hover',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='hover',
+                command_args=command,
+                metadata=session.metadata,
+                result=None,
+                timings=timings
+            )
     
     async def inner_html(
         self,
@@ -2023,7 +2174,18 @@ class MercurySyncPlaywrightClient:
             if timeout is None:
                 timeout = self.timeouts.request_timeout
 
-            page = self.pages.popleft()
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
 
             command = DOMCommand(
                 selector=selector,
@@ -2031,13 +2193,48 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            await page.inner_html(
-                command.selector,
-                strict=command.strict,
-                timeout=command.timeout
-            )
+            result: str = None
+            err: Optional[Exception] = None
+            page = await session.next_page()
 
-            self.pages.append(page)
+            timings['command_start'] = time.monotonic()
+
+            try:
+
+                result = await page.inner_html(
+                    command.selector,
+                    strict=command.strict,
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+
+                return PlaywrightResult(
+                    command='inner_html',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='inner_html',
+                command_args=command,
+                result=result,
+                metadata=session.metadata,
+                timings=timings
+            )
 
     async def inner_text(
         self,
@@ -2050,7 +2247,18 @@ class MercurySyncPlaywrightClient:
             if timeout is None:
                 timeout = self.timeouts.request_timeout
 
-            page = self.pages.popleft()
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
 
             command = DOMCommand(
                 selector=selector,
@@ -2058,13 +2266,48 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            await page.inner_text(
-                command.selector,
-                strict=command.strict,
-                timeout=command.timeout
-            )
+            result: str = None
+            err: Optional[Exception] = None
+            page = await session.next_page()
 
-            self.pages.append(page)
+            timings['command_start'] = time.monotonic()
+
+            try:
+
+                result = await page.inner_text(
+                    command.selector,
+                    strict=command.strict,
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+
+                return PlaywrightResult(
+                    command='inner_text',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='inner_text',
+                command_args=command,
+                result=result,
+                metadata=session.metadata,
+                timings=timings
+            )
 
     async def input_value(
         self,
@@ -2077,7 +2320,18 @@ class MercurySyncPlaywrightClient:
             if timeout is None:
                 timeout = self.timeouts.request_timeout
 
-            page = self.pages.popleft()
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
 
             command = DOMCommand(
                 selector=selector,
@@ -2085,13 +2339,48 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            await page.input_value(
-                command.selector,
-                strict=command.strict,
-                timeout=command.timeout
-            )
+            result: str = None
+            err: Optional[Exception] = None
+            page = await session.next_page()
 
-            self.pages.append(page)
+            timings['command_start'] = time.monotonic()
+
+            try:
+
+                result = await page.input_value(
+                    command.selector,
+                    strict=command.strict,
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+
+                return PlaywrightResult(
+                    command='input_value',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='input_value',
+                command_args=command,
+                result=result,
+                metadata=session.metadata,
+                timings=timings
+            )
 
     async def press(
         self,
@@ -2107,7 +2396,18 @@ class MercurySyncPlaywrightClient:
             if timeout is None:
                 timeout = self.timeouts.request_timeout
 
-            page = self.pages.popleft()
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
 
             command = PressCommand(
                 selector=selector,
@@ -2118,13 +2418,47 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            await page.press(
-                command.selector,
-                strict=command.strict,
-                timeout=command.timeout
-            )
+            err: Optional[Exception] = None
+            page = await session.next_page()
 
-            self.pages.append(page)
+            timings['command_start'] = time.monotonic()
+
+            try:
+
+                await page.press(
+                    command.selector,
+                    strict=command.strict,
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+
+                return PlaywrightResult(
+                    command='press',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='press',
+                command_args=command,
+                metadata=session.metadata,
+                result=None,
+                timings=timings
+            )
 
     async def is_enabled(
         self,
@@ -2137,7 +2471,18 @@ class MercurySyncPlaywrightClient:
             if timeout is None:
                 timeout = self.timeouts.request_timeout
 
-            page = self.pages.popleft()
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
 
             command = DOMCommand(
                 selector=selector,
@@ -2145,13 +2490,48 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            await page.is_enabled(
-                command.selector,
-                strict=command.strict,
-                timeout=command.timeout
-            )
+            result: bool = None
+            err: Optional[Exception] = None
+            page = await session.next_page()
 
-            self.pages.append(page)
+            timings['command_start'] = time.monotonic()
+
+            try:
+
+                result = await page.is_enabled(
+                    command.selector,
+                    strict=command.strict,
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+
+                return PlaywrightResult(
+                    command='is_enabled',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='is_enabled',
+                command_args=command,
+                result=result,
+                metadata=session.metadata,
+                timings=timings
+            )
 
     async def is_hidden(
         self,
@@ -2164,7 +2544,18 @@ class MercurySyncPlaywrightClient:
             if timeout is None:
                 timeout = self.timeouts.request_timeout
 
-            page = self.pages.popleft()
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
 
             command = DOMCommand(
                 selector=selector,
@@ -2172,13 +2563,48 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            await page.is_hidden(
-                command.selector,
-                strict=command.strict,
-                timeout=command.timeout
-            )
+            result: bool = None
+            err: Optional[Exception] = None
+            page = await session.next_page()
 
-            self.pages.append(page)
+            timings['command_start'] = time.monotonic()
+
+            try:
+
+                result = await page.is_hidden(
+                    command.selector,
+                    strict=command.strict,
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+
+                return PlaywrightResult(
+                    command='is_hidden',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='is_hidden',
+                command_args=command,
+                result=result,
+                metadata=session.metadata,
+                timings=timings
+            )
 
     async def is_visible(
         self,
@@ -2191,7 +2617,18 @@ class MercurySyncPlaywrightClient:
             if timeout is None:
                 timeout = self.timeouts.request_timeout
 
-            page = self.pages.popleft()
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
 
             command = DOMCommand(
                 selector=selector,
@@ -2199,13 +2636,48 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            await page.is_visible(
-                command.selector,
-                strict=command.strict,
-                timeout=command.timeout
-            )
+            result: bool = None
+            err: Optional[Exception] = None
+            page = await session.next_page()
 
-            self.pages.append(page)
+            timings['command_start'] = time.monotonic()
+
+            try:
+
+                result = await page.is_visible(
+                    command.selector,
+                    strict=command.strict,
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+
+                return PlaywrightResult(
+                    command='is_visible',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='is_visible',
+                command_args=command,
+                result=result,
+                metadata=session.metadata,
+                timings=timings
+            )
 
     async def is_checked(
         self,
@@ -2218,7 +2690,18 @@ class MercurySyncPlaywrightClient:
             if timeout is None:
                 timeout = self.timeouts.request_timeout
 
-            page = self.pages.popleft()
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
 
             command = DOMCommand(
                 selector=selector,
@@ -2226,78 +2709,525 @@ class MercurySyncPlaywrightClient:
                 timeout=timeout
             )
 
-            await page.is_checked(
-                command.selector,
-                strict=command.strict,
-                timeout=command.timeout
-            )
+            result: bool = None
+            err: Optional[Exception] = None
+            page = await session.next_page()
 
-            self.pages.append(page)
+            timings['command_start'] = time.monotonic()
+
+            try:
+
+                result = await page.is_checked(
+                    command.selector,
+                    strict=command.strict,
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+
+                return PlaywrightResult(
+                    command='is_checked',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='is_checked',
+                command_args=command,
+                result=result,
+                metadata=session.metadata,
+                timings=timings
+            )
 
     async def content(
         self,
         timeout: Optional[int | float]=None,
-    ):
+    ) -> PlaywrightResult[Exception] | PlaywrightResult[str]:
         async with self.sem:
 
             if timeout is None:
                 timeout = self.timeouts.request_timeout
 
-            page = self.pages.popleft()
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
 
             command = ContentCommand(
                 timeout=timeout
             )
 
-            await page.content(
+            result: str = None
+            err: Optional[Exception] = None
+            page = await session.next_page()
+
+            timings['command_start'] = time.monotonic()
+
+            try:
+
+                result = await page.content(
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+
+                return PlaywrightResult(
+                    command='content',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='content',
+                command_args=command,
+                result=result,
+                metadata=session.metadata,
+                timings=timings
+            )
+
+    async def query_selector(
+        self,
+        selector: str,
+        strict: Optional[bool]=None,
+        timeout: Optional[int | float]=None,
+    ):
+
+        if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        session = self.sessions.popleft()
+
+        command = DOMCommand(
+            selector=selector,
+            strict=strict,
+            timeout=timeout
+        )
+    
+        result: Optional[ElementHandle] = None
+        err: Optional[Exception] = None
+        page = await session.next_page()
+
+        timings['command_start'] = time.monotonic()
+
+        try:
+            result = await asyncio.wait_for(
+                page.query_selector(
+                    command.selector,
+                    strict=command.strict
+                ),
                 timeout=command.timeout
             )
 
-            self.pages.append(page)
+        except Exception as err:
+                
+            timings['command_end'] = time.monotonic()
+            
+            session.return_page(page)
+            self.sessions.append(session)
 
-    async def get_element(self, command: PlaywrightCommand):
-        return await self.page.query_selector(
-            command.page.selector, 
-            **command.options.extra
+            return PlaywrightResult(
+                command='query_selector',
+                command_args=command,
+                metadata=session.metadata,
+                result=err,
+                error=str(err),
+                timings=timings
+            )
+        
+        timings['command_end'] = time.monotonic()
+
+        session.return_page(page)
+        self.sessions.append(session)
+
+        return PlaywrightResult(
+            command='query_selector',
+            command_args=command,
+            result=result,
+            metadata=session.metadata,
+            timings=timings
         )
 
-    async def get_all_elements(self, command: PlaywrightCommand):
-        return await self.page.query_selector_all(
-            command.page.selector, 
-            **command.options.extra
+    async def get_all_elements(
+        self,
+        selector: str,
+        timeout: Optional[int | float]=None,
+    ):
+
+        if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        session = self.sessions.popleft()
+    
+        command = DOMCommand(
+            selector=selector,
+            timeout=timeout
+        )
+    
+        result: List[ElementHandle] = []
+        err: Optional[Exception] = None
+        page = await session.next_page()
+
+        timings['command_start'] = time.monotonic()
+
+        try:
+
+            result = await asyncio.wait_for(
+                page.query_selector_all(command.selector),
+                timeout=command.timeout
+            )
+
+        except Exception as err:
+                
+            timings['command_end'] = time.monotonic()
+            
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='query_selector_all',
+                command_args=command,
+                metadata=session.metadata,
+                result=err,
+                error=str(err),
+                timings=timings
+            )
+        
+        timings['command_end'] = time.monotonic()
+
+        session.return_page(page)
+        self.sessions.append(session)
+
+        return PlaywrightResult(
+            command='query_selector_all',
+            command_args=command,
+            result=result,
+            metadata=session.metadata,
+            timings=timings
         )
 
-    async def reload_page(self, command: PlaywrightCommand):
-        await self.page.reload(**command.options.extra)
+    async def reload_page(
+        self,
+        wait_until: Optional[
+            Literal[
+                'commit', 
+                'domcontentloaded', 
+                'load', 
+                'networkidle'
+            ]
+        ] = None,
+        timeout: Optional[int | float] = None,
+    ):
 
-    async def take_screenshot(self, command: PlaywrightCommand):
-        await self.page.screenshot(
-            path=f'{command.input.path}.png', 
-            **command.options.extra
+        if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        session = self.sessions.popleft()
+
+        command = ReloadCommand(
+            wait_util=wait_until,
+            timeout=timeout
+        )
+      
+        result: Optional[Response] = None
+        err: Optional[Exception] = None
+        page = await session.next_page()
+
+        timings['command_start'] = time.monotonic()
+
+        try:
+
+            result = await page.reload(
+                wait_until=command.wait_util,
+                timeout=command.timeout
+            )
+
+        except Exception as err:
+                
+            timings['command_end'] = time.monotonic()
+            
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='reload',
+                command_args=command,
+                metadata=session.metadata,
+                result=err,
+                error=str(err),
+                timings=timings
+            )
+        
+        timings['command_end'] = time.monotonic()
+
+        session.return_page(page)
+        self.sessions.append(session)
+
+        return PlaywrightResult(
+            command='reload',
+            command_args=command,
+            result=result,
+            metadata=session.metadata,
+            timings=timings
         )
 
-    async def select_option(self, command: PlaywrightCommand):
+    async def screenshot(
+        self,
+        path: str | Path,
+        image_type: Optional[Literal['jpeg', 'png']] = None,
+        quality: Optional[int]= None,
+        omit_background: Optional[bool] = None,
+        full_page: Optional[bool] = None,
+        clip: Optional[FloatRect] = None,
+        animations: Optional[Literal['allow', 'disabled']] = None,
+        caret: Optional[Literal['hide', 'initial']] = None,
+        scale: Optional[Literal['css', 'device']] = None,
+        mask: Optional[Sequence[Locator]] = None,
+        mask_color: Optional[str] = None,
+        style: Optional[str] = None,
+        timeout: Optional[int | float] = None,
+    ):
 
-        if command.input.by_label:
-            await self.page.select_option(
-                command.page.selector, 
-                label=command.input.option, 
-                **command.options.extra
+        if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        session = self.sessions.popleft()
+
+        command = ScreenshotCommand(
+            path=path,
+            image_type=image_type,
+            quality=quality,
+            omit_background=omit_background,
+            full_page=full_page,
+            clip=clip,
+            animations=animations,
+            caret=caret,
+            scale=scale,
+            mask=mask,
+            mask_color=mask_color,
+            style=style,
+            timeout=timeout
+        )
+      
+        result: bytes = None
+        err: Optional[Exception] = None
+        page = await session.next_page()
+
+        timings['command_start'] = time.monotonic()
+
+        try:
+
+            result = await page.screenshot(
+                path=command.path,
+                type=command.image_type,
+                quality=command.quality,
+                omit_background=command.omit_background,
+                full_page=command.full_page,
+                clip=command.clip,
+                animations=command.animations,
+                caret=command.caret,
+                scale=command.scale,
+                mask=command.mask,
+                mask_color=command.mask_color,
+                style=command.style,
+                timeout=command.timeout
             )
 
-        elif command.input.by_value:
-            await self.page.select_option(
-                command.page.selector, 
-                value=command.input.option, 
-                **command.options.extra
+        except Exception as err:
+                
+            timings['command_end'] = time.monotonic()
+            
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='screenshot',
+                command_args=command,
+                metadata=session.metadata,
+                result=err,
+                error=str(err),
+                timings=timings
+            )
+        
+        timings['command_end'] = time.monotonic()
+
+        session.return_page(page)
+        self.sessions.append(session)
+
+        return PlaywrightResult(
+            command='screenshot',
+            command_args=command,
+            result=result,
+            metadata=session.metadata,
+            timings=timings
+        )
+
+    async def select_option(
+        self,
+        selector: str,
+        value: Optional[str | Sequence[str]] = None,
+        index: Optional[int | Sequence[int]] = None,
+        label: Optional[str | Sequence[str]] = None,
+        element: Optional[ElementHandle | Sequence[ElementHandle]] = None,
+        no_wait_after: Optional[bool] = None,
+        force: Optional[bool] = None,
+        strict: Optional[bool] = None,
+        timeout: Optional[int | float]=None,
+    ):
+
+        if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        session = self.sessions.popleft()
+    
+        command = SelectOptionCommand(
+            selector=selector,
+            value=value,
+            index=index,
+            label=label,
+            element=element,
+            no_wait_after=no_wait_after,
+            force=force,
+            strict=strict,
+            timeout=timeout
+        )
+    
+        result: List[str] = []
+        err: Optional[Exception] = None
+        page = await session.next_page()
+
+        timings['command_start'] = time.monotonic()
+
+        try:
+
+            await page.select_option(
+                command.selector,
+                value=command.validate,
+                index=command.index,
+                label=command.label,
+                element=command.element,
+                no_wait_after=command.no_wait_after,
+                force=command.force,
+                strict=command.strict,
+                timeout=command.timeout
             )
 
-        else:
-            await self.page.select_option(
-                command.page.selector, 
-                command.input.option, 
-                **command.options.extra
+        except Exception as err:
+                
+            timings['command_end'] = time.monotonic()
+            
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='select_option',
+                command_args=command,
+                metadata=session.metadata,
+                result=err,
+                error=str(err),
+                timings=timings
             )
+        
+        timings['command_end'] = time.monotonic()
+
+        session.return_page(page)
+        self.sessions.append(session)
+
+        return PlaywrightResult(
+            command='select_option',
+            command_args=command,
+            result=result,
+            metadata=session.metadata,
+            timings=timings
+        )
 
     async def set_checked(self, command: PlaywrightCommand):
         await self.page.set_checked(
@@ -2396,3 +3326,11 @@ class MercurySyncPlaywrightClient:
 
     async def go_forward_page(self, command: PlaywrightCommand):
         await self.page.go_forward(**command.options.extra)
+
+
+
+async def test():
+    sess = MercurySyncPlaywrightClient()
+
+    async with sess as page:
+        pass

@@ -33,3 +33,4 @@ from .get_url_command import GetUrlCommand as GetUrlCommand
 from .goto_command import GoToCommand as GoToCommand
 from .hover_command import HoverCommand as HoverCommand
 from .press_command import PressCommand as PressCommand
+from .reload_command import ReloadCommand as ReloadCommand

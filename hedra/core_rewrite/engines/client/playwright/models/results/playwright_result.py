@@ -1,15 +1,16 @@
-from typing import Any, Dict, Literal, Optional
+from typing import Dict, Generic, Literal, Optional, TypeVar
 
 from pydantic import BaseModel, StrictFloat, StrictStr
 
 from hedra.core_rewrite.engines.client.playwright.models.browser import BrowserMetadata
 
+T = TypeVar('T')
 
-class PlaywrightResult(BaseModel):
+class PlaywrightResult(BaseModel, Generic[T]):
     command: StrictStr
     command_args: BaseModel
     metadata: BrowserMetadata
-    result: Any
+    result: T
     error: Optional[StrictStr]=None
     timings: Dict[
         Literal[
