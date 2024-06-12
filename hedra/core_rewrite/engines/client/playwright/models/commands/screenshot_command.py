@@ -25,3 +25,6 @@ class ScreenshotCommand(BaseModel):
     mask_color: Optional[StrictStr] = None
     style: Optional[StrictStr] = None
     timeout: StrictInt | StrictFloat
+
+    class Config:
+        arbitrary_types_allowed=True

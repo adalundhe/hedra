@@ -1,3 +1,9 @@
+from .add_init_script_command import AddInitScriptCommand as AddInitScriptCommand
+from .add_locator_handler_command import (
+    AddLocatorHandlerCommand as AddLocatorHandlerCommand,
+)
+from .add_script_tag_command import AddScriptTagCommand as AddScriptTagCommand
+from .add_style_tag_command import AddStyleTagCommand as AddStyleTagCommand
 from .bring_to_front_command import BringToFrontCommand as BringToFrontCommand
 from .check_command import CheckCommand as CheckCommand
 from .click_command import ClickCommand as ClickCommand
@@ -6,6 +12,7 @@ from .dispatch_event_command import DispatchEventCommand as DispatchEventCommand
 from .dom_command import DOMCommand as DOMCommand
 from .double_click_command import DoubleClickCommand as DoubleClickCommand
 from .drag_and_drop_command import DragAndDropCommand as DragAndDropCommand
+from .emulate_media_command import EmulateMediaCommand as EmulateMediaCommand
 from .evaluate_command import EvaluateCommand as EvaluateCommand
 from .evaluate_on_selector_command import (
     EvaluateOnSelectorCommand as EvaluateOnSelectorCommand,
@@ -27,6 +34,10 @@ from .expect_request_finished_command import (
     ExpectRequestFinishedCommand as ExpectRequestFinishedCommand,
 )
 from .expect_response_command import ExpectResponseCommand as ExpectResponseCommand
+from .expect_websocket_command import ExpectWebsocketCommand as ExpectWebsocketCommand
+from .expect_worker_command import ExpectWorkerCommand as ExpectWorkerCommand
+from .expose_binding_command import ExposeBindingCommand as ExposeBindingCommand
+from .expose_function_command import ExposeFunctionCommand as ExposeFunctionCommand
 from .fill_command import FillCommand as FillCommand
 from .focus_command import FocusCommand as FocusCommand
 from .frame_command import FrameCommand as FrameCommand

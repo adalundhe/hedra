@@ -23,3 +23,6 @@ class SelectOptionCommand(BaseModel):
     force: Optional[StrictBool]=None
     strict: Optional[StrictBool]=None
     timeout: StrictInt | StrictFloat
+
+    class Config:
+        arbitrary_types_allowed=True

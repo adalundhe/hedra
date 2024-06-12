@@ -26,6 +26,7 @@ from playwright.async_api import (
     FileChooser,
     FloatRect,
     Frame,
+    FrameLocator,
     Geolocation,
     JSHandle,
     Locator,
@@ -33,6 +34,8 @@ from playwright.async_api import (
     Position,
     Request,
     Response,
+    WebSocket,
+    Worker,
     async_playwright,
 )
 
@@ -40,6 +43,10 @@ from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
 from .browser_session import BrowserSession
 from .models.commands import (
+    AddInitScriptCommand,
+    AddLocatorHandlerCommand,
+    AddScriptTagCommand,
+    AddStyleTagCommand,
     BringToFrontCommand,
     CheckCommand,
     ClickCommand,
@@ -48,6 +55,7 @@ from .models.commands import (
     DOMCommand,
     DoubleClickCommand,
     DragAndDropCommand,
+    EmulateMediaCommand,
     EvaluateCommand,
     EvaluateOnSelectorCommand,
     ExpectConsoleMessageCommand,
@@ -59,9 +67,14 @@ from .models.commands import (
     ExpectRequestCommand,
     ExpectRequestFinishedCommand,
     ExpectResponseCommand,
+    ExpectWebsocketCommand,
+    ExpectWorkerCommand,
+    ExposeBindingCommand,
+    ExposeFunctionCommand,
     FillCommand,
     FocusCommand,
     FrameCommand,
+    FrameLocatorCommand,
     GetAttributeCommand,
     GetUrlCommand,
     GoCommand,
@@ -212,6 +225,748 @@ class MercurySyncPlaywrightClient:
 
         self.sem.release()
 
+    async def add_script_tag(
+        self,
+        url: Optional[str] = None,
+        path: Optional[str | Path] = None,
+        content: Optional[str] = None,
+        tag_type: Optional[str] = None,
+        timeout: Optional[int | float]=None
+    ):
+        async with self.sem:
+
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
+
+            command = AddScriptTagCommand(
+                url=url,
+                path=path,
+                content=content,
+                tag_type=tag_type,
+                timeout=timeout
+            )
+
+            result: ElementHandle = None
+            err: Optional[Exception] = None
+
+            page = await session.next_page()
+
+            timings['command_start'] = time.monotonic()
+
+            try:
+                result = await asyncio.wait_for(
+                    page.add_script_tag(
+                        url=command.url,
+                        path=command.path,
+                        content=command.content,
+                        type=command.tag_type,
+                    ),
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+                
+                return PlaywrightResult(
+                    command='add_script_tag',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='add_script_tag',
+                command_args=command,
+                metadata=session.metadata,
+                result=result,
+                timings=timings
+            )
+        
+    async def add_init_script(
+        self,
+        script: Optional[str] = None,
+        path: Optional[str | Path] = None,
+        timeout: Optional[int | float]=None
+    ):
+        async with self.sem:
+
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
+
+            command = AddInitScriptCommand(
+                script=script,
+                path=path,
+                timeout=timeout
+            )
+
+            result: ElementHandle = None
+            err: Optional[Exception] = None
+
+            page = await session.next_page()
+
+            timings['command_start'] = time.monotonic()
+
+            try:
+                result = await asyncio.wait_for(
+                    page.add_init_script(
+                        script=command.script,
+                        path=command.path,
+                    ),
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+                
+                return PlaywrightResult(
+                    command='add_init_script',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='add_init_script',
+                command_args=command,
+                metadata=session.metadata,
+                result=result,
+                timings=timings
+            )
+        
+    async def add_locator_handler(
+        self,
+        locator: Locator,
+        handler: Callable[
+            [Locator],
+            Any
+        ] | Callable[[], Any],
+        no_wait_after: Optional[bool] = None,
+        times: Optional[int] = None,
+        timeout: Optional[int | float]=None
+    ):
+        async with self.sem:
+
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
+
+            command = AddLocatorHandlerCommand(
+                locator=locator,
+                handler=handler,
+                no_wait_after=no_wait_after,
+                times=times,
+                timeout=timeout
+            )
+
+            err: Optional[Exception] = None
+
+            page = await session.next_page()
+
+            timings['command_start'] = time.monotonic()
+
+            try:
+                await asyncio.wait_for(
+                    page.add_locator_handler(
+                        command.locator,
+                        command.handler,
+                        no_wait_after=command.no_wait_after,
+                        times=command.times
+
+                    ),
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+                
+                return PlaywrightResult(
+                    command='add_locator_handler',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='add_locator_handler',
+                command_args=command,
+                metadata=session.metadata,
+                result=None,
+                timings=timings
+            )
+        
+    async def add_style_tag(
+        self,
+        url: Optional[str] = None,
+        path: Optional[str | Path] = None,
+        content: Optional[str] = None,
+        timeout: Optional[int | float]=None
+    ):
+        async with self.sem:
+
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
+
+            command = AddStyleTagCommand(
+                url=url,
+                path=path,
+                content=content,
+                timeout=timeout
+            )
+
+            result: ElementHandle = None
+            err: Optional[Exception] = None
+            page = await session.next_page()
+
+            timings['command_start'] = time.monotonic()
+
+            try:
+                result = await asyncio.wait_for(
+                    page.add_style_tag(
+                        url=command.url,
+                        path=command.path,
+                        content=command.content
+
+                    ),
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+                
+                return PlaywrightResult(
+                    command='add_style_tag',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='add_style_tag',
+                command_args=command,
+                metadata=session.metadata,
+                result=result,
+                timings=timings
+            )
+        
+    async def emulate_media(
+        self,
+        media: Optional[
+            Literal['null', 'print', 'screen']
+        ] = None,
+        color_scheme: Optional[
+            Literal['dark', 'light', 'no-preference', 'null']
+        ] = None,
+        reduced_motion: Optional[
+            Literal['no-preference', 'null', 'reduce']
+        ] = None,
+        forced_colors: Optional[
+            Literal['active', 'none', 'null']
+        ] = None,
+        timeout: Optional[int | float]=None
+    ):
+        async with self.sem:
+
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
+
+            command = EmulateMediaCommand(
+                media=media,
+                color_scheme=color_scheme,
+                reduced_motion=reduced_motion,
+                forced_colors=forced_colors,
+                timeout=timeout
+            )
+
+            err: Optional[Exception] = None
+            page = await session.next_page()
+
+            timings['command_start'] = time.monotonic()
+
+            try:
+                await asyncio.wait_for(
+                    page.emulate_media(
+                        media=command.media,
+                        color_scheme=command.color_scheme,
+                        reduced_motion=command.reduced_motion,
+                        forced_colors=command.forced_colors
+                    ),
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+                
+                return PlaywrightResult(
+                    command='emulate_media',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='emulate_media',
+                command_args=command,
+                metadata=session.metadata,
+                result=None,
+                timings=timings
+            )
+        
+    async def expect_websocket(
+        self,
+        predicate: Optional[
+            Callable[[WebSocket], bool]
+        ],
+        timeout: Optional[int | float]=None
+    ):
+        async with self.sem:
+
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
+
+            command = ExpectWebsocketCommand(
+                predicate=predicate,
+                timeout=timeout
+            )
+
+            response: WebSocket = None
+            err: Optional[Exception] = None
+            page = await session.next_page()
+
+            timings['command_start'] = time.monotonic()
+
+            try:
+                websocket_response: AsyncEventContextManager[WebSocket] = await page.expect_websocket(
+                    predicate=command.predicate,
+                    timeout=command.timeout
+                )
+
+                async with websocket_response as websocket:
+                    response = websocket
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+                
+                return PlaywrightResult(
+                    command='expect_websocket',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='expect_websocket',
+                command_args=command,
+                metadata=session.metadata,
+                result=response,
+                timings=timings
+            )
+        
+    async def expect_worker(
+        self,
+        predicate: Optional[
+            Callable[[Worker], bool]
+        ],
+        timeout: Optional[int | float]=None
+    ):
+        async with self.sem:
+
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
+
+            command = ExpectWorkerCommand(
+                predicate=predicate,
+                timeout=timeout
+            )
+
+            response: Worker = None
+            err: Optional[Exception] = None
+            page = await session.next_page()
+
+            timings['command_start'] = time.monotonic()
+
+            try:
+                websocket_response: AsyncEventContextManager[Worker] = await page.expect_worker(
+                    predicate=command.predicate,
+                    timeout=command.timeout
+                )
+
+                async with websocket_response as websocket:
+                    response = websocket
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+                
+                return PlaywrightResult(
+                    command='expect_worker',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='expect_worker',
+                command_args=command,
+                metadata=session.metadata,
+                result=response,
+                timings=timings
+            )
+        
+    async def expose_binding(
+        self,
+        name: str,
+        callback: Callable[..., Any],
+        handle: Optional[bool] = None,
+        timeout: Optional[int | float]=None
+    ):
+        async with self.sem:
+
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
+
+            command = ExposeBindingCommand(
+                name=name,
+                callback=callback,
+                handle=handle,
+                timeout=timeout
+            )
+
+            err: Optional[Exception] = None
+            page = await session.next_page()
+
+            timings['command_start'] = time.monotonic()
+
+            try:
+                await asyncio.wait_for(
+                    page.expose_binding(
+                        command.name,
+                        command.callback,
+                        handle=command.handle,
+                    ),
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+                
+                return PlaywrightResult(
+                    command='expose_binding',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='expose_binding',
+                command_args=command,
+                metadata=session.metadata,
+                result=None,
+                timings=timings
+            )
+        
+    async def expose_function(
+        self,
+        name: str,
+        callback: Callable[..., Any],
+        timeout: Optional[int | float]=None
+    ):
+        async with self.sem:
+
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
+
+            command = ExposeFunctionCommand(
+                name=name,
+                callback=callback,
+                timeout=timeout
+            )
+
+            err: Optional[Exception] = None
+            page = await session.next_page()
+
+            timings['command_start'] = time.monotonic()
+
+            try:
+                await asyncio.wait_for(
+                    page.expose_function(
+                        command.name,
+                        command.callback
+                    ),
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+                
+                return PlaywrightResult(
+                    command='expose_function',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='expose_function',
+                command_args=command,
+                metadata=session.metadata,
+                result=None,
+                timings=timings
+            )
+        
+    async def frame_locator(
+        self,
+        selector: str,
+        timeout: Optional[int | float]=None
+    ):
+        async with self.sem:
+
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
+
+            command = FrameLocatorCommand(
+                selector=selector,
+                timeout=timeout
+            )
+
+            result: FrameLocator = None
+            err: Exception = None
+            page = await session.next_page()
+
+            timings['command_start'] = time.monotonic()
+
+            try:
+                result = await asyncio.wait_for(
+                    page.frame_locator(
+                        command.selector
+                    ),
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+                
+                return PlaywrightResult(
+                    command='frame_locator',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+
+            return PlaywrightResult(
+                command='frame_locator',
+                command_args=command,
+                metadata=session.metadata,
+                result=result,
+                timings=timings
+            )
 
     async def goto(
         self, 
@@ -4399,7 +5154,7 @@ class MercurySyncPlaywrightClient:
                     name=command.name,
                     url=command.url
                 )
-
+                
             except Exception as err:
                 
                 timings['command_end'] = time.monotonic()
