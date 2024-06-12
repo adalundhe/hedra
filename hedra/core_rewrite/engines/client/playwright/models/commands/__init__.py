@@ -29,7 +29,10 @@ from .expect_request_finished_command import (
 from .expect_response_command import ExpectResponseCommand as ExpectResponseCommand
 from .fill_command import FillCommand as FillCommand
 from .focus_command import FocusCommand as FocusCommand
+from .frame_command import FrameCommand as FrameCommand
+from .get_attribute_command import GetAttributeCommand as GetAttributeCommand
 from .get_url_command import GetUrlCommand as GetUrlCommand
+from .go_command import GoCommand as GoCommand
 from .goto_command import GoToCommand as GoToCommand
 from .hover_command import HoverCommand as HoverCommand
 from .press_command import PressCommand as PressCommand
@@ -44,3 +47,10 @@ from .set_timeout_command import SetTimeoutCommand as SetTimeoutCommand
 from .tap_command import TapCommand as TapCommand
 from .title_command import TitleCommand as TitleCommand
 from .type_command import TypeCommand as TypeCommand
+from .wait_for_function_command import WaitForFunctionCommand as WaitForFunctionCommand
+from .wait_for_load_state_command import (
+    WaitForLoadStateCommand as WaitForLoadStateCommand,
+)
+from .wait_for_selector_command import WaitForSelectorCommand as WaitForSelectorCommand
+from .wait_for_timeout_command import WaitForTimeoutCommand as WaitForTimeoutCommand
+from .wait_for_url_command import WaitForUrlCommand as WaitForUrlCommand

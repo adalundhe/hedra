@@ -62,7 +62,9 @@ from .models.commands import (
     FillCommand,
     FocusCommand,
     FrameCommand,
+    GetAttributeCommand,
     GetUrlCommand,
+    GoCommand,
     GoToCommand,
     HoverCommand,
     PressCommand,
@@ -4426,26 +4428,269 @@ class MercurySyncPlaywrightClient:
                 result=result,
                 timings=timings
             )
+        
+    async def frames(
+        self,
+        name: Optional[str] = None,
+        url: Optional[str | Pattern[str] | Callable[[str], bool]]=None,
+    ):
+        
+        async with self.sem:
 
-    async def get_frames(self, command: PlaywrightCommand):
-        return await self.page.frames()
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
 
-    async def get_attribute(self, command: PlaywrightCommand):
-        return await self.page.get_attribute(
-            command.page.selector,
-            command.page.attribute
-        )
+            session = self.sessions.popleft()
 
-    async def go_back_page(self, command: PlaywrightCommand):
-        await self.page.go_back(**command.options.extra)
+            command = FrameCommand(
+                name=name,
+                url=url
+            )
 
-    async def go_forward_page(self, command: PlaywrightCommand):
-        await self.page.go_forward(**command.options.extra)
+            page = await session.next_page()
 
+            timings['command_start'] = time.monotonic()
 
+            result = page.frames
 
-async def test():
-    sess = MercurySyncPlaywrightClient()
+            timings['command_end'] = time.monotonic()
 
-    async with sess as page:
-        pass
+            session.return_page(page)
+            self.sessions.append(session)
+            
+            return PlaywrightResult(
+                command='wait_for_url',
+                command_args=command,
+                metadata=session.metadata,
+                result=result,
+                timings=timings
+            )
+
+    async def get_attribute(
+        self,
+        selector: str,
+        name: str,
+        strict: Optional[bool] = None,
+        timeout: Optional[int | float]=None
+    ):
+        
+        async with self.sem:
+
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
+
+            command = GetAttributeCommand(
+                selector=selector,
+                name=name,
+                strict=strict,
+                timeout=timeout,
+            )
+
+            result: Optional[str] = None
+            err: Optional[Exception] = None
+            page = await session.next_page()
+
+            timings['command_start'] = time.monotonic()
+
+            try:
+
+                result = await page.get_attribute(
+                    command.selector,
+                    command.name,
+                    strict=command.strict,
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+
+                return PlaywrightResult(
+                    command='get_attribute',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+            
+            return PlaywrightResult(
+                command='get_attribute',
+                command_args=command,
+                metadata=session.metadata,
+                result=result,
+                timings=timings
+            )
+        
+    async def go_back(
+        self,
+        wait_until: Optional[
+            Literal[
+                'commit', 
+                'domcontentloaded', 
+                'load', 
+                'networkidle'
+            ]
+        ] = None,
+        timeout: Optional[int | float]=None
+    ):
+        
+        async with self.sem:
+
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
+
+            command = GoCommand(
+                wait_until=wait_until,
+                timeout=timeout,
+            )
+
+            result: Optional[Response] = None
+            err: Optional[Exception] = None
+            page = await session.next_page()
+
+            timings['command_start'] = time.monotonic()
+
+            try:
+
+                result = await page.go_back(
+                    wait_until=command.wait_until,
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+
+                return PlaywrightResult(
+                    command='go_back',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+            
+            return PlaywrightResult(
+                command='go_back',
+                command_args=command,
+                metadata=session.metadata,
+                result=result,
+                timings=timings
+            )
+        
+    async def go_forward(
+        self,
+        wait_until: Optional[
+            Literal[
+                'commit', 
+                'domcontentloaded', 
+                'load', 
+                'networkidle'
+            ]
+        ] = None,
+        timeout: Optional[int | float]=None
+    ):
+        
+        async with self.sem:
+
+            timings: Dict[
+                Literal[
+                    'command_start',
+                    'command_end'
+                ],
+                float
+            ] = {}
+
+            if timeout is None:
+                timeout = self.timeouts.request_timeout
+
+            session = self.sessions.popleft()
+
+            command = GoCommand(
+                wait_until=wait_until,
+                timeout=timeout,
+            )
+
+            result: Optional[Response] = None
+            err: Optional[Exception] = None
+            page = await session.next_page()
+
+            timings['command_start'] = time.monotonic()
+
+            try:
+
+                result = await page.go_forward(
+                    wait_until=command.wait_until,
+                    timeout=command.timeout
+                )
+
+            except Exception as err:
+                
+                timings['command_end'] = time.monotonic()
+                
+                session.return_page(page)
+                self.sessions.append(session)
+
+                return PlaywrightResult(
+                    command='go_forward',
+                    command_args=command,
+                    metadata=session.metadata,
+                    result=err,
+                    error=str(err),
+                    timings=timings
+                )
+
+            timings['command_end'] = time.monotonic()
+
+            session.return_page(page)
+            self.sessions.append(session)
+            
+            return PlaywrightResult(
+                command='go_forward',
+                command_args=command,
+                metadata=session.metadata,
+                result=result,
+                timings=timings
+            )
