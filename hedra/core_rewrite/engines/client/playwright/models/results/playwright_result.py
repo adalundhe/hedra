@@ -22,6 +22,7 @@ class PlaywrightResult(BaseModel, Generic[T]):
         'command_start': 0,
         'command_end': 0
     }
+    frame: Optional[StrictStr]=None
 
     class Config:
         arbitrary_types_allowed=True

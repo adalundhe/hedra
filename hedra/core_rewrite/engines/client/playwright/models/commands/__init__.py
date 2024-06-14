@@ -41,6 +41,7 @@ from .expose_function_command import ExposeFunctionCommand as ExposeFunctionComm
 from .fill_command import FillCommand as FillCommand
 from .focus_command import FocusCommand as FocusCommand
 from .frame_command import FrameCommand as FrameCommand
+from .frame_element_command import FrameElementCommand as FrameElementCommand
 from .frame_locator_command import FrameLocatorCommand as FrameLocatorCommand
 from .get_attribute_command import GetAttributeCommand as GetAttributeCommand
 from .get_by_role_command import GetByRoleCommand as GetByRoleCommand
@@ -69,7 +70,9 @@ from .set_content_command import SetContentCommand as SetContentCommand
 from .set_extra_http_headers_command import (
     SetExtraHTTPHeadersCommand as SetExtraHTTPHeadersCommand,
 )
+from .set_input_files_command import SetInputFilesCommand as SetInputFilesCommand
 from .set_timeout_command import SetTimeoutCommand as SetTimeoutCommand
+from .set_viewport_size_command import SetViewportSize as SetViewportSize
 from .tap_command import TapCommand as TapCommand
 from .title_command import TitleCommand as TitleCommand
 from .type_command import TypeCommand as TypeCommand
