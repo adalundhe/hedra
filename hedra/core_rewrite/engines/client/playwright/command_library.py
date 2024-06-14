@@ -219,6 +219,74 @@ class MercurySyncPlaywrightConnection:
             ) for session in self.sessions
         ])
 
+    async def mouse(self):
+        await self.sem.acquire()
+        session = self.sessions.popleft()
+
+        page = await session.next_page()
+
+        mouse = page.mouse
+
+        session.return_page(page)
+        self.sessions.append(session)
+
+        self.sem.release()
+
+        return mouse
+
+    async def frame(
+        self,
+        name: Optional[str] = None,
+        url: Optional[str | Pattern[str] | Callable[[str], bool]]=None,
+    ):
+        
+        await self.sem.acquire()
+        session = self.sessions.popleft()
+
+        command = FrameCommand(
+            name=name,
+            url=url
+        )
+
+        page = await session.next_page()
+
+        frame = BrowserFrame(
+            page.frame(
+                name=command.name,
+                url=command.url
+            ),
+            self.timeouts,
+            session.metadata
+        )
+
+        session.return_page(page)
+        self.sessions.append(session)
+
+        self.sem.release()
+        
+        return frame
+        
+    async def frames(self):
+        
+        await self.sem.acquire()
+        session = self.sessions.popleft()
+
+        page = await session.next_page()
+
+        frames = [
+            BrowserFrame(
+                frame,
+                self.timeouts,
+                session.metadata
+            ) for frame in page.frames
+        ]
+
+        session.return_page(page)
+        self.sessions.append(session)
+        self.sem.release()
+        
+        return frames
+
     async def next_context(self):
         await self.sem.acquire()
         session = self.sessions.popleft()
@@ -6886,125 +6954,6 @@ class MercurySyncPlaywrightConnection:
                 command_args=command,
                 metadata=session.metadata,
                 result=None,
-                timings=timings
-            )
-
-    async def frame(
-        self,
-        name: Optional[str] = None,
-        url: Optional[str | Pattern[str] | Callable[[str], bool]]=None,
-    ):
-        
-        async with self.sem:
-
-            timings: Dict[
-                Literal[
-                    'command_start',
-                    'command_end'
-                ],
-                float
-            ] = {}
-
-            session = self.sessions.popleft()
-
-            command = FrameCommand(
-                name=name,
-                url=url
-            )
-
-            result: Optional[BrowserFrame] = None
-            err: Optional[Exception] = None
-            page = await session.next_page()
-
-            timings['command_start'] = time.monotonic()
-
-            try:
-
-                result = page.frame(
-                    name=command.name,
-                    url=command.url
-                )
-
-                result = BrowserFrame(
-                    result,
-                    self.timeouts,
-                    session.metadata
-                )
-                
-            except Exception as err:
-                
-                timings['command_end'] = time.monotonic()
-                
-                session.return_page(page)
-                self.sessions.append(session)
-
-                return PlaywrightResult(
-                    command='frame',
-                    command_args=command,
-                    metadata=session.metadata,
-                    result=err,
-                    error=str(err),
-                    timings=timings
-                )
-
-            timings['command_end'] = time.monotonic()
-
-            session.return_page(page)
-            self.sessions.append(session)
-            
-            return PlaywrightResult(
-                command='frame',
-                command_args=command,
-                metadata=session.metadata,
-                result=result,
-                timings=timings
-            )
-        
-    async def frames(
-        self,
-        name: Optional[str] = None,
-        url: Optional[str | Pattern[str] | Callable[[str], bool]]=None,
-    ):
-        
-        async with self.sem:
-
-            timings: Dict[
-                Literal[
-                    'command_start',
-                    'command_end'
-                ],
-                float
-            ] = {}
-
-            session = self.sessions.popleft()
-
-            command = FrameCommand(
-                name=name,
-                url=url
-            )
-
-            page = await session.next_page()
-
-            timings['command_start'] = time.monotonic()
-
-            result = [
-                BrowserFrame(
-                    frame,
-                    self.timeouts,
-                    session.metadata
-                ) for frame in page.frames
-            ]
-
-            timings['command_end'] = time.monotonic()
-
-            session.return_page(page)
-            self.sessions.append(session)
-            
-            return PlaywrightResult(
-                command='frames',
-                command_args=command,
-                metadata=session.metadata,
-                result=result,
                 timings=timings
             )
 
