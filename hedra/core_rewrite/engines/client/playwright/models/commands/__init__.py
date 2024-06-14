@@ -41,16 +41,31 @@ from .expose_function_command import ExposeFunctionCommand as ExposeFunctionComm
 from .fill_command import FillCommand as FillCommand
 from .focus_command import FocusCommand as FocusCommand
 from .frame_command import FrameCommand as FrameCommand
+from .frame_locator_command import FrameLocatorCommand as FrameLocatorCommand
 from .get_attribute_command import GetAttributeCommand as GetAttributeCommand
+from .get_by_role_command import GetByRoleCommand as GetByRoleCommand
+from .get_by_test_id_command import GetByTestIdCommand as GetByTestIdCommand
+from .get_by_text_command import GetByTextCommand as GetByTextCommand
 from .get_url_command import GetUrlCommand as GetUrlCommand
 from .go_command import GoCommand as GoCommand
 from .goto_command import GoToCommand as GoToCommand
 from .hover_command import HoverCommand as HoverCommand
+from .is_closed_command import IsClosedCommand as IsClosedCommand
+from .on_command import OnCommand as OnCommand
+from .opener_command import OpenerCommand as OpenerCommand
+from .pause_command import PauseCommand as PauseCommand
+from .pdf_command import PdfCommand as PdfCommand
 from .press_command import PressCommand as PressCommand
 from .reload_command import ReloadCommand as ReloadCommand
+from .remove_locator_handler_command import (
+    RemoveLocatorHandlerCommand as RemoveLocatorHandlerCommand,
+)
+from .route_command import RouteCommand as RouteCommand
+from .route_from_har_command import RouteFromHarCommand as RouteFromHarCommand
 from .screenshot_command import ScreenshotCommand as ScreenshotCommand
 from .select_option_command import SelectOptionCommand as SelectOptionCommand
 from .set_checked_command import SetCheckedCommand as SetCheckedCommand
+from .set_content_command import SetContentCommand as SetContentCommand
 from .set_extra_http_headers_command import (
     SetExtraHTTPHeadersCommand as SetExtraHTTPHeadersCommand,
 )
