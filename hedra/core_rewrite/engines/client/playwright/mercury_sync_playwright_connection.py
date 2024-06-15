@@ -46,7 +46,7 @@ class MercurySyncPlaywrightConnection:
             Tuple[BrowserSession, BrowserPage]
         ] = deque()
 
-    async def begin(self):
+    async def open_page(self):
         await self.sem.acquire()
 
         session = self.sessions.popleft()
@@ -59,7 +59,7 @@ class MercurySyncPlaywrightConnection:
 
         return page
 
-    def end(self):
+    def close_page(self):
         session, page = self._active.popleft()
 
         session.return_page(page)
