@@ -1,43 +1,54 @@
+from __future__ import annotations
+
 import asyncio
 import time
-from typing import Dict, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
-from playwright.async_api import Mouse
+from playwright.async_api import (
+    FloatRect,
+    Locator,
+)
 
 from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
 from .models.browser import BrowserMetadata
-from .models.commands.mouse import (
-    ButtonCommand,
-    ClickCommand,
-    MoveCommand,
-    WheelCommand,
+from .models.commands.locator import (
+    AllTextsCommand,
+    AndMatchingCommand,
+    BoundingBoxCommand,
 )
 from .models.results import PlaywrightResult
 
 
-class BrowserMouse:
+class BrowserLocator:
 
     def __init__(
         self,
-        mouse: Mouse,
+        locator: Locator,
         timeouts: Timeouts,
         metadata: BrowserMetadata,
         url: str
     ) -> None:
-        self.mouse = mouse
+        self.locator = locator
         self.timeouts = timeouts
         self.metadata = metadata
         self.url = url
 
-    async def click(
+    async def all(self):
+        return [
+            BrowserLocator(
+                locator,
+                self.timeouts,
+                self.metadata,
+                self.url
+            ) for locator in (
+                await self.locator.all()
+            )
+        ]
+    
+    async def all_inner_texts(
         self,
-        x_position: int | float,
-        y_position: int | float,
-        delay: Optional[int | float]=None,
-        button: Optional[Literal['left', 'middle', 'right']]='left',
-        click_count: Optional[int]=None,
-        timeout: Optional[int | float]=None,
+        timeout: Optional[int | float]=None
     ):
 
         if timeout is None:
@@ -54,29 +65,20 @@ class BrowserMouse:
         if timeout is None:
             timeout = self.timeouts.request_timeout
 
-        command = ClickCommand(
-            x_position=x_position,
-            y_position=y_position,
-            delay=delay,
-            button=button,
-            click_count=click_count,
+
+        command = AllTextsCommand(
             timeout=timeout
         )
-
+        
+        result: List[str] = None
         err: Optional[Exception] = None
 
         timings['command_start'] = time.monotonic()
 
         try:
-        
-            await asyncio.wait_for(
-                self.mouse.click(
-                    x=command.x_position,
-                    y=command.y_position,
-                    delay=command.delay,
-                    button=command.button,
-                    click_count=command.click_count
-                ),
+
+            result = await asyncio.wait_for(
+                self.locator.all_inner_texts(),
                 timeout=command.timeout
             )
 
@@ -85,7 +87,7 @@ class BrowserMouse:
             timings['command_end'] = time.monotonic()
 
             return PlaywrightResult(
-                command='click',
+                command='all_inner_texts',
                 command_args=command,
                 metadata=self.metadata,
                 result=err,
@@ -97,21 +99,17 @@ class BrowserMouse:
         timings['command_end'] = time.monotonic()
         
         return PlaywrightResult(
-            command='click',
+            command='all_inner_texts',
             command_args=command,
             metadata=self.metadata,
-            result=None,
+            result=result,
             timings=timings,
             url=self.url
         )
     
-    async def double_click(
+    async def all_text_contents(
         self,
-        x_position: int | float,
-        y_position: int | float,
-        delay: Optional[int | float]=None,
-        button: Optional[Literal['left', 'middle', 'right']]='left',
-        timeout: Optional[int | float]=None,
+        timeout: Optional[int | float]=None
     ):
 
         if timeout is None:
@@ -128,27 +126,20 @@ class BrowserMouse:
         if timeout is None:
             timeout = self.timeouts.request_timeout
 
-        command = ClickCommand(
-            x_position=x_position,
-            y_position=y_position,
-            delay=delay,
-            button=button,
+
+        command = AllTextsCommand(
             timeout=timeout
         )
-
+        
+        result: List[str] = None
         err: Optional[Exception] = None
 
         timings['command_start'] = time.monotonic()
 
         try:
-        
-            await asyncio.wait_for(
-                self.mouse.dblclick(
-                    x=command.x_position,
-                    y=command.y_position,
-                    delay=command.delay,
-                    button=command.button
-                ),
+
+            result = await asyncio.wait_for(
+                self.locator.all_text_contents(),
                 timeout=command.timeout
             )
 
@@ -157,7 +148,7 @@ class BrowserMouse:
             timings['command_end'] = time.monotonic()
 
             return PlaywrightResult(
-                command='double_click',
+                command='all_text_contents',
                 command_args=command,
                 metadata=self.metadata,
                 result=err,
@@ -169,22 +160,20 @@ class BrowserMouse:
         timings['command_end'] = time.monotonic()
         
         return PlaywrightResult(
-            command='double_click',
+            command='all_text_contents',
             command_args=command,
             metadata=self.metadata,
-            result=None,
+            result=result,
             timings=timings,
             url=self.url
         )
     
-    async def move(
+    async def and_matching(
         self,
-        x_position: int | float,
-        y_position: int | float,
-        steps: int=1,
-        timeout: Optional[int | float]=None,
+        locator: BrowserLocator,
+        timeout: Optional[int | float]=None
     ):
-
+        
         if timeout is None:
             timeout = self.timeouts.request_timeout
 
@@ -199,90 +188,21 @@ class BrowserMouse:
         if timeout is None:
             timeout = self.timeouts.request_timeout
 
-        command = MoveCommand(
-            x_position=x_position,
-            y_position=y_position,
-            steps=steps,
+
+        command = AndMatchingCommand(
+            locator=locator.locator,
             timeout=timeout
         )
-
+        
+        result: List[str] = None
         err: Optional[Exception] = None
 
         timings['command_start'] = time.monotonic()
 
         try:
-        
-            await asyncio.wait_for(
-                self.mouse.move(
-                    x=command.x_position,
-                    y=command.y_position,
-                    steps=command.steps
-                ),
-                timeout=command.timeout
-            )
-        except Exception as err:
-            
-            timings['command_end'] = time.monotonic()
 
-            return PlaywrightResult(
-                command='move',
-                command_args=command,
-                metadata=self.metadata,
-                result=err,
-                error=str(err),
-                timings=timings,
-                url=self.url
-            )
-
-        timings['command_end'] = time.monotonic()
-        
-        return PlaywrightResult(
-            command='move',
-            command_args=command,
-            metadata=self.metadata,
-            result=None,
-            timings=timings,
-            url=self.url
-        )
-    
-    async def down(
-        self,
-        button: Optional[Literal['left', 'middle', 'right']]='left',
-        click_count: Optional[int]=None,
-        timeout: Optional[int | float]=None,
-    ):
-
-        if timeout is None:
-            timeout = self.timeouts.request_timeout
-
-        timings: Dict[
-            Literal[
-                'command_start',
-                'command_end'
-            ],
-            float
-        ] = {}
-
-        if timeout is None:
-            timeout = self.timeouts.request_timeout
-
-        command = ButtonCommand(
-            button=button,
-            click_count=click_count,
-            timeout=timeout
-        )
-
-        err: Optional[Exception] = None
-
-        timings['command_start'] = time.monotonic()
-
-        try:
-        
-            await asyncio.wait_for(
-                self.mouse.down(
-                    button=command.button,
-                    click_count=command.click_count
-                ),
+            result = await asyncio.wait_for(
+                self.locator.and_(command.locator),
                 timeout=command.timeout
             )
 
@@ -291,7 +211,7 @@ class BrowserMouse:
             timings['command_end'] = time.monotonic()
 
             return PlaywrightResult(
-                command='down',
+                command='and_matching',
                 command_args=command,
                 metadata=self.metadata,
                 result=err,
@@ -303,21 +223,18 @@ class BrowserMouse:
         timings['command_end'] = time.monotonic()
         
         return PlaywrightResult(
-            command='down',
+            command='and_matching',
             command_args=command,
             metadata=self.metadata,
-            result=None,
+            result=result,
             timings=timings,
             url=self.url
         )
     
-    async def up(
+    async def blur(
         self,
-        button: Optional[Literal['left', 'middle', 'right']]='left',
-        click_count: Optional[int]=None,
-        timeout: Optional[int | float]=None,
+        timeout: Optional[int | float]=None
     ):
-
         if timeout is None:
             timeout = self.timeouts.request_timeout
 
@@ -332,89 +249,16 @@ class BrowserMouse:
         if timeout is None:
             timeout = self.timeouts.request_timeout
 
-        command = ButtonCommand(
-            button=button,
-            click_count=click_count,
+
+        command = BoundingBoxCommand(
             timeout=timeout
         )
-
-        err: Optional[Exception] = None
-
+        
         timings['command_start'] = time.monotonic()
 
         try:
-        
-            await asyncio.wait_for(
-                self.mouse.up(
-                    button=command.button,
-                    click_count=command.click_count
-                ),
-                command.timeout
-            )
 
-        except Exception as err:
-            
-            timings['command_end'] = time.monotonic()
-
-            return PlaywrightResult(
-                command='up',
-                command_args=command,
-                metadata=self.metadata,
-                result=err,
-                error=str(err),
-                timings=timings,
-                url=self.url
-            )
-
-        timings['command_end'] = time.monotonic()
-        
-        return PlaywrightResult(
-            command='up',
-            command_args=command,
-            metadata=self.metadata,
-            result=None,
-            timings=timings,
-            url=self.url
-        )
-    
-    async def wheel(
-        self,
-        delta_x: int | float,
-        delta_y: int | float,
-        timeout: Optional[int | float]=None,
-    ):
-
-        if timeout is None:
-            timeout = self.timeouts.request_timeout
-
-        timings: Dict[
-            Literal[
-                'command_start',
-                'command_end'
-            ],
-            float
-        ] = {}
-
-        if timeout is None:
-            timeout = self.timeouts.request_timeout
-
-        command = WheelCommand(
-            delta_x=delta_x,
-            delta_y=delta_y,
-            timeout=timeout
-        )
-
-        err: Optional[Exception] = None
-
-        timings['command_start'] = time.monotonic()
-
-        try:
-        
-            await asyncio.wait_for(
-                self.mouse.wheel(
-                    delta_x=command.delta_x,
-                    delta_y=command.delta_y
-                ),
+            await self.locator.blur(
                 timeout=command.timeout
             )
 
@@ -423,7 +267,7 @@ class BrowserMouse:
             timings['command_end'] = time.monotonic()
 
             return PlaywrightResult(
-                command='wheel',
+                command='blur',
                 command_args=command,
                 metadata=self.metadata,
                 result=err,
@@ -435,10 +279,70 @@ class BrowserMouse:
         timings['command_end'] = time.monotonic()
         
         return PlaywrightResult(
-            command='wheel',
+            command='blur',
             command_args=command,
             metadata=self.metadata,
             result=None,
+            timings=timings,
+            url=self.url
+        )
+    
+    async def bounding_box(
+        self,
+        timeout: Optional[int | float]=None
+    ):
+        
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+
+        command = BoundingBoxCommand(
+            timeout=timeout
+        )
+        
+        result: FloatRect = None
+        err: Optional[Exception] = None
+
+        timings['command_start'] = time.monotonic()
+
+        try:
+
+            result = await self.locator.bounding_box(
+                timeout=command.timeout
+            )
+
+        except Exception as err:
+            
+            timings['command_end'] = time.monotonic()
+
+            return PlaywrightResult(
+                command='bounding_box',
+                command_args=command,
+                metadata=self.metadata,
+                result=err,
+                error=str(err),
+                timings=timings,
+                url=self.url
+            )
+
+        timings['command_end'] = time.monotonic()
+        
+        return PlaywrightResult(
+            command='bounding_box',
+            command_args=command,
+            metadata=self.metadata,
+            result=result,
             timings=timings,
             url=self.url
         )
