@@ -4735,7 +4735,8 @@ class BrowserPage:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
@@ -4795,7 +4796,8 @@ class BrowserPage:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
@@ -4862,7 +4864,8 @@ class BrowserPage:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
@@ -4955,7 +4958,8 @@ class BrowserPage:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
@@ -5036,7 +5040,8 @@ class BrowserPage:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
@@ -5113,7 +5118,8 @@ class BrowserPage:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
@@ -5169,7 +5175,8 @@ class BrowserPage:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
@@ -5225,7 +5232,8 @@ class BrowserPage:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
@@ -5287,7 +5295,8 @@ class BrowserPage:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
@@ -5374,7 +5383,8 @@ class BrowserPage:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
@@ -5437,7 +5447,8 @@ class BrowserPage:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
@@ -5495,7 +5506,8 @@ class BrowserPage:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
@@ -5566,7 +5578,8 @@ class BrowserPage:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()

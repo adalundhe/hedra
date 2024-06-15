@@ -2797,7 +2797,8 @@ class BrowserLocator:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
@@ -2929,7 +2930,8 @@ class BrowserLocator:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
@@ -2989,7 +2991,8 @@ class BrowserLocator:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
@@ -3060,7 +3063,8 @@ class BrowserLocator:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
@@ -3200,7 +3204,8 @@ class BrowserLocator:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
@@ -3257,7 +3262,8 @@ class BrowserLocator:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                url=self.url
             )
         
         timings['command_end'] = time.monotonic()
