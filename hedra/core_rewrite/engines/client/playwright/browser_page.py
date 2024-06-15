@@ -43,6 +43,7 @@ from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 from .browser_frame import BrowserFrame
 from .browser_keyboard import BrowserKeyboard
 from .browser_mouse import BrowserMouse
+from .browser_touchscreen import BrowserTouchscreen
 from .models.browser import BrowserMetadata
 from .models.commands.page import (
     AddInitScriptCommand,
@@ -140,15 +141,6 @@ class BrowserPage:
         )
 
     @property
-    def mouse(self):
-        return BrowserMouse(
-            self.page.mouse,
-            self.timeouts,
-            self.metadata,
-            self.url
-        )
-
-    @property
     def frame(
         self,
         name: Optional[str] = None,
@@ -177,6 +169,24 @@ class BrowserPage:
                 self.metadata
             ) for frame in self.page.frames
         ]
+    
+    @property
+    def mouse(self):
+        return BrowserMouse(
+            self.page.mouse,
+            self.timeouts,
+            self.metadata,
+            self.url
+        )
+    
+    @property
+    def touchscreen(self):
+        return BrowserTouchscreen(
+            self.page.touchscreen,
+            self.timeouts,
+            self.metadata,
+            self.url,
+        )
 
     async def add_script_tag(
         self,
