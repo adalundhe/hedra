@@ -59,7 +59,7 @@ class MercurySyncPlaywrightConnection:
 
         return page
 
-    async def end(self):
+    def end(self):
         session, page = self._active.popleft()
 
         session.return_page(page)
