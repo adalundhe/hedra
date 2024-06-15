@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from pathlib import Path
 from typing import (
     Any,
     Dict,
@@ -13,6 +14,8 @@ from typing import (
 )
 
 from playwright.async_api import (
+    ElementHandle,
+    FilePayload,
     FloatRect,
     FrameLocator,
     JSHandle,
@@ -39,6 +42,17 @@ from .models.commands.locator import (
     GetAttributeCommand,
     HighlightCommand,
     HoverCommand,
+    NthCommand,
+    OrMatchingCommand,
+    PressCommand,
+    PressSequentiallyCommand,
+    ScrollIntoViewIfNeeded,
+    SelectOptionCommand,
+    SelectTextCommand,
+    SetCheckedCommand,
+    SetInputFilesCommand,
+    TapCommand,
+    WaitForCommand,
 )
 from .models.commands.page import (
     EvaluateCommand,
@@ -47,6 +61,7 @@ from .models.commands.page import (
     GetByTestIdCommand,
     GetByTextCommand,
     LocatorCommand,
+    ScreenshotCommand,
 )
 from .models.results import PlaywrightResult
 
@@ -86,6 +101,22 @@ class BrowserLocator:
                 has_text=command.has_text,
                 has_not_text=command.has_not_text
             ),
+            self.timeouts,
+            self.metadata,
+            self.url
+        )
+    
+    def nth(
+        self,
+        index: int,
+    ):
+        
+        command = NthCommand(
+            index=index
+        )
+
+        return BrowserLocator(
+            self.locator.nth(command.index),
             self.timeouts,
             self.metadata,
             self.url
@@ -2488,6 +2519,877 @@ class BrowserLocator:
             command_args=command,
             result=result,
             metadata=self.metadata,
+            timings=timings,
+            url=self.url
+        )
+    
+    async def or_matching(
+        self,
+        locator: BrowserLocator,
+        timeout: Optional[int | float]=None
+    ):
+        
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+
+        command = OrMatchingCommand(
+            locator=locator.locator,
+            timeout=timeout
+        )
+        
+        result: List[str] = None
+        err: Optional[Exception] = None
+
+        timings['command_start'] = time.monotonic()
+
+        try:
+
+            result = await asyncio.wait_for(
+                self.locator.or_(command.locator),
+                timeout=command.timeout
+            )
+
+        except Exception as err:
+            
+            timings['command_end'] = time.monotonic()
+
+            return PlaywrightResult(
+                command='or_matching',
+                command_args=command,
+                metadata=self.metadata,
+                result=err,
+                error=str(err),
+                timings=timings,
+                url=self.url
+            )
+
+        timings['command_end'] = time.monotonic()
+        
+        return PlaywrightResult(
+            command='or_matching',
+            command_args=command,
+            metadata=self.metadata,
+            result=result,
+            timings=timings,
+            url=self.url
+        )
+    
+    async def press(
+        self,
+        key: str,
+        delay: Optional[int | float] = None,
+        no_wait_after: Optional[bool] = None,
+        timeout: Optional[int | float]=None,
+    ):
+        
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        command = PressCommand(
+            key=key,
+            delay=delay,
+            no_wait_after=no_wait_after,
+            timeout=timeout
+        )
+
+        err: Optional[Exception] = None
+        timings['command_start'] = time.monotonic()
+
+        try:
+
+            await self.locator.press(
+                command.key,
+                delay=command.delay,
+                no_wait_after=command.no_wait_after,
+                timeout=command.timeout
+            )
+
+        except Exception as err:
+            
+            timings['command_end'] = time.monotonic()
+
+            return PlaywrightResult(
+                command='press',
+                command_args=command,
+                metadata=self.metadata,
+                result=err,
+                error=str(err),
+                timings=timings,
+                url=self.url
+            )
+
+        timings['command_end'] = time.monotonic()
+
+        return PlaywrightResult(
+            command='press',
+            command_args=command,
+            metadata=self.metadata,
+            result=None,
+            timings=timings,
+            url=self.url
+        )
+    
+    async def press_sequentially(
+        self,
+        text: str,
+        delay: Optional[int | float] = None,
+        no_wait_after: Optional[bool] = None,
+        timeout: Optional[int | float]=None,
+    ):
+        
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        command = PressSequentiallyCommand(
+            text=text,
+            delay=delay,
+            no_wait_after=no_wait_after,
+            timeout=timeout
+        )
+
+        err: Optional[Exception] = None
+        timings['command_start'] = time.monotonic()
+
+        try:
+
+            await self.locator.press_sequentially(
+                command.key,
+                delay=command.delay,
+                no_wait_after=command.no_wait_after,
+                timeout=command.timeout
+            )
+
+        except Exception as err:
+            
+            timings['command_end'] = time.monotonic()
+
+            return PlaywrightResult(
+                command='press',
+                command_args=command,
+                metadata=self.metadata,
+                result=err,
+                error=str(err),
+                timings=timings,
+                url=self.url
+            )
+
+        timings['command_end'] = time.monotonic()
+
+        return PlaywrightResult(
+            command='press',
+            command_args=command,
+            metadata=self.metadata,
+            result=None,
+            timings=timings,
+            url=self.url
+        )
+    
+    async def screenshot(
+        self,
+        path: str | Path,
+        image_type: Optional[Literal['jpeg', 'png']] = None,
+        quality: Optional[int]= None,
+        omit_background: Optional[bool] = None,
+        full_page: Optional[bool] = None,
+        clip: Optional[FloatRect] = None,
+        animations: Optional[Literal['allow', 'disabled']] = None,
+        caret: Optional[Literal['hide', 'initial']] = None,
+        scale: Optional[Literal['css', 'device']] = None,
+        mask: Optional[Sequence[Locator]] = None,
+        mask_color: Optional[str] = None,
+        style: Optional[str] = None,
+        timeout: Optional[int | float] = None,
+    ):
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        command = ScreenshotCommand(
+            path=path,
+            image_type=image_type,
+            quality=quality,
+            omit_background=omit_background,
+            full_page=full_page,
+            clip=clip,
+            animations=animations,
+            caret=caret,
+            scale=scale,
+            mask=mask,
+            mask_color=mask_color,
+            style=style,
+            timeout=timeout
+        )
+    
+        result: bytes = None
+        err: Optional[Exception] = None
+        timings['command_start'] = time.monotonic()
+
+        try:
+
+            result = await self.locator.screenshot(
+                path=command.path,
+                type=command.image_type,
+                quality=command.quality,
+                omit_background=command.omit_background,
+                full_page=command.full_page,
+                clip=command.clip,
+                animations=command.animations,
+                caret=command.caret,
+                scale=command.scale,
+                mask=command.mask,
+                mask_color=command.mask_color,
+                style=command.style,
+                timeout=command.timeout
+            )
+
+        except Exception as err:
+                
+            timings['command_end'] = time.monotonic()
+
+            return PlaywrightResult(
+                command='screenshot',
+                command_args=command,
+                metadata=self.metadata,
+                result=err,
+                error=str(err),
+                timings=timings
+            )
+        
+        timings['command_end'] = time.monotonic()
+
+        return PlaywrightResult(
+            command='screenshot',
+            command_args=command,
+            result=result,
+            metadata=self.metadata,
+            timings=timings,
+            url=self.url
+        )
+    
+    async def scroll_into_view_if_needed(
+        self,
+        timeout: Optional[int | float]=None,
+    ):
+        
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        command = ScrollIntoViewIfNeeded(
+            timeout=timeout
+        )
+
+        err: Optional[Exception] = None
+        timings['command_start'] = time.monotonic()
+
+        try:
+
+            await self.locator.scroll_into_view_if_needed(
+                timeout=command.timeout
+            )
+
+        except Exception as err:
+            
+            timings['command_end'] = time.monotonic()
+
+            return PlaywrightResult(
+                command='scroll_into_view_if_needed',
+                command_args=command,
+                metadata=self.metadata,
+                result=err,
+                error=str(err),
+                timings=timings,
+                url=self.url
+            )
+
+        timings['command_end'] = time.monotonic()
+
+        return PlaywrightResult(
+            command='scroll_into_view_if_needed',
+            command_args=command,
+            metadata=self.metadata,
+            result=None,
+            timings=timings,
+            url=self.url
+        )
+    
+    async def select_option(
+        self,
+        value: Optional[str | Sequence[str]] = None,
+        index: Optional[int | Sequence[int]] = None,
+        label: Optional[str | Sequence[str]] = None,
+        element: Optional[ElementHandle | Sequence[ElementHandle]] = None,
+        no_wait_after: Optional[bool] = None,
+        force: Optional[bool] = None,
+        timeout: Optional[int | float]=None,
+    ):
+            
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+    
+        command = SelectOptionCommand(
+            value=value,
+            index=index,
+            label=label,
+            element=element,
+            no_wait_after=no_wait_after,
+            force=force,
+            timeout=timeout
+        )
+    
+        result: List[str] = []
+        err: Optional[Exception] = None
+        timings['command_start'] = time.monotonic()
+
+        try:
+
+            await self.locator.select_option(
+                value=command.value,
+                index=command.index,
+                label=command.label,
+                element=command.element,
+                no_wait_after=command.no_wait_after,
+                force=command.force,
+                timeout=command.timeout
+            )
+
+        except Exception as err:
+                
+            timings['command_end'] = time.monotonic()
+
+            return PlaywrightResult(
+                command='select_option',
+                command_args=command,
+                metadata=self.metadata,
+                result=err,
+                error=str(err),
+                timings=timings
+            )
+        
+        timings['command_end'] = time.monotonic()
+
+        return PlaywrightResult(
+            command='select_option',
+            command_args=command,
+            result=result,
+            metadata=self.metadata,
+            timings=timings,
+            url=self.url
+        )
+    
+    async def select_text(
+        self,
+        force: Optional[bool] = None,
+        timeout: Optional[int | float]=None,
+    ):
+            
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+    
+        command = SelectTextCommand(
+            force=force,
+            timeout=timeout
+        )
+    
+        result: List[str] = []
+        err: Optional[Exception] = None
+        timings['command_start'] = time.monotonic()
+
+        try:
+
+            await self.locator.select_text(
+                force=command.force,
+                timeout=command.timeout
+            )
+
+        except Exception as err:
+                
+            timings['command_end'] = time.monotonic()
+
+            return PlaywrightResult(
+                command='select_text',
+                command_args=command,
+                metadata=self.metadata,
+                result=err,
+                error=str(err),
+                timings=timings
+            )
+        
+        timings['command_end'] = time.monotonic()
+
+        return PlaywrightResult(
+            command='select_text',
+            command_args=command,
+            result=result,
+            metadata=self.metadata,
+            timings=timings,
+            url=self.url
+        )
+
+    async def set_checked(
+        self,
+        checked: bool,
+        position: Optional[Position] = None,
+        force: Optional[bool] = None,
+        no_wait_after: Optional[bool] = None,
+        trial: Optional[bool] = None,
+        timeout: Optional[int | float] = None,
+    ):
+            
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+    
+        command = SetCheckedCommand(
+            checked=checked,
+            position=position,
+            force=force,
+            no_wait_after=no_wait_after,
+            trial=trial,
+            timeout=timeout
+        )
+    
+        err: Optional[Exception] = None
+        timings['command_start'] = time.monotonic()
+
+        try:
+
+            await self.locator.set_checked(
+                command.checked,
+                position=command.position,
+                force=command.force,
+                no_wait_after=command.no_wait_after,
+                trial=command.trial,
+                timeout=command.timeout
+            )
+
+        except Exception as err:
+                
+            timings['command_end'] = time.monotonic()
+
+            return PlaywrightResult(
+                command='set_checked',
+                command_args=command,
+                metadata=self.metadata,
+                result=err,
+                error=str(err),
+                timings=timings
+            )
+        
+        timings['command_end'] = time.monotonic()
+
+        return PlaywrightResult(
+            command='set_checked',
+            command_args=command,
+            result=None,
+            metadata=self.metadata,
+            timings=timings,
+            url=self.url
+        )
+    
+    async def set_input_files(
+        self,
+        files: str | Path | FilePayload | Sequence[str | Path] | Sequence[FilePayload],
+        no_wait_after: Optional[bool] = None,
+        timeout: Optional[int | float]=None
+    ):
+    
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        command = SetInputFilesCommand(
+            files=files,
+            no_wait_after=no_wait_after,
+            timeout=timeout
+        )
+
+        err: Exception = None
+        timings['command_start'] = time.monotonic()
+
+        try:
+            await self.locator.set_input_files(
+                command.files,
+                no_wait_after=command.no_wait_after,
+                timeout=command.timeout
+            )
+
+        except Exception as err:
+            
+            timings['command_end'] = time.monotonic()
+            
+            return PlaywrightResult(
+                command='set_content',
+                command_args=command,
+                metadata=self.metadata,
+                result=err,
+                error=str(err),
+                timings=timings,
+                url=self.url
+            )
+
+        timings['command_end'] = time.monotonic()
+
+        return PlaywrightResult(
+            command='set_content',
+            command_args=command,
+            metadata=self.metadata,
+            result=None,
+            timings=timings,
+            url=self.url
+        )
+    
+    async def tap(
+        self,
+        modifiers: Optional[
+            Sequence[
+                Literal[
+                    'Alt', 
+                    'Control', 
+                    'ControlOrMeta', 
+                    'Meta', 
+                    'Shift'
+                ]
+            ]
+        ] = None,
+        position: Optional[Position] = None,
+        force: Optional[bool] = None,
+        no_wait_after: Optional[bool] = None,
+        trial: Optional[bool] = None,
+        timeout: Optional[int | float]=None
+    ):
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+    
+        command = TapCommand(
+            modifiers=modifiers,
+            position=position,
+            force=force,
+            no_wait_after=no_wait_after,
+            trial=trial,
+            timeout=timeout
+        )
+    
+        err: Optional[Exception] = None
+        timings['command_start'] = time.monotonic()
+
+        try:
+
+            await self.locator.tap(
+                modifiers=command.modifiers,
+                position=command.position,
+                force=command.force,
+                no_wait_after=command.no_wait_after,
+                trial=command.trial,
+                timeout=command.timeout
+            )
+
+        except Exception as err:
+                
+            timings['command_end'] = time.monotonic()
+
+            return PlaywrightResult(
+                command='tap',
+                command_args=command,
+                metadata=self.metadata,
+                result=err,
+                error=str(err),
+                timings=timings
+            )
+        
+        timings['command_end'] = time.monotonic()
+
+        return PlaywrightResult(
+            command='tap',
+            command_args=command,
+            result=None,
+            metadata=self.metadata,
+            timings=timings,
+            url=self.url
+        )
+    
+    async def text_content(
+        self,
+        timeout: Optional[int | float]=None
+    ):
+    
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+    
+        command = DOMCommand(
+            timeout=timeout
+        )
+
+        result: Optional[str]=None
+        err: Optional[Exception] = None
+        timings['command_start'] = time.monotonic()
+
+        try:
+
+            result = await self.locator.text_content(
+                timeout=command.timeout
+            )
+
+        except Exception as err:
+                
+            timings['command_end'] = time.monotonic()
+
+            return PlaywrightResult(
+                command='text_content',
+                command_args=command,
+                metadata=self.metadata,
+                result=err,
+                error=str(err),
+                timings=timings
+            )
+        
+        timings['command_end'] = time.monotonic()
+
+        return PlaywrightResult(
+            command='text_content',
+            command_args=command,
+            result=result,
+            metadata=self.metadata,
+            timings=timings,
+            url=self.url
+        )
+    
+    async def uncheck(
+        self,
+        postion: Optional[Position]=None,
+        timeout: Optional[int | float]=None,
+        force: Optional[bool]=None,
+        no_wait_after: Optional[bool]=None,
+        trial: Optional[bool]=None
+    ):
+         
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        command = CheckCommand(
+            postion=postion,
+            no_wait_after=no_wait_after,
+            force=force,
+            trial=trial,
+            timeout=timeout,
+        )
+
+        err: Optional[Exception] = None
+        timings['command_start'] = time.monotonic()
+
+        try:
+
+            await self.locator.uncheck(
+                position=command.postion,
+                force=command.force,
+                no_wait_after=command.no_wait_after,
+                trial=command.trial,
+                timeout=command.timeout
+            )
+
+        except Exception as err:
+            
+            timings['command_end'] = time.monotonic()
+
+            return PlaywrightResult(
+                command='uncheck',
+                command_args=command,
+                metadata=self.metadata,
+                result=err,
+                error=str(err),
+                timings=timings,
+                url=self.url
+            )
+
+        timings['command_end'] = time.monotonic()
+        
+        return PlaywrightResult(
+            command='uncheck',
+            command_args=command,
+            metadata=self.metadata,
+            result=None,
+            timings=timings,
+            url=self.url
+        )
+    
+    async def wait_for(
+        self,
+        state: Literal['attached', 'detached', 'visible', 'hidden']='visible',
+        timeout: Optional[int | float]=None,
+    ):
+         
+        timings: Dict[
+            Literal[
+                'command_start',
+                'command_end'
+            ],
+            float
+        ] = {}
+
+        if timeout is None:
+            timeout = self.timeouts.request_timeout
+
+        command = WaitForCommand(
+            state=state,
+            timeout=timeout,
+        )
+
+        err: Optional[Exception] = None
+        timings['command_start'] = time.monotonic()
+
+        try:
+
+            await self.locator.wait_for(
+                state=command.state,
+                timeout=command.timeout
+            )
+
+        except Exception as err:
+            
+            timings['command_end'] = time.monotonic()
+
+            return PlaywrightResult(
+                command='wait_for',
+                command_args=command,
+                metadata=self.metadata,
+                result=err,
+                error=str(err),
+                timings=timings,
+                url=self.url
+            )
+
+        timings['command_end'] = time.monotonic()
+        
+        return PlaywrightResult(
+            command='wait_for',
+            command_args=command,
+            metadata=self.metadata,
+            result=None,
             timings=timings,
             url=self.url
         )

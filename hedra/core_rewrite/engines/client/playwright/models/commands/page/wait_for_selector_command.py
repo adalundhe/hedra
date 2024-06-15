@@ -12,6 +12,6 @@ class WaitForSelectorCommand(BaseModel):
             'hidden', 
             'visible'
         ]
-    ] = None
+    ] = 'visible'
     strict: Optional[StrictBool] = None
     timeout: StrictInt | StrictFloat

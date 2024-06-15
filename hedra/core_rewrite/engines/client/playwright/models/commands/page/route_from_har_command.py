@@ -22,9 +22,7 @@ class RouteFromHarCommand(BaseModel):
         Pattern[StrictStr] | 
         Callable[[StrictStr], StrictBool]
     ]=None
-    not_found: Optional[
-        Literal['abort', 'fallback']
-    ] = None
+    not_found: Literal['abort', 'fallback'] = 'abort'
     update: Optional[StrictBool] = None
     update_content: Optional[
         Literal['attach', 'embed']

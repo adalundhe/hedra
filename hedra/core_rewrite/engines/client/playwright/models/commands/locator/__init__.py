@@ -15,3 +15,16 @@ from .focus_command import FocusCommand as FocusCommand
 from .get_attribute_command import GetAttributeCommand as GetAttributeCommand
 from .highlight_command import HighlightCommand as HighlightCommand
 from .hover_command import HoverCommand as HoverCommand
+from .nth_command import NthCommand as NthCommand
+from .or_matching_command import OrMatchingCommand as OrMatchingCommand
+from .press_command import PressCommand as PressCommand
+from .press_sequentially_command import (
+    PressSequentiallyCommand as PressSequentiallyCommand,
+)
+from .scroll_into_view_if_needed import ScrollIntoViewIfNeeded as ScrollIntoViewIfNeeded
+from .select_option_command import SelectOptionCommand as SelectOptionCommand
+from .select_text_command import SelectTextCommand as SelectTextCommand
+from .set_checked_command import SetCheckedCommand as SetCheckedCommand
+from .set_input_files import SetInputFilesCommand as SetInputFilesCommand
+from .tap_command import TapCommand as TapCommand
+from .wait_for_command import WaitForCommand as WaitForCommand

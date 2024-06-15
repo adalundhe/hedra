@@ -2088,7 +2088,7 @@ class BrowserPage:
         self,
         har: Path | str,
         url: Optional[str | Pattern[str] | Callable[[str], bool]]=None,
-        not_found: Optional[Literal['abort', 'fallback']] = None,
+        not_found: Literal['abort', 'fallback'] = 'abort',
         update: Optional[bool] = None,
         update_content: Optional[Literal['attach', 'embed']] = None,
         update_mode: Optional[Literal['full', 'minimal']] = None,
@@ -2595,7 +2595,7 @@ class BrowserPage:
         selector: str,
         modifiers: Optional[Sequence[Literal['Alt', 'Control', 'ControlOrMeta', 'Meta', 'Shift']]]=None,
         delay: Optional[int | float]=None,
-        button: Optional[Literal['left', 'middle', 'right']]=None,
+        button: Literal['left', 'middle', 'right']='left',
         click_count: Optional[int]=None,
         postion: Optional[Position]=None,
         timeout: Optional[int | float]=None,
@@ -2682,7 +2682,7 @@ class BrowserPage:
         selector: str,
         modifiers: Optional[Sequence[Literal['Alt', 'Control', 'ControlOrMeta', 'Meta', 'Shift']]]=None,
         delay: Optional[int | float]=None,
-        button: Optional[Literal['left', 'middle', 'right']]=None,
+        button: Literal['left', 'middle', 'right']='left',
         postion: Optional[Position]=None,
         timeout: Optional[int | float]=None,
         force: Optional[bool]=None,
@@ -4319,6 +4319,9 @@ class BrowserPage:
 
             await self.page.press(
                 command.selector,
+                command.key,
+                delay=command.delay,
+                no_wait_after=command.no_wait_after,
                 strict=command.strict,
                 timeout=command.timeout
             )
@@ -4670,7 +4673,7 @@ class BrowserPage:
     ):
             
         if timeout is None:
-                timeout = self.timeouts.request_timeout
+            timeout = self.timeouts.request_timeout
 
         timings: Dict[
             Literal[
@@ -4733,7 +4736,7 @@ class BrowserPage:
     ):
             
         if timeout is None:
-                timeout = self.timeouts.request_timeout
+            timeout = self.timeouts.request_timeout
 
         timings: Dict[
             Literal[
@@ -4800,7 +4803,7 @@ class BrowserPage:
     ):
         
         if timeout is None:
-                timeout = self.timeouts.request_timeout
+            timeout = self.timeouts.request_timeout
 
         timings: Dict[
             Literal[
@@ -4856,14 +4859,14 @@ class BrowserPage:
     async def screenshot(
         self,
         path: str | Path,
-        image_type: Optional[Literal['jpeg', 'png']] = None,
+        image_type: Literal['jpeg', 'png'] = 'png',
         quality: Optional[int]= None,
         omit_background: Optional[bool] = None,
         full_page: Optional[bool] = None,
         clip: Optional[FloatRect] = None,
-        animations: Optional[Literal['allow', 'disabled']] = None,
-        caret: Optional[Literal['hide', 'initial']] = None,
-        scale: Optional[Literal['css', 'device']] = None,
+        animations: Literal['allow', 'disabled'] = 'allow',
+        caret: Literal['hide', 'initial'] = 'hide',
+        scale: Literal['css', 'device'] = 'device',
         mask: Optional[Sequence[Locator]] = None,
         mask_color: Optional[str] = None,
         style: Optional[str] = None,
@@ -4871,7 +4874,7 @@ class BrowserPage:
     ):
 
         if timeout is None:
-                timeout = self.timeouts.request_timeout
+            timeout = self.timeouts.request_timeout
 
         timings: Dict[
             Literal[
@@ -4960,7 +4963,7 @@ class BrowserPage:
     ):
             
         if timeout is None:
-                timeout = self.timeouts.request_timeout
+            timeout = self.timeouts.request_timeout
 
         timings: Dict[
             Literal[
@@ -4993,7 +4996,7 @@ class BrowserPage:
 
             await self.page.select_option(
                 command.selector,
-                value=command.validate,
+                value=command.value,
                 index=command.index,
                 label=command.label,
                 element=command.element,
@@ -5040,7 +5043,7 @@ class BrowserPage:
     ):
             
         if timeout is None:
-                timeout = self.timeouts.request_timeout
+            timeout = self.timeouts.request_timeout
 
         timings: Dict[
             Literal[
@@ -5110,7 +5113,7 @@ class BrowserPage:
     ):
 
         if timeout is None:
-                timeout = self.timeouts.request_timeout
+            timeout = self.timeouts.request_timeout
 
         timings: Dict[
             Literal[
@@ -5166,7 +5169,7 @@ class BrowserPage:
     ):
 
         if timeout is None:
-                timeout = self.timeouts.request_timeout
+            timeout = self.timeouts.request_timeout
 
         timings: Dict[
             Literal[
@@ -5224,7 +5227,7 @@ class BrowserPage:
 
         
         if timeout is None:
-                timeout = self.timeouts.request_timeout
+            timeout = self.timeouts.request_timeout
 
         timings: Dict[
             Literal[
@@ -5301,7 +5304,7 @@ class BrowserPage:
     ):
 
         if timeout is None:
-                timeout = self.timeouts.request_timeout
+            timeout = self.timeouts.request_timeout
 
         timings: Dict[
             Literal[
@@ -5373,7 +5376,7 @@ class BrowserPage:
     ):
     
         if timeout is None:
-                timeout = self.timeouts.request_timeout
+            timeout = self.timeouts.request_timeout
 
         timings: Dict[
             Literal[
@@ -5434,7 +5437,7 @@ class BrowserPage:
     ):
         
         if timeout is None:
-                timeout = self.timeouts.request_timeout
+            timeout = self.timeouts.request_timeout
 
         timings: Dict[
             Literal[
@@ -5497,7 +5500,7 @@ class BrowserPage:
     ):
         
         if timeout is None:
-                timeout = self.timeouts.request_timeout
+            timeout = self.timeouts.request_timeout
 
         timings: Dict[
             Literal[
@@ -5825,7 +5828,7 @@ class BrowserPage:
     async def wait_for_selector(
         self,
         selector: str,
-        state: Optional[Literal['attached', 'detached', 'hidden', 'visible']] = None,
+        state: Literal['attached', 'detached', 'hidden', 'visible'] = 'visible',
         strict: Optional[bool] = None,
         timeout: Optional[int | float]=None,
     ):
