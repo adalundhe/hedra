@@ -1,6 +1,5 @@
 
 import asyncio
-import time
 from collections import deque
 from typing import (
     Any,
@@ -16,12 +15,12 @@ from typing import (
 from playwright.async_api import (
     BrowserContext,
     Geolocation,
-    Page,
     async_playwright,
 )
 
 from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
+from .browser_page import BrowserPage
 from .browser_session import BrowserSession
 from .models.commands.page import CloseCommand
 from .models.results import PlaywrightResult
@@ -43,17 +42,36 @@ class MercurySyncPlaywrightConnection:
         self.sem = asyncio.Semaphore(self.pool_size)
         self.timeouts = Timeouts()
         self.results: List[PlaywrightResult] = []
-        self._active: Deque[Tuple[
-            BrowserSession,
-            Dict[
-                Literal[
-                    'command_start',
-                    'command_end'
-                ],
-                float
-            ],
-            Page
-        ]] = deque()
+        self._active: Deque[
+            Tuple[
+                BrowserSession,
+                BrowserPage
+            ]
+        ] = deque()
+
+    async def begin(self):
+        await self.sem.acquire()
+
+        session = self.sessions.popleft()
+        page = await session.next_page()
+
+        self._active.append((
+            session,
+            None
+        ))
+
+        return page
+
+    async def end(
+        self,
+        page: BrowserPage
+    ):
+        session, _ = self._active.popleft()
+
+        await session.return_page(page)
+        self.sessions.append(session)
+
+        self.sem.release()
 
     async def __aenter__(self):
         await self.sem.acquire()
@@ -61,30 +79,17 @@ class MercurySyncPlaywrightConnection:
         session = self.sessions.popleft()
         page = await session.next_page()
 
-        timings: Dict[
-            Literal[
-                'command_start',
-                'command_end'
-            ],
-            float
-        ] = {}
-
-        timings['command_start'] = time.monotonic()
-
         self._active.append((
             session,
-            timings,
             page
         ))
 
         return page
     
     async def __aexit__(self,  exc_t: Type[Exception], exc_v: Exception, exc_tb: str):
-        session, timings, page = self._active.popleft()
+        session, page = self._active.popleft()
 
-        timings['command_start'] = time.monotonic()
-
-        session.return_page(page)
+        await session.return_page(page)
         self.sessions.append(session)
 
         self.sem.release()
