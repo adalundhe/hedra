@@ -43,10 +43,7 @@ class MercurySyncPlaywrightConnection:
         self.timeouts = Timeouts()
         self.results: List[PlaywrightResult] = []
         self._active: Deque[
-            Tuple[
-                BrowserSession,
-                BrowserPage
-            ]
+            Tuple[BrowserSession, BrowserPage]
         ] = deque()
 
     async def begin(self):
@@ -57,16 +54,13 @@ class MercurySyncPlaywrightConnection:
 
         self._active.append((
             session,
-            None
+            page
         ))
 
         return page
 
-    async def end(
-        self,
-        page: BrowserPage
-    ):
-        session, _ = self._active.popleft()
+    async def end(self):
+        session, page = self._active.popleft()
 
         session.return_page(page)
         self.sessions.append(session)
