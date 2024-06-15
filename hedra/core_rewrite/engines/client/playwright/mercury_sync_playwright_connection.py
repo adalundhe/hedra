@@ -68,7 +68,7 @@ class MercurySyncPlaywrightConnection:
     ):
         session, _ = self._active.popleft()
 
-        await session.return_page(page)
+        session.return_page(page)
         self.sessions.append(session)
 
         self.sem.release()
@@ -89,7 +89,7 @@ class MercurySyncPlaywrightConnection:
     async def __aexit__(self,  exc_t: Type[Exception], exc_v: Exception, exc_tb: str):
         session, page = self._active.popleft()
 
-        await session.return_page(page)
+        session.return_page(page)
         self.sessions.append(session)
 
         self.sem.release()
