@@ -41,6 +41,7 @@ from playwright.async_api import (
 from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
 from .browser_frame import BrowserFrame
+from .browser_keyboard import BrowserKeyboard
 from .browser_mouse import BrowserMouse
 from .models.browser import BrowserMetadata
 from .models.commands.page import (
@@ -128,6 +129,15 @@ class BrowserPage:
         self.url = self.page.url
         self.timeouts = timeouts
         self.metadata = metadata
+
+    @property
+    def keyboard(self):
+        return BrowserKeyboard(
+            self.page.keyboard,
+            self.timeouts,
+            self.metadata,
+            self.page.url
+        )
 
     @property
     def mouse(self):
