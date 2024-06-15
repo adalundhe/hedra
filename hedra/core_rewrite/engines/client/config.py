@@ -25,6 +25,7 @@ class Config:
         self.persona_type = kwargs.get('persona_type', 'default')
         self.total_time = parsed_time.time
         self.vus = kwargs.get('vus', 1000)
+        self.pages: int = kwargs.get('pages', 1)
         self.batch_interval = kwargs.get('batch_interval')
         self.action_interval = kwargs.get('action_interval', 0)
         self.optimize_iterations = kwargs.get('optimize_iterations', 0)

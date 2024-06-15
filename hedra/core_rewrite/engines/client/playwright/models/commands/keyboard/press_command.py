@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import (
     BaseModel,
     StrictFloat,
@@ -8,5 +10,5 @@ from pydantic import (
 
 class PressCommand(BaseModel):
     key: StrictStr
-    delay: StrictInt | StrictFloat
+    delay: Optional[StrictInt | StrictFloat]=None
     timeout: StrictInt | StrictFloat
