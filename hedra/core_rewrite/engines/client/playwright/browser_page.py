@@ -41,6 +41,7 @@ from playwright.async_api import (
 from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
 from .browser_frame import BrowserFrame
+from .browser_js_handle import BrowserJSHandle
 from .browser_keyboard import BrowserKeyboard
 from .browser_mouse import BrowserMouse
 from .browser_touchscreen import BrowserTouchscreen
@@ -3259,7 +3260,12 @@ class BrowserPage:
         return PlaywrightResult(
             command='evaluate_handle',
             command_args=command,
-            result=result,
+            result=BrowserJSHandle(
+                result,
+                self.timeouts,
+                self.metadata,
+                self.url
+            ),
             metadata=self.metadata,
             timings=timings,
             url=self.url

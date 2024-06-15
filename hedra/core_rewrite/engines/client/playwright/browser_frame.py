@@ -22,6 +22,7 @@ from playwright.async_api import (
 
 from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
+from .browser_js_handle import BrowserJSHandle
 from .models.browser import BrowserMetadata
 from .models.commands.frame import FrameElementCommand
 from .models.commands.page import (
@@ -485,7 +486,12 @@ class BrowserFrame:
         return PlaywrightResult(
             command='evaluate_handle',
             command_args=command,
-            result=result,
+            result=BrowserJSHandle(
+                result,
+                self.timeouts,
+                self.metadata,
+                self.url
+            ),
             metadata=self.metadata,
             timings=timings,
             source='frame',
