@@ -10,6 +10,7 @@ class PlaywrightResult(BaseModel, Generic[T]):
     command: StrictStr
     command_args: BaseModel
     metadata: BrowserMetadata
+    url: StrictStr
     result: T
     error: Optional[StrictStr]=None
     timings: Dict[
@@ -23,6 +24,7 @@ class PlaywrightResult(BaseModel, Generic[T]):
         'command_end': 0
     }
     frame: Optional[StrictStr]=None
+    source: Literal['page', 'frame', 'mouse']='page'
 
     class Config:
         arbitrary_types_allowed=True

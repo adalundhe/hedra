@@ -23,14 +23,14 @@ from playwright.async_api import (
 from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
 from .models.browser import BrowserMetadata
-from .models.commands import (
+from .models.commands.frame import FrameElementCommand
+from .models.commands.page import (
     AddScriptTagCommand,
     AddStyleTagCommand,
     ContentCommand,
     DOMCommand,
     DragAndDropCommand,
     EvaluateCommand,
-    FrameElementCommand,
     FrameLocatorCommand,
     GetByRoleCommand,
     GetByTestIdCommand,
@@ -56,6 +56,7 @@ class BrowserFrame:
     ) -> None:
         self.frame = frame
         self.name = frame.name
+        self.url = frame.url
         self.timeouts = timeouts
         self.metadata = metadata
 
@@ -114,7 +115,9 @@ class BrowserFrame:
                 frame=self.name,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -125,7 +128,9 @@ class BrowserFrame:
             metadata=self.metadata,
             frame=self.name,
             result=result,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def add_style_tag(
@@ -181,7 +186,9 @@ class BrowserFrame:
                 frame=self.name,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -192,7 +199,9 @@ class BrowserFrame:
             metadata=self.metadata,
             frame=self.name,
             result=result,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def content(
@@ -240,7 +249,9 @@ class BrowserFrame:
                 frame=self.name,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -251,7 +262,9 @@ class BrowserFrame:
             result=result,
             metadata=self.metadata,
             frame=self.name,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def drag_and_drop(
@@ -322,7 +335,9 @@ class BrowserFrame:
                 frame=self.name,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -334,7 +349,9 @@ class BrowserFrame:
             metadata=self.metadata,
             frame=self.name,
             result=None,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def evaluate(
@@ -389,7 +406,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -399,7 +418,9 @@ class BrowserFrame:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def evaluate_handle(
@@ -454,7 +475,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -464,7 +487,9 @@ class BrowserFrame:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def frame_element(
@@ -512,7 +537,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -522,7 +549,9 @@ class BrowserFrame:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def frame_locator(
@@ -570,7 +599,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -580,7 +611,9 @@ class BrowserFrame:
             command_args=command,
             metadata=self.metadata,
             result=result,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def get_by_alt_text(
@@ -631,7 +664,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -641,7 +676,9 @@ class BrowserFrame:
             command_args=command,
             metadata=self.metadata,
             result=result,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def get_by_label(
@@ -692,7 +729,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -702,7 +741,9 @@ class BrowserFrame:
             command_args=command,
             metadata=self.metadata,
             result=result,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
         
     async def get_by_placeholder(
@@ -754,7 +795,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -764,7 +807,9 @@ class BrowserFrame:
             command_args=command,
             metadata=self.metadata,
             result=result,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def get_by_role(
@@ -838,7 +883,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -848,7 +895,9 @@ class BrowserFrame:
             command_args=command,
             metadata=self.metadata,
             result=result,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
         
     async def get_by_test_id(
@@ -897,7 +946,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -958,7 +1009,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -968,7 +1021,9 @@ class BrowserFrame:
             command_args=command,
             metadata=self.metadata,
             result=result,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def get_by_title(
@@ -1019,7 +1074,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -1029,7 +1086,9 @@ class BrowserFrame:
             command_args=command,
             metadata=self.metadata,
             result=result,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def goto(
@@ -1086,7 +1145,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -1096,7 +1157,9 @@ class BrowserFrame:
             command_args=command,
             metadata=self.metadata,
             result=result,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def is_enabled(
@@ -1149,7 +1212,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -1159,7 +1224,9 @@ class BrowserFrame:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def locator(
@@ -1223,7 +1290,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -1233,7 +1302,9 @@ class BrowserFrame:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def set_content(
@@ -1288,7 +1359,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -1298,7 +1371,9 @@ class BrowserFrame:
             command_args=command,
             metadata=self.metadata,
             result=None,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def title(
@@ -1356,7 +1431,9 @@ class BrowserFrame:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def wait_for_function(
@@ -1409,7 +1486,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -1419,7 +1498,9 @@ class BrowserFrame:
             command_args=command,
             metadata=self.metadata,
             result=result,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
         
     async def wait_for_load_state(
@@ -1472,7 +1553,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()
@@ -1482,7 +1565,9 @@ class BrowserFrame:
             command_args=command,
             metadata=self.metadata,
             result=None,
-            timings=timings
+            timings=timings,
+            source='frame',
+            url=self.url
         )
     
     async def wait_for_url(
@@ -1539,7 +1624,9 @@ class BrowserFrame:
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
-                timings=timings
+                timings=timings,
+                source='frame',
+                url=self.url
             )
 
         timings['command_end'] = time.monotonic()

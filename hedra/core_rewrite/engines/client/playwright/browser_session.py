@@ -1,9 +1,11 @@
 import asyncio
-from collections import deque
-from typing import Any, Deque, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from playwright.async_api import Browser, BrowserContext, Geolocation, Page, Playwright
 
+from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
+
+from .browser_page import BrowserPage
 from .models.browser import BrowserMetadata
 
 
@@ -12,17 +14,17 @@ class BrowserSession:
     def __init__(
         self,
         playwright: Playwright,
-        pages: int
+        pool_size: int,
+        timeouts: Timeouts
     ) -> None:
         self.playwright = playwright
-        self.pages = pages
+        self.pool_size = pool_size
         self.browser: Browser = None
         self.context: BrowserContext = None
-        self.pages: Deque[Page] = deque()
+        self.pages: asyncio.Queue[BrowserPage] = asyncio.Queue(maxsize=pool_size)
         self.metadata: BrowserMetadata = None
         self.config: Dict[str, Any] = {}
-
-        self.sem = asyncio.Semaphore(pages)
+        self.timeouts = timeouts
 
     async def open(
         self,
@@ -102,23 +104,53 @@ class BrowserSession:
                 self.browser.new_context(),
                 timeout=timeout
             )
-
-        self.pages.extend(
-            await asyncio.gather(*[
-                asyncio.wait_for(
-                    self.context.new_page(),
-                    timeout=timeout
-                ) for _ in range(self.pages)
-            ])
-        )
+        
+        await asyncio.gather(*[
+            self.pages.put(
+                BrowserPage(
+                    asyncio.wait_for(
+                        self.context.new_page(),
+                        timeout=timeout
+                    ),
+                    self.timeouts,
+                    self.metadata
+                )
+            ) for _ in range(self.pages)
+        ])
 
     async def next_page(self):
-        await self.sem.acquire()
-        return self.pages.popleft()
+        return await self.pages.get()
     
+    async def close(
+        self,
+        run_before_unload: Optional[bool] = None, 
+        reason: Optional[str] = None,
+        timeout: Optional[int | float]=None      
+    ):
+        await asyncio.gather(*[
+            self._close(
+                self.pages.get_nowait(),
+                run_before_unload=run_before_unload,
+                reason=reason,
+                timeout=timeout
+            ) for _ in range(self.pool_size)
+        ])
+
+    async def _close(
+        self,
+        page: BrowserPage,
+        run_before_unload: Optional[bool] = None, 
+        reason: Optional[str] = None,
+        timeout: Optional[int | float]=None  
+    ):
+        await page.close(
+            run_before_unload=run_before_unload,
+            reason=reason,
+            timeout=timeout
+        )
+        
     def return_page(
         self,
         page: Page
     ):
-        self.pages.append(page)
-        self.sem.release()
+        self.pages.put_nowait(page)
