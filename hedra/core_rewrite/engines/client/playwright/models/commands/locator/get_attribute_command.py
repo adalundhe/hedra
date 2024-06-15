@@ -1,9 +1,12 @@
+
 from pydantic import (
     BaseModel,
     StrictFloat,
     StrictInt,
+    StrictStr,
 )
 
 
-class WaitForTimeoutCommand(BaseModel):
+class GetAttributeCommand(BaseModel):
+    name: StrictStr
     timeout: StrictInt | StrictFloat

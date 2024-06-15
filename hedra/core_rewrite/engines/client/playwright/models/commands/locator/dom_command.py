@@ -5,5 +5,5 @@ from pydantic import (
 )
 
 
-class WaitForTimeoutCommand(BaseModel):
+class DOMCommand(BaseModel):
     timeout: StrictInt | StrictFloat

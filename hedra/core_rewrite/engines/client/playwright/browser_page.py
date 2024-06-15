@@ -817,7 +817,8 @@ class BrowserPage:
             command_args=command,
             metadata=self.metadata,
             result=result,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def get_by_alt_text(
@@ -1648,7 +1649,8 @@ class BrowserPage:
             command_args=command,
             metadata=self.metadata,
             result=None,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def once(
@@ -2078,7 +2080,8 @@ class BrowserPage:
             command_args=command,
             metadata=self.metadata,
             result=None,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def route_from_har(
@@ -2281,7 +2284,8 @@ class BrowserPage:
             command_args=command,
             metadata=self.metadata,
             result=None,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def set_viewport_size(
@@ -2509,7 +2513,8 @@ class BrowserPage:
             command_args=command,
             result=None,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def check(
@@ -2581,7 +2586,8 @@ class BrowserPage:
             command_args=command,
             metadata=self.metadata,
             result=None,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def click(
@@ -2667,7 +2673,8 @@ class BrowserPage:
             command_args=command,
             metadata=self.metadata,
             result=None,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def double_click(
@@ -2720,9 +2727,9 @@ class BrowserPage:
             await self.page.dblclick(
                 command.selector,
                 position=command.postion,
-                modifiers=modifiers,
-                delay=delay,
-                button=button,
+                modifiers=command.modifiers,
+                delay=command.delay,
+                button=command.button,
                 force=command.force,
                 no_wait_after=command.no_wait_after,
                 strict=command.strict,
@@ -2751,7 +2758,8 @@ class BrowserPage:
             command_args=command,
             metadata=self.metadata,
             result=None,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def dispatch_event(
@@ -2760,7 +2768,7 @@ class BrowserPage:
         event_type: str,
         event_init: Optional[Dict[str, Any]]=None,
         strict: Optional[bool]=None,
-        timeout: int | float=None
+        timeout: Optional[int | float] = None
     ):
         
     
@@ -2820,7 +2828,8 @@ class BrowserPage:
             command_args=command,
             metadata=self.metadata,
             result=None,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def drag_and_drop(
@@ -2900,7 +2909,8 @@ class BrowserPage:
             command_args=command,
             metadata=self.metadata,
             result=None,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def bring_to_front(
@@ -2957,7 +2967,8 @@ class BrowserPage:
             command_args=command,
             metadata=self.metadata,
             result=None,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def evaluate_on_selector(
@@ -3028,7 +3039,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def evaluate_on_selectors_all(
@@ -3097,7 +3109,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def evaluate(
@@ -3162,7 +3175,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def evaluate_handle(
@@ -3227,7 +3241,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def expect_console_message(
@@ -3382,7 +3397,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def expect_event(
@@ -3463,7 +3479,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def expect_file_chooser(
@@ -3540,7 +3557,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def expect_navigation(
@@ -3608,7 +3626,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def expect_popup(
@@ -3685,7 +3704,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def expect_request(
@@ -3764,7 +3784,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def expect_request_finished(
@@ -3921,7 +3942,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
     
     async def focus(
@@ -3983,7 +4005,8 @@ class BrowserPage:
             command_args=command,
             metadata=self.metadata,
             result=None,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def hover(
@@ -4060,7 +4083,8 @@ class BrowserPage:
             command_args=command,
             metadata=self.metadata,
             result=None,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
     
     async def inner_html(
@@ -4123,7 +4147,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def inner_text(
@@ -4186,7 +4211,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def input_value(
@@ -4249,7 +4275,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def press(
@@ -4317,7 +4344,8 @@ class BrowserPage:
             command_args=command,
             metadata=self.metadata,
             result=None,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def is_enabled(
@@ -4380,7 +4408,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def is_hidden(
@@ -4443,7 +4472,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def is_visible(
@@ -4506,7 +4536,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def is_checked(
@@ -4569,7 +4600,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def content(
@@ -4626,7 +4658,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def query_selector(
@@ -5592,7 +5625,8 @@ class BrowserPage:
             command_args=command,
             metadata=self.metadata,
             result=None,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def wait_for_event(
@@ -5969,7 +6003,8 @@ class BrowserPage:
             command_args=command,
             metadata=self.metadata,
             result=None,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def get_attribute(
@@ -6237,7 +6272,8 @@ class BrowserPage:
             command_args=command,
             result=result,
             metadata=self.metadata,
-            timings=timings
+            timings=timings,
+            url=self.url
         )
 
     async def close(

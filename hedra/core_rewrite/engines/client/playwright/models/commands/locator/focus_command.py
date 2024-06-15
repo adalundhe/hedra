@@ -1,3 +1,4 @@
+
 from pydantic import (
     BaseModel,
     StrictFloat,
@@ -5,5 +6,5 @@ from pydantic import (
 )
 
 
-class WaitForTimeoutCommand(BaseModel):
+class FocusCommand(BaseModel):
     timeout: StrictInt | StrictFloat
