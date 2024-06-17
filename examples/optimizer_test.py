@@ -54,6 +54,7 @@ class Test(Workflow):
             params={"sort": True},
             auth=("user", "pass"),
             data={"test": "this"},
+            redirects=4,
         )
 
     @step("two", "three")

@@ -20,16 +20,32 @@ import orjson
 from google.protobuf.message import Message
 from graphql import Source, parse, print_ast
 
-from hedra.core_rewrite.engines.client.graphql import MercurySyncGraphQLConnection
+from hedra.core_rewrite.engines.client.graphql import (
+    MercurySyncGraphQLConnection,
+    OptimizedGraphQLRequest,
+)
 from hedra.core_rewrite.engines.client.graphql_http2 import (
     MercurySyncGraphQLHTTP2Connection,
+    OptimizedGraphQLHTTP2Request,
 )
-from hedra.core_rewrite.engines.client.grpc import MercurySyncGRPCConnection
-from hedra.core_rewrite.engines.client.http import MercurySyncHTTPConnection
-from hedra.core_rewrite.engines.client.http2 import MercurySyncHTTP2Connection
+from hedra.core_rewrite.engines.client.grpc import (
+    MercurySyncGRPCConnection,
+    OptimizedGRPCRequest,
+)
+from hedra.core_rewrite.engines.client.http import (
+    MercurySyncHTTPConnection,
+    OptimizedHTTPRequest,
+)
+from hedra.core_rewrite.engines.client.http2 import (
+    MercurySyncHTTP2Connection,
+    OptimizedHTTP2Request,
+)
 from hedra.core_rewrite.engines.client.http2.fast_hpack import Encoder
 from hedra.core_rewrite.engines.client.http2.settings import Settings
-from hedra.core_rewrite.engines.client.http3 import MercurySyncHTTP3Connection
+from hedra.core_rewrite.engines.client.http3 import (
+    MercurySyncHTTP3Connection,
+    OptimizedHTTP3Request,
+)
 from hedra.core_rewrite.engines.client.http3.protocols.quic_protocol import (
     FrameType,
     encode_frame,
@@ -40,8 +56,14 @@ from hedra.core_rewrite.engines.client.shared.protocols import (
     WEBSOCKETS_VERSION,
 )
 from hedra.core_rewrite.engines.client.shared.request_types_map import RequestTypesMap
-from hedra.core_rewrite.engines.client.udp import MercurySyncUDPConnection
-from hedra.core_rewrite.engines.client.websocket import MercurySyncWebsocketConnection
+from hedra.core_rewrite.engines.client.udp import (
+    MercurySyncUDPConnection,
+    OptimizedUDPRequest,
+)
+from hedra.core_rewrite.engines.client.websocket import (
+    MercurySyncWebsocketConnection,
+    OptimizedWebsocketRequest,
+)
 from hedra.core_rewrite.engines.client.websocket.models.websocket.utils import (
     create_sec_websocket_key,
     pack_hostname,
@@ -56,6 +78,7 @@ from .resolved_data import ResolvedData
 from .resolved_headers import ResolvedHeaders
 from .resolved_method import ResolvedMethod
 from .resolved_params import ResolvedParams
+from .resolved_redirects import ResolvedRedirects
 from .resolved_url import ResolvedURL
 
 
@@ -85,10 +108,37 @@ class CallResolver:
             "params": self._set_params,
             "headers": self._set_headers,
             "data": self._set_data,
+            "redirects": self._set_redirects,
         }
 
         self._request_types_map = RequestTypesMap()
-        self._resolved: Dict[str, Dict[str, ResolvedArg]] = defaultdict(dict)
+        self._resolved: Dict[
+            int,
+            Dict[
+                Literal[
+                    "url",
+                    "method",
+                    "auth",
+                    "cookies",
+                    "params",
+                    "headers",
+                    "data",
+                    "redirects",
+                ],
+                ResolvedArg,
+            ],
+        ] = defaultdict(dict)
+        self._optimized_actions: Dict[
+            RequestType,
+            OptimizedGraphQLRequest
+            | OptimizedGraphQLHTTP2Request
+            | OptimizedGRPCRequest
+            | OptimizedHTTPRequest
+            | OptimizedHTTP2Request
+            | OptimizedHTTP3Request
+            | OptimizedUDPRequest
+            | OptimizedWebsocketRequest,
+        ] = {}
 
         self._connections: Dict[
             RequestType,
@@ -129,6 +179,7 @@ class CallResolver:
                 "headers",
                 "auth",
                 "cookies",
+                "redirects",
             ],
             List[Tuple[CallArg, Callable[..., None]]],
         ] = defaultdict(list)
@@ -142,16 +193,17 @@ class CallResolver:
                 "headers",
                 "auth",
                 "cookies",
+                "redirects",
             ],
             List[str],
         ] = defaultdict(list)
 
     def __iter__(self):
-        for call_id, args in self._resolved.items():
-            yield call_id, args
+        for call_id, action in self._optimized_actions.items():
+            yield call_id, action
 
     def __getitem__(self, call_id: str):
-        return self._resolved.get(call_id)
+        return self._optimized_actions.get(call_id)
 
     def get_engine(self, call_id: str):
         return self._call_engine_types.get(call_id)
@@ -177,70 +229,147 @@ class CallResolver:
             ]
         )
 
-        call_ids = set(self._args)
-
-        for call_id in call_ids:
+        for call_id in self._args:
             # call_engine_type = self.get_engine(call_id)
             call_workflow = self.get_workflow(call_id)
 
             if call_workflow:
-                arg_set: Dict[
-                    Literal[
-                        "method",
-                        "url",
-                        "data",
-                        "params",
-                        "headers",
-                        "auth",
-                        "cookies",
-                    ],
-                    ResolvedArg[
-                        ResolvedURL
-                        | ResolvedHeaders
-                        | ResolvedAuth
-                        | ResolvedParams
-                        | ResolvedData
-                    ],
-                ] = self._resolved[call_id]
+                method: ResolvedArg[ResolvedMethod] = self._resolved[call_id]["method"]
+                has_headers = call_id in self._available_optimizations["headers"]
+                has_optimized_headers = self._resolved[call_id].get("headers")
+                headers_request_type = self._request_types_map[method.arg.engine]
 
-                call_ids: List[int] = []
+                optimize_default_headers = (
+                    has_headers is False
+                    and has_optimized_headers is None
+                    and headers_request_type != RequestType.UDP
+                )
 
-                call_ids.extend(self._args.keys())
-                call_ids.extend(self._kwargs.keys())
-
-                call_ids = list(set(call_ids))
-
-                for call_id in call_ids:
-                    method: ResolvedArg[ResolvedMethod] = self._resolved[call_id][
-                        "method"
-                    ]
-                    has_headers = call_id in self._available_optimizations["headers"]
-                    has_optimized_headers = self._resolved[call_id].get("headers")
-                    headers_request_type = self._request_types_map[method.arg.engine]
-
-                    optimize_default_headers = (
-                        has_headers is False
-                        and has_optimized_headers is None
-                        and headers_request_type != RequestType.UDP
+                if optimize_default_headers:
+                    self._set_headers(
+                        CallArg(
+                            call_name=method.arg.call_name,
+                            call_id=method.arg.call_id,
+                            method=method.arg.method,
+                            arg_name="headers",
+                            arg_type="kwarg",
+                            workflow=method.arg.workflow,
+                            engine=method.arg.engine,
+                            value={},
+                            data_type="static",
+                            timeouts=method.arg.timeouts,
+                        )
                     )
 
-                    if optimize_default_headers:
-                        self._set_headers(
-                            CallArg(
-                                call_name=method.arg.call_name,
-                                call_id=method.arg.call_id,
-                                method=method.arg.method,
-                                arg_name="headers",
-                                arg_type="kwarg",
-                                workflow=method.arg.workflow,
-                                engine=method.arg.engine,
-                                value={},
-                                data_type="static",
-                                timeouts=method.arg.timeouts,
-                            )
+                    self._available_optimizations["headers"].append(call_id)
+
+                request_type = self._request_types_map[method.arg.engine]
+
+                resolved_data = self._resolved[call_id]
+
+                method: ResolvedArg[ResolvedMethod] = resolved_data.get("method")
+                url: ResolvedArg[ResolvedURL] = resolved_data.get("url")
+                params: ResolvedArg[ResolvedParams] = resolved_data.get("params")
+                auth: ResolvedArg[ResolvedAuth] = resolved_data.get("auth")
+                headers: ResolvedArg[ResolvedHeaders] = resolved_data.get("headers")
+                data: ResolvedArg[ResolvedData] = resolved_data.get("data")
+                redirects: ResolvedArg[ResolvedRedirects] = resolved_data.get(
+                    "redirects"
+                )
+
+                match request_type:
+                    case RequestType.GRAPHQL:
+                        self._optimized_actions[call_id] = OptimizedGraphQLRequest(
+                            call_id=call_id,
+                            method=method.value.method,
+                            url=url.value.url if url else None,
+                            encoded_params=params.value.params if params else None,
+                            encoded_auth=auth.value.auth if auth else None,
+                            encoded_headers=headers.value.headers if headers else None,
+                            encoded_data=data.value.data if data else None,
+                            redirects=redirects.value.redirects if redirects else 3,
                         )
 
-                        self._available_optimizations["headers"].append(call_id)
+                    case RequestType.GRAPHQL_HTTP2:
+                        self._optimized_actions[call_id] = OptimizedGraphQLHTTP2Request(
+                            call_id=call_id,
+                            method=method.value.method,
+                            url=url.value.url if url else None,
+                            encoded_params=params.value.params if params else None,
+                            encoded_auth=auth.value.auth if auth else None,
+                            encoded_headers=headers.value.headers if headers else None,
+                            encoded_data=data.value.data if data else None,
+                            redirects=redirects.value.redirects if redirects else 3,
+                        )
+
+                    case RequestType.GRPC:
+                        self._optimized_actions[call_id] = OptimizedGRPCRequest(
+                            call_id=call_id,
+                            method=method.value.method,
+                            url=url.value.url if url else None,
+                            encoded_headers=headers.value.headers if headers else None,
+                            encoded_data=data.value.data if data else None,
+                            redirects=redirects.value.redirects if redirects else 3,
+                        )
+
+                    case RequestType.HTTP:
+                        self._optimized_actions[call_id] = OptimizedHTTPRequest(
+                            call_id=call_id,
+                            method=method.value.method,
+                            url=url.value.url if url else None,
+                            encoded_params=params.value.params if params else None,
+                            encoded_auth=auth.value.auth if auth else None,
+                            encoded_headers=headers.value.headers if headers else None,
+                            encoded_data=data.value.data if data else None,
+                            redirects=redirects.value.redirects if redirects else 3,
+                        )
+
+                    case RequestType.HTTP2:
+                        self._optimized_actions[call_id] = OptimizedHTTP2Request(
+                            call_id=call_id,
+                            method=method.value.method,
+                            url=url.value.url if url else None,
+                            encoded_params=params.value.params if params else None,
+                            encoded_auth=auth.value.auth if auth else None,
+                            encoded_headers=headers.value.headers if headers else None,
+                            encoded_data=data.value.data if data else None,
+                            redirects=redirects.value.redirects if redirects else 3,
+                        )
+
+                    case RequestType.HTTP3:
+                        self._optimized_actions[call_id] = OptimizedHTTP3Request(
+                            call_id=call_id,
+                            method=method.value.method,
+                            url=url.value.url if url else None,
+                            encoded_params=params.value.params if params else None,
+                            encoded_auth=auth.value.auth if auth else None,
+                            encoded_headers=headers.value.headers if headers else None,
+                            encoded_data=data.value.data if data else None,
+                            redirects=redirects.value.redirects if redirects else 3,
+                        )
+
+                    case RequestType.UDP:
+                        self._optimized_actions[call_id] = OptimizedUDPRequest(
+                            call_id=call_id,
+                            url=url.value.url if url else None,
+                            encoded_data=data.value.data if data else None,
+                            redirects=redirects.value.redirects if redirects else 3,
+                        )
+
+                    case RequestType.WEBSOCKET:
+                        self._optimized_actions[call_id] = OptimizedWebsocketRequest(
+                            call_id=call_id,
+                            method=method.value.method,
+                            url=url.value.url if url else None,
+                            encoded_params=params.value.params if params else None,
+                            encoded_auth=auth.value.auth if auth else None,
+                            encoded_headers=headers.value.headers if headers else None,
+                            encoded_data=data.value.data if data else None,
+                            redirects=redirects.value.redirects if redirects else 3,
+                        )
+
+                    case _:
+                        raise Exception("Err. - Invalid request type.")
 
     async def _optimize_engine_type(self, engine_type: str):
         engine_type_args: List[Tuple[CallArg, Callable[..., None]]] = []
@@ -250,10 +379,19 @@ class CallResolver:
             for arg in self._args[call_id]:
                 self._call_engine_types[call_id] = self._request_types_map[arg.engine]
                 self._call_workflows[call_id] = arg.workflow
+
+                method = arg.method
+
+                if method == "query":
+                    method = "GET"
+
+                elif method == "mutate":
+                    method = "POST"
+
                 self._resolved[call_id]["method"] = ResolvedArg(
                     ResolvedArgType.METHOD,
                     arg,
-                    ResolvedMethod(method=arg.method),
+                    ResolvedMethod(method=method.upper()),
                 )
 
         for call_id in self._args:
@@ -318,6 +456,9 @@ class CallResolver:
             call_optimizer(arg)
 
         for arg, call_optimizer in self._call_args["headers"]:
+            call_optimizer(arg)
+
+        for arg, call_optimizer in self._call_args["redirects"]:
             call_optimizer(arg)
 
     async def _set_url(self, arg: CallArg):
@@ -412,6 +553,13 @@ class CallResolver:
                 upgrade_ssl,
             )
 
+    def _set_redirects(self, arg: CallArg):
+        self._resolved[arg.call_id]["redirects"] = ResolvedArg(
+            arg_type=ResolvedArgType.REDIRECTS,
+            call_arg=arg,
+            value=ResolvedRedirects(redirects=arg.value),
+        )
+
     def _set_headers(self, arg: CallArg):
         request_type = self._request_types_map[arg.engine]
 
@@ -441,10 +589,12 @@ class CallResolver:
             case RequestType.GRAPHQL | RequestType.HTTP | RequestType.WEBSOCKET:
                 self._parse_to_http_cookies(arg)
 
-            case RequestType.GRAPHQL_HTTP2 | RequestType.GRPC | RequestType.HTTP2:
-                self._parse_to_http2_or_http3_cookies(arg)
-
-            case RequestType.HTTP3:
+            case (
+                RequestType.GRAPHQL_HTTP2
+                | RequestType.GRPC
+                | RequestType.HTTP2
+                | RequestType.HTTP3
+            ):
                 self._parse_to_http2_or_http3_cookies(arg)
 
             case RequestType.PLAYWRIGHT | RequestType.UDP:
@@ -454,10 +604,12 @@ class CallResolver:
                 raise Exception("Err. - Invalid request type.")
 
     def _set_method(self, arg: CallArg):
+        method: str = arg.value
+
         self._resolved[arg.call_id]["method"] = ResolvedArg(
             arg_type=ResolvedArgType.METHOD,
             call_arg=arg,
-            value=ResolvedMethod(method=arg.value),
+            value=ResolvedMethod(method=method.upper()),
         )
 
     def _set_auth(self, arg: CallArg):
@@ -593,7 +745,7 @@ class CallResolver:
         elif method == "mutate":
             method = "POST"
 
-        get_base = f"{method.capitalize()} {url_path} HTTP/1.1{NEW_LINE}"
+        get_base = f"{method.upper()} {url_path} HTTP/1.1{NEW_LINE}"
 
         port = resolved_url.url.port or (
             443 if resolved_url.url.scheme == "https" else 80
@@ -715,10 +867,19 @@ class CallResolver:
 
         headers.extend(["", ""])
 
+        encoded_headers = f"{NEW_LINE}".join(headers)
+
+        optimized_cookies: Optional[ResolvedArg[ResolvedCookies]] = self._resolved[
+            arg.call_id
+        ].get("cookies")
+
+        if optimized_cookies:
+            encoded_headers += optimized_cookies.value.cookies
+
         self._resolved[arg.call_id]["headers"] = ResolvedArg(
             arg_type=ResolvedArgType.HEADERS,
             call_arg=arg,
-            value=ResolvedHeaders(headers="\r\n".join(headers).encode()),
+            value=ResolvedHeaders(headers=encoded_headers.encode()),
         )
 
     def _parse_to_http2_headers(self, arg: CallArg):
@@ -871,6 +1032,29 @@ class CallResolver:
             ),
         )
 
+        has_headers = arg.call_id in self._available_optimizations["headers"]
+
+        if has_headers is False:
+            self._call_args["headers"].append(
+                (
+                    CallArg(
+                        call_name=arg.call_name,
+                        call_id=arg.call_id,
+                        arg_name="headers",
+                        arg_type="kwarg",
+                        workflow=arg.workflow,
+                        engine=arg.engine,
+                        method=arg.method,
+                        value={},
+                        data_type="static",
+                        timeouts=arg.timeouts,
+                    ),
+                    self._set_headers,
+                )
+            )
+
+            self._available_optimizations["headers"].append(arg.call_id)
+
     def _parse_to_http2_or_http3_cookies(self, arg: CallArg):
         cookies: List[str] = []
 
@@ -892,6 +1076,29 @@ class CallResolver:
                 ),
             ),
         )
+
+        has_headers = arg.call_id in self._available_optimizations["headers"]
+
+        if has_headers is False:
+            self._call_args["headers"].append(
+                (
+                    CallArg(
+                        call_name=arg.call_name,
+                        call_id=arg.call_id,
+                        arg_name="headers",
+                        arg_type="kwarg",
+                        workflow=arg.workflow,
+                        engine=arg.engine,
+                        method=arg.method,
+                        value={},
+                        data_type="static",
+                        timeouts=arg.timeouts,
+                    ),
+                    self._set_headers,
+                )
+            )
+
+            self._available_optimizations["headers"].append(arg.call_id)
 
     def _parse_to_http_or_udp_data(
         self,

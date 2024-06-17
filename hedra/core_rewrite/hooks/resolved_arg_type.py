@@ -11,3 +11,4 @@ class ResolvedArgType(Enum):
     DATA = "DATA"
     OPTIONS = "OPTIONS"
     COOKIES = "COOKIES"
+    REDIRECTS = "REDIRECTS"

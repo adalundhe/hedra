@@ -1,4 +1,10 @@
-from typing import Dict, List, Literal, Optional
+from typing import (
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+)
 
 import orjson
 from pydantic import BaseModel, StrictInt, StrictStr
@@ -26,6 +32,8 @@ class GraphQLRequest(BaseModel):
         "GET",
         "POST",
     ]
+    cookies: Optional[List[HTTPCookie]] = None
+    auth: Optional[Tuple[str, str]] = None
     cookies: Optional[List[HTTPCookie]] = None
     headers: Dict[str, str] = {}
     data: Dict[Literal["query", "operation_name", "variables"], str] = {}
