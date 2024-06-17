@@ -180,7 +180,7 @@ class CallResolver:
         call_ids = set(self._args)
 
         for call_id in call_ids:
-            call_engine_type = self.get_engine(call_id)
+            # call_engine_type = self.get_engine(call_id)
             call_workflow = self.get_workflow(call_id)
 
             if call_workflow:
@@ -202,6 +202,45 @@ class CallResolver:
                         | ResolvedData
                     ],
                 ] = self._resolved[call_id]
+
+                call_ids: List[int] = []
+
+                call_ids.extend(self._args.keys())
+                call_ids.extend(self._kwargs.keys())
+
+                call_ids = list(set(call_ids))
+
+                for call_id in call_ids:
+                    method: ResolvedArg[ResolvedMethod] = self._resolved[call_id][
+                        "method"
+                    ]
+                    has_headers = call_id in self._available_optimizations["headers"]
+                    has_optimized_headers = self._resolved[call_id].get("headers")
+                    headers_request_type = self._request_types_map[method.arg.engine]
+
+                    optimize_default_headers = (
+                        has_headers is False
+                        and has_optimized_headers is None
+                        and headers_request_type != RequestType.UDP
+                    )
+
+                    if optimize_default_headers:
+                        self._set_headers(
+                            CallArg(
+                                call_name=method.arg.call_name,
+                                call_id=method.arg.call_id,
+                                method=method.arg.method,
+                                arg_name="headers",
+                                arg_type="kwarg",
+                                workflow=method.arg.workflow,
+                                engine=method.arg.engine,
+                                value={},
+                                data_type="static",
+                                timeouts=method.arg.timeouts,
+                            )
+                        )
+
+                        self._available_optimizations["headers"].append(call_id)
 
     async def _optimize_engine_type(self, engine_type: str):
         engine_type_args: List[Tuple[CallArg, Callable[..., None]]] = []
@@ -517,6 +556,7 @@ class CallResolver:
                         method=arg.method,
                         value={},
                         data_type="static",
+                        timeouts=arg.timeouts,
                     ),
                     self._set_headers,
                 )
@@ -591,7 +631,7 @@ class CallResolver:
         self._resolved[arg.call_id]["headers"] = ResolvedArg(
             arg_type=ResolvedArgType.HEADERS,
             call_arg=arg,
-            value=ResolvedHeaders(headers=(get_base + NEW_LINE).encode()),
+            value=ResolvedHeaders(headers=get_base.encode()),
         )
 
     def _parse_to_websocket_headers(self, arg: CallArg):
@@ -603,7 +643,16 @@ class CallResolver:
             header_name_lowered = header_name.lower()
             lowered_headers[header_name_lowered] = header_value
 
-        headers = [f"GET {resolved_url.url.path} HTTP/1.1", "Upgrade: websocket"]
+        url_path = resolved_url.url.path
+
+        optimized_params: Optional[ResolvedArg[ResolvedParams]] = self._resolved[
+            arg.call_id
+        ].get("params")
+
+        if optimized_params:
+            url_path += optimized_params.value.params
+
+        headers = [f"GET {url_path} HTTP/1.1", "Upgrade: websocket"]
 
         optimized_data: Optional[ResolvedArg[ResolvedData]] = self._resolved[
             arg.call_id
@@ -688,8 +737,16 @@ class CallResolver:
         if optimized_params:
             url_path += optimized_params.value.params
 
+        method = arg.method
+
+        if method == "query":
+            method = "GET"
+
+        elif method == "mutate":
+            method = "POST"
+
         request_headers: List[Tuple[str, str]] = [
-            (":method", arg.method),
+            (":method", method),
             (":authority", resolved_url.url.authority),
             (":scheme", resolved_url.url.scheme),
             (":path", url_path),
