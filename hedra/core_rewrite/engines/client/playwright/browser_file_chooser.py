@@ -12,13 +12,12 @@ from .models.results import PlaywrightResult
 
 
 class BrowserFileChooser:
-
     def __init__(
         self,
         file_chooser: FileChooser,
         timeouts: Timeouts,
         metadata: BrowserMetadata,
-        url: str
+        url: str,
     ) -> None:
         self.file_chooser = file_chooser
         self.timeouts = timeouts
@@ -28,20 +27,13 @@ class BrowserFileChooser:
     async def set_files(
         self,
         files: str | Path | FilePayload | Sequence[str | Path] | Sequence[FilePayload],
-        no_wait_after: Optional[bool]=None,
-        timeout: Optional[int | float]=None
+        no_wait_after: Optional[bool] = None,
+        timeout: Optional[int | float] = None,
     ):
-        
-        timings: Dict[
-            Literal[
-                'command_start',
-                'command_end'
-            ],
-            float
-        ] = {}
+        timings: Dict[Literal["command_start", "command_end"], float] = {}
 
         if timeout is None:
-            timeout = self.timeouts.request_timeout
+            timeout = self.timeouts.request_timeout * 1000
 
         command = SetFilesCommand(
             files=files,
@@ -50,37 +42,35 @@ class BrowserFileChooser:
         )
 
         err: Optional[Exception] = None
-        timings['command_start'] = time.monotonic()
+        timings["command_start"] = time.monotonic()
 
         try:
-
             await self.file_chooser.set_files(
                 command.files,
                 no_wait_after=command.no_wait_after,
-                timeout=command.timeout
+                timeout=command.timeout,
             )
 
         except Exception as err:
-            
-            timings['command_end'] = time.monotonic()
+            timings["command_end"] = time.monotonic()
 
             return PlaywrightResult(
-                command='set_files',
+                command="set_files",
                 command_args=command,
                 metadata=self.metadata,
                 result=err,
                 error=str(err),
                 timings=timings,
-                url=self.url
+                url=self.url,
             )
 
-        timings['command_end'] = time.monotonic()
-        
+        timings["command_end"] = time.monotonic()
+
         return PlaywrightResult(
-            command='set_files',
+            command="set_files",
             command_args=command,
             metadata=self.metadata,
             result=None,
             timings=timings,
-            url=self.url
+            url=self.url,
         )

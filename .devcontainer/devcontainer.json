@@ -1,0 +1,48 @@
+{
+	"name": "Python 3.12",
+	"dockerComposeFile": "docker-compose.yml",
+	// We can specify environmental variables via remoteEnv
+	// to make them only available for debugging/terminal sessions
+	// etc.
+	"service": "hedra",
+	"customizations": {
+		// Configure properties specific to VS Code.
+		"vscode": {
+			// Set *default* container specific settings.json values on container create.
+			// These are all common to https://github.com/datavant/datavant-devcontainers/blob/main/.devcontainer/devcontainer.json
+			"settings": { 
+				"python.defaultInterpreterPath": "/usr/local/bin/python",
+				"python.linting.enabled": true,
+				"python.linting.enable": true,
+				"git.path": "/usr/local/bin/git",
+				"python.languageServer": "Pylance",
+				"pylint.path": [
+					"/usr/local/bin/python",
+					"-m",
+					"pylint"
+				],	
+				"editor.formatOnSave": true,
+
+				"editor.codeActionsOnSave": {
+					"source.fixAll": "always",
+					"source.organizeImports": "always"
+				},
+				"editor.defaultFormatter": "charliermarsh.ruff",
+				"terminal.integrated.shellIntegration.decorationsEnabled": "both",
+				"editor.tabCompletion": "on",
+				"terminal.integrated.defaultProfile.linux": "bash"
+			},
+			
+			// Add the IDs of extensions you want installed when the container is created.
+			"extensions": [
+				"charliermarsh.ruff",
+				"ms-python.python",
+				"ms-python.vscode-pylance",
+				"ms-azuretools.vscode-docker",
+				"skellock.just"
+			]
+		}
+	},
+	"postCreateCommand": "bash .devcontainer/run.sh",
+	"workspaceFolder": "/workspace"
+}

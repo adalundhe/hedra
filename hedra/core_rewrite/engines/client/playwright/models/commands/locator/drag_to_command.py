@@ -14,4 +14,7 @@ class DragToCommand(BaseModel):
     trial: Optional[StrictBool] = None
     source_position: Optional[Position] = None
     target_position: Optional[Position] = None
-    timeout: Optional[StrictInt | StrictFloat] =None
+    timeout: Optional[StrictInt | StrictFloat] = None
+
+    class Config:
+        arbitrary_types_allowed = True

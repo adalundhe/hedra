@@ -5,8 +5,8 @@ from ssl import SSLContext
 from typing import Optional, Tuple
 
 from hedra.core_rewrite.engines.client.http2.streams import Stream
+from hedra.core_rewrite.engines.client.shared.protocols import _DEFAULT_LIMIT
 
-from .shared import _DEFAULT_LIMIT
 from .tcp import TCPConnection
 
 

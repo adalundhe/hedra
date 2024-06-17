@@ -1,6 +1,6 @@
 from weakref import ref
 
-from hedra.core_rewrite.engines.client.http2.protocols.shared import Reader
+from hedra.core_rewrite.engines.client.shared.protocols import Reader
 
 from .protocol import TCPProtocol
 

@@ -24,3 +24,5 @@ python3-dtls
 zstandard
 cryptography
 python-dotenv
+aioquic
+playwright

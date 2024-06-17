@@ -19,7 +19,7 @@ class RouteFromHarCommand(BaseModel):
     har: Path | StrictStr
     url: Optional[
         StrictStr | 
-        Pattern[StrictStr] | 
+        Pattern[str] | 
         Callable[[StrictStr], StrictBool]
     ]=None
     not_found: Literal['abort', 'fallback'] = 'abort'

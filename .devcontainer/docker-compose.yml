@@ -1,0 +1,22 @@
+version: '3.10'
+
+services:
+  hedra:
+      build:
+        context: ..
+        dockerfile: ./.devcontainer/dockerfile
+        ssh:
+          - default=${SSH_AUTH_SOCK}
+      environment:
+        - LD_LIBRARY_PATH=/usr/local/lib
+      volumes:
+        - ..:/workspace
+        - ../.git:/workspace/.git
+        - ../.devcontainer:/workspace/.devcontainer
+        - ~/.aws:/home/datavant/.aws
+        - ~/.ssh:/home/datavant/.ssh
+        - ~/.git:/home/datavant/.git
+      ports:
+        - 5003:5003
+      stdin_open: true
+      tty: true

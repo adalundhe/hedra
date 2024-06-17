@@ -34,28 +34,45 @@ has the following effects:
       PROTOCOL_DTLSv1 for the parameter ssl_version is supported
 """
 
-from socket import socket, getaddrinfo, error as socket_error
-from socket import AF_INET, SOCK_STREAM, SOCK_DGRAM
-from ssl import PROTOCOL_SSLv23, CERT_NONE
+import errno
+from socket import AF_INET, SOCK_DGRAM, SOCK_STREAM, getaddrinfo, socket
+from socket import error as socket_error
+from ssl import CERT_NONE, PROTOCOL_SSLv23
 from types import MethodType
 from weakref import proxy
-import errno
 
-from .sslconnection import SSLConnection, PROTOCOL_DTLS, PROTOCOL_DTLSv1, PROTOCOL_DTLSv1_2
-from .sslconnection import DTLS_OPENSSL_VERSION_NUMBER, DTLS_OPENSSL_VERSION, DTLS_OPENSSL_VERSION_INFO
-from .sslconnection import SSL_BUILD_CHAIN_FLAG_NONE, SSL_BUILD_CHAIN_FLAG_UNTRUSTED, \
-    SSL_BUILD_CHAIN_FLAG_NO_ROOT, SSL_BUILD_CHAIN_FLAG_CHECK, SSL_BUILD_CHAIN_FLAG_IGNORE_ERROR, SSL_BUILD_CHAIN_FLAG_CLEAR_ERROR
-from .err import raise_as_ssl_module_error, patch_ssl_errors
+from .err import patch_ssl_errors, raise_as_ssl_module_error
+from .sslconnection import (
+    DTLS_OPENSSL_VERSION,
+    DTLS_OPENSSL_VERSION_INFO,
+    DTLS_OPENSSL_VERSION_NUMBER,
+    PROTOCOL_DTLS,
+    SSL_BUILD_CHAIN_FLAG_CHECK,
+    SSL_BUILD_CHAIN_FLAG_CLEAR_ERROR,
+    SSL_BUILD_CHAIN_FLAG_IGNORE_ERROR,
+    SSL_BUILD_CHAIN_FLAG_NO_ROOT,
+    SSL_BUILD_CHAIN_FLAG_NONE,
+    SSL_BUILD_CHAIN_FLAG_UNTRUSTED,
+    PROTOCOL_DTLSv1,
+    PROTOCOL_DTLSv1_2,
+    SSLConnection,
+)
 
 
 def do_patch():
     import ssl as _ssl  # import to be avoided if ssl module is never patched
-    global _orig_SSLSocket_init, _orig_get_server_certificate, _orig_SSLSocket_close, _orig_SSLSocket_settimeout, _orig_SSLSocket___del__
+
+    global \
+        _orig_SSLSocket_init, \
+        _orig_get_server_certificate, \
+        _orig_SSLSocket_close, \
+        _orig_SSLSocket_settimeout, \
+        _orig_SSLSocket___del__
     global ssl
     ssl = _ssl
     if hasattr(ssl, "PROTOCOL_DTLSv1"):
         return
-    _orig_wrap_socket = ssl.wrap_socket
+    _orig_wrap_socket = ssl.SSLContext().wrap_socket
     ssl.wrap_socket = _wrap_socket
     ssl.PROTOCOL_DTLS = PROTOCOL_DTLS
     ssl.PROTOCOL_DTLSv1 = PROTOCOL_DTLSv1
@@ -86,23 +103,34 @@ def do_patch():
     raise_as_ssl_module_error()
 
 
-def _wrap_socket(sock, keyfile=None, certfile=None,
-                 server_side=False, cert_reqs=CERT_NONE,
-                 ssl_version=PROTOCOL_DTLS, ca_certs=None,
-                 do_handshake_on_connect=True,
-                 suppress_ragged_eofs=True,
-                 ciphers=None,
-                 cb_user_config_ssl_ctx=None,
-                 cb_user_config_ssl=None):
-
-    return ssl.SSLSocket(sock, keyfile=keyfile, certfile=certfile,
-                         server_side=server_side, cert_reqs=cert_reqs,
-                         ssl_version=ssl_version, ca_certs=ca_certs,
-                         do_handshake_on_connect=do_handshake_on_connect,
-                         suppress_ragged_eofs=suppress_ragged_eofs,
-                         ciphers=ciphers,
-                         cb_user_config_ssl_ctx=cb_user_config_ssl_ctx,
-                         cb_user_config_ssl=cb_user_config_ssl)
+def _wrap_socket(
+    sock,
+    keyfile=None,
+    certfile=None,
+    server_side=False,
+    cert_reqs=CERT_NONE,
+    ssl_version=PROTOCOL_DTLS,
+    ca_certs=None,
+    do_handshake_on_connect=True,
+    suppress_ragged_eofs=True,
+    ciphers=None,
+    cb_user_config_ssl_ctx=None,
+    cb_user_config_ssl=None,
+):
+    return ssl.SSLSocket(
+        sock,
+        keyfile=keyfile,
+        certfile=certfile,
+        server_side=server_side,
+        cert_reqs=cert_reqs,
+        ssl_version=ssl_version,
+        ca_certs=ca_certs,
+        do_handshake_on_connect=do_handshake_on_connect,
+        suppress_ragged_eofs=suppress_ragged_eofs,
+        ciphers=ciphers,
+        cb_user_config_ssl_ctx=cb_user_config_ssl_ctx,
+        cb_user_config_ssl=cb_user_config_ssl,
+    )
 
 
 def _get_server_certificate(addr, ssl_version=PROTOCOL_SSLv23, ca_certs=None):
@@ -122,9 +150,12 @@ def _get_server_certificate(addr, ssl_version=PROTOCOL_SSLv23, ca_certs=None):
     else:
         cert_reqs = ssl.CERT_NONE
     af = getaddrinfo(addr[0], addr[1])[0][0]
-    s = ssl.wrap_socket(socket(af, SOCK_DGRAM),
-                        ssl_version=ssl_version,
-                        cert_reqs=cert_reqs, ca_certs=ca_certs)
+    s = ssl.wrap_socket(
+        socket(af, SOCK_DGRAM),
+        ssl_version=ssl_version,
+        cert_reqs=cert_reqs,
+        ca_certs=ca_certs,
+    )
     s.connect(addr)
     dercert = s.getpeercert(True)
     # s = s.unwrap()
@@ -141,17 +172,29 @@ def _sockclone_kwargs(old):
     return dict(family=old.family, type=old.type, proto=old.proto, fileno=old.fileno())
 
 
-def _SSLSocket_init(self, sock=None, keyfile=None, certfile=None,
-                    server_side=False, cert_reqs=CERT_NONE,
-                    ssl_version=PROTOCOL_DTLS, ca_certs=None,
-                    do_handshake_on_connect=True,
-                    family=AF_INET, type=SOCK_STREAM, proto=0, fileno=None,
-                    suppress_ragged_eofs=True, npn_protocols=None, ciphers=None,
-                    server_hostname=None,
-                    _context=None,
-                    _session=None,
-                    cb_user_config_ssl_ctx=None,
-                    cb_user_config_ssl=None):
+def _SSLSocket_init(
+    self,
+    sock=None,
+    keyfile=None,
+    certfile=None,
+    server_side=False,
+    cert_reqs=CERT_NONE,
+    ssl_version=PROTOCOL_DTLS,
+    ca_certs=None,
+    do_handshake_on_connect=True,
+    family=AF_INET,
+    type=SOCK_STREAM,
+    proto=0,
+    fileno=None,
+    suppress_ragged_eofs=True,
+    npn_protocols=None,
+    ciphers=None,
+    server_hostname=None,
+    _context=None,
+    _session=None,
+    cb_user_config_ssl_ctx=None,
+    cb_user_config_ssl=None,
+):
     is_connection = is_datagram = False
     if isinstance(sock, SSLConnection):
         is_connection = True
@@ -159,17 +202,27 @@ def _SSLSocket_init(self, sock=None, keyfile=None, certfile=None,
         is_datagram = True
     if not is_connection and not is_datagram:
         # Non-DTLS code path
-        return _orig_SSLSocket_init(self, sock=sock, keyfile=keyfile,
-                                    certfile=certfile, server_side=server_side,
-                                    cert_reqs=cert_reqs,
-                                    ssl_version=ssl_version, ca_certs=ca_certs,
-                                    do_handshake_on_connect=do_handshake_on_connect,
-                                    family=family, type=type, proto=proto, fileno=fileno,
-                                    suppress_ragged_eofs=suppress_ragged_eofs,
-                                    npn_protocols=npn_protocols,
-                                    ciphers=ciphers,
-                                    server_hostname=server_hostname,
-                                    _context=_context, _session=_session)
+        return _orig_SSLSocket_init(
+            self,
+            sock=sock,
+            keyfile=keyfile,
+            certfile=certfile,
+            server_side=server_side,
+            cert_reqs=cert_reqs,
+            ssl_version=ssl_version,
+            ca_certs=ca_certs,
+            do_handshake_on_connect=do_handshake_on_connect,
+            family=family,
+            type=type,
+            proto=proto,
+            fileno=fileno,
+            suppress_ragged_eofs=suppress_ragged_eofs,
+            npn_protocols=npn_protocols,
+            ciphers=ciphers,
+            server_hostname=server_hostname,
+            _context=_context,
+            _session=_session,
+        )
     # DTLS code paths: datagram socket and newly accepted DTLS connection
     if is_datagram:
         socket.__init__(self, **_sockclone_kwargs(sock))
@@ -177,7 +230,7 @@ def _SSLSocket_init(self, sock=None, keyfile=None, certfile=None,
         socket.__init__(self, **_sockclone_kwargs(sock.get_socket(True)))
 
     # hmm, why?
-    if hasattr(sock, 'timeout'):
+    if hasattr(sock, "timeout"):
         self.settimeout(sock.timeout)
     if isinstance(sock, socket):
         sock.detach()
@@ -224,13 +277,20 @@ def _SSLSocket_init(self, sock=None, keyfile=None, certfile=None,
             self._sslobj = None
         else:
             # yes, create the SSL object
-            self._sslobj = SSLConnection(self, keyfile, certfile,
-                                         server_side, cert_reqs,
-                                         ssl_version, ca_certs,
-                                         do_handshake_on_connect,
-                                         suppress_ragged_eofs, ciphers,
-                                         cb_user_config_ssl_ctx=cb_user_config_ssl_ctx,
-                                         cb_user_config_ssl=cb_user_config_ssl)
+            self._sslobj = SSLConnection(
+                self,
+                keyfile,
+                certfile,
+                server_side,
+                cert_reqs,
+                ssl_version,
+                ca_certs,
+                do_handshake_on_connect,
+                suppress_ragged_eofs,
+                ciphers,
+                cb_user_config_ssl_ctx=cb_user_config_ssl_ctx,
+                cb_user_config_ssl=cb_user_config_ssl,
+            )
             self._connected = True
     else:
         self._connected = True
@@ -246,15 +306,21 @@ def _SSLSocket_listen(self, ignored):
         raise ValueError("attempt to listen on connected SSLSocket!")
     if self._sslobj:
         return
-    self._sslobj = SSLConnection(socket(**_sockclone_kwargs(self)),
-                                 self.keyfile, self.certfile, True,
-                                 self.cert_reqs, self.ssl_version,
-                                 self.ca_certs,
-                                 self.do_handshake_on_connect,
-                                 self.suppress_ragged_eofs, self.ciphers,
-                                 cb_user_config_ssl_ctx=self._user_config_ssl_ctx,
-                                 cb_user_config_ssl=self._user_config_ssl)
-    if hasattr(self, 'timeout'):
+    self._sslobj = SSLConnection(
+        socket(**_sockclone_kwargs(self)),
+        self.keyfile,
+        self.certfile,
+        True,
+        self.cert_reqs,
+        self.ssl_version,
+        self.ca_certs,
+        self.do_handshake_on_connect,
+        self.suppress_ragged_eofs,
+        self.ciphers,
+        cb_user_config_ssl_ctx=self._user_config_ssl_ctx,
+        cb_user_config_ssl=self._user_config_ssl,
+    )
+    if hasattr(self, "timeout"):
         try:
             self._sslobj._sock.settimeout(self.timeout)
         except:
@@ -270,13 +336,20 @@ def _SSLSocket_accept(self):
     if not acc_ret:
         return
     new_conn, addr = acc_ret
-    new_ssl_sock = ssl.SSLSocket(new_conn, self.keyfile, self.certfile, True,
-                                 self.cert_reqs, self.ssl_version,
-                                 self.ca_certs,
-                                 self.do_handshake_on_connect,
-                                 self.suppress_ragged_eofs, self.ciphers,
-                                 cb_user_config_ssl_ctx=self._user_config_ssl_ctx,
-                                 cb_user_config_ssl=self._user_config_ssl)
+    new_ssl_sock = ssl.SSLSocket(
+        new_conn,
+        self.keyfile,
+        self.certfile,
+        True,
+        self.cert_reqs,
+        self.ssl_version,
+        self.ca_certs,
+        self.do_handshake_on_connect,
+        self.suppress_ragged_eofs,
+        self.ciphers,
+        cb_user_config_ssl_ctx=self._user_config_ssl_ctx,
+        cb_user_config_ssl=self._user_config_ssl,
+    )
     return new_ssl_sock, addr
 
 
@@ -285,15 +358,21 @@ def _SSLSocket_real_connect(self, addr, return_errno):
         raise ValueError("attempt to connect already-connected SSLSocket!")
     if self._sslobj:
         raise RuntimeError("Overwriting SSLConnection?")
-    self._sslobj = SSLConnection(socket(**_sockclone_kwargs(self)),
-                                 self.keyfile, self.certfile, False,
-                                 self.cert_reqs, self.ssl_version,
-                                 self.ca_certs,
-                                 self.do_handshake_on_connect,
-                                 self.suppress_ragged_eofs, self.ciphers,
-                                 cb_user_config_ssl_ctx=self._user_config_ssl_ctx,
-                                 cb_user_config_ssl=self._user_config_ssl)
-    if hasattr(self, 'timeout'):
+    self._sslobj = SSLConnection(
+        socket(**_sockclone_kwargs(self)),
+        self.keyfile,
+        self.certfile,
+        False,
+        self.cert_reqs,
+        self.ssl_version,
+        self.ca_certs,
+        self.do_handshake_on_connect,
+        self.suppress_ragged_eofs,
+        self.ciphers,
+        cb_user_config_ssl_ctx=self._user_config_ssl_ctx,
+        cb_user_config_ssl=self._user_config_ssl,
+    )
+    if hasattr(self, "timeout"):
         try:
             self._sslobj._sock.settimeout(self.timeout)
         except:
@@ -322,7 +401,7 @@ def _SSLSocket_handle_timeout(self):
 def _SSLSocket_close(self):
     try:
         _orig_SSLSocket_close(self)
-    except Exception as e:
+    except Exception:
         pass
 
 

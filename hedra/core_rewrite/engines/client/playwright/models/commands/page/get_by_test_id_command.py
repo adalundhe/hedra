@@ -1,10 +1,13 @@
-from typing import Optional, Pattern
+from typing import Pattern
 
 from pydantic import (
     BaseModel,
+    StrictFloat,
+    StrictInt,
+    StrictStr,
 )
 
 
 class GetByTestIdCommand(BaseModel):
-    test_id: str | Pattern[str]
-    timeout: Optional[int | float]=None
+    test_id: StrictStr | Pattern[str]
+    timeout: StrictInt | StrictFloat

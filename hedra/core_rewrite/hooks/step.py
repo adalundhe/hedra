@@ -1,25 +1,12 @@
-from hedra.core_rewrite.engines.client.client_types.common import Timeouts
-from functools import wraps
+from typing import Any, Awaitable, Callable, Optional
+
+from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
+
 from .hook import Hook
 
-from typing import (
-    Callable,
-    Awaitable,
-    Optional,
-    Any
-)
 
-
-def step(
-    *args: str, 
-    timeouts: Optional[Timeouts]=None
-):
-
+def step(*args: str, timeouts: Optional[Timeouts] = None):
     def wrapper(func: Callable[..., Awaitable[Any]]):
-        
-        return Hook(
-            func,
-            args
-        )
-    
+        return Hook(func, args)
+
     return wrapper

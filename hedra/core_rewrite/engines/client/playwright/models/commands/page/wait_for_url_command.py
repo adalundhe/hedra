@@ -15,7 +15,7 @@ from pydantic import (
 
 
 class WaitForUrlCommand(BaseModel):
-    url: StrictStr | Pattern[StrictStr] | Callable[[StrictStr], StrictBool]
+    url: StrictStr | Pattern[str] | Callable[[StrictStr], StrictBool]
     wait_until: Optional[
         Literal[
             'commit', 

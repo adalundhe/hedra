@@ -12,7 +12,6 @@ from typing import (
 )
 from urllib.parse import urlparse
 
-from hedra.core_rewrite.engines.client.client_types.common import Timeouts
 from hedra.core_rewrite.engines.client.http2 import MercurySyncHTTP2Connection
 from hedra.core_rewrite.engines.client.http2.pipe import HTTP2Pipe
 from hedra.core_rewrite.engines.client.http2.protocols import HTTP2Connection
@@ -20,6 +19,7 @@ from hedra.core_rewrite.engines.client.shared.models import (
     URL,
     URLMetadata,
 )
+from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
 from .models.grpc import (
     GRPCRequest,

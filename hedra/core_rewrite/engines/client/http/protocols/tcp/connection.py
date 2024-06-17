@@ -1,7 +1,7 @@
 import asyncio
 import socket
 
-from hedra.core_rewrite.engines.client.http.protocols.shared import (
+from hedra.core_rewrite.engines.client.shared.protocols import (
     _DEFAULT_LIMIT,
     Reader,
     Writer,

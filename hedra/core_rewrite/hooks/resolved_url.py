@@ -1,12 +1,14 @@
 from ssl import SSLContext
-from hedra.core_rewrite.engines.client.client_types.common.url import URL
-from pydantic import BaseModel
 from typing import Optional
+
+from pydantic import BaseModel
+
+from hedra.core_rewrite.engines.client.shared.models import URL
 
 
 class ResolvedURL(BaseModel):
-    ssl_context: Optional[SSLContext]=None
+    ssl_context: Optional[SSLContext] = None
     url: URL
 
     class Config:
-        arbitrary_types_allowed=True
+        arbitrary_types_allowed = True

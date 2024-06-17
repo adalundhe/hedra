@@ -1,11 +1,10 @@
 import struct
 from typing import Optional
 
-from http2.settings import SettingCodes, Settings
-from http2.windows import WindowManager
-
 from hedra.core_rewrite.engines.client.http2.frames import Frame, FrameBuffer
-from hedra.core_rewrite.engines.client.http2.protocols.shared import (
+from hedra.core_rewrite.engines.client.http2.settings import SettingCodes, Settings
+from hedra.core_rewrite.engines.client.http2.windows import WindowManager
+from hedra.core_rewrite.engines.client.shared.protocols import (
     Reader,
     Writer,
 )

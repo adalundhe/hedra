@@ -9,4 +9,4 @@ from pydantic import (
 
 class FrameCommand(BaseModel):
     name: Optional[StrictStr]=None
-    url: Optional[StrictStr | Pattern[StrictStr] | Callable[[StrictStr], StrictBool]]=None
+    url: Optional[StrictStr | Pattern[str] | Callable[[StrictStr], StrictBool]]=None

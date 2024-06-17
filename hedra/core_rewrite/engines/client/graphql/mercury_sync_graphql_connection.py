@@ -3,7 +3,6 @@ import uuid
 from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
-from hedra.core_rewrite.engines.client.client_types.common import Timeouts
 from hedra.core_rewrite.engines.client.http import MercurySyncHTTPConnection
 from hedra.core_rewrite.engines.client.shared.models import (
     HTTPCookie,
@@ -11,6 +10,7 @@ from hedra.core_rewrite.engines.client.shared.models import (
     Metadata,
     URLMetadata,
 )
+from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
 from .models.graphql import (
     GraphQLRequest,

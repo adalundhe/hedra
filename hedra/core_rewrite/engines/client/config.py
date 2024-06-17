@@ -4,7 +4,6 @@ import psutil
 
 from hedra.core.experiments.mutations.types.base.mutation import Mutation
 
-from .playwright.context_config import ContextConfig
 from .shared.timeouts import Timeouts
 from .time_parser import TimeParser
 from .tracing_config import TracingConfig
@@ -53,8 +52,6 @@ class Config:
         self.permissions: List[str] = kwargs.get('permissions', [])
         self.color_scheme = kwargs.get('color_scheme')
         self.group_size = kwargs.get('group_size')
-
-        self.playwright_options: ContextConfig = kwargs.get('playwright_options', {})
 
         self.experiment: Dict[str, Union[str, int, List[float]]] = kwargs.get('experiment', {})
         self.tracing: Union[TracingConfig, None] = kwargs.get('tracing')

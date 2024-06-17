@@ -7,7 +7,7 @@ from pydantic import BaseModel, StrictFloat, StrictInt, StrictStr
 class ExpectRequestCommand(BaseModel):
     url_or_predicate: Optional[
         StrictStr |
-        Pattern[StrictStr] |
+        Pattern[str] |
         Callable[
             [Request],
             bool

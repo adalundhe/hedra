@@ -11,7 +11,7 @@ from pydantic import (
 
 
 class RouteCommand(BaseModel):
-    url: StrictStr | Pattern[StrictStr] | Callable[[StrictStr], StrictBool]
+    url: StrictStr | Pattern[str] | Callable[[StrictStr], StrictBool]
     handler: Callable[[Route], Any] | Callable[[Route, Request], Any]
     times: Optional[StrictInt]
     timeout: StrictInt | StrictFloat

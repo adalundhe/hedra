@@ -91,8 +91,8 @@ class GetByRoleCommand(BaseModel):
     expanded: Optional[StrictBool] = None
     include_hidden: Optional[StrictBool] = None
     level: Optional[StrictInt] = None
-    name: Optional[StrictStr | Pattern[StrictStr]] = None
+    name: Optional[StrictStr | Pattern[str]] = None
     pressed: Optional[StrictBool] = None
     selected: Optional[StrictBool] = None
     exact: Optional[StrictBool] = None
-    timeout: Optional[StrictInt | StrictFloat]=None
+    timeout: StrictInt | StrictFloat
