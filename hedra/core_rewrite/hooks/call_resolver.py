@@ -492,7 +492,7 @@ class CallResolver:
 
     def _parse_to_graphql_params(self, arg: CallArg):
         query_string: str = arg.value
-        query_string = "".join(query_string.replace("query", "").split())
+        query_string = "".join(query_string.split()).replace("query", "", 1)
 
         query_url = f"?query={{{query_string}}}"
 
