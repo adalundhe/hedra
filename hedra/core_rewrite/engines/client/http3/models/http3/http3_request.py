@@ -1,5 +1,13 @@
-from typing import Dict, Iterator, List, Literal, Optional, Tuple, Union
-from urllib.parse import urlencode, urlparse
+from typing import (
+    Dict,
+    Iterator,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Union,
+)
+from urllib.parse import urlencode
 
 import orjson
 from pydantic import BaseModel, StrictBytes, StrictInt, StrictStr
@@ -9,10 +17,11 @@ from hedra.core_rewrite.engines.client.shared.models import (
     HTTPCookie,
     HTTPEncodableValue,
 )
-from hedra.core_rewrite.engines.client.shared.protocols import NEW_LINE
+
+NEW_LINE = "\r\n"
 
 
-class HTTP2Request(BaseModel):
+class HTTP3Request(BaseModel):
     url: StrictStr
     method: Literal["GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"]
     cookies: Optional[List[HTTPCookie]] = None
@@ -25,8 +34,20 @@ class HTTP2Request(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    def parse_url(self):
-        return urlparse(self.url)
+    def encode_headers(self, url: URL):
+        encoded_headers = [
+            (b":method", self.method.encode()),
+            (b":scheme", url.scheme.encode()),
+            (b":authority", url.authority.encode()),
+            (b":path", url.full.encode()),
+            (b"user-agent", "hedra/client".encode()),
+        ]
+
+        encoded_headers.extend(
+            [(k.encode(), v.encode()) for (k, v) in self.headers.items()]
+        )
+
+        return encoded_headers
 
     def encode_data(self):
         encoded_data: Optional[bytes] = None
@@ -57,25 +78,3 @@ class HTTP2Request(BaseModel):
                     encoded_data = self.data.encode()
 
         return encoded_data
-
-    def encode_headers(self, url: URL) -> List[Tuple[bytes, bytes]]:
-        encoded_headers = [
-            (b":method", self.method.encode()),
-            (b":authority", url.hostname.encode()),
-            (b":scheme", url.scheme.encode()),
-            (b":path", url.path.encode()),
-        ]
-
-        encoded_headers.extend(
-            [
-                (k.lower().encode(), v.encode())
-                for k, v in self.headers.items()
-                if k.lower()
-                not in (
-                    b"host",
-                    b"transfer-encoding",
-                )
-            ]
-        )
-
-        return encoded_headers

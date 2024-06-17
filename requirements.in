@@ -26,3 +26,5 @@ cryptography
 python-dotenv
 aioquic
 playwright
+protobuf
+graphql-core

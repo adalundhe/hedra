@@ -69,7 +69,7 @@ class Hook:
             self.return_type = [return_type for return_type in annotation_subtypes]
 
         else:
-            self.is_test = issubclass(self.return_type, BaseResult)
+            self.is_test = self.return_type in BaseResult.__subclasses__()
 
         self.cache: Dict[
             str, Dict[str, Dict[str, Union[List[Dict[str, Any]], Dict[str, Any]]]]
@@ -131,9 +131,14 @@ class Hook:
                     result["source"] = source_fullname
                     self.cache[source_fullname][call_id] = result
 
+        self.cache = {
+            key: value for key, value in self.cache.items() if isinstance(key, str)
+        }
+
     @property
     def args_map(self):
         call_args: Dict[str, List[CallArg]] = defaultdict(list)
+
         for call_name, calls in self.cache.items():
             for call_id, call_data in calls.items():
                 call_id = call_data.get("call_id")

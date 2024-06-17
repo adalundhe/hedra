@@ -1,5 +1,5 @@
-from pydantic import BaseModel, StrictBytes
+from pydantic import BaseModel, StrictBytes, StrictStr
 
 
 class ResolvedParams(BaseModel):
-    params: StrictBytes
+    params: StrictStr | StrictBytes

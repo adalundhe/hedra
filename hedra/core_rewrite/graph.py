@@ -1,8 +1,10 @@
 import asyncio
 import math
-import psutil
 import time
-from typing import List, Any, Dict, Callable
+from typing import Any, Callable, Dict, List
+
+import psutil
+
 from .hooks import CallResolver, Hook
 from .workflow import Workflow
 
@@ -20,7 +22,7 @@ async def cancel_pending(pend: asyncio.Task):
             await pend
 
         return pend
-    
+
     except asyncio.CancelledError as cancelled_error:
         return cancelled_error
 
@@ -32,14 +34,10 @@ async def cancel_pending(pend: asyncio.Task):
 
 
 class Graph:
-    
     def __init__(
         self,
         workflows: List[Workflow],
-        context: Dict[
-            str, 
-            Callable[..., Any] | object
-        ] = {}
+        context: Dict[str, Callable[..., Any] | object] = {},
     ) -> None:
         self.graph = __file__
         self.workflows = workflows
@@ -47,21 +45,16 @@ class Graph:
         self.active = 0
         self._call_resolver = CallResolver()
 
-        self.context: Dict[
-            str, 
-            Callable[..., Any] | object
-        ] = context
+        self.context: Dict[str, Callable[..., Any] | object] = context
 
         self._active_waiter: asyncio.Future | None = None
         self._workflows_by_name: Dict[str, Workflow] = {}
 
     async def run(self):
-
         for workflow in self.workflows:
             await self._run(workflow)
 
     async def setup(self):
-
         call_ids: List[str] = []
         hooks_by_call_id: Dict[str, Hook] = {}
 
@@ -69,79 +62,52 @@ class Graph:
             self._workflows_by_name[workflow.name] = workflow
 
             for hook in workflow.hooks.values():
-                self._call_resolver.add_args(
-                    hook.static_args
-                )
+                self._call_resolver.add_args(hook.static_args)
 
-                hooks_by_call_id.update({
-                    call_id: hook for call_id in hook.call_ids
-                })
+                hooks_by_call_id.update({call_id: hook for call_id in hook.call_ids})
 
                 call_ids.extend(hook.call_ids)
-                
+
         await self._call_resolver.resolve_arg_types()
 
-        for call_id in call_ids:
-            
-            call_engine_type = self._call_resolver.get_engine(call_id)
-            call_workflow = self._call_resolver.get_workflow(call_id)
-
-            if call_workflow:
-
-                workflow = self._workflows_by_name.get(call_workflow)
-                engine = workflow.client.get_engine(call_engine_type)
-
-                arg_set = self._call_resolver[call_id]
-                hook = hooks_by_call_id[call_id]
-                
-                engine.prepare(arg_set)
-
-    async def _run(
-        self,
-        workflow: Workflow
-    ):
-        
+    async def _run(self, workflow: Workflow):
         loop = asyncio.get_event_loop()
-        
-        completed, pending = await asyncio.wait([
-            loop.create_task(
-                self._spawn_vu(
-                    workflow
-                )
-            ) async for _ in self._generate(
-                workflow
-            )
-        ], timeout=1)
-        
+
+        completed, pending = await asyncio.wait(
+            [
+                loop.create_task(self._spawn_vu(workflow))
+                async for _ in self._generate(workflow)
+            ],
+            timeout=1,
+        )
+
         results: List[List[Any]] = await asyncio.gather(*completed)
 
-        await asyncio.gather(*[
-            asyncio.create_task(
-                cancel_pending(pend)
-            ) for pend in pending
-        ])
-        
+        await asyncio.gather(
+            *[asyncio.create_task(cancel_pending(pend)) for pend in pending]
+        )
+
         all_completed: List[Any] = []
         for results_set in results:
             all_completed.extend(results_set)
 
         return all_completed
-        
-    async def _generate(self, workflow: Workflow):
 
+    async def _generate(self, workflow: Workflow):
         self._active_waiter = asyncio.Future()
 
-        duration = workflow.config.get('duration')
-        vus = workflow.config.get('vus')
-        threads = workflow.config.get('threads')
+        duration = workflow.config.get("duration")
+        vus = workflow.config.get("vus")
+        threads = workflow.config.get("threads")
 
         elapsed = 0
 
-        self.max_active = math.ceil(vus * (psutil.cpu_count(logical=False)**2)/threads)
+        self.max_active = math.ceil(
+            vus * (psutil.cpu_count(logical=False) ** 2) / threads
+        )
 
         start = time.monotonic()
         while elapsed < duration:
-
             remaining = duration - elapsed
 
             yield remaining
@@ -150,34 +116,28 @@ class Graph:
             elapsed = time.monotonic() - start
 
             if self.active > self.max_active:
-
                 remaining = duration - elapsed
-                
+
                 try:
-                    await asyncio.wait_for(
-                        self._active_waiter,
-                        timeout=remaining
-                    )
+                    await asyncio.wait_for(self._active_waiter, timeout=remaining)
                 except asyncio.TimeoutError:
                     pass
 
     async def _spawn_vu(
-        self, 
+        self,
         workflow: Workflow,
     ):
-
         try:
             results: List[Any] = []
 
             for hook_set in workflow.traversal_order:
-
                 set_count = len(hook_set)
                 self.active += set_count
 
                 results.extend(
-                    await asyncio.gather(*[
-                        hook() for hook in hook_set 
-                    ], return_exceptions=True)
+                    await asyncio.gather(
+                        *[hook() for hook in hook_set], return_exceptions=True
+                    )
                 )
 
                 self.active -= set_count
@@ -190,6 +150,3 @@ class Graph:
             pass
 
         return results
-
-
-            

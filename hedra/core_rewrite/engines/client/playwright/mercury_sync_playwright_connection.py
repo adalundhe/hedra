@@ -26,14 +26,19 @@ from .models.results import PlaywrightResult
 
 
 class MercurySyncPlaywrightConnection:
-    def __init__(self, pool_size: int = 10**3, pages: int = 1) -> None:
+    def __init__(
+        self,
+        pool_size: int = 10**3,
+        pages: int = 1,
+        timeouts: Timeouts = Timeouts(),
+    ) -> None:
         self.pool_size = pool_size
         self.pages = pages
         self.config = {}
         self.context: Optional[BrowserContext] = None
         self.sessions: Deque[BrowserSession] = deque()
         self.sem = asyncio.Semaphore(self.pool_size)
-        self.timeouts = Timeouts()
+        self.timeouts = timeouts
         self.results: List[PlaywrightResult] = []
         self._active: Deque[Tuple[BrowserSession, BrowserPage]] = deque()
 

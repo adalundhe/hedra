@@ -17,29 +17,20 @@ from .models.graphql_http2 import (
     GraphQLHTTP2Response,
 )
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class MercurySyncGraphQLHTTP2Connection(MercurySyncHTTP2Connection):
-
     def __init__(
-        self, 
-        pool_size: int = 10 ** 3, 
-        cert_path: Optional[str]=None,
-        key_path: Optional[str]=None,
-        timeouts: Timeouts = Timeouts(), 
-        reset_connections: bool = False
+        self,
+        pool_size: int = 10**3,
+        timeouts: Timeouts = Timeouts(),
+        reset_connections: bool = False,
     ) -> None:
-
-        super(
-            MercurySyncGraphQLHTTP2Connection, 
-            self
-        ).__init__(
-            pool_size=pool_size, 
-            cert_path=cert_path,
-            key_path=key_path,
-            timeouts=timeouts, 
-            reset_connections=reset_connections
+        super(MercurySyncGraphQLHTTP2Connection, self).__init__(
+            pool_size=pool_size,
+            timeouts=timeouts,
+            reset_connections=reset_connections,
         )
 
         self.session_id = str(uuid.uuid4())
@@ -48,32 +39,26 @@ class MercurySyncGraphQLHTTP2Connection(MercurySyncHTTP2Connection):
         self,
         url: str,
         protobuf: T,
-        headers: Dict[str, str]={},
-        timeout: Union[
-            Optional[int], 
-            Optional[float]
-        ]=None,
-        redirects: int=3
+        headers: Dict[str, str] = {},
+        timeout: Union[Optional[int], Optional[float]] = None,
+        redirects: int = 3,
     ) -> GraphQLHTTP2Response:
         async with self._semaphore:
-
             try:
-                
                 return await asyncio.wait_for(
                     self._request(
                         GraphQLHTTP2Request(
                             url=url,
-                            method='POST',
+                            method="POST",
                             headers=headers,
                             protobuf=protobuf,
-                            redirects=redirects
+                            redirects=redirects,
                         ),
                     ),
-                    timeout=timeout
+                    timeout=timeout,
                 )
-            
-            except asyncio.TimeoutError:
 
+            except asyncio.TimeoutError:
                 url_data = urlparse(url)
 
                 return GraphQLHTTP2Response(
@@ -81,11 +66,10 @@ class MercurySyncGraphQLHTTP2Connection(MercurySyncHTTP2Connection):
                         host=url_data.hostname,
                         path=url_data.path,
                         params=url_data.params,
-                        query=url_data.query
+                        query=url_data.query,
                     ),
                     headers=headers,
-                    method='POST',
+                    method="POST",
                     status=408,
-                    status_message='Request timed out.'
+                    status_message="Request timed out.",
                 )
-  

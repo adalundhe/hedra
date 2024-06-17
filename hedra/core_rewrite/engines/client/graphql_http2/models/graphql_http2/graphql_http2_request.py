@@ -1,58 +1,92 @@
-import binascii
 from typing import (
+    Dict,
     List,
+    Literal,
+    Optional,
     Tuple,
 )
 from urllib.parse import urlparse
 
-from hedra.core_rewrite.engines.client.http2.models.http2 import HTTP2Request
-from hedra.core_rewrite.engines.client.shared.models import URL
+import orjson
 
-NEW_LINE = '\r\n'
+from hedra.core_rewrite.engines.client.http2.models.http2 import HTTP2Request
+from hedra.core_rewrite.engines.client.shared.models import (
+    URL,
+)
+
+
+def mock_fn():
+    return None
+
+
+try:
+    from graphql import Source, parse, print_ast
+
+except ImportError:
+    Source = None
+    parse = mock_fn
+    print_ast = mock_fn
+
 
 class GraphQLHTTP2Request(HTTP2Request):
-
     class Config:
-        arbitrary_types_allowed=True
+        arbitrary_types_allowed = True
 
     def parse_url(self):
         return urlparse(self.url)
 
-    def encode_data(self):
+    def encode_headers(self, url: URL) -> List[Tuple[bytes, bytes]]:
+        url_path = url.path
 
-        encoded_protobuf = str(binascii.b2a_hex(self.protobuf.SerializeToString()), encoding='raw_unicode_escape')
-        encoded_message_length = hex(int(len(encoded_protobuf)/2)).lstrip("0x").zfill(8)
-        encoded_protobuf = f'00{encoded_message_length}{encoded_protobuf}'
+        if self.method == "GET":
+            data: Dict[Literal["query", "operation_name", "variables"], str] = self.data
+            query_string = data.get("query")
+            query_string = "".join(query_string.replace("query", "").split())
 
-        return binascii.a2b_hex(encoded_protobuf)
+            url_path += f"?query={{{query_string}}}"
 
-    def encode_headers(
-        self,
-        url: URL,
-        timeout: int | float=60
-    ) -> List[Tuple[bytes, bytes]]:
-    
         encoded_headers = [
             (b":method", self.method.encode()),
             (b":authority", url.hostname.encode()),
             (b":scheme", url.scheme.encode()),
-            (b":path", url.path.encode()),
-            (b'Content-Type', b'application/grpc'),
-            (b'Grpc-Timeout', f'{timeout}'.encode()),
-            (b'TE', b'trailers')
+            (b":path", url_path.encode()),
         ]
 
-        encoded_headers.extend([
-            (
-                k.lower().encode(), 
-                v.encode()
-            )
-            for k, v in self.headers.items()
-            if k.lower()
-            not in (
-                b"host",
-                b"transfer-encoding",
-            )
-        ])
-        
+        encoded_headers.extend(
+            [
+                (k.lower().encode(), v.encode())
+                for k, v in self.headers.items()
+                if k.lower()
+                not in (
+                    b"host",
+                    b"transfer-encoding",
+                )
+            ]
+        )
+
         return encoded_headers
+
+    def encode_data(self):
+        encoded_data: Optional[bytes] = None
+
+        if self.method == "POST":
+            data: Dict[Literal["query", "operation_name", "variables"], str] = self.data
+
+            source = Source(data.get("query"))
+            document_node = parse(source)
+            query_string = print_ast(document_node)
+
+            query = {"query": query_string}
+
+            operation_name = data.get("operation_name")
+            variables = data.get("variables")
+
+            if operation_name:
+                query["operationName"] = operation_name
+
+            if variables:
+                query["variables"] = variables
+
+            encoded_data = orjson.dumps(query)
+
+        return encoded_data

@@ -7,7 +7,7 @@ from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
 class CallArg(BaseModel):
     call_name: StrictStr
-    call_id: StrictStr
+    call_id: StrictInt
     arg_name: Optional[StrictStr] = None
     arg_type: Literal["arg", "kwarg"]
     position: Optional[StrictInt] = None

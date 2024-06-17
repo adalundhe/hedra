@@ -19,73 +19,50 @@ from .models.graphql import (
 
 
 class MercurySyncGraphQLConnection(MercurySyncHTTPConnection):
-
     def __init__(
-        self, 
-        pool_size: int = 10 ** 3, 
-        cert_path: Optional[str]=None,
-        key_path: Optional[str]=None,
-        timeouts: Timeouts = Timeouts(), 
-        reset_connections: bool = False
+        self,
+        pool_size: int = 10**3,
+        timeouts: Timeouts = Timeouts(),
+        reset_connections: bool = False,
     ) -> None:
-
-        super(
-            MercurySyncGraphQLConnection,
-            self
-        ).__init__(
-            pool_size=pool_size, 
-            cert_path=cert_path,
-            key_path=key_path,
-            timeouts=timeouts, 
-            reset_connections=reset_connections
+        super(MercurySyncGraphQLConnection, self).__init__(
+            pool_size=pool_size,
+            timeouts=timeouts,
+            reset_connections=reset_connections,
         )
 
         self.session_id = str(uuid.uuid4())
-        
+
     async def query(
         self,
         url: str,
         query: str,
-        operation_name: str = None,
-        variables: Dict[str, Any] = None, 
-        auth: Optional[Tuple[str, str]]=None,
-        cookies: Optional[List[HTTPCookie]]=None,
-        headers: Dict[str, str]={},
-        params: Optional[Dict[str, HTTPEncodableValue]]=None,
-        timeout: Union[
-            Optional[int], 
-            Optional[float]
-        ]=None,
-        
-        
-        redirects: int=3
+        auth: Optional[Tuple[str, str]] = None,
+        cookies: Optional[List[HTTPCookie]] = None,
+        headers: Dict[str, str] = {},
+        timeout: Union[Optional[int], Optional[float]] = None,
+        redirects: int = 3,
     ) -> GraphQLResponse:
         async with self._semaphore:
-
             try:
-                
                 return await asyncio.wait_for(
                     self._request(
                         GraphQLRequest(
                             url=url,
-                            method='POST',
+                            method="GET",
                             cookies=cookies,
                             auth=auth,
                             headers=headers,
-                            params=params,
                             data={
                                 "query": query,
-                                "operation_name": operation_name,
-                                "variables": variables
                             },
-                            redirects=redirects
+                            redirects=redirects,
                         ),
                     ),
-                    timeout=timeout
+                    timeout=timeout,
                 )
-            
-            except asyncio.TimeoutError:
 
+            except asyncio.TimeoutError:
                 url_data = urlparse(url)
 
                 return GraphQLResponse(
@@ -94,10 +71,62 @@ class MercurySyncGraphQLConnection(MercurySyncHTTPConnection):
                         host=url_data.hostname,
                         path=url_data.path,
                         params=url_data.params,
-                        query=url_data.query
+                        query=url_data.query,
                     ),
                     headers=headers,
-                    method='POST',
+                    method="GET",
                     status=408,
-                    status_message='Request timed out.'
+                    status_message="Request timed out.",
+                )
+
+    async def mutate(
+        self,
+        url: str,
+        query: str,
+        operation_name: str = None,
+        variables: Dict[str, Any] = None,
+        auth: Optional[Tuple[str, str]] = None,
+        cookies: Optional[List[HTTPCookie]] = None,
+        headers: Dict[str, str] = {},
+        params: Optional[Dict[str, HTTPEncodableValue]] = None,
+        timeout: Union[Optional[int], Optional[float]] = None,
+        redirects: int = 3,
+    ) -> GraphQLResponse:
+        async with self._semaphore:
+            try:
+                return await asyncio.wait_for(
+                    self._request(
+                        GraphQLRequest(
+                            url=url,
+                            method="POST",
+                            cookies=cookies,
+                            auth=auth,
+                            headers=headers,
+                            params=params,
+                            data={
+                                "query": query,
+                                "operation_name": operation_name,
+                                "variables": variables,
+                            },
+                            redirects=redirects,
+                        ),
+                    ),
+                    timeout=timeout,
+                )
+
+            except asyncio.TimeoutError:
+                url_data = urlparse(url)
+
+                return GraphQLResponse(
+                    metadata=Metadata(),
+                    url=URLMetadata(
+                        host=url_data.hostname,
+                        path=url_data.path,
+                        params=url_data.params,
+                        query=url_data.query,
+                    ),
+                    headers=headers,
+                    method="POST",
+                    status=408,
+                    status_message="Request timed out.",
                 )
