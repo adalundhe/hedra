@@ -44,11 +44,11 @@ class Hook:
         self.workflow = self.full_name.split(".").pop(0)
         self.dependencies = dependencies
         self._timeouts = timeouts
-        self.call_ids: List[str] = []
+        self.call_id: int = 0
 
         self.params = call_signature.parameters
         self.args: Dict[
-            str,
+            int,
             Dict[
                 Union[Literal["annotation"], Literal["default"]], Union[Type[Any], Any]
             ],
@@ -72,14 +72,10 @@ class Hook:
             self.is_test = self.return_type in BaseResult.__subclasses__()
 
         self.cache: Dict[
-            str, Dict[str, Dict[str, Union[List[Dict[str, Any]], Dict[str, Any]]]]
+            str, Dict[int, Dict[str, Union[List[Dict[str, Any]], Dict[str, Any]]]]
         ] = defaultdict(dict)
         self.parser = Parser()
         self._tree = ast.parse(textwrap.dedent(inspect.getsource(call)))
-
-    def __iter__(self):
-        for call_id in self.call_ids:
-            yield call_id
 
     def setup(self, context: Dict[str, Any]):
         self.parser.attributes.update(context)
@@ -103,11 +99,11 @@ class Hook:
                 result = self.parser.parse_call(node)
                 engine = result.get("engine")
                 call_source = result.get("source")
-                call_id = result.get("call_id")
+                call_id: int = result.get("call_id")
                 method = result.get("method")
 
                 if engine:
-                    self.call_ids.append(call_id)
+                    self.call_id = call_id
 
                     parser_class = self.parser.parser_class_name
                     self.static = result.get("static")

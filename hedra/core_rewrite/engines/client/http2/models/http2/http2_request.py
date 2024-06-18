@@ -40,7 +40,6 @@ class HTTP2Request(BaseModel):
                     size += len(encoded_chunk)
                     chunks.append(encoded_chunk)
 
-                self.is_stream = True
                 encoded_data = chunks
 
             else:
@@ -72,8 +71,8 @@ class HTTP2Request(BaseModel):
                 for k, v in self.headers.items()
                 if k.lower()
                 not in (
-                    b"host",
-                    b"transfer-encoding",
+                    "host",
+                    "transfer-encoding",
                 )
             ]
         )

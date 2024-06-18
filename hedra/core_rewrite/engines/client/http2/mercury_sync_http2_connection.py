@@ -3,8 +3,10 @@ import ssl
 import time
 import uuid
 from collections import defaultdict
+from random import randrange
 from typing import (
     Dict,
+    Iterator,
     List,
     Literal,
     Optional,
@@ -12,8 +14,13 @@ from typing import (
     TypeVar,
     Union,
 )
-from urllib.parse import urlparse
+from urllib.parse import (
+    ParseResult,
+    urlencode,
+    urlparse,
+)
 
+import orjson
 from pydantic import BaseModel
 
 from hedra.core_rewrite.engines.client.shared.models import (
@@ -23,14 +30,16 @@ from hedra.core_rewrite.engines.client.shared.models import (
     HTTPEncodableValue,
     URLMetadata,
 )
+from hedra.core_rewrite.engines.client.shared.protocols import NEW_LINE
 from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
+from .fast_hpack import Encoder
 from .models.http2 import (
-    HTTP2Request,
     HTTP2Response,
 )
 from .pipe import HTTP2Pipe
 from .protocols import HTTP2Connection
+from .settings import Settings
 
 A = TypeVar("A")
 R = TypeVar("R")
@@ -43,13 +52,12 @@ class MercurySyncHTTP2Connection:
         timeouts: Timeouts = Timeouts(),
         reset_connections: bool = False,
     ) -> None:
-        super(MercurySyncHTTP2Connection, self).__init__()
-
         self.session_id = str(uuid.uuid4())
         self.timeouts = timeouts
 
         self.closed = False
         self._concurrency = pool_size
+        self._reset_connections = reset_connections
 
         self._semaphore = asyncio.Semaphore(pool_size)
 
@@ -61,10 +69,10 @@ class MercurySyncHTTP2Connection:
         self._connections: List[HTTP2Connection] = [
             HTTP2Connection(
                 pool_size,
-                stream_id=idx * pool_size + 1,
-                reset_connection=reset_connections,
+                stream_id=randrange(1, 2**20 + 2, 2),
+                reset_connections=reset_connections,
             )
-            for idx in range(pool_size)
+            for _ in range(pool_size)
         ]
 
         self._pipes = [HTTP2Pipe(pool_size) for _ in range(pool_size)]
@@ -81,6 +89,9 @@ class MercurySyncHTTP2Connection:
         self.active = 0
         self.waiter = None
 
+        self._encoder = Encoder()
+        self._settings = Settings(client=False)
+
         self._client_ssl_context = self._create_http2_ssl_context()
 
     async def head(
@@ -88,7 +99,7 @@ class MercurySyncHTTP2Connection:
         url: str,
         auth: Optional[Tuple[str, str]] = None,
         cookies: Optional[List[HTTPCookie]] = None,
-        headers: Dict[str, str] = {},
+        headers: Optional[Dict[str, str]] = None,
         params: Optional[Dict[str, HTTPEncodableValue]] = None,
         timeout: Union[Optional[int], Optional[float]] = None,
         redirects: int = 3,
@@ -97,15 +108,13 @@ class MercurySyncHTTP2Connection:
             try:
                 return await asyncio.wait_for(
                     self._request(
-                        HTTP2Request(
-                            url=url,
-                            method="HEAD",
-                            cookies=cookies,
-                            auth=auth,
-                            headers=headers,
-                            params=params,
-                            redirects=redirects,
-                        ),
+                        url,
+                        "HEAD",
+                        auth=auth,
+                        cookies=cookies,
+                        headers=headers,
+                        params=params,
+                        redirects=redirects,
                     ),
                     timeout=timeout,
                 )
@@ -140,15 +149,13 @@ class MercurySyncHTTP2Connection:
             try:
                 return await asyncio.wait_for(
                     self._request(
-                        HTTP2Request(
-                            url=url,
-                            method="OPTIONS",
-                            cookies=cookies,
-                            auth=auth,
-                            headers=headers,
-                            params=params,
-                            redirects=redirects,
-                        ),
+                        url,
+                        "OPTIONS",
+                        auth=auth,
+                        cookies=cookies,
+                        headers=headers,
+                        params=params,
+                        redirects=redirects,
                     ),
                     timeout=timeout,
                 )
@@ -183,16 +190,13 @@ class MercurySyncHTTP2Connection:
             try:
                 return await asyncio.wait_for(
                     self._request(
-                        HTTP2Request(
-                            url=url,
-                            method="GET",
-                            cookies=cookies,
-                            data=None,
-                            auth=auth,
-                            headers=headers,
-                            params=params,
-                            redirects=redirects,
-                        )
+                        url,
+                        "GET",
+                        auth=auth,
+                        cookies=cookies,
+                        headers=headers,
+                        params=params,
+                        redirects=redirects,
                     ),
                     timeout=timeout,
                 )
@@ -228,16 +232,14 @@ class MercurySyncHTTP2Connection:
             try:
                 return await asyncio.wait_for(
                     self._request(
-                        HTTP2Request(
-                            url=url,
-                            method="POST",
-                            cookies=cookies,
-                            auth=auth,
-                            headers=headers,
-                            params=params,
-                            data=data,
-                            redirects=redirects,
-                        ),
+                        url,
+                        "POST",
+                        auth=auth,
+                        cookies=cookies,
+                        headers=headers,
+                        params=params,
+                        data=data,
+                        redirects=redirects,
                     ),
                     timeout=timeout,
                 )
@@ -273,16 +275,14 @@ class MercurySyncHTTP2Connection:
             try:
                 return await asyncio.wait_for(
                     self._request(
-                        HTTP2Request(
-                            url=url,
-                            method="PUT",
-                            cookies=cookies,
-                            auth=auth,
-                            headers=headers,
-                            params=params,
-                            data=data,
-                            redirects=redirects,
-                        ),
+                        url,
+                        "PUT",
+                        auth=auth,
+                        cookies=cookies,
+                        headers=headers,
+                        params=params,
+                        data=data,
+                        redirects=redirects,
                     ),
                     timeout=timeout,
                 )
@@ -318,16 +318,14 @@ class MercurySyncHTTP2Connection:
             try:
                 return await asyncio.wait_for(
                     self._request(
-                        HTTP2Request(
-                            url=url,
-                            method="PATCH",
-                            cookies=cookies,
-                            auth=auth,
-                            headers=headers,
-                            params=params,
-                            data=data,
-                            redirects=redirects,
-                        ),
+                        url,
+                        "PATCH",
+                        auth=auth,
+                        cookies=cookies,
+                        headers=headers,
+                        params=params,
+                        data=data,
+                        redirects=redirects,
                     ),
                     timeout=timeout,
                 )
@@ -362,15 +360,13 @@ class MercurySyncHTTP2Connection:
             try:
                 return await asyncio.wait_for(
                     self._request(
-                        HTTP2Request(
-                            url=url,
-                            method="DELETE",
-                            cookies=cookies,
-                            auth=auth,
-                            headers=headers,
-                            params=params,
-                            redirects=redirects,
-                        ),
+                        url,
+                        "DELETE",
+                        auth=auth,
+                        cookies=cookies,
+                        headers=headers,
+                        params=params,
+                        redirects=redirects,
                     ),
                     timeout=timeout,
                 )
@@ -391,7 +387,17 @@ class MercurySyncHTTP2Connection:
                     status_message="Request timed out.",
                 )
 
-    async def _request(self, request: HTTP2Request):
+    async def _request(
+        self,
+        url: str,
+        method: str,
+        cookies: Optional[List[HTTPCookie]] = None,
+        auth: Optional[Tuple[str, str]] = None,
+        params: Optional[Dict[str, HTTPEncodableValue]] = None,
+        headers: Optional[Dict[str, str]] = {},
+        data: Union[Optional[str], Optional[bytes], Optional[BaseModel]] = None,
+        redirects: Optional[int] = 3,
+    ):
         timings: Dict[
             Literal[
                 "request_start",
@@ -416,21 +422,36 @@ class MercurySyncHTTP2Connection:
         }
         timings["request_start"] = time.monotonic()
 
-        result, redirect, timings = await self._execute(request, timings=timings)
+        result, redirect, timings = await self._execute(
+            url,
+            method,
+            cookies=cookies,
+            auth=auth,
+            params=params,
+            headers=headers,
+            data=data,
+            timings=timings,
+        )
 
         if redirect:
             location = result.headers.get("location")
 
             upgrade_ssl = False
-            if "https" in location and "https" not in request.url:
+            if "https" in location and "https" not in url:
                 upgrade_ssl = True
 
-            for _ in range(request.redirects):
+            for _ in range(redirects):
                 result, redirect, timings = await self._execute(
-                    request,
+                    url,
+                    method,
+                    cookies=cookies,
+                    auth=auth,
+                    params=params,
+                    headers=headers,
+                    data=data,
+                    timings=timings,
                     upgrade_ssl=upgrade_ssl,
                     redirect_url=location,
-                    timings=timings,
                 )
 
                 if redirect is False:
@@ -439,7 +460,7 @@ class MercurySyncHTTP2Connection:
                 location = result.headers.get("location")
 
                 upgrade_ssl = False
-                if "https" in location and "https" not in request.url:
+                if "https" in location and "https" not in url:
                     upgrade_ssl = True
 
         timings["request_end"] = time.monotonic()
@@ -449,7 +470,17 @@ class MercurySyncHTTP2Connection:
 
     async def _execute(
         self,
-        request: HTTP2Request,
+        request_url: str,
+        method: str,
+        cookies: Optional[List[HTTPCookie]] = None,
+        auth: Optional[Tuple[str, str]] = None,
+        params: Optional[Dict[str, HTTPEncodableValue]] = None,
+        headers: Optional[Dict[str, str]] = {},
+        data: Union[
+            Optional[str],
+            Optional[bytes],
+            Optional[BaseModel],
+        ] = None,
         upgrade_ssl: bool = False,
         redirect_url: Optional[str] = None,
         timings: Dict[
@@ -469,8 +500,7 @@ class MercurySyncHTTP2Connection:
         if redirect_url:
             request_url = redirect_url
 
-        else:
-            request_url = request.url
+        connection: HTTP2Connection = None
 
         try:
             if timings["connect_start"] is None:
@@ -495,16 +525,14 @@ class MercurySyncHTTP2Connection:
 
                 request_url = ssl_redirect_url
 
-            headers = request.encode_headers(url)
-
             if error:
                 timings["connect_end"] = time.monotonic()
 
                 self._connections.append(
                     HTTP2Connection(
                         self._concurrency,
-                        stream_id=connection.stream.stream_id,
-                        reset_connection=connection.reset_connection,
+                        stream_id=randrange(1, 2**20 + 2, 2),
+                        reset_connections=self._reset_connections,
                     )
                 )
 
@@ -516,13 +544,15 @@ class MercurySyncHTTP2Connection:
                             host=url.hostname,
                             path=url.path,
                         ),
-                        method=request.method,
+                        method=method,
                         status=400,
                         status_message=str(error),
                         headers={
                             key.encode(): value.encode()
-                            for key, value in request.headers.items()
-                        },
+                            for key, value in headers.items()
+                        }
+                        if headers
+                        else {},
                     ),
                     False,
                     timings,
@@ -534,13 +564,28 @@ class MercurySyncHTTP2Connection:
                 timings["write_start"] = time.monotonic()
 
             connection = pipe.send_preamble(connection)
-            data = request.encode_data()
 
-            connection = pipe.send_request_headers(headers, data, connection)
+            encoded_headers = self._encode_headers(
+                url,
+                method,
+                params=params,
+                headers=headers,
+            )
+
+            connection = pipe.send_request_headers(
+                encoded_headers,
+                data,
+                connection,
+            )
 
             if data:
+                encoded_data = self._encode_data(data)
+
                 connection = await asyncio.wait_for(
-                    pipe.submit_request_body(data, connection),
+                    pipe.submit_request_body(
+                        encoded_data,
+                        connection,
+                    ),
                     timeout=self.timeouts.write_timeout,
                 )
 
@@ -556,7 +601,13 @@ class MercurySyncHTTP2Connection:
             if status >= 300 and status < 400:
                 timings["read_end"] = time.monotonic()
 
-                self._connections.append(connection)
+                self._connections.append(
+                    HTTP2Connection(
+                        self._concurrency,
+                        stream_id=randrange(1, 2**20 + 2, 2),
+                        reset_connections=self._reset_connections,
+                    )
+                )
                 self._pipes.append(HTTP2Pipe(self._max_concurrency))
 
                 return (
@@ -565,7 +616,7 @@ class MercurySyncHTTP2Connection:
                             host=url.hostname,
                             path=url.path,
                         ),
-                        method=request.method,
+                        method=method,
                         status=status,
                         headers=headers,
                     ),
@@ -594,7 +645,7 @@ class MercurySyncHTTP2Connection:
                         path=url.path,
                     ),
                     cookies=cookies,
-                    method=request.method,
+                    method=method,
                     status=status,
                     headers=headers,
                     content=body,
@@ -607,15 +658,15 @@ class MercurySyncHTTP2Connection:
             self._connections.append(
                 HTTP2Connection(
                     self._concurrency,
-                    connection.stream.stream_id,
-                    reset_connection=connection.reset_connection,
+                    stream_id=randrange(1, 2**20 + 2, 2),
+                    reset_connections=self._reset_connections,
                 )
             )
 
             self._pipes.append(HTTP2Pipe(self._max_concurrency))
 
             if isinstance(request_url, str):
-                request_url = urlparse(request_url)
+                request_url: ParseResult = urlparse(request_url)
 
             timings["read_end"] = time.monotonic()
 
@@ -627,13 +678,89 @@ class MercurySyncHTTP2Connection:
                         params=request_url.params,
                         query=request_url.query,
                     ),
-                    method=request.method,
+                    method=method,
                     status=400,
                     status_message=str(request_exception),
                 ),
                 False,
                 timings,
             )
+
+    def _encode_data(
+        self,
+        data: Union[
+            Optional[str],
+            Optional[bytes],
+            Optional[BaseModel],
+        ] = None,
+    ):
+        encoded_data: Optional[bytes] = None
+        size = 0
+
+        if isinstance(data, Iterator):
+            chunks = []
+            for chunk in data:
+                chunk_size = hex(len(chunk)).replace("0x", "") + NEW_LINE
+                encoded_chunk = chunk_size.encode() + chunk + NEW_LINE.encode()
+                size += len(encoded_chunk)
+                chunks.append(encoded_chunk)
+
+            encoded_data = chunks
+
+        else:
+            if isinstance(data, dict):
+                encoded_data = orjson.dumps(data)
+
+            elif isinstance(data, BaseModel):
+                return data.model_dump_json().encode()
+
+            elif isinstance(data, tuple):
+                encoded_data = urlencode(data).encode()
+
+            elif isinstance(data, str):
+                encoded_data = data.encode()
+
+        return encoded_data
+
+    def _encode_headers(
+        self,
+        url: URL,
+        method: str,
+        params: Optional[Dict[str, HTTPEncodableValue]] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ):
+        url_path = url.path
+        if params:
+            url_params = urlencode(params)
+            url_path += f"?{url_params}"
+
+        encoded_headers: List[Tuple[bytes, bytes]] = [
+            (b":method", method.encode()),
+            (b":authority", url.hostname.encode()),
+            (b":scheme", url.scheme.encode()),
+            (b":path", url_path.encode()),
+        ]
+
+        if headers:
+            encoded_headers.extend(
+                [
+                    (k.lower().encode(), v.encode())
+                    for k, v in headers.items()
+                    if k.lower()
+                    not in (
+                        "host",
+                        "transfer-encoding",
+                    )
+                ]
+            )
+
+        encoded_headers: bytes = self._encoder.encode(encoded_headers)
+        encoded_headers: List[bytes] = [
+            encoded_headers[i : i + self._settings.max_frame_size]
+            for i in range(0, len(encoded_headers), self._settings.max_frame_size)
+        ]
+
+        return encoded_headers[0]
 
     def _create_http2_ssl_context(self):
         """
@@ -758,4 +885,10 @@ class MercurySyncHTTP2Connection:
 
                 raise connection_error
 
-        return (connection_error, connection, pipe, parsed_url, False)
+        return (
+            connection_error,
+            connection,
+            pipe,
+            parsed_url,
+            False,
+        )

@@ -64,9 +64,9 @@ class Graph:
             for hook in workflow.hooks.values():
                 self._call_resolver.add_args(hook.static_args)
 
-                hooks_by_call_id.update({call_id: hook for call_id in hook.call_ids})
+                hooks_by_call_id.update({hook.call_id: hook})
 
-                call_ids.extend(hook.call_ids)
+                call_ids.append(hook.call_id)
 
         await self._call_resolver.resolve_arg_types()
 
@@ -139,7 +139,8 @@ class Graph:
 
                 results.extend(
                     await asyncio.gather(
-                        *[hook() for hook in hook_set], return_exceptions=True
+                        *[hook.call() for hook in hook_set],
+                        return_exceptions=True,
                     )
                 )
 

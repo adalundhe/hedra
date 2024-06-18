@@ -11,13 +11,15 @@ from .tcp import TCPConnection
 
 
 class HTTP2Connection:
-
     def __init__(
-        self,  
+        self,
         concurrency: int,
-        stream_id: int=1,
-        reset_connection: bool=False
+        stream_id: int = 1,
+        reset_connections: bool = False,
     ) -> None:
+        if stream_id % 2 == 0:
+            stream_id += 1
+
         self.dns_address: str = None
         self.port: int = None
         self.ssl: SSLContext = None
@@ -25,29 +27,30 @@ class HTTP2Connection:
         self.lock = asyncio.Lock()
 
         self.stream = Stream(
-            concurrency, 
-            stream_id=stream_id, 
-            reset_connection=reset_connection,
+            concurrency,
+            stream_id=stream_id,
+            reset_connections=reset_connections,
         )
 
         self.connected = False
-        self.reset_connection = reset_connection
+        self.reset_connections = reset_connections
         self.pending = 0
         self._connection_factory = TCPConnection()
 
     async def make_connection(
-        self, 
-        hostname: str, 
+        self,
+        hostname: str,
         dns_address: str,
-        port: int, 
+        port: int,
         socket_config: Tuple[int, int, int, int, Tuple[int, int]],
-        ssl: Optional[SSLContext]=None,
-        timeout: Optional[float]=None,
-        ssl_upgrade: bool =False
+        ssl: Optional[SSLContext] = None,
+        timeout: Optional[float] = None,
+        ssl_upgrade: bool = False,
     ):
-        if self.connected is False or self.dns_address != dns_address  or ssl_upgrade:
-            
-            reader, writer = await self._connection_factory.create_http2(hostname, socket_config, ssl=ssl)
+        if self.connected is False or self.dns_address != dns_address or ssl_upgrade:
+            reader, writer = await self._connection_factory.create_http2(
+                hostname, socket_config, ssl=ssl
+            )
 
             self.stream.reader = reader
             self.stream.writer = writer
@@ -69,9 +72,9 @@ class HTTP2Connection:
     def readexactly(self, n_bytes: int):
         return self.stream.reader.readexactly(n=n_bytes)
 
-    def readuntil(self, sep=b'\n'):
+    def readuntil(self, sep=b"\n"):
         return self.stream.reader.readuntil(separator=sep)
-    
+
     def readline(self):
         return self.stream.reader.readline()
 

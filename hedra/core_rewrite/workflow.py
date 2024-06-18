@@ -1,7 +1,7 @@
 import inspect
 import os
 import uuid
-from typing import Any, Awaitable, Callable, Dict, List
+from typing import Any, Dict, List
 
 import networkx
 
@@ -53,7 +53,7 @@ class Workflow:
 
         self.workflow_graph = networkx.DiGraph()
 
-        self.traversal_order: List[List[Callable[..., Awaitable[Any]]]] = []
+        self.traversal_order: List[List[Hook]] = []
 
         self.is_test = len([hook for hook in self.hooks.values() if hook.is_test]) > 0
 
@@ -74,5 +74,5 @@ class Workflow:
 
         for traversal_layer in networkx.bfs_layers(self.workflow_graph, sources):
             self.traversal_order.append(
-                [self.hooks.get(hook_name).call for hook_name in traversal_layer]
+                [self.hooks.get(hook_name) for hook_name in traversal_layer]
             )
