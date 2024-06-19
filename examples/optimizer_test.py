@@ -6,6 +6,7 @@ from typing import Generic, Literal, TypeVar
 
 from hedra.core.engines.types.http2 import HTTP2Result
 from hedra.core_rewrite import Graph, Workflow, step
+from hedra.core_rewrite.engines.client.shared.models import URL
 
 
 class Result:
@@ -62,9 +63,13 @@ class Test(Workflow):
         return await self.client.udp.send(f"127.0.0.1:{self.udp_port}", "Test this!")
 
     @step("two", "three")
-    async def six(self) -> HTTP2Result:
+    async def six(
+        self,
+        url: URL = "https://httpbin.org/get",
+        headers: dict[str, str] = {"test": "this"},
+    ) -> HTTP2Result:
         return await self.client.graphql.query(
-            "https://httpbin.org/get",
+            url,
             """
             query getContinents {
                 continents {
@@ -73,6 +78,7 @@ class Test(Workflow):
                 }
                 }
             """,
+            headers=headers,
         )
 
 

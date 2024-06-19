@@ -11,6 +11,7 @@ from typing import (
     List,
     Literal,
     Tuple,
+    Type,
     Union,
     get_args,
     get_origin,
@@ -24,7 +25,15 @@ from .placeholder_call import PlaceholderCall
 
 
 class Parser:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        step_args: Dict[
+            int,
+            Dict[
+                Union[Literal["annotation"], Literal["default"]], Union[Type[Any], Any]
+            ],
+        ],
+    ) -> None:
         self._id_generator = SnowflakeGenerator(
             (uuid.uuid1().int + threading.get_native_id()) >> 64
         )
@@ -34,6 +43,7 @@ class Parser:
         self._constants = []
         self._calls: Dict[int, Callable[..., Any]] = {}
         self._active_trace: bool = False
+        self.step_args = step_args
 
         node_types = {
             ast.Constant: self.parse_constant,
@@ -82,8 +92,20 @@ class Parser:
     def parse_name(self, node: ast.Name) -> Any:
         attribute_value = self.attributes.get(node.id)
 
+        arg_default = self.step_args.get(node.id)
+
         if attribute_value:
             return attribute_value
+
+        elif (
+            isinstance(
+                node.ctx,
+                ast.Load,
+            )
+            and arg_default
+            and arg_default["default"]
+        ):
+            return arg_default["default"]
 
         return DynamicPlaceholder(node.id)
 

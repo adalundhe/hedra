@@ -36,7 +36,10 @@ class GraphQLRequest(BaseModel):
     auth: Optional[Tuple[str, str]] = None
     cookies: Optional[List[HTTPCookie]] = None
     headers: Dict[str, str] = {}
-    data: Dict[Literal["query", "operation_name", "variables"], str] = {}
+    data: (
+        Dict[Literal["query"], str]
+        | Dict[Literal["query", "operation_name", "variables"], str]
+    )
     redirects: StrictInt = 3
 
     class Config:

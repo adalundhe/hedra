@@ -68,10 +68,10 @@ class Graph:
 
                 call_ids.append(hook.call_id)
 
-        await self._call_resolver.resolve_arg_types()
+        # await self._call_resolver.resolve_arg_types()
 
-        for call_id, optimized in self._call_resolver:
-            print(call_id, optimized)
+        # for call_id, optimized in self._call_resolver:
+        #     print(call_id, optimized)
 
     async def _run(self, workflow: Workflow):
         loop = asyncio.get_event_loop()

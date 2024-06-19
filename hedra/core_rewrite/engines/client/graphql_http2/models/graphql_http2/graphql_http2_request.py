@@ -29,6 +29,11 @@ except ImportError:
 
 
 class GraphQLHTTP2Request(HTTP2Request):
+    data: (
+        Dict[Literal["query"], str]
+        | Dict[Literal["query", "operation_name", "variables"], str]
+    )
+
     class Config:
         arbitrary_types_allowed = True
 

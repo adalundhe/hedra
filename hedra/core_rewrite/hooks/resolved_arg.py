@@ -8,7 +8,6 @@ from .resolved_data import ResolvedData
 from .resolved_headers import ResolvedHeaders
 from .resolved_method import ResolvedMethod
 from .resolved_params import ResolvedParams
-from .resolved_query import ResolvedQuery
 from .resolved_url import ResolvedURL
 
 T = TypeVar("T")
@@ -30,7 +29,6 @@ class ResolvedArg(Generic[T]):
         | ResolvedHeaders
         | ResolvedMethod
         | ResolvedParams
-        | ResolvedQuery
         | ResolvedURL
     ):
         return self.value

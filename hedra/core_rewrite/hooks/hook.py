@@ -58,8 +58,9 @@ class Hook:
             if arg.KEYWORD_ONLY
         }
 
-        self.static = len([param for param in self.params if param != "self"]) == 0
+        # self.static = len([param for param in self.params if param != "self"]) == 0
 
+        self.static = True
         self.return_type = call_signature.return_annotation
         self.is_test = False
 
@@ -74,7 +75,7 @@ class Hook:
         self.cache: Dict[
             str, Dict[int, Dict[str, Union[List[Dict[str, Any]], Dict[str, Any]]]]
         ] = defaultdict(dict)
-        self.parser = Parser()
+        self.parser = Parser(self.args)
         self._tree = ast.parse(textwrap.dedent(inspect.getsource(call)))
 
     def setup(self, context: Dict[str, Any]):
