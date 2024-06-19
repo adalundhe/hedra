@@ -1,6 +1,7 @@
 from typing import Optional
 from urllib.parse import urlparse
 
+from hedra.core_rewrite.engines.client.shared.models import URL as OptimizedUrl
 from hedra.core_rewrite.hooks.optimized.models.base import OptimizedArg
 
 from .url_validator import URLValidator
@@ -16,7 +17,7 @@ class URL(OptimizedArg):
         URLValidator(value=url)
         self.data = url
         self.parsed = urlparse(url)
-        self.optimized: Optional[OptimizedArg] = None
+        self.optimized: Optional[OptimizedUrl] = None
 
     def __str__(self) -> str:
         return self.data
