@@ -433,7 +433,6 @@ class MercurySyncHTTPConnection:
             headers=headers,
             params=params,
             data=data,
-            timeout=timeout,
             timings=timings,
         )
 
@@ -453,7 +452,6 @@ class MercurySyncHTTPConnection:
                     headers=headers,
                     params=params,
                     data=data,
-                    timeout=timeout,
                     upgrade_ssl=upgrade_ssl,
                     redirect_url=location,
                     timings=timings,
@@ -481,9 +479,7 @@ class MercurySyncHTTPConnection:
         cookies: Optional[List[HTTPCookie]] = None,
         headers: Dict[str, str] = {},
         params: Optional[Dict[str, HTTPEncodableValue]] = None,
-        timeout: Union[Optional[int], Optional[float]] = None,
         data: Union[Optional[str], Optional[BaseModel]] = None,
-        redirects: int = 3,
         upgrade_ssl: bool = False,
         redirect_url: Optional[str] = None,
         timings: Dict[
@@ -712,7 +708,9 @@ class MercurySyncHTTPConnection:
             )
 
     async def _connect_to_url_location(
-        self, request_url: str, ssl_redirect_url: Optional[str] = None
+        self,
+        request_url: str,
+        ssl_redirect_url: Optional[str] = None,
     ) -> Tuple[HTTPConnection, URL, bool]:
         if ssl_redirect_url:
             parsed_url = URL(ssl_redirect_url)

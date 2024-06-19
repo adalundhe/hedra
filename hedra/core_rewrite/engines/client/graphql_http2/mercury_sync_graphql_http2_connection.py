@@ -30,7 +30,6 @@ from hedra.core_rewrite.engines.client.shared.models import (
 from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
 from .models.graphql_http2 import (
-    GraphQLHTTP2Request,
     GraphQLHTTP2Response,
 )
 
@@ -79,17 +78,15 @@ class MercurySyncGraphQLHTTP2Connection(MercurySyncHTTP2Connection):
             try:
                 return await asyncio.wait_for(
                     self._request(
-                        GraphQLHTTP2Request(
-                            url=url,
-                            method="GET",
-                            cookies=cookies,
-                            auth=auth,
-                            headers=headers,
-                            data={
-                                "query": query,
-                            },
-                            redirects=redirects,
-                        ),
+                        url=url,
+                        method="GET",
+                        cookies=cookies,
+                        auth=auth,
+                        headers=headers,
+                        data={
+                            "query": query,
+                        },
+                        redirects=redirects,
                     ),
                     timeout=timeout,
                 )
@@ -127,19 +124,17 @@ class MercurySyncGraphQLHTTP2Connection(MercurySyncHTTP2Connection):
             try:
                 return await asyncio.wait_for(
                     self._request(
-                        GraphQLHTTP2Request(
-                            url=url,
-                            method="POST",
-                            cookies=cookies,
-                            auth=auth,
-                            headers=headers,
-                            data={
-                                "query": query,
-                                "operation_name": operation_name,
-                                "variables": variables,
-                            },
-                            redirects=redirects,
-                        ),
+                        url=url,
+                        method="POST",
+                        cookies=cookies,
+                        auth=auth,
+                        headers=headers,
+                        data={
+                            "query": query,
+                            "operation_name": operation_name,
+                            "variables": variables,
+                        },
+                        redirects=redirects,
                     ),
                     timeout=timeout,
                 )
@@ -513,6 +508,7 @@ class MercurySyncGraphQLHTTP2Connection(MercurySyncHTTP2Connection):
             (b":scheme", url.scheme.encode()),
             (b":path", url_path.encode()),
             (b"user-agent", b"hedra"),
+            (b"content-type", b""),
         ]
 
         if headers:
