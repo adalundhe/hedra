@@ -739,6 +739,7 @@ class MercurySyncHTTP2Connection:
             (b":authority", url.hostname.encode()),
             (b":scheme", url.scheme.encode()),
             (b":path", url_path.encode()),
+            (b"user-agent", b"hedra"),
         ]
 
         if headers:

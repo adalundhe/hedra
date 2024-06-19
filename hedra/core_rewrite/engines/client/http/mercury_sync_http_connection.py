@@ -4,9 +4,21 @@ import asyncio
 import ssl
 import time
 from collections import defaultdict
-from typing import Dict, List, Literal, Optional, Tuple, Union
-from urllib.parse import urlparse
+from typing import (
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Union,
+)
+from urllib.parse import (
+    ParseResult,
+    urlencode,
+    urlparse,
+)
 
+import orjson
 from pydantic import BaseModel
 
 from hedra.core_rewrite.engines.client.shared.models import (
@@ -16,6 +28,7 @@ from hedra.core_rewrite.engines.client.shared.models import (
     HTTPEncodableValue,
     URLMetadata,
 )
+from hedra.core_rewrite.engines.client.shared.protocols import NEW_LINE
 from hedra.core_rewrite.engines.client.shared.timeouts import Timeouts
 
 from .models.http import (
@@ -376,7 +389,18 @@ class MercurySyncHTTPConnection:
                     status_message="Request timed out.",
                 )
 
-    async def _request(self, request: HTTPRequest):
+    async def _request(
+        self,
+        url: str,
+        method: str,
+        auth: Optional[Tuple[str, str]] = None,
+        cookies: Optional[List[HTTPCookie]] = None,
+        headers: Dict[str, str] = {},
+        params: Optional[Dict[str, HTTPEncodableValue]] = None,
+        data: Union[Optional[str], Optional[BaseModel]] = None,
+        timeout: Union[Optional[int], Optional[float]] = None,
+        redirects: int = 3,
+    ):
         timings: Dict[
             Literal[
                 "request_start",
@@ -401,18 +425,35 @@ class MercurySyncHTTPConnection:
         }
         timings["request_start"] = time.monotonic()
 
-        result, redirect, timings = await self._execute(request, timings=timings)
+        result, redirect, timings = await self._execute(
+            url,
+            method,
+            auth=auth,
+            cookies=cookies,
+            headers=headers,
+            params=params,
+            data=data,
+            timeout=timeout,
+            timings=timings,
+        )
 
         if redirect:
             location = result.headers.get(b"location").decode()
 
             upgrade_ssl = False
-            if "https" in location and "https" not in request.url:
+            if "https" in location and "https" not in url:
                 upgrade_ssl = True
 
-            for _ in range(request.redirects):
+            for _ in range(redirects):
                 result, redirect, timings = await self._execute(
-                    request,
+                    url,
+                    method,
+                    auth=auth,
+                    cookies=cookies,
+                    headers=headers,
+                    params=params,
+                    data=data,
+                    timeout=timeout,
                     upgrade_ssl=upgrade_ssl,
                     redirect_url=location,
                     timings=timings,
@@ -424,7 +465,7 @@ class MercurySyncHTTPConnection:
                 location = result.headers.get(b"location").decode()
 
                 upgrade_ssl = False
-                if "https" in location and "https" not in request.url:
+                if "https" in location and "https" not in url:
                     upgrade_ssl = True
 
         timings["request_end"] = time.monotonic()
@@ -434,7 +475,15 @@ class MercurySyncHTTPConnection:
 
     async def _execute(
         self,
-        request: HTTPRequest,
+        request_url: str,
+        method: str,
+        auth: Optional[Tuple[str, str]] = None,
+        cookies: Optional[List[HTTPCookie]] = None,
+        headers: Dict[str, str] = {},
+        params: Optional[Dict[str, HTTPEncodableValue]] = None,
+        timeout: Union[Optional[int], Optional[float]] = None,
+        data: Union[Optional[str], Optional[BaseModel]] = None,
+        redirects: int = 3,
         upgrade_ssl: bool = False,
         redirect_url: Optional[str] = None,
         timings: Dict[
@@ -470,9 +519,6 @@ class MercurySyncHTTPConnection:
         if redirect_url:
             request_url = redirect_url
 
-        else:
-            request_url = request.url
-
         try:
             if timings["connect_start"] is None:
                 timings["connect_start"] = time.monotonic()
@@ -496,7 +542,21 @@ class MercurySyncHTTPConnection:
 
                 request_url = ssl_redirect_url
 
-            headers, data = request.prepare(url)
+            encoded_data: Optional[bytes] = None
+            content_type: Optional[str] = None
+
+            if data:
+                encoded_data, content_type = self.encode_data(data)
+
+            encoded_headers = self.encode_headers(
+                url,
+                method,
+                params=params,
+                headers=headers,
+                cookies=cookies,
+                data=encoded_data,
+                content_type=content_type,
+            )
 
             if connection.reader is None:
                 timings["connect_end"] = time.monotonic()
@@ -509,9 +569,10 @@ class MercurySyncHTTPConnection:
                 return (
                     HTTPResponse(
                         url=URLMetadata(host=url.hostname, path=url.path),
-                        method=request.method,
+                        method=method,
                         status=400,
                         headers=headers,
+                        timings=timings,
                     ),
                     False,
                     timings,
@@ -522,10 +583,10 @@ class MercurySyncHTTPConnection:
             if timings["write_start"] is None:
                 timings["write_start"] = time.monotonic()
 
-            connection.write(headers)
+            connection.write(encoded_headers)
 
             if data:
-                connection.write(data)
+                connection.write(encoded_data)
 
             timings["write_end"] = time.monotonic()
 
@@ -550,9 +611,10 @@ class MercurySyncHTTPConnection:
                 return (
                     HTTPResponse(
                         url=URLMetadata(host=url.hostname, path=url.path),
-                        method=request.method,
+                        method=method,
                         status=status,
                         headers=headers,
+                        timings=timings,
                     ),
                     True,
                     timings,
@@ -615,10 +677,11 @@ class MercurySyncHTTPConnection:
                 HTTPResponse(
                     url=URLMetadata(host=url.hostname, path=url.path),
                     cookies=cookies,
-                    method=request.method,
+                    method=method,
                     status=status,
                     headers=headers,
                     content=body,
+                    timings=timings,
                 ),
                 False,
                 timings,
@@ -626,20 +689,23 @@ class MercurySyncHTTPConnection:
 
         except Exception as request_exception:
             self._connections.append(
-                HTTPConnection(reset_connections=self.reset_connections)
+                HTTPConnection(
+                    reset_connections=self.reset_connections,
+                )
             )
 
             if isinstance(request_url, str):
-                request_url = urlparse(request_url)
+                request_url: ParseResult = urlparse(request_url)
 
             timings["read_end"] = time.monotonic()
 
             return (
                 HTTPResponse(
                     url=URLMetadata(host=request_url.hostname, path=request_url.path),
-                    method=request.method,
+                    method=method,
                     status=400,
                     status_message=str(request_exception),
+                    timings=timings,
                 ),
                 False,
                 timings,
@@ -726,3 +792,81 @@ class MercurySyncHTTPConnection:
                 raise connection_error
 
         return connection, parsed_url, False
+
+    def encode_data(
+        self,
+        data: str | bytes | BaseModel | bytes,
+    ):
+        content_type: Optional[str] = None
+        if isinstance(data, BaseModel):
+            data = orjson.dumps(data.model_dump())
+            content_type = "application/json"
+
+        elif isinstance(data, (dict, list)):
+            data = orjson.dumps(data)
+            content_type = "application/json"
+
+        elif isinstance(data, str):
+            data = data.encode()
+
+        elif isinstance(data, (memoryview, bytearray)):
+            data = bytes(data)
+
+        return data, content_type
+
+    def encode_headers(
+        self,
+        url: URL,
+        method: str,
+        params: Optional[Dict[str, HTTPEncodableValue]] = None,
+        headers: Optional[Dict[str, str]] = None,
+        cookies: Optional[List[HTTPCookie]] = None,
+        data: Optional[bytes] = None,
+        content_type: Optional[str] = None,
+    ):
+        url_path = url.path
+
+        if params and len(params) > 0:
+            url_params = urlencode(params)
+            url_path += f"?{url_params}"
+
+        get_base = f"{method} {url.path} HTTP/1.1{NEW_LINE}"
+
+        port = url.port or (443 if url.scheme == "https" else 80)
+
+        hostname = url.hostname.encode("idna").decode()
+
+        if port not in [80, 443]:
+            hostname = f"{hostname}:{port}"
+
+        header_items = {
+            "user-agent": "hedra",
+        }
+
+        if data:
+            header_items["content-length"] = len(data)
+
+        if content_type:
+            header_items["content-type"] = content_type
+
+        if headers:
+            header_items.update(headers)
+
+        for key, value in header_items.items():
+            get_base += f"{key}: {value}{NEW_LINE}"
+
+        if cookies:
+            cookies = []
+
+            for cookie_data in cookies:
+                if len(cookie_data) == 1:
+                    cookies.append(cookie_data[0])
+
+                elif len(cookie_data) == 2:
+                    cookie_name, cookie_value = cookie_data
+                    cookies.append(f"{cookie_name}={cookie_value}")
+
+            cookies = "; ".join(cookies)
+            get_base += f"cookie: {cookies}{NEW_LINE}"
+
+        return (get_base + NEW_LINE).encode(), data
