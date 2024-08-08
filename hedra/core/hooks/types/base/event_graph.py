@@ -1,6 +1,5 @@
 from __future__ import annotations
 import networkx
-import matplotlib.pyplot as plt
 from collections import defaultdict
 from typing import List, Union, Dict
 from hedra.core.hooks.types.base.event import BaseEvent

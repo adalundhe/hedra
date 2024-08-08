@@ -14,5 +14,7 @@ class SubmitAWSLambdaResultsStage(Submit):
         aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY', ''),
         region_name=os.getenv("AWS_REGION_NAME", ''),
         events_lambda='events',
-        metrics_lambda='metrics'
+        metrics_lambda='metrics',
+        experiments_lambda='experiments',
+        streams_lambda='streams'
     )

@@ -16,7 +16,7 @@ def graph():
 @click.argument('path')
 @click.option(
     '--cpus', 
-    default=psutil.cpu_count(logical=False), 
+    default=psutil.cpu_count(), 
     help='Number of CPUs to use. Default is the number of physical processesors available to the system.'
 )
 @click.option(

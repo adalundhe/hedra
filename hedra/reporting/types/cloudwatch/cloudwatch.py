@@ -4,7 +4,7 @@ import datetime
 import json
 import uuid
 import psutil
-from typing import List, Dict, Union
+from typing import List, Dict
 from hedra.logging import HedraLogger
 from hedra.reporting.experiment.experiments_collection import ExperimentMetricsCollectionSet
 from hedra.reporting.processed_result.types.base_processed_result import BaseProcessedResult

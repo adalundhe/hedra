@@ -10,7 +10,7 @@ class KafkaConfig(BaseModel):
     metrics_topic: str='metrics'
     experiments_topic: str='experiments'
     streams_topic: str='streams'
-    system_metrics_topic='system_metrics'
+    system_metrics_topic: str='system_metrics'
     events_partition: int=0
     metrics_partition: int=0
     experiments_partition: int=0
