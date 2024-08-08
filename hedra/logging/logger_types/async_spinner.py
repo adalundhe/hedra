@@ -15,12 +15,11 @@ from typing import (
     Coroutine
 )
 from asyncio import Task
-from yaspin.core import Yaspin
+from yaspin.core import Yaspin, to_unicode
 from yaspin.spinners import Spinners
 from aiologger.levels import LogLevel
 from aiologger.formatters.base import Formatter
 from hedra.logging.spinner import ProgressText
-from yaspin.core import to_unicode
 from .async_logger import AsyncLogger
 from .logger_types import LoggerTypes
 
