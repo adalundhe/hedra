@@ -7,6 +7,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "hedra"
 version = "0.7.22"
+requires-python = ">=3.10"
 description = "Performance testing at scale."
 readme = "README.md"
 authors = [{ name = "Ada Lundhe", email = "sean.corbett@umconnect.edu" }]
@@ -208,8 +209,6 @@ opentelemetry = [
 har = [
     'haralyzer'
 ]
-
-requires-python = [">=3.10"]
 
 [project.urls]
 Homepage = "https://github.com/adalundhe/hedra"
