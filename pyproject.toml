@@ -216,3 +216,6 @@ Homepage = "https://github.com/adalundhe/hedra"
 [project.scripts]
 hedra = "hedra.cli:run"
 hedra-server = "hedra.run_uwsgi:run_uwsgi"
+
+[tool.setuptools.packages]
+find = {}  # Scanning implicit namespaces is active by default
