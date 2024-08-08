@@ -131,10 +131,10 @@ all-reporters = [
 ]
 playwright = [
     'playwright'
-],
+]
 azure = [
     'azure-cosmos'
-],
+]
 honeycomb = [
     'libhoney'
 ]
@@ -215,5 +215,5 @@ requires-python = ">=3.10"
 Homepage = "https://github.com/adalundhe/hedra"
 
 [project.scripts]
-hedra=hedra.cli:run
-hedra-server=hedra.run_uwsgi:run_uwsgi
+hedra = "hedra.cli:run"
+hedra-server = "hedra.run_uwsgi:run_uwsgi"
