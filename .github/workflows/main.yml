@@ -24,10 +24,10 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
     - uses: actions/checkout@master
-    - name: Set up Python 3.23
+    - name: Set up Python 3.12
       uses: actions/setup-python@v3
       with:
-        python-version: '3.23'
+        python-version: '3.12'
     - name: Install pypa/setuptools
       run: >-
         python -m
