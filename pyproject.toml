@@ -1,0 +1,219 @@
+# pyproject.toml
+
+[build-system]
+requires      = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hedra"
+version = "0.7.22"
+description = "Performance testing at scale."
+readme = "README.md"
+authors = [{ name = "Ada Lundhe", email = "sean.corbett@umconnect.edu" }]
+license = { file = "LICENSE" }
+classifiers = [
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+]
+keywords = [
+        'pypi', 
+        'cicd', 
+        'python',
+        'performance',
+        'testing',
+        'dag',
+        'graph',
+        'workflow'
+]
+dependencies = [
+    'hyperframe',
+    'aiologger',
+    'yaspin',
+    'attr',
+    'networkx',
+    'aiodns',
+    'click',
+    'psutil',
+    'fastapi',
+    'dill',
+    'scipy',
+    'art',
+    'scikit-learn',
+    'uvloop',
+    'tdigest',
+    'pydantic',
+    'GitPython',
+    'tabulate',
+    'plotille',
+    'python3-dtls',
+    'zstandard',
+    'cryptography',
+    'python-dotenv'
+]
+
+[project.optional-dependencies]
+all = [
+    'grpcio',
+    'grpcio-tools',
+    'gql',
+    'playwright',
+    'azure-cosmos',
+    'libhoney',
+    'influxdb_client',
+    'newrelic',
+    'aio_statsd',
+    'prometheus-client',
+    'prometheus-api-client',
+    'cassandra-driver',
+    'datadog',
+    'motor',
+    'redis',
+    'aioredis',
+    'aiomysql',
+    'psycopg2-binary',
+    'sqlalchemy',
+    'sqlalchemy[asyncio]',
+    'boto3',
+    'snowflake-sqlalchemy',
+    'snowflake-connector-python',
+    'google-cloud-bigquery',
+    'google-cloud-bigtable',
+    'google-cloud-storage',
+    'cryptography==38.0.4',
+    'aioquic',
+    'dicttoxml',
+    'opentelemetry-api',
+    'datadog_api_client',
+    'aiokafka',
+    'haralyzer',
+    'asyncpg',
+    'xmltodict'
+]
+all-engines = [
+    'grpcio',
+    'grpcio-tools',
+    'gql',
+    'playwright',
+    'cryptography==38.0.4',
+    'aioquic',
+    'opentelemetry-api'
+]
+all-reporters = [
+    'azure-cosmos',
+    'libhoney',
+    'influxdb_client',
+    'newrelic',
+    'aio_statsd',
+    'prometheus-client',
+    'prometheus-api-client',
+    'cassandra-driver',
+    'datadog',
+    'motor',
+    'redis',
+    'aioredis',
+    'aiomysql',
+    'psycopg2-binary',
+    'asyncpg',
+    'sqlalchemy',
+    'boto3',
+    'snowflake-connector-python',
+    'google-cloud-bigquery',
+    'google-cloud-bigtable',
+    'google-cloud-storage',
+    'dicttoxml',
+    'datadog-api-client',
+    'aiosonic',
+    'aiokafka'
+]
+playwright = [
+    'playwright'
+],
+azure = [
+    'azure-cosmos'
+],
+honeycomb = [
+    'libhoney'
+]
+influxdb = [
+    'influxdb_client'
+]
+newrelic = [
+    'newrelic'
+]
+statsd = [
+    'aio_statsd'
+]
+prometheus = [
+    'prometheus-client',
+    'prometheus-api-client'
+]
+cassandra = [
+    'cassandra-driver'
+]
+datadog = [
+    'datadog-api-client',
+    'aiosonic'
+]
+mongodb = [
+    'motor'
+]
+redis = [
+    'redis',
+    'aioredis'
+]
+kafka = [
+    'aiokafka'
+]
+sql = [
+    'aiomysql',
+    'psycopg2-binary',
+    'asyncpg',
+    'sqlalchemy',
+    'sqlalchemy[asyncio]'
+]
+aws = [
+    'boto3'
+]
+grpc = [
+    'grpcio',
+    'grpcio-tools'
+]
+graphql = [
+    'gql'
+]
+http3 = [
+    'cryptography==38.0.4',
+    'aioquic'
+]
+snowflake = [
+    'snowflake-sqlalchemy',
+    'snowflake-connector-python'
+]
+google = [
+    'google-cloud-bigquery',
+    'google-cloud-bigtable',
+    'google-cloud-storage',
+]
+xml = [
+    'dicttoxml',
+    'xmltodict'
+]
+opentelemetry = [
+    'opentelemetry-api'
+]
+har = [
+    'haralyzer'
+]
+
+requires-python = ">=3.10"
+
+[project.urls]
+Homepage = "https://github.com/adalundhe/hedra"
+
+[project.scripts]
+hedra=hedra.cli:run
+hedra-server=hedra.run_uwsgi:run_uwsgi

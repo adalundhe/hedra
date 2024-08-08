@@ -21,7 +21,7 @@ setup(
     long_description_content_type="text/markdown",
     author="Sean Corbett",
     author_email="sean.corbett@umconnect.edu",
-    url="https://github.com/scorbettUM/hedra",
+    url="https://github.com/adalundhe/hedra",
     packages=find_packages(),
     keywords=[
         'pypi', 
