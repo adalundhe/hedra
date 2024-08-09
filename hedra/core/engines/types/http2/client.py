@@ -150,7 +150,7 @@ class MercuryHTTP2Client(BaseEngine[Union[A, HTTP2Action], Union[R, HTTP2Result]
                             break
 
                 if request.url.socket_config is None:
-                        raise Exception('Err. - No socket found.')
+                        raise Exception('Connection Failed')
                 
                 self._hosts[request.url.hostname] = request.url.ip_addr
                         

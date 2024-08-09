@@ -141,7 +141,12 @@ class HTTPAction(BaseAction):
 
         port = self.url.port or (443 if self.url.scheme == "https" else 80)
 
-        hostname = self.url.parsed.hostname.encode("idna").decode()
+        print(self.url.hostname)
+
+        if self.url.hostname is None:
+            raise Exception(f'Invalid url - {self.url.full}. Please provide a url of the format - http(s)://<HOST>/<PATH>')
+
+        hostname = self.url.hostname.encode("idna").decode()
 
         if port not in [80, 443]:
             hostname = f'{hostname}:{port}'

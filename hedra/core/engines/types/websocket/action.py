@@ -41,6 +41,9 @@ class WebsocketAction(HTTPAction):
 
     def _setup_headers(self):
 
+        if self.url.hostname is None:
+            raise Exception(f'Invalid url - {self.url.full}. Please provide a url of the format - ws(s)://<HOST>/<PATH>')
+
         for header_name, header_value in self._headers.items():
             header_name_lowered = header_name.lower()
             self._headers[header_name_lowered] = header_value

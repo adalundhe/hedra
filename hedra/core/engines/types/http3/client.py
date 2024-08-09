@@ -138,7 +138,7 @@ class MercuryHTTP3Client(BaseEngine[Union[A, HTTP3Action], Union[R, HTTP3Result]
                         break
 
                 if action.url.socket_config is None:
-                    raise Exception('Err. - No socket found.')
+                    raise Exception('Connection Failed')
 
                 self._hosts[action.url.hostname] = {
                     'ip_addr': action.url.ip_addr,

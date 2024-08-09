@@ -96,7 +96,7 @@ class MercuryUDPClient(BaseEngine[UDPAction, UDPResult]):
                             break
 
                     if action.url.socket_config is None:
-                        raise Exception('Err. - No socket found.')
+                        raise Exception('Connection Failed')
                     
                     self._hosts[action.url.hostname] = {
                         'ip_addr': action.url.ip_addr,

@@ -47,6 +47,9 @@ class HTTP3Action(HTTPAction):
     
     def _setup_headers(self) -> Union[bytes, Dict[str, str]]:
 
+        if self.url.hostname is None:
+            raise Exception(f'Invalid url - {self.url.full}. Please provide a url of the format - http(s)://<HOST>/<PATH>')
+
         self.encoded_headers = [
             (b":method", self.method.encode()),
             (b":scheme", self.url.scheme.encode()),
