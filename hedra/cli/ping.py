@@ -149,7 +149,16 @@ async def ping_target(uri: str, engine_type: RequestTypes, timeout: int, logger:
         )
     }
 
-    action = action_types.get(
+    action: (
+        GraphQLAction
+        | GraphQLHTTP2Action
+        | GRPCAction
+        | HTTPAction
+        | HTTP2Action
+        | HTTP3Action
+        | UDPAction
+        | WebsocketAction
+    ) = action_types.get(
         engine_type, 
         HTTPAction(
             action_name,
